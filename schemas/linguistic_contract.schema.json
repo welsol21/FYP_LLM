@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/linguistic_contract.schema.json",
+  "title": "ELA Linguistic Contract",
+  "type": "object",
+  "additionalProperties": {
+    "$ref": "#/$defs/sentenceNode"
+  },
+  "$defs": {
+    "wordNode": {
+      "type": "object",
+      "required": ["type", "content", "tense", "linguistic_notes", "part_of_speech", "linguistic_elements"],
+      "properties": {
+        "type": {"const": "Word"},
+        "content": {"type": "string"},
+        "tense": {"type": "string"},
+        "linguistic_notes": {"type": "array", "items": {"type": "string"}},
+        "part_of_speech": {"type": "string"},
+        "linguistic_elements": {"type": "array", "maxItems": 0}
+      },
+      "additionalProperties": true
+    },
+    "phraseNode": {
+      "type": "object",
+      "required": ["type", "content", "tense", "linguistic_notes", "part_of_speech", "linguistic_elements"],
+      "properties": {
+        "type": {"const": "Phrase"},
+        "content": {"type": "string"},
+        "tense": {"type": "string"},
+        "linguistic_notes": {"type": "array", "items": {"type": "string"}},
+        "part_of_speech": {"type": "string"},
+        "linguistic_elements": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/wordNode"}
+        }
+      },
+      "additionalProperties": true
+    },
+    "sentenceNode": {
+      "type": "object",
+      "required": ["type", "content", "tense", "linguistic_notes", "part_of_speech", "linguistic_elements"],
+      "properties": {
+        "type": {"const": "Sentence"},
+        "content": {"type": "string"},
+        "tense": {"type": "string"},
+        "linguistic_notes": {"type": "array", "items": {"type": "string"}},
+        "part_of_speech": {"type": "string"},
+        "linguistic_elements": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/phraseNode"}
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}
