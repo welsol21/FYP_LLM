@@ -1,31 +1,31 @@
-# ELA Pipeline: Полная документация
+# ELA Pipeline: Full Documentation
 
-## 1. Назначение
-`ELA Pipeline` строит и валидирует иерархический JSON с лингвистическими элементами для английского текста.
+## 1. Purpose
+`ELA Pipeline` builds and validates hierarchical linguistic JSON for English text.
 
-Пайплайн реализует последовательность:
+Pipeline flow:
 1. spaCy parsing
 2. deterministic skeleton builder
-3. TAM rules (tense/aspect/modality в поле `tense`)
+3. TAM rules (tense/aspect/modality reflected in `tense`)
 4. optional local T5 generation (`linguistic_notes`)
 5. strict validation (structure + frozen fields)
 
-Авторитетный контракт структуры: `docs/sample.json`.
+Authoritative structure contract: `docs/sample.json`.
 
-## 2. Контракт данных
+## 2. Data Contract
 
-### 2.1 Верхний уровень
-JSON-объект вида:
-- ключ: исходное предложение (`Sentence.content`)
-- значение: узел `Sentence`
+### 2.1 Top-level
+JSON object where:
+- key: original sentence (`Sentence.content`)
+- value: `Sentence` node
 
-### 2.2 Типы узлов
-Поддерживаются только:
+### 2.2 Node Types
+Supported node types only:
 - `Sentence`
 - `Phrase`
 - `Word`
 
-### 2.3 Обязательные поля каждого узла
+### 2.3 Required Fields on Every Node
 - `type`: `Sentence | Phrase | Word`
 - `content`: string
 - `tense`: string
@@ -33,101 +33,101 @@ JSON-объект вида:
 - `part_of_speech`: string
 - `linguistic_elements`: array
 
-### 2.4 Ограничения вложенности
-- `Sentence.linguistic_elements` содержит только `Phrase`
-- `Phrase.linguistic_elements` содержит только `Word`
-- `Word.linguistic_elements` всегда пустой массив
+### 2.4 Nesting Rules
+- `Sentence.linguistic_elements` can contain only `Phrase`
+- `Phrase.linguistic_elements` can contain only `Word`
+- `Word.linguistic_elements` must be an empty array
 
-### 2.5 Frozen-поля
-После построения skeleton запрещено менять:
+### 2.5 Frozen Fields
+After skeleton generation, the following cannot be changed:
 - `type`
 - `content`
 - `part_of_speech`
-- структуру дочерних узлов
+- child structure
 
-`linguistic_notes` и `tense` могут изменяться в процессе enrichment.
+`linguistic_notes` and `tense` may be updated during enrichment.
 
-## 3. Структура проекта
+## 3. Project Structure
 
-### 3.1 Основной пакет
-- `ela_pipeline/parse/spacy_parser.py` — загрузка spaCy pipeline
-- `ela_pipeline/skeleton/builder.py` — построение contract-compliant skeleton
-- `ela_pipeline/tam/rules.py` — rule-based TAM
-- `ela_pipeline/validation/validator.py` — структурная и frozen валидация
-- `ela_pipeline/validation/schema.py` — entrypoint структурной валидации
-- `ela_pipeline/validation/logical.py` — entrypoint frozen-валидации
-- `ela_pipeline/annotate/local_generator.py` — локальный T5 annotator
-- `ela_pipeline/annotate/llm_annotator.py` — CLI-аннотация json-файла
-- `ela_pipeline/inference/run.py` — production inference runner
-- `ela_pipeline/dataset/build_dataset.py` — сбор train/dev/test jsonl
-- `ela_pipeline/training/train_generator.py` — unified training entrypoint
-- `ela_pipeline/corpus/normalize.py` — нормализация входного корпуса
+### 3.1 Core Package
+- `ela_pipeline/parse/spacy_parser.py` - spaCy pipeline loading
+- `ela_pipeline/skeleton/builder.py` - contract-compliant skeleton construction
+- `ela_pipeline/tam/rules.py` - rule-based TAM
+- `ela_pipeline/validation/validator.py` - structural and frozen validation
+- `ela_pipeline/validation/schema.py` - structural validation entrypoint
+- `ela_pipeline/validation/logical.py` - frozen validation entrypoint
+- `ela_pipeline/annotate/local_generator.py` - local T5 annotator
+- `ela_pipeline/annotate/llm_annotator.py` - CLI annotator for existing JSON
+- `ela_pipeline/inference/run.py` - production inference runner
+- `ela_pipeline/dataset/build_dataset.py` - train/dev/test JSONL builder
+- `ela_pipeline/training/train_generator.py` - unified training entrypoint
+- `ela_pipeline/corpus/normalize.py` - corpus normalization
 
-### 3.2 Схемы и тесты
+### 3.2 Schemas and Tests
 - `schemas/linguistic_contract.schema.json`
 - `tests/test_validator.py`
 - `tests/test_tam.py`
 - `tests/test_pipeline.py`
 
-## 4. Этапы пайплайна
+## 4. Pipeline Stages
 
 ### 4.1 Skeleton Builder
-Вход: raw text.
-Выход: JSON по контракту (`Sentence -> Phrase -> Word`).
+Input: raw text.
+Output: contract JSON (`Sentence -> Phrase -> Word`).
 
-Особенности:
-- noun phrases из `sent.noun_chunks`
-- verb phrase вокруг root-глагола
-- prepositional phrases вокруг ADP
-- fallback на один clause-подобный phrase, если кандидатов нет
+Behavior:
+- noun phrases from `sent.noun_chunks`
+- verb phrase around sentence root verb
+- prepositional phrases around ADP tokens
+- fallback to one clause-like phrase if no candidates are found
 
 ### 4.2 TAM Rule Engine
-Модуль `ela_pipeline/tam/rules.py`:
-- определяет tense/aspect/voice/modality/polarity на последовательности токенов
-- в output записывает нормализованное значение в `tense`
+Module: `ela_pipeline/tam/rules.py`
+- detects tense/aspect/voice/modality/polarity over token sequences
+- writes normalized result to `tense`
 
-Практический результат:
+Practical outcomes:
 - `should have + VBN` -> `past perfect`
 - `will + verb` -> `future ...`
 
 ### 4.3 Local Notes Generation
-Если задан `--model-dir`, запускается `LocalT5Annotator`:
-- генерирует `linguistic_notes` для каждого узла
-- сохраняет структуру/контент без изменений
+If `--model-dir` is set, `LocalT5Annotator` runs:
+- generates `linguistic_notes` for each node
+- preserves structure and frozen fields
 
-Если `--model-dir` не задан:
-- пайплайн возвращает валидный JSON
-- `linguistic_notes` остаются пустыми массивами
+If `--model-dir` is not set:
+- pipeline still returns valid contract JSON
+- `linguistic_notes` remain empty arrays
 
 ### 4.4 Validation
-Проверяется:
-- структура и обязательные поля
-- допустимые типы узлов
-- согласованность ключа top-level и `Sentence.content`
-- frozen-правила после enrichment
+Checks include:
+- required structure and fields
+- allowed node types
+- consistency between top-level key and `Sentence.content`
+- frozen rules after enrichment
 
 ## 5. CLI
 
-### 5.1 Сбор skeleton из JSONL
+### 5.1 Build Skeleton from JSONL
 ```bash
 python -m ela_pipeline.build_skeleton --input input.jsonl --output skeleton.jsonl
 ```
 
-`input.jsonl` должен содержать поле `text` в каждой строке.
+`input.jsonl` must include a `text` field in each row.
 
-### 5.2 Применение TAM
+### 5.2 Apply TAM
 ```bash
 python -m ela_pipeline.run_tam --input skeleton.jsonl --output tam.jsonl
 ```
 
-### 5.3 Полный inference
+### 5.3 Full Inference
 ```bash
 python -m ela_pipeline.inference.run \
   --text "The young scientist in the white coat carefully examined the strange artifact on the table." \
   --model-dir results_llm_notes_v3_t5-small_phrase/best_model
 ```
 
-### 5.4 Аннотация существующего JSON
+### 5.4 Annotate Existing JSON
 ```bash
 python -m ela_pipeline.annotate.llm_annotator \
   --input docs/sample.json \
@@ -135,14 +135,14 @@ python -m ela_pipeline.annotate.llm_annotator \
   --model-dir results_llm_notes_v3_t5-small_phrase/best_model
 ```
 
-### 5.5 Сбор датасета
+### 5.5 Build Dataset
 ```bash
 python -m ela_pipeline.dataset.build_dataset \
   --input linguistic_hierarchical_3000_v3.json \
   --output-dir data/processed
 ```
 
-### 5.6 Обучение генератора
+### 5.6 Train Generator
 ```bash
 python -m ela_pipeline.training.train_generator \
   --train data/processed/train.jsonl \
@@ -150,39 +150,39 @@ python -m ela_pipeline.training.train_generator \
   --output-dir artifacts/models/t5_notes
 ```
 
-## 6. Формат входов/выходов
+## 6. Input/Output Formats
 
-### 6.1 Вход в inference
-- один аргумент `--text` (строка)
+### 6.1 Inference Input
+- single `--text` argument
 
-### 6.2 Выход inference
-- JSON-файл в `inference_results/`
-- имя `pipeline_result_<timestamp>.json`, если `--output` не указан
+### 6.2 Inference Output
+- JSON file in `inference_results/`
+- default name: `pipeline_result_<timestamp>.json` when `--output` is not provided
 
-### 6.3 Ошибки
-- несуществующий `model_dir` -> `FileNotFoundError` с понятным сообщением
-- structural mismatch -> `ValueError` с перечислением ошибок валидации
+### 6.3 Errors
+- missing `model_dir` -> `FileNotFoundError` with a clear message
+- structural mismatch -> `ValueError` with detailed validation errors
 
-## 7. Тестирование
+## 7. Testing
 
-Запуск:
+Run:
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-Покрытие проверяет:
-- валидность `docs/sample.json`
-- frozen-валидацию
-- базовые кейсы TAM
-- smoke-проход inference без генератора
+Coverage validates:
+- `docs/sample.json` contract validity
+- frozen validation behavior
+- baseline TAM cases
+- inference smoke pass without generator
 
-## 8. Практические замечания
+## 8. Practical Notes
 
-1. Рекомендуется запускать команды через активированное `.venv`.
-2. Для генерации notes используйте реально существующую директорию модели.
-3. `docs/sample.json` остается эталонным форматом для проверки совместимости.
+1. Run commands inside activated `.venv`.
+2. For notes generation, provide an existing local model directory.
+3. `docs/sample.json` remains the authoritative compatibility reference.
 
-## 9. Связанные документы
+## 9. Related Documents
 - `docs/TZ_ELA_Linguistic_Notes_Pipeline.docx`
 - `docs/implementation_proposal.md`
 - `docs/pipeline_cli.md`

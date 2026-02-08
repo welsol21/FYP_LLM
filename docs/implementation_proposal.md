@@ -1,64 +1,64 @@
-# Предложение по полной реализации задачи ELA Linguistic Notes Pipeline
+# Full Implementation Proposal for ELA Linguistic Notes Pipeline
 
-## 1. Фаза 1: Детерминированный core-пайплайн (spaCy + Skeleton + TAM + Validator)
+## 1. Phase 1: Deterministic Core Pipeline (spaCy + Skeleton + TAM + Validator)
 
-- Создать модули в `src/ela_pipeline/`:
+- Build modules in `src/ela_pipeline/`:
   - `corpus/normalize.py`
   - `parse/spacy_parser.py`
   - `skeleton/builder.py`
   - `tam/rules.py`
   - `validation/schema.py`
   - `validation/logical.py`
-- Описать строгую JSON Schema: `schemas/linguistic_contract.schema.json`.
-- Добавить CLI:
+- Define strict JSON Schema in `schemas/linguistic_contract.schema.json`.
+- Add CLI:
   - `python -m ela_pipeline.build_skeleton --input data/raw.jsonl --output data/skeleton.jsonl`
   - `python -m ela_pipeline.run_tam --input data/skeleton.jsonl --output data/tam.jsonl`
-- Критерии:
-  - одинаковый вход всегда дает одинаковую структуру и `content`;
-  - тесты TAM проходят на эталонном наборе.
+- Acceptance criteria:
+  - identical input always produces identical structure and `content`;
+  - TAM tests pass on the reference set.
 
-## 2. Фаза 2: Генерация датасета (LLM Annotator + строгая валидация)
+## 2. Phase 2: Dataset Generation (LLM Annotator + Strict Validation)
 
-- Добавить `src/ela_pipeline/annotate/llm_annotator.py` и шаблоны промптов.
-- Ввести обязательную проверку “structure/content frozen” перед сохранением.
-- Реализовать `dataset_builder.py`:
+- Add `src/ela_pipeline/annotate/llm_annotator.py` and prompt templates.
+- Enforce mandatory “structure/content frozen” validation before saving.
+- Implement `dataset_builder.py`:
   - `input = skeleton + TAM + metadata`
-  - `target = linguistic_notes` (рекомендуемый режим A).
-- Разделить ошибки по категориям:
+  - `target = linguistic_notes` (recommended mode A)
+- Categorize errors:
   - JSON parse error
   - schema error
   - content drift
   - logical contradiction
-- Выход:
+- Outputs:
   - `data/processed/train.jsonl`, `dev.jsonl`, `test.jsonl`
-  - `reports/annotation_quality.json`.
+  - `reports/annotation_quality.json`
 
-## 3. Фаза 3: Обучение локальной модели и оценка
+## 3. Phase 3: Local Model Training and Evaluation
 
-- Рефакторинг текущих скриптов (`t5_training_script.py`, `train_llm_1_linguistic_notes_base_cpu.py`, `train_llm_1_linguistic_notes_base_cuda.py`) в единый тренер:
+- Refactor current scripts (`t5_training_script.py`, `train_llm_1_linguistic_notes_base_cpu.py`, `train_llm_1_linguistic_notes_base_cuda.py`) into a single trainer:
   - `src/ela_pipeline/training/train_generator.py`
-  - конфиг `configs/train_t5_small.yaml`
-- Поддержать CPU/CUDA через флаги/конфиг.
-- Добавить оценку:
+  - config `configs/train_t5_small.yaml`
+- Support CPU/CUDA via flags/config.
+- Add evaluation:
   - ROUGE-L, BLEU
-  - доля структурно валидных outputs
-  - выгрузка примеров для human review.
-- Версионировать артефакты:
+  - rate of structurally valid outputs
+  - sample export for human review
+- Version artifacts:
   - `artifacts/models/<run_id>/`
-  - `artifacts/metrics/<run_id>.json`.
+  - `artifacts/metrics/<run_id>.json`
 
-## 4. Фаза 4: Production inference runner
+## 4. Phase 4: Production Inference Runner
 
-- Реализовать цепочку:
+- Implement chain:
   - `parse -> skeleton -> TAM -> generator -> validator -> final JSON`
-- Заменить текущий плоский формат инференса на иерархический JSON по контракту.
-- Добавить entrypoint:
+- Replace flat inference output with hierarchical contract-compliant JSON.
+- Add entrypoint:
   - `python -m ela_pipeline.infer --text "..." --model artifacts/models/...`
-- Ошибки:
-  - только честный fail со структурированной диагностикой;
-  - не возвращать “частично сломанный” JSON.
+- Error handling:
+  - honest fail with structured diagnostics only;
+  - do not return partially broken JSON.
 
-## Целевая структура репозитория
+## Target Repository Structure
 
 - `src/ela_pipeline/...`
 - `schemas/...`
@@ -68,25 +68,25 @@
 - `data/{raw,interim,processed}/...`
 - `artifacts/{models,metrics,reports}/...`
 
-## Приемочные критерии (по ТЗ)
+## Acceptance Criteria (from specification)
 
-- TAM accuracy >= 90% на 200 вручную проверенных предложениях.
+- TAM accuracy >= 90% on 200 manually reviewed sentences.
 - LLM annotation structural validation >= 99%.
 - Inference JSON validity >= 99%.
-- Human eval на 50+ предложений подтверждает полезность и согласованность нотаций.
+- Human evaluation on 50+ sentences confirms note quality and consistency.
 
-## Текущий gap относительно ТЗ
+## Current Gap vs Specification
 
-- Уже есть базовые скрипты обучения/инференса генератора.
-- Отсутствуют ключевые части deterministic pipeline:
+- Baseline generator training/inference scripts already exist.
+- Missing deterministic pipeline components:
   - Skeleton Builder
   - TAM Rule Engine
-  - строгий Validator
-  - оркестрация Dataset Builder
-  - production-safe end-to-end inference.
+  - strict Validator
+  - Dataset Builder orchestration
+  - production-safe end-to-end inference
 
-## Рекомендуемый порядок реализации
+## Recommended Implementation Order
 
-1. Сначала полностью реализовать Фазу 1 (фундамент и защита от data drift).
-2. Затем сделать минимальный vertical slice инференса (Фаза 4).
-3. После этого довести Фазы 2 и 3 для масштабируемой подготовки датасета и качества модели.
+1. Fully implement Phase 1 first (foundation and drift protection).
+2. Build a minimal inference vertical slice (Phase 4).
+3. Complete Phase 2 and Phase 3 for scalable data prep and model quality.

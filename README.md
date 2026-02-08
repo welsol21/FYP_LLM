@@ -1,57 +1,57 @@
 # FYP_LLM: ELA Linguistic Notes Pipeline
 
-Репозиторий содержит end-to-end пайплайн для построения лингвистического JSON по английскому тексту:
-- deterministic parsing/structure (spaCy + правила)
-- rule-based TAM
-- optional local T5 generation для `linguistic_notes`
-- строгая валидация по контракту
+This repository contains an end-to-end pipeline for generating contract-compliant linguistic JSON from English text:
+- deterministic parsing and structure building (spaCy + rules)
+- rule-based TAM enrichment
+- optional local T5 generation for `linguistic_notes`
+- strict contract validation
 
-Контракт-эталон: `docs/sample.json`.
+Authoritative contract reference: `docs/sample.json`.
 
-## Что реализовано
+## Implemented
 
 1. Core pipeline (`ela_pipeline`)
 - `build_skeleton`
 - `run_tam`
 - `inference.run`
-- validators (schema + frozen)
+- validators (schema + frozen checks)
 
 2. Data and training
 - dataset builder: `ela_pipeline.dataset.build_dataset`
 - unified trainer: `ela_pipeline.training.train_generator`
 
-3. Документация и тесты
-- полный гайд: `docs/ela_pipeline_full_documentation.md`
+3. Docs and tests
+- full guide: `docs/ela_pipeline_full_documentation.md`
 - CLI quick guide: `docs/pipeline_cli.md`
-- тесты: `tests/`
+- tests: `tests/`
 
-## Быстрый старт
+## Quick Start
 
-### 1) Установка зависимостей
+### 1) Install dependencies
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2) Проверка тестов
+### 2) Run tests
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-### 3) Inference без генератора
+### 3) Inference without generator
 ```bash
 python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision."
 ```
 
-### 4) Inference с локальной моделью
+### 4) Inference with local model
 ```bash
 python -m ela_pipeline.inference.run \
   --text "The young scientist in the white coat carefully examined the strange artifact on the table." \
   --model-dir results_llm_notes_v3_t5-small_phrase/best_model
 ```
 
-## Основные команды
+## Main Commands
 
 ### Build dataset splits
 ```bash
@@ -68,24 +68,24 @@ python -m ela_pipeline.training.train_generator \
   --output-dir artifacts/models/t5_notes
 ```
 
-### Build skeleton and TAM via JSONL
+### Build skeleton and apply TAM from JSONL
 ```bash
 python -m ela_pipeline.build_skeleton --input input.jsonl --output skeleton.jsonl
 python -m ela_pipeline.run_tam --input skeleton.jsonl --output tam.jsonl
 ```
 
-## Структура проекта
+## Project Layout
 
-- `ela_pipeline/` — код пайплайна
-- `schemas/` — JSON schema
-- `data/processed/` — train/dev/test jsonl
-- `inference_results/` — результаты инференса
-- `docs/` — документация
-- `tests/` — unit/smoke тесты
+- `ela_pipeline/` - pipeline source code
+- `schemas/` - JSON schema files
+- `data/processed/` - train/dev/test JSONL
+- `inference_results/` - inference outputs
+- `docs/` - documentation
+- `tests/` - unit/smoke tests
 
-## Документация
+## Documentation
 
-- Полная: `docs/ela_pipeline_full_documentation.md`
-- Краткая по командам: `docs/pipeline_cli.md`
-- План реализации: `docs/implementation_proposal.md`
-- ТЗ: `docs/TZ_ELA_Linguistic_Notes_Pipeline.docx`
+- Full guide: `docs/ela_pipeline_full_documentation.md`
+- CLI guide: `docs/pipeline_cli.md`
+- Implementation plan: `docs/implementation_proposal.md`
+- Technical specification: `docs/TZ_ELA_Linguistic_Notes_Pipeline.docx`
