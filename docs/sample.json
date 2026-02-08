@@ -1,0 +1,136 @@
+{
+  "She should have trusted her instincts before making the decision.": {
+    "type": "Sentence",
+    "content": "She should have trusted her instincts before making the decision.",
+    "tense": "past perfect",
+    "linguistic_notes": [
+      "This sentence uses a modal verb 'should' followed by a perfect infinitive 'have trusted' to express a past recommendation or regret."
+    ],
+    "part_of_speech": "sentence",
+    "linguistic_elements": [
+      {
+        "type": "Phrase",
+        "content": "She should have trusted her instincts",
+        "tense": "past perfect",
+        "linguistic_notes": [
+          "This phrase uses a modal verb 'should' with a perfect infinitive to express a past action that was advisable."
+        ],
+        "part_of_speech": "verb phrase",
+        "linguistic_elements": [
+          {
+            "type": "Word",
+            "content": "She",
+            "tense": "null",
+            "linguistic_notes": [
+              "A pronoun used to refer to a female person or animal previously mentioned or easily identified."
+            ],
+            "part_of_speech": "pronoun",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "should",
+            "tense": "null",
+            "linguistic_notes": [
+              "A modal verb used to indicate obligation, duty, or correctness, typically when criticizing someone's actions."
+            ],
+            "part_of_speech": "modal verb",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "have",
+            "tense": "null",
+            "linguistic_notes": [
+              "An auxiliary verb used with past participles to form perfect tenses."
+            ],
+            "part_of_speech": "auxiliary verb",
+            "translations": ["иметь"],
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "trusted",
+            "tense": "past participle",
+            "linguistic_notes": [
+              "The past participle form of the verb 'trust', used to express a completed action."
+            ],
+            "part_of_speech": "verb",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "her",
+            "tense": "null",
+            "linguistic_notes": [
+              "A pronoun used to refer to a female person or animal previously mentioned or easily identified."
+            ],
+            "part_of_speech": "pronoun",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "instincts",
+            "tense": "null",
+            "linguistic_notes": [
+              "A noun referring to an innate, typically fixed pattern of behavior in animals in response to certain stimuli."
+            ],
+            "part_of_speech": "noun",
+            "linguistic_elements": []
+          }
+        ]
+      },
+      {
+        "type": "Phrase",
+        "content": "before making the decision",
+        "tense": "null",
+        "linguistic_notes": [
+          "This phrase indicates the time frame in which the action should have been completed."
+        ],
+        "part_of_speech": "prepositional phrase",
+        "linguistic_elements": [
+          {
+            "type": "Word",
+            "content": "before",
+            "tense": "null",
+            "linguistic_notes": [
+              "A preposition used to indicate the time or event preceding another."
+            ],
+            "part_of_speech": "preposition",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "making",
+            "tense": "present participle",
+            "linguistic_notes": [
+              "The present participle form of the verb 'make', used to form continuous tenses."
+            ],
+            "part_of_speech": "verb",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "the",
+            "tense": "null",
+            "linguistic_notes": [
+              "A definite article used to specify a particular noun that is known to the reader or listener."
+            ],
+            "part_of_speech": "article",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "decision",
+            "tense": "null",
+            "linguistic_notes": [
+              "A noun referring to a conclusion or resolution reached after consideration."
+            ],
+            "part_of_speech": "noun",
+            "linguistic_elements": []
+          }
+        ]
+      }
+    ]
+  }
+}
