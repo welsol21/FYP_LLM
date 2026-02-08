@@ -1,0 +1,95 @@
+# -------------------------
+# Python
+# -------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.pickle
+*.tmp
+*.log
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# -------------------------
+# VS Code
+# -------------------------
+.vscode/
+.history/
+
+# -------------------------
+# HuggingFace / Transformers
+# -------------------------
+# Model checkpoints
+checkpoint-*/
+*/checkpoint-*/
+pytorch_model.bin
+pytorch_model.bin.*
+tf_model.h5
+rust_model.ot
+*.safetensors
+*.safetensors.index.json
+
+# Tokenizer artifacts
+tokenizer.json
+tokenizer.model
+special_tokens_map.json
+tokenizer_config.json
+vocab.json
+merges.txt
+
+# Training output directories
+results_*/
+*/trainer_output/
+*/best_model/
+*/hf_logs/
+
+# -------------------------
+# Datasets
+# -------------------------
+*.csv
+*.tsv
+*.jsonl
+*.parquet
+
+# Your large dataset file
+linguistic_hierarchical_3000_v3.json
+
+# -------------------------
+# Cache
+# -------------------------
+.cache/
+.cache/*
+*.cache
+huggingface/
+huggingface/*
+~$*
+
+# Transformers cache
+~/.cache/huggingface/
+~/.cache/torch/
+~/.cache/datasets/
+
+# -------------------------
+# OS files
+# -------------------------
+.DS_Store
+Thumbs.db
+
+# -------------------------
+# Build artifacts
+# -------------------------
+build/
+dist/
+*.egg-info/
+
+
+# Inference output
+inference_results/
