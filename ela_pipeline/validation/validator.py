@@ -52,6 +52,26 @@ def _validate_optional_grammatical_role(node: Dict[str, Any], path: str, errors:
     )
 
 
+def _validate_optional_dependency(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "dep_label" in node:
+        _expect(
+            isinstance(node.get("dep_label"), str),
+            errors,
+            f"{path}.dep_label",
+            "dep_label must be string",
+        )
+    if "head_id" in node:
+        head_id = node.get("head_id")
+        _expect(
+            head_id is None or isinstance(head_id, str),
+            errors,
+            f"{path}.head_id",
+            "head_id must be string or null",
+        )
+        if isinstance(head_id, str) and isinstance(node.get("node_id"), str):
+            _expect(head_id != node.get("node_id"), errors, f"{path}.head_id", "head_id must not equal node_id")
+
+
 def _validate_optional_ids(
     node: Dict[str, Any],
     path: str,
@@ -101,6 +121,7 @@ def _validate_node(
     _expect(isinstance(node.get("part_of_speech"), str), errors, f"{path}.part_of_speech", "part_of_speech must be string")
     _validate_optional_source_span(node, path, errors)
     _validate_optional_grammatical_role(node, path, errors)
+    _validate_optional_dependency(node, path, errors)
     _validate_optional_ids(node, path, errors, seen_ids, expected_parent_id)
 
     notes = node.get("linguistic_notes")
@@ -149,7 +170,17 @@ def validate_contract(doc: Dict[str, Any]) -> ValidationResult:
 
 
 def _freeze_compare(base: Dict[str, Any], candidate: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
-    for field in ("type", "content", "part_of_speech", "node_id", "parent_id", "source_span", "grammatical_role"):
+    for field in (
+        "type",
+        "content",
+        "part_of_speech",
+        "node_id",
+        "parent_id",
+        "source_span",
+        "grammatical_role",
+        "dep_label",
+        "head_id",
+    ):
         if base.get(field) != candidate.get(field):
             errors.append(ValidationErrorItem(path=f"{path}.{field}", message="Frozen field mismatch"))
 

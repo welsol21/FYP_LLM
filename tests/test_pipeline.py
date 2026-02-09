@@ -40,6 +40,10 @@ class PipelineTests(unittest.TestCase):
                 self.assertIn("source_span", word)
                 self.assertIn("grammatical_role", word)
                 self.assertIsInstance(word["grammatical_role"], str)
+                self.assertIn("dep_label", word)
+                self.assertIsInstance(word["dep_label"], str)
+                self.assertIn("head_id", word)
+                self.assertTrue(word["head_id"] is None or isinstance(word["head_id"], str))
                 self.assertGreaterEqual(word["source_span"]["end"], word["source_span"]["start"])
 
 

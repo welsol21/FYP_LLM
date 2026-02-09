@@ -71,6 +71,26 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
+    def test_rejects_invalid_optional_dependency_fields(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        phrase = sentence["linguistic_elements"][0]
+        word = phrase["linguistic_elements"][0]
+        word["node_id"] = "n100"
+        word["parent_id"] = "p1"
+        word["dep_label"] = {"bad": "value"}
+        word["head_id"] = "n100"
+
+        result = validate_contract(data)
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("dep_label" in err.path or "head_id" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

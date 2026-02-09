@@ -169,6 +169,7 @@ def _phrase_role(span, phrase_pos: str) -> str:
 
 def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
     words: List[Dict] = []
+    entries: List[Tuple[object, Dict]] = []
     for token in span:
         if token.is_space:
             continue
@@ -186,7 +187,16 @@ def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
             end=token.idx + len(token.text),
         )
         word_node["grammatical_role"] = _word_role(token)
+        word_node["dep_label"] = token.dep_
+        word_node["head_id"] = None
         words.append(word_node)
+        entries.append((token, word_node))
+
+    token_to_id = {token.i: node["node_id"] for token, node in entries}
+    for token, node in entries:
+        if token.head.i in token_to_id and token.head.i != token.i:
+            node["head_id"] = token_to_id[token.head.i]
+
     return words
 
 
