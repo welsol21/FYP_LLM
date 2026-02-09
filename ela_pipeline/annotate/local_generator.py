@@ -69,8 +69,9 @@ class LocalT5Annotator:
             out = self.model.generate(**enc, **generation_kwargs)
         return self.tokenizer.decode(out[0], skip_special_tokens=True).strip()
 
-    def _generate_note_with_retry(self, prompt: str) -> str:
+    def _generate_note_with_retry(self, prompt: str) -> tuple[str, List[str]]:
         candidates: List[str] = []
+        rejected: List[str] = []
         attempts = max(1, self.max_retries + 1)
 
         for attempt in range(attempts):
@@ -79,12 +80,14 @@ class LocalT5Annotator:
             note = sanitize_note(self._generate(prompt, do_sample=do_sample, temperature=temperature))
             candidates.append(note)
             if is_valid_note(note):
-                return note
+                return note, rejected
+            if note:
+                rejected.append(note)
 
         for note in candidates:
             if note:
-                return note
-        return ""
+                return note, rejected
+        return "", rejected
 
     def _is_note_suitable_for_node(self, node: Dict, note: str) -> bool:
         if not is_valid_note(note):
@@ -146,29 +149,50 @@ class LocalT5Annotator:
 
     def _annotate_node(self, sentence_text: str, node: Dict, seen_notes: Set[str]) -> None:
         prompt = self._build_prompt(sentence_text, node)
-        note = self._generate_note_with_retry(prompt)
+        note, rejected_candidates = self._generate_note_with_retry(prompt)
         norm_note = sanitize_note(note).lower()
         node_type = (node.get("type") or "").strip()
         should_dedupe = node_type != "Word"
+        note_is_valid = is_valid_note(note)
+        note_is_suitable = self._is_note_suitable_for_node(node, note)
         is_new_note = (norm_note not in seen_notes) if should_dedupe else True
 
-        if self._is_note_suitable_for_node(node, note) and is_new_note:
+        node["quality_flags"] = []
+        node["rejected_candidates"] = list(rejected_candidates)
+        node["reason_codes"] = []
+
+        if note_is_valid and note_is_suitable and is_new_note:
             node["linguistic_notes"] = [note]
             node["notes"] = [self._build_typed_note(node, note, source="model")]
+            node["quality_flags"] = ["note_generated", "model_used"]
+            node["reason_codes"] = ["MODEL_NOTE_ACCEPTED"]
             if should_dedupe:
                 seen_notes.add(norm_note)
         else:
+            if note and note not in node["rejected_candidates"]:
+                node["rejected_candidates"].append(note)
+            if not note_is_valid:
+                node["reason_codes"].append("MODEL_OUTPUT_LOW_QUALITY")
+            elif not note_is_suitable:
+                node["reason_codes"].append("MODEL_NOTE_UNSUITABLE")
+            elif not is_new_note:
+                node["reason_codes"].append("DUPLICATE_NOTE")
+
             fallback_note = build_fallback_note(node)
             fallback_norm = sanitize_note(fallback_note).lower()
             fallback_is_new = (fallback_norm not in seen_notes) if should_dedupe else True
             if self._is_note_suitable_for_node(node, fallback_note) and fallback_is_new:
                 node["linguistic_notes"] = [fallback_note]
                 node["notes"] = [self._build_typed_note(node, fallback_note, source="fallback")]
+                node["quality_flags"] = ["fallback_used"]
+                node["reason_codes"].append("FALLBACK_NOTE_ACCEPTED")
                 if should_dedupe:
                     seen_notes.add(fallback_norm)
             else:
                 node["linguistic_notes"] = []
                 node["notes"] = []
+                node["quality_flags"] = ["no_note"]
+                node["reason_codes"].append("NO_VALID_NOTE")
 
         for child in node.get("linguistic_elements", []):
             self._annotate_node(sentence_text, child, seen_notes)

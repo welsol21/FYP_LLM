@@ -17,6 +17,10 @@ def blank_node(node_type: str, content: str, part_of_speech: str, tense: str = "
         "finiteness": "null",
         "linguistic_notes": [],
         "notes": [],
+        "quality_flags": [],
+        "rejected_candidates": [],
+        "reason_codes": [],
+        "schema_version": "v2",
         "part_of_speech": part_of_speech,
         "linguistic_elements": [],
     }

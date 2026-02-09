@@ -29,12 +29,12 @@
   - [x] `notes: [{text, kind, confidence, source}]`
   - [x] where `kind` in `semantic|syntactic|morphological|discourse`
   - [x] where `source` in `model|rule|fallback`
-- Add validation trace fields:
-  - `quality_flags`
-  - `rejected_candidates`
-  - `reason_codes`
-- Add versioning:
-  - `schema_version`
+- [x] Add validation trace fields:
+  - [x] `quality_flags`
+  - [x] `rejected_candidates`
+  - [x] `reason_codes`
+- [x] Add versioning:
+  - [x] `schema_version`
 
 ## Migration Plan
 

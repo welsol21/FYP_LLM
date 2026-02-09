@@ -163,6 +163,62 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
+    def test_accepts_valid_optional_trace_fields(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["quality_flags"] = ["note_generated", "model_used"]
+        sentence["rejected_candidates"] = ["Bad template output"]
+        sentence["reason_codes"] = ["MODEL_NOTE_ACCEPTED"]
+
+        result = validate_contract(data)
+        self.assertTrue(result.ok, msg=str(result.errors))
+
+    def test_rejects_invalid_optional_trace_fields(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["quality_flags"] = "model_used"
+        sentence["rejected_candidates"] = [123]
+        sentence["reason_codes"] = [None]
+
+        result = validate_contract(data)
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any(".quality_flags" in err.path or ".rejected_candidates" in err.path or ".reason_codes" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
+    def test_accepts_valid_optional_schema_version(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["schema_version"] = "v2"
+
+        result = validate_contract(data)
+        self.assertTrue(result.ok, msg=str(result.errors))
+
+    def test_rejects_invalid_optional_schema_version(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["schema_version"] = ""
+
+        result = validate_contract(data)
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any(".schema_version" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

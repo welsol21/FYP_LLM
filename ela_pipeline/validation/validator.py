@@ -129,6 +129,42 @@ def _validate_optional_notes(node: Dict[str, Any], path: str, errors: List[Valid
         _expect(note.get("source") in NOTE_SOURCES, errors, f"{item_path}.source", "source must be one of model|rule|fallback")
 
 
+def _validate_optional_trace_fields(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    for field in ("quality_flags", "rejected_candidates", "reason_codes"):
+        if field not in node:
+            continue
+        value = node.get(field)
+        _expect(isinstance(value, list), errors, f"{path}.{field}", f"{field} must be list")
+        if not isinstance(value, list):
+            continue
+        for idx, item in enumerate(value):
+            _expect(
+                isinstance(item, str),
+                errors,
+                f"{path}.{field}[{idx}]",
+                f"{field} items must be string",
+            )
+
+
+def _validate_optional_schema_version(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "schema_version" not in node:
+        return
+    schema_version = node.get("schema_version")
+    _expect(
+        isinstance(schema_version, str),
+        errors,
+        f"{path}.schema_version",
+        "schema_version must be string",
+    )
+    if isinstance(schema_version, str):
+        _expect(
+            schema_version.strip() != "",
+            errors,
+            f"{path}.schema_version",
+            "schema_version must be non-empty",
+        )
+
+
 def _validate_optional_ids(
     node: Dict[str, Any],
     path: str,
@@ -182,6 +218,8 @@ def _validate_node(
     _validate_optional_verbal_fields(node, path, errors)
     _validate_optional_features(node, path, errors)
     _validate_optional_notes(node, path, errors)
+    _validate_optional_trace_fields(node, path, errors)
+    _validate_optional_schema_version(node, path, errors)
     _validate_optional_ids(node, path, errors, seen_ids, expected_parent_id)
 
     notes = node.get("linguistic_notes")
@@ -241,6 +279,7 @@ def _freeze_compare(base: Dict[str, Any], candidate: Dict[str, Any], path: str, 
         "dep_label",
         "head_id",
         "features",
+        "schema_version",
     ):
         if base.get(field) != candidate.get(field):
             errors.append(ValidationErrorItem(path=f"{path}.{field}", message="Frozen field mismatch"))
