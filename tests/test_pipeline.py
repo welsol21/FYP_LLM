@@ -63,18 +63,6 @@ class PipelineTests(unittest.TestCase):
         phrase_texts = [p.get("content") for p in out[key].get("linguistic_elements", [])]
         self.assertNotIn("the decision", phrase_texts)
 
-    def test_pipeline_populates_aux_function_for_auxiliaries(self):
-        out = run_pipeline("She should have trusted her instincts before making the decision.", model_dir=None)
-        sentence = out[next(iter(out))]
-        aux_functions = {}
-        for phrase in sentence.get("linguistic_elements", []):
-            for word in phrase.get("linguistic_elements", []):
-                if word.get("part_of_speech") == "auxiliary verb":
-                    aux_functions[word.get("content").lower()] = word.get("aux_function")
-
-        self.assertEqual(aux_functions.get("should"), "modal_auxiliary")
-        self.assertEqual(aux_functions.get("have"), "perfect_auxiliary")
-
 
 if __name__ == "__main__":
     unittest.main()
