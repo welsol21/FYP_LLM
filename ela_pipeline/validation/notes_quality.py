@@ -15,9 +15,23 @@ _BAD_PATTERNS = [
     re.compile(r"^[\W_]+$"),
 ]
 
+_GENERIC_TEMPLATE_PATTERNS = [
+    re.compile(r"\bsubordinate clause of concession\b", re.IGNORECASE),
+    re.compile(r"\bverb-?centred phrase expressing what happens\b", re.IGNORECASE),
+    re.compile(r"\bsimple expression with an initial\b", re.IGNORECASE),
+]
+
 
 def sanitize_note(note: str) -> str:
     return " ".join(note.strip().split())
+
+
+def is_generic_template(note: str) -> bool:
+    text = sanitize_note(note)
+    for pattern in _GENERIC_TEMPLATE_PATTERNS:
+        if pattern.search(text):
+            return True
+    return False
 
 
 def is_valid_note(note: str) -> bool:
@@ -34,5 +48,8 @@ def is_valid_note(note: str) -> bool:
     for pattern in _BAD_PATTERNS:
         if pattern.search(text):
             return False
+
+    if is_generic_template(text):
+        return False
 
     return True

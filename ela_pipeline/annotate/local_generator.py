@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, List
+from typing import Dict, List, Set
 
 import torch
 from transformers import T5ForConditionalGeneration, T5Tokenizer
@@ -86,13 +86,19 @@ class LocalT5Annotator:
 
     def annotate(self, contract_doc: Dict[str, Dict]) -> Dict[str, Dict]:
         for sentence_text, sentence_node in contract_doc.items():
-            self._annotate_node(sentence_text, sentence_node)
+            seen_notes: Set[str] = set()
+            self._annotate_node(sentence_text, sentence_node, seen_notes)
         return contract_doc
 
-    def _annotate_node(self, sentence_text: str, node: Dict) -> None:
+    def _annotate_node(self, sentence_text: str, node: Dict, seen_notes: Set[str]) -> None:
         prompt = self._build_prompt(sentence_text, node)
         note = self._generate_note_with_retry(prompt)
-        node["linguistic_notes"] = [note] if is_valid_note(note) else []
+        norm_note = sanitize_note(note).lower()
+        if is_valid_note(note) and norm_note not in seen_notes:
+            node["linguistic_notes"] = [note]
+            seen_notes.add(norm_note)
+        else:
+            node["linguistic_notes"] = []
 
         for child in node.get("linguistic_elements", []):
-            self._annotate_node(sentence_text, child)
+            self._annotate_node(sentence_text, child, seen_notes)

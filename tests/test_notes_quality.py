@@ -1,6 +1,6 @@
 import unittest
 
-from ela_pipeline.validation.notes_quality import is_valid_note, sanitize_note
+from ela_pipeline.validation.notes_quality import is_generic_template, is_valid_note, sanitize_note
 
 
 class NotesQualityTests(unittest.TestCase):
@@ -12,6 +12,11 @@ class NotesQualityTests(unittest.TestCase):
 
     def test_accepts_normal_note(self):
         self.assertTrue(is_valid_note("A noun phrase functioning as the subject of the clause."))
+
+    def test_rejects_generic_template(self):
+        text = "Subordinate clause of concession introduced by a subordinating conjunction."
+        self.assertTrue(is_generic_template(text))
+        self.assertFalse(is_valid_note(text))
 
     def test_sanitize_whitespace(self):
         self.assertEqual(sanitize_note("  A   short\nnote   "), "A short note")
