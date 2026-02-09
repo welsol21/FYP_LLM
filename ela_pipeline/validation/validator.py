@@ -41,6 +41,17 @@ def _validate_optional_source_span(node: Dict[str, Any], path: str, errors: List
         _expect(end >= start, errors, f"{path}.source_span.end", "end must be >= start")
 
 
+def _validate_optional_grammatical_role(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "grammatical_role" not in node:
+        return
+    _expect(
+        isinstance(node.get("grammatical_role"), str),
+        errors,
+        f"{path}.grammatical_role",
+        "grammatical_role must be string",
+    )
+
+
 def _validate_optional_ids(
     node: Dict[str, Any],
     path: str,
@@ -89,6 +100,7 @@ def _validate_node(
     _expect(isinstance(node.get("tense"), str), errors, f"{path}.tense", "tense must be string")
     _expect(isinstance(node.get("part_of_speech"), str), errors, f"{path}.part_of_speech", "part_of_speech must be string")
     _validate_optional_source_span(node, path, errors)
+    _validate_optional_grammatical_role(node, path, errors)
     _validate_optional_ids(node, path, errors, seen_ids, expected_parent_id)
 
     notes = node.get("linguistic_notes")
@@ -137,7 +149,7 @@ def validate_contract(doc: Dict[str, Any]) -> ValidationResult:
 
 
 def _freeze_compare(base: Dict[str, Any], candidate: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
-    for field in ("type", "content", "part_of_speech", "node_id", "parent_id", "source_span"):
+    for field in ("type", "content", "part_of_speech", "node_id", "parent_id", "source_span", "grammatical_role"):
         if base.get(field) != candidate.get(field):
             errors.append(ValidationErrorItem(path=f"{path}.{field}", message="Frozen field mismatch"))
 

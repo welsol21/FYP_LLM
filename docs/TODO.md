@@ -11,8 +11,8 @@
 - [x] Add source alignment:
   - [x] `source_span.start`
   - [x] `source_span.end`
-- Add explicit syntactic role metadata:
-  - `grammatical_role` (`subject`, `predicate`, `object`, `modifier`, `adjunct`, etc.)
+- [x] Add explicit syntactic role metadata:
+  - [x] `grammatical_role` (`subject`, `predicate`, `object`, `modifier`, `adjunct`, etc.)
 - Split verbal grammar into separate fields instead of one overloaded `tense`:
   - `tense`
   - `aspect`

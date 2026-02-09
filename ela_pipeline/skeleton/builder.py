@@ -27,6 +27,52 @@ WORD_POS_MAP = {
 }
 
 
+PHRASE_DEP_ROLE_MAP = {
+    "nsubj": "subject",
+    "nsubjpass": "subject",
+    "csubj": "subject",
+    "csubjpass": "subject",
+    "obj": "object",
+    "dobj": "object",
+    "iobj": "object",
+    "pobj": "object",
+    "attr": "complement",
+    "acomp": "complement",
+    "oprd": "complement",
+    "appos": "modifier",
+    "amod": "modifier",
+    "nmod": "modifier",
+    "advmod": "adjunct",
+    "advcl": "adjunct",
+    "obl": "adjunct",
+}
+
+WORD_DEP_ROLE_MAP = {
+    "ROOT": "predicate",
+    "nsubj": "subject",
+    "nsubjpass": "subject",
+    "csubj": "subject",
+    "csubjpass": "subject",
+    "obj": "object",
+    "dobj": "object",
+    "iobj": "object",
+    "pobj": "object",
+    "attr": "complement",
+    "acomp": "complement",
+    "oprd": "complement",
+    "amod": "modifier",
+    "nmod": "modifier",
+    "advmod": "adjunct",
+    "advcl": "adjunct",
+    "det": "determiner",
+    "aux": "auxiliary",
+    "auxpass": "auxiliary",
+    "prep": "linker",
+    "cc": "coordinator",
+    "conj": "conjunct",
+}
+
+
 def _word_tense(token) -> str:
     morph = token.morph
     verb_form = morph.get("VerbForm")
@@ -94,6 +140,33 @@ def _with_metadata(node: Dict, *, node_id: str, parent_id: str | None, start: in
     return node
 
 
+def _word_role(token) -> str:
+    return WORD_DEP_ROLE_MAP.get(token.dep_, "other")
+
+
+def _span_head_token(span):
+    span_token_ids = {t.i for t in span}
+    for token in span:
+        if token.i in span_token_ids and token.head.i not in span_token_ids:
+            return token
+    for token in span:
+        if token.dep_ == "ROOT":
+            return token
+    for token in span:
+        if not token.is_space:
+            return token
+    return None
+
+
+def _phrase_role(span, phrase_pos: str) -> str:
+    if phrase_pos == "verb phrase":
+        return "predicate"
+    head = _span_head_token(span)
+    if head is None:
+        return "other"
+    return PHRASE_DEP_ROLE_MAP.get(head.dep_, "modifier")
+
+
 def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
     words: List[Dict] = []
     for token in span:
@@ -112,6 +185,7 @@ def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
             start=token.idx,
             end=token.idx + len(token.text),
         )
+        word_node["grammatical_role"] = _word_role(token)
         words.append(word_node)
     return words
 
@@ -140,6 +214,7 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
             start=sent.start_char,
             end=sent.end_char,
         )
+        sentence_node["grammatical_role"] = "clause"
 
         for start, end, phrase_pos in _phrase_candidates(sent):
             span = doc[start:end]
@@ -156,6 +231,7 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
                 start=span.start_char,
                 end=span.end_char,
             )
+            phrase_node["grammatical_role"] = _phrase_role(span, phrase_pos)
             phrase_node["linguistic_elements"] = _build_word_nodes(
                 span,
                 parent_id=phrase_id,
@@ -179,6 +255,7 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
                 start=sent.start_char,
                 end=sent.end_char,
             )
+            phrase_node["grammatical_role"] = "predicate"
             phrase_node["linguistic_elements"] = _build_word_nodes(
                 sent,
                 parent_id=phrase_id,

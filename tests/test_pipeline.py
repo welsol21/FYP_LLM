@@ -25,15 +25,21 @@ class PipelineTests(unittest.TestCase):
         self.assertIn("parent_id", sentence)
         self.assertIsNone(sentence["parent_id"])
         self.assertIn("source_span", sentence)
+        self.assertIn("grammatical_role", sentence)
+        self.assertIsInstance(sentence["grammatical_role"], str)
         self.assertEqual(sentence["source_span"]["start"], 0)
         self.assertEqual(sentence["source_span"]["end"], len(text))
 
         for phrase in sentence.get("linguistic_elements", []):
             self.assertEqual(phrase.get("parent_id"), sentence.get("node_id"))
             self.assertIn("source_span", phrase)
+            self.assertIn("grammatical_role", phrase)
+            self.assertIsInstance(phrase["grammatical_role"], str)
             for word in phrase.get("linguistic_elements", []):
                 self.assertEqual(word.get("parent_id"), phrase.get("node_id"))
                 self.assertIn("source_span", word)
+                self.assertIn("grammatical_role", word)
+                self.assertIsInstance(word["grammatical_role"], str)
                 self.assertGreaterEqual(word["source_span"]["end"], word["source_span"]["start"])
 
 
