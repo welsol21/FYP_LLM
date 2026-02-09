@@ -7,6 +7,9 @@ from typing import Any, Dict, List, Set
 
 from ela_pipeline.constants import NODE_TYPES, REQUIRED_NODE_FIELDS
 
+NOTE_KINDS = {"semantic", "syntactic", "morphological", "discourse"}
+NOTE_SOURCES = {"model", "rule", "fallback"}
+
 
 @dataclass
 class ValidationErrorItem:
@@ -95,6 +98,37 @@ def _validate_optional_features(node: Dict[str, Any], path: str, errors: List[Va
         _expect(isinstance(value, str), errors, f"{path}.features.{key}", "feature values must be string")
 
 
+def _validate_optional_notes(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "notes" not in node:
+        return
+    notes = node.get("notes")
+    _expect(isinstance(notes, list), errors, f"{path}.notes", "notes must be list")
+    if not isinstance(notes, list):
+        return
+    for idx, note in enumerate(notes):
+        item_path = f"{path}.notes[{idx}]"
+        _expect(isinstance(note, dict), errors, item_path, "note item must be object")
+        if not isinstance(note, dict):
+            continue
+        _expect(isinstance(note.get("text"), str), errors, f"{item_path}.text", "text must be string")
+        _expect(note.get("kind") in NOTE_KINDS, errors, f"{item_path}.kind", "kind must be one of semantic|syntactic|morphological|discourse")
+        confidence = note.get("confidence")
+        _expect(
+            isinstance(confidence, (float, int)),
+            errors,
+            f"{item_path}.confidence",
+            "confidence must be number",
+        )
+        if isinstance(confidence, (float, int)):
+            _expect(
+                0.0 <= float(confidence) <= 1.0,
+                errors,
+                f"{item_path}.confidence",
+                "confidence must be in range [0, 1]",
+            )
+        _expect(note.get("source") in NOTE_SOURCES, errors, f"{item_path}.source", "source must be one of model|rule|fallback")
+
+
 def _validate_optional_ids(
     node: Dict[str, Any],
     path: str,
@@ -147,6 +181,7 @@ def _validate_node(
     _validate_optional_dependency(node, path, errors)
     _validate_optional_verbal_fields(node, path, errors)
     _validate_optional_features(node, path, errors)
+    _validate_optional_notes(node, path, errors)
     _validate_optional_ids(node, path, errors, seen_ids, expected_parent_id)
 
     notes = node.get("linguistic_notes")

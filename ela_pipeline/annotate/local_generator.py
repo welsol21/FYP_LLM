@@ -120,6 +120,24 @@ class LocalT5Annotator:
 
         return True
 
+    def _infer_note_kind(self, node: Dict, note: str) -> str:
+        note_l = sanitize_note(note).lower()
+        if any(marker in note_l for marker in ("tense", "aspect", "voice", "mood", "verb form", "plural", "singular")):
+            return "morphological"
+        if any(marker in note_l for marker in ("subject", "predicate", "object", "clause", "phrase", "sentence", "agreement")):
+            return "syntactic"
+        if any(marker in note_l for marker in ("topic", "context", "cohesion", "register", "emphasis")):
+            return "discourse"
+        return "semantic"
+
+    def _build_typed_note(self, node: Dict, note: str, source: str) -> Dict[str, object]:
+        return {
+            "text": note,
+            "kind": self._infer_note_kind(node, note),
+            "confidence": 0.85 if source == "model" else 0.65,
+            "source": source,
+        }
+
     def annotate(self, contract_doc: Dict[str, Dict]) -> Dict[str, Dict]:
         for sentence_text, sentence_node in contract_doc.items():
             seen_notes: Set[str] = set()
@@ -136,6 +154,7 @@ class LocalT5Annotator:
 
         if self._is_note_suitable_for_node(node, note) and is_new_note:
             node["linguistic_notes"] = [note]
+            node["notes"] = [self._build_typed_note(node, note, source="model")]
             if should_dedupe:
                 seen_notes.add(norm_note)
         else:
@@ -144,10 +163,12 @@ class LocalT5Annotator:
             fallback_is_new = (fallback_norm not in seen_notes) if should_dedupe else True
             if self._is_note_suitable_for_node(node, fallback_note) and fallback_is_new:
                 node["linguistic_notes"] = [fallback_note]
+                node["notes"] = [self._build_typed_note(node, fallback_note, source="fallback")]
                 if should_dedupe:
                     seen_notes.add(fallback_norm)
             else:
                 node["linguistic_notes"] = []
+                node["notes"] = []
 
         for child in node.get("linguistic_elements", []):
             self._annotate_node(sentence_text, child, seen_notes)

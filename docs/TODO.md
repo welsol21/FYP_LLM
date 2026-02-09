@@ -25,10 +25,10 @@
   - [x] `head_id`
 - [x] Add normalized morphology object:
   - [x] `features` (`number`, `person`, `case`, `degree`, `definiteness`, `verb_form`, etc.)
-- Replace plain `linguistic_notes: [string]` with typed note objects:
-  - `notes: [{text, kind, confidence, source}]`
-  - where `kind` in `semantic|syntactic|morphological|discourse`
-  - where `source` in `model|rule|fallback`
+- [x] Replace plain `linguistic_notes: [string]` with typed note objects:
+  - [x] `notes: [{text, kind, confidence, source}]`
+  - [x] where `kind` in `semantic|syntactic|morphological|discourse`
+  - [x] where `source` in `model|rule|fallback`
 - Add validation trace fields:
   - `quality_flags`
   - `rejected_candidates`

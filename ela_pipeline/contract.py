@@ -16,6 +16,7 @@ def blank_node(node_type: str, content: str, part_of_speech: str, tense: str = "
         "voice": "null",
         "finiteness": "null",
         "linguistic_notes": [],
+        "notes": [],
         "part_of_speech": part_of_speech,
         "linguistic_elements": [],
     }

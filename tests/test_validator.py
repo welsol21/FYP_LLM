@@ -123,6 +123,46 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
+    def test_accepts_valid_optional_typed_notes(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["notes"] = [
+            {
+                "text": "This sentence has a finite predicate.",
+                "kind": "syntactic",
+                "confidence": 0.9,
+                "source": "model",
+            }
+        ]
+
+        result = validate_contract(data)
+        self.assertTrue(result.ok, msg=str(result.errors))
+
+    def test_rejects_invalid_optional_typed_notes(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["notes"] = [
+            {
+                "text": 123,
+                "kind": "syntax",
+                "confidence": 1.5,
+                "source": "llm",
+            }
+        ]
+
+        result = validate_contract(data)
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any(".notes[0]." in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
