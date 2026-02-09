@@ -17,8 +17,18 @@ _BAD_PATTERNS = [
 
 _GENERIC_TEMPLATE_PATTERNS = [
     re.compile(r"\bsubordinate clause of concession\b", re.IGNORECASE),
+    re.compile(r"\bsubordinate clause of reason\b", re.IGNORECASE),
+    re.compile(r"\bsubordinate clause of reference\b", re.IGNORECASE),
     re.compile(r"\bverb-?centred phrase expressing what happens\b", re.IGNORECASE),
+    re.compile(r"\bverb-?centred sentence expressing what happens\b", re.IGNORECASE),
+    re.compile(r"\bverb-?centred speech\b", re.IGNORECASE),
+    re.compile(r"\bverb-?centred subject\b", re.IGNORECASE),
     re.compile(r"\bsimple expression with an initial\b", re.IGNORECASE),
+    re.compile(r"\bsimple note with\b", re.IGNORECASE),
+    re.compile(r"\bshort (educational|linguistic|note)\b", re.IGNORECASE),
+    re.compile(r"\bsensibilisation\b", re.IGNORECASE),
+    re.compile(r"\bemphase\b", re.IGNORECASE),
+    re.compile(r"\bsensation posed\b", re.IGNORECASE),
 ]
 
 

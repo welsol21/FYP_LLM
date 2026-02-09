@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import os
+import re
 from typing import Dict, List, Set
 
 import torch
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
+from ela_pipeline.annotate.fallback_notes import build_fallback_note
 from ela_pipeline.validation.notes_quality import is_valid_note, sanitize_note
 
 
@@ -84,6 +86,40 @@ class LocalT5Annotator:
                 return note
         return ""
 
+    def _is_note_suitable_for_node(self, node: Dict, note: str) -> bool:
+        if not is_valid_note(note):
+            return False
+
+        node_type = (node.get("type") or "").strip()
+        content = sanitize_note(str(node.get("content", ""))).lower()
+        note_l = sanitize_note(note).lower()
+
+        if node_type == "Word":
+            # Force strict lexical anchoring in quoted form to suppress generic noise.
+            if content and f"'{content}'" not in note_l:
+                return False
+            return True
+
+        if node_type == "Phrase":
+            if "phrase" not in note_l:
+                return False
+            phrase_tokens = [t for t in re.findall(r"[a-z]+", content) if len(t) >= 4]
+            if phrase_tokens and not any(tok in note_l for tok in phrase_tokens[:2]):
+                return False
+            return True
+
+        if node_type == "Sentence":
+            if "sentence" not in note_l:
+                return False
+            tense = (node.get("tense") or "").lower()
+            if tense == "past" and "present simple" in note_l:
+                return False
+            if tense == "present" and "past simple" in note_l:
+                return False
+            return True
+
+        return True
+
     def annotate(self, contract_doc: Dict[str, Dict]) -> Dict[str, Dict]:
         for sentence_text, sentence_node in contract_doc.items():
             seen_notes: Set[str] = set()
@@ -94,11 +130,24 @@ class LocalT5Annotator:
         prompt = self._build_prompt(sentence_text, node)
         note = self._generate_note_with_retry(prompt)
         norm_note = sanitize_note(note).lower()
-        if is_valid_note(note) and norm_note not in seen_notes:
+        node_type = (node.get("type") or "").strip()
+        should_dedupe = node_type != "Word"
+        is_new_note = (norm_note not in seen_notes) if should_dedupe else True
+
+        if self._is_note_suitable_for_node(node, note) and is_new_note:
             node["linguistic_notes"] = [note]
-            seen_notes.add(norm_note)
+            if should_dedupe:
+                seen_notes.add(norm_note)
         else:
-            node["linguistic_notes"] = []
+            fallback_note = build_fallback_note(node)
+            fallback_norm = sanitize_note(fallback_note).lower()
+            fallback_is_new = (fallback_norm not in seen_notes) if should_dedupe else True
+            if self._is_note_suitable_for_node(node, fallback_note) and fallback_is_new:
+                node["linguistic_notes"] = [fallback_note]
+                if should_dedupe:
+                    seen_notes.add(fallback_norm)
+            else:
+                node["linguistic_notes"] = []
 
         for child in node.get("linguistic_elements", []):
             self._annotate_node(sentence_text, child, seen_notes)

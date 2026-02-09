@@ -18,6 +18,11 @@ class NotesQualityTests(unittest.TestCase):
         self.assertTrue(is_generic_template(text))
         self.assertFalse(is_valid_note(text))
 
+    def test_rejects_gibberish_template(self):
+        text = "Sensibilisation: a simple note with an educational linguistic tone."
+        self.assertTrue(is_generic_template(text))
+        self.assertFalse(is_valid_note(text))
+
     def test_sanitize_whitespace(self):
         self.assertEqual(sanitize_note("  A   short\nnote   "), "A short note")
 
