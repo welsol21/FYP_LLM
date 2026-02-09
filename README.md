@@ -1,33 +1,42 @@
 # FYP_LLM: ELA Linguistic Notes Pipeline
 
-This repository contains an end-to-end pipeline for generating contract-compliant linguistic JSON from English text:
-- deterministic parsing and structure building (spaCy + rules)
-- rule-based TAM enrichment
-- optional local T5 generation for `linguistic_notes`
-- strict contract validation
+## Overview
+This project converts English text into a validated hierarchical linguistic JSON contract:
+- `Sentence -> Phrase -> Word` structure
+- deterministic parsing and rule-based enrichment
+- optional local T5 note generation
+- strict validation and frozen-structure checks
 
 Authoritative contract reference: `docs/sample.json`.
 
-## Implemented
+## What Has Been Improved
+- Contract v2 metadata added and validated (`node_id`, `parent_id`, `source_span`, `grammatical_role`, dependency links, morphology features).
+- Verbal grammar split into explicit fields (`tense`, `aspect`, `mood`, `voice`, `finiteness`).
+- Phrase quality improved:
+  - one-word phrases removed
+  - simple determiner-led noun chunks removed (for example, `the decision`)
+- Notes quality pipeline improved:
+  - typed notes (`notes[{text, kind, confidence, source}]`) alongside legacy `linguistic_notes`
+  - fallback notes strengthened
+  - validation trace fields added (`quality_flags`, `rejected_candidates`, `rejected_candidate_stats`, `reason_codes`)
+- Dual validation modes implemented:
+  - `v1` (backward-compatible)
+  - `v2_strict` (core v2 fields required)
 
-1. Core pipeline (`ela_pipeline`)
-- `build_skeleton`
-- `run_tam`
-- `inference.run`
-- validators (schema + frozen checks)
-
-2. Data and training
-- dataset builder: `ela_pipeline.dataset.build_dataset`
-- unified trainer: `ela_pipeline.training.train_generator`
-
-3. Docs and tests
-- full guide: `docs/ela_pipeline_full_documentation.md`
-- CLI quick guide: `docs/pipeline_cli.md`
-- tests: `tests/`
+## Current Output Characteristics
+Each node always keeps required contract fields and may include optional v2 fields such as:
+- `schema_version`
+- `node_id`, `parent_id`
+- `source_span`
+- `grammatical_role`
+- `dep_label`, `head_id` (Word nodes)
+- `features` (normalized morphology)
+- `notes` (typed note objects)
+- trace fields for note-generation quality
 
 ## Quick Start
 
-### 1) Install dependencies
+### 1) Environment setup
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -49,6 +58,14 @@ python -m ela_pipeline.inference.run --text "She should have trusted her instinc
 python -m ela_pipeline.inference.run \
   --text "The young scientist in the white coat carefully examined the strange artifact on the table." \
   --model-dir results_llm_notes_v3_t5-small_phrase/best_model
+```
+
+### 5) Strict contract validation mode
+```bash
+python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --model-dir results_llm_notes_v3_t5-small_phrase/best_model \
+  --validation-mode v2_strict
 ```
 
 ## Main Commands
@@ -74,18 +91,10 @@ python -m ela_pipeline.build_skeleton --input input.jsonl --output skeleton.json
 python -m ela_pipeline.run_tam --input skeleton.jsonl --output tam.jsonl
 ```
 
-## Project Layout
-
-- `ela_pipeline/` - pipeline source code
-- `schemas/` - JSON schema files
-- `data/processed/` - train/dev/test JSONL
-- `inference_results/` - inference outputs
-- `docs/` - documentation
-- `tests/` - unit/smoke tests
-
 ## Documentation
-
-- Full guide: `docs/ela_pipeline_full_documentation.md`
-- CLI guide: `docs/pipeline_cli.md`
-- Implementation plan: `docs/implementation_proposal.md`
+- Full documentation: `docs/ela_pipeline_full_documentation.md`
+- CLI usage: `docs/pipeline_cli.md`
+- Implementation proposal: `docs/implementation_proposal.md`
+- Progress TODO: `docs/TODO.md`
+- Curator summary report: `docs/curator_progress_report.md`
 - Technical specification: `docs/TZ_ELA_Linguistic_Notes_Pipeline.docx`
