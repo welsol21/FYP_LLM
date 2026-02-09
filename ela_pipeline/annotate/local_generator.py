@@ -69,9 +69,9 @@ class LocalT5Annotator:
             out = self.model.generate(**enc, **generation_kwargs)
         return self.tokenizer.decode(out[0], skip_special_tokens=True).strip()
 
-    def _generate_note_with_retry(self, prompt: str) -> tuple[str, List[str]]:
+    def _generate_note_with_retry(self, prompt: str) -> tuple[str, List[Dict[str, str]]]:
         candidates: List[str] = []
-        rejected: List[str] = []
+        rejected: List[Dict[str, str]] = []
         attempts = max(1, self.max_retries + 1)
 
         for attempt in range(attempts):
@@ -82,12 +82,33 @@ class LocalT5Annotator:
             if is_valid_note(note):
                 return note, rejected
             if note:
-                rejected.append(note)
+                rejected.append({"text": note, "reason": "MODEL_OUTPUT_LOW_QUALITY"})
 
         for note in candidates:
             if note:
                 return note, rejected
         return "", rejected
+
+    def _build_rejection_stats(self, rejected_items: List[Dict[str, str]]) -> tuple[List[str], List[Dict[str, object]]]:
+        merged: Dict[str, Dict[str, object]] = {}
+        order: List[str] = []
+
+        for item in rejected_items:
+            text = sanitize_note(str(item.get("text", "")))
+            reason = sanitize_note(str(item.get("reason", "")))
+            if not text:
+                continue
+            key = text.lower()
+            if key not in merged:
+                merged[key] = {"text": text, "count": 0, "reasons": []}
+                order.append(key)
+            merged[key]["count"] = int(merged[key]["count"]) + 1
+            if reason and reason not in merged[key]["reasons"]:
+                merged[key]["reasons"].append(reason)
+
+        stats = [merged[key] for key in order]
+        deduped = [item["text"] for item in stats]
+        return deduped, stats
 
     def _is_note_suitable_for_node(self, node: Dict, note: str) -> bool:
         if not is_valid_note(note):
@@ -149,7 +170,7 @@ class LocalT5Annotator:
 
     def _annotate_node(self, sentence_text: str, node: Dict, seen_notes: Set[str]) -> None:
         prompt = self._build_prompt(sentence_text, node)
-        note, rejected_candidates = self._generate_note_with_retry(prompt)
+        note, rejected_items = self._generate_note_with_retry(prompt)
         norm_note = sanitize_note(note).lower()
         node_type = (node.get("type") or "").strip()
         should_dedupe = node_type != "Word"
@@ -158,7 +179,8 @@ class LocalT5Annotator:
         is_new_note = (norm_note not in seen_notes) if should_dedupe else True
 
         node["quality_flags"] = []
-        node["rejected_candidates"] = list(rejected_candidates)
+        node["rejected_candidates"] = []
+        node["rejected_candidate_stats"] = []
         node["reason_codes"] = []
 
         if note_is_valid and note_is_suitable and is_new_note:
@@ -169,8 +191,13 @@ class LocalT5Annotator:
             if should_dedupe:
                 seen_notes.add(norm_note)
         else:
-            if note and note not in node["rejected_candidates"]:
-                node["rejected_candidates"].append(note)
+            if note:
+                reject_reason = "MODEL_OUTPUT_LOW_QUALITY"
+                if note_is_valid and not note_is_suitable:
+                    reject_reason = "MODEL_NOTE_UNSUITABLE"
+                elif note_is_valid and note_is_suitable and not is_new_note:
+                    reject_reason = "DUPLICATE_NOTE"
+                rejected_items.append({"text": note, "reason": reject_reason})
             if not note_is_valid:
                 node["reason_codes"].append("MODEL_OUTPUT_LOW_QUALITY")
             elif not note_is_suitable:
@@ -193,6 +220,10 @@ class LocalT5Annotator:
                 node["notes"] = []
                 node["quality_flags"] = ["no_note"]
                 node["reason_codes"].append("NO_VALID_NOTE")
+
+        deduped_rejected, rejected_stats = self._build_rejection_stats(rejected_items)
+        node["rejected_candidates"] = deduped_rejected
+        node["rejected_candidate_stats"] = rejected_stats
 
         for child in node.get("linguistic_elements", []):
             self._annotate_node(sentence_text, child, seen_notes)

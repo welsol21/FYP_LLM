@@ -148,6 +148,44 @@ def _validate_optional_trace_fields(node: Dict[str, Any], path: str, errors: Lis
             )
 
 
+def _validate_optional_rejected_candidate_stats(
+    node: Dict[str, Any],
+    path: str,
+    errors: List[ValidationErrorItem],
+) -> None:
+    if "rejected_candidate_stats" not in node:
+        return
+    stats = node.get("rejected_candidate_stats")
+    _expect(
+        isinstance(stats, list),
+        errors,
+        f"{path}.rejected_candidate_stats",
+        "rejected_candidate_stats must be list",
+    )
+    if not isinstance(stats, list):
+        return
+    for idx, item in enumerate(stats):
+        item_path = f"{path}.rejected_candidate_stats[{idx}]"
+        _expect(isinstance(item, dict), errors, item_path, "stats item must be object")
+        if not isinstance(item, dict):
+            continue
+        _expect(isinstance(item.get("text"), str), errors, f"{item_path}.text", "text must be string")
+        count = item.get("count")
+        _expect(isinstance(count, int), errors, f"{item_path}.count", "count must be integer")
+        if isinstance(count, int):
+            _expect(count >= 1, errors, f"{item_path}.count", "count must be >= 1")
+        reasons = item.get("reasons")
+        _expect(isinstance(reasons, list), errors, f"{item_path}.reasons", "reasons must be list")
+        if isinstance(reasons, list):
+            for reason_idx, reason in enumerate(reasons):
+                _expect(
+                    isinstance(reason, str),
+                    errors,
+                    f"{item_path}.reasons[{reason_idx}]",
+                    "reason must be string",
+                )
+
+
 def _validate_optional_schema_version(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
     if "schema_version" not in node:
         return
@@ -234,6 +272,7 @@ def _validate_node(
     _validate_optional_features(node, path, errors)
     _validate_optional_notes(node, path, errors)
     _validate_optional_trace_fields(node, path, errors)
+    _validate_optional_rejected_candidate_stats(node, path, errors)
     _validate_optional_schema_version(node, path, errors)
     if validation_mode == "v2_strict":
         _expect(node.get("schema_version") == "v2", errors, f"{path}.schema_version", "schema_version must be 'v2' in strict mode")

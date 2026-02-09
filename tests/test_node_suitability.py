@@ -43,6 +43,24 @@ class NodeSuitabilityTests(unittest.TestCase):
             )
         )
 
+    def test_rejected_candidates_are_deduplicated_with_stats(self):
+        rejected_items = [
+            {"text": "Verb-centred phrase expressing what happens to or about the subject.", "reason": "MODEL_OUTPUT_LOW_QUALITY"},
+            {"text": "Verb-centred phrase expressing what happens to or about the subject.", "reason": "MODEL_OUTPUT_LOW_QUALITY"},
+            {"text": "Verb-centred phrase expressing what happens to or about the subject.", "reason": "MODEL_NOTE_UNSUITABLE"},
+        ]
+        deduped, stats = self.annotator._build_rejection_stats(rejected_items)
+        self.assertEqual(
+            deduped,
+            ["Verb-centred phrase expressing what happens to or about the subject."],
+        )
+        self.assertEqual(len(stats), 1)
+        self.assertEqual(stats[0]["count"], 3)
+        self.assertEqual(
+            set(stats[0]["reasons"]),
+            {"MODEL_OUTPUT_LOW_QUALITY", "MODEL_NOTE_UNSUITABLE"},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

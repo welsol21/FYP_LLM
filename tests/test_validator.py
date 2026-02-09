@@ -187,6 +187,23 @@ class ValidatorTests(unittest.TestCase):
         result = validate_contract(data)
         self.assertTrue(result.ok, msg=str(result.errors))
 
+    def test_accepts_valid_optional_rejected_candidate_stats(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["rejected_candidate_stats"] = [
+            {
+                "text": "Template-like output",
+                "count": 3,
+                "reasons": ["MODEL_OUTPUT_LOW_QUALITY", "MODEL_NOTE_UNSUITABLE"],
+            }
+        ]
+
+        result = validate_contract(data)
+        self.assertTrue(result.ok, msg=str(result.errors))
+
     def test_rejects_invalid_optional_trace_fields(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -201,6 +218,27 @@ class ValidatorTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertTrue(
             any(".quality_flags" in err.path or ".rejected_candidates" in err.path or ".reason_codes" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
+    def test_rejects_invalid_optional_rejected_candidate_stats(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["rejected_candidate_stats"] = [
+            {
+                "text": "Bad item",
+                "count": 0,
+                "reasons": [123],
+            }
+        ]
+
+        result = validate_contract(data)
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any(".rejected_candidate_stats" in err.path for err in result.errors),
             msg=str(result.errors),
         )
 

@@ -44,4 +44,4 @@
 
 ## Next Quality Tasks
 
-- [ ] Deduplicate repeated entries in `rejected_candidates` and preserve attempt statistics (`count` or per-candidate reason trace).
+- [x] Deduplicate repeated entries in `rejected_candidates` and preserve attempt statistics (`count` + per-candidate reason trace in `rejected_candidate_stats`).
