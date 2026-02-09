@@ -5,6 +5,17 @@ from ela_pipeline.validation.validator import validate_contract, validate_frozen
 
 
 class ValidatorTests(unittest.TestCase):
+    @staticmethod
+    def _inject_minimal_v2_fields(node, parent_id, next_id):
+        node["node_id"] = f"n{next_id[0]}"
+        next_id[0] += 1
+        node["parent_id"] = parent_id
+        node["source_span"] = {"start": 0, "end": len(node.get("content", ""))}
+        node["grammatical_role"] = "unknown"
+        node["schema_version"] = "v2"
+        for child in node.get("linguistic_elements", []):
+            ValidatorTests._inject_minimal_v2_fields(child, node["node_id"], next_id)
+
     def test_sample_contract_valid(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -218,6 +229,26 @@ class ValidatorTests(unittest.TestCase):
             any(".schema_version" in err.path for err in result.errors),
             msg=str(result.errors),
         )
+
+    def test_rejects_missing_core_fields_in_v2_strict(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        result = validate_contract(data, validation_mode="v2_strict")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("Missing required fields" in err.message for err in result.errors),
+            msg=str(result.errors),
+        )
+
+    def test_accepts_v2_strict_when_core_fields_present(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        self._inject_minimal_v2_fields(sentence, None, [1])
+
+        result = validate_contract(data, validation_mode="v2_strict")
+        self.assertTrue(result.ok, msg=str(result.errors))
 
 
 if __name__ == "__main__":

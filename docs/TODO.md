@@ -38,6 +38,6 @@
 
 ## Migration Plan
 
-1. Introduce new fields as optional in a backward-compatible `v2`.
-2. Update validators and pipeline to support dual mode (`v1` + `v2`).
-3. Promote core fields (`node_id`, `source_span`, `grammatical_role`) to required in strict `v2`.
+1. [x] Introduce new fields as optional in a backward-compatible `v2`.
+2. [x] Update validators and pipeline to support dual mode (`v1` + `v2`).
+3. [x] Promote core fields (`node_id`, `source_span`, `grammatical_role`) to required in strict `v2`.

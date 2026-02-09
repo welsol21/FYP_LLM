@@ -9,6 +9,8 @@ from ela_pipeline.constants import NODE_TYPES, REQUIRED_NODE_FIELDS
 
 NOTE_KINDS = {"semantic", "syntactic", "morphological", "discourse"}
 NOTE_SOURCES = {"model", "rule", "fallback"}
+VALIDATION_MODES = {"v1", "v2_strict"}
+STRICT_V2_REQUIRED_FIELDS = {"node_id", "source_span", "grammatical_role", "schema_version"}
 
 
 @dataclass
@@ -165,6 +167,19 @@ def _validate_optional_schema_version(node: Dict[str, Any], path: str, errors: L
         )
 
 
+def _validate_required_fields(
+    node: Dict[str, Any],
+    path: str,
+    errors: List[ValidationErrorItem],
+    validation_mode: str,
+) -> None:
+    required_fields = set(REQUIRED_NODE_FIELDS)
+    if validation_mode == "v2_strict":
+        required_fields |= STRICT_V2_REQUIRED_FIELDS
+    missing = required_fields - set(node.keys())
+    _expect(not missing, errors, path, f"Missing required fields: {sorted(missing)}")
+
+
 def _validate_optional_ids(
     node: Dict[str, Any],
     path: str,
@@ -197,14 +212,14 @@ def _validate_node(
     path: str,
     errors: List[ValidationErrorItem],
     seen_ids: Set[str],
+    validation_mode: str,
     expected_parent_id: str | None = None,
 ) -> None:
     _expect(isinstance(node, dict), errors, path, "Node must be an object")
     if not isinstance(node, dict):
         return
 
-    missing = REQUIRED_NODE_FIELDS - set(node.keys())
-    _expect(not missing, errors, path, f"Missing required fields: {sorted(missing)}")
+    _validate_required_fields(node, path, errors, validation_mode)
 
     node_type = node.get("type")
     _expect(node_type in NODE_TYPES, errors, f"{path}.type", "Invalid node type")
@@ -220,6 +235,8 @@ def _validate_node(
     _validate_optional_notes(node, path, errors)
     _validate_optional_trace_fields(node, path, errors)
     _validate_optional_schema_version(node, path, errors)
+    if validation_mode == "v2_strict":
+        _expect(node.get("schema_version") == "v2", errors, f"{path}.schema_version", "schema_version must be 'v2' in strict mode")
     _validate_optional_ids(node, path, errors, seen_ids, expected_parent_id)
 
     notes = node.get("linguistic_notes")
@@ -235,7 +252,14 @@ def _validate_node(
 
     for idx, child in enumerate(children):
         child_path = f"{path}.linguistic_elements[{idx}]"
-        _validate_node(child, child_path, errors, seen_ids, expected_parent_id=node.get("node_id"))
+        _validate_node(
+            child,
+            child_path,
+            errors,
+            seen_ids,
+            validation_mode=validation_mode,
+            expected_parent_id=node.get("node_id"),
+        )
 
     if node_type == "Sentence":
         for idx, child in enumerate(children):
@@ -251,15 +275,23 @@ def _validate_node(
         )
 
 
-def validate_contract(doc: Dict[str, Any]) -> ValidationResult:
+def validate_contract(doc: Dict[str, Any], validation_mode: str = "v1") -> ValidationResult:
     errors: List[ValidationErrorItem] = []
     seen_ids: Set[str] = set()
+    _expect(validation_mode in VALIDATION_MODES, errors, "$.validation_mode", "validation_mode must be v1 or v2_strict")
     _expect(isinstance(doc, dict), errors, "$", "Top-level must be an object keyed by sentence content")
 
     if isinstance(doc, dict):
         for sentence_key, sentence_node in doc.items():
             _expect(isinstance(sentence_key, str), errors, "$", "Top-level keys must be strings")
-            _validate_node(sentence_node, f"$.{sentence_key}", errors, seen_ids, expected_parent_id=None)
+            _validate_node(
+                sentence_node,
+                f"$.{sentence_key}",
+                errors,
+                seen_ids,
+                validation_mode=validation_mode,
+                expected_parent_id=None,
+            )
             if isinstance(sentence_node, dict):
                 _expect(sentence_node.get("type") == "Sentence", errors, f"$.{sentence_key}.type", "Top-level value must be Sentence")
                 _expect(sentence_node.get("content") == sentence_key, errors, f"$.{sentence_key}.content", "Sentence content must match top-level key")

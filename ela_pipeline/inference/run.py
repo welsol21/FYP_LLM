@@ -18,11 +18,16 @@ from ela_pipeline.validation.validator import (
 )
 
 
-def run_pipeline(text: str, model_dir: str | None = None, spacy_model: str = "en_core_web_sm") -> dict:
+def run_pipeline(
+    text: str,
+    model_dir: str | None = None,
+    spacy_model: str = "en_core_web_sm",
+    validation_mode: str = "v1",
+) -> dict:
     nlp = load_nlp(spacy_model)
 
     skeleton = build_skeleton(text, nlp)
-    raise_if_invalid(validate_contract(skeleton))
+    raise_if_invalid(validate_contract(skeleton, validation_mode=validation_mode))
 
     enriched = deep_copy_contract(skeleton)
     apply_tam(enriched, nlp)
@@ -33,7 +38,7 @@ def run_pipeline(text: str, model_dir: str | None = None, spacy_model: str = "en
         annotator = LocalT5Annotator(model_dir=model_dir)
         annotator.annotate(enriched)
 
-    raise_if_invalid(validate_contract(enriched))
+    raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
     raise_if_invalid(validate_frozen_structure(skeleton, enriched))
     return enriched
 
@@ -43,10 +48,16 @@ def main() -> None:
     parser.add_argument("--text", required=True)
     parser.add_argument("--model-dir", default=None)
     parser.add_argument("--spacy-model", default="en_core_web_sm")
+    parser.add_argument("--validation-mode", default="v1", choices=["v1", "v2_strict"])
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
-    result = run_pipeline(text=args.text, model_dir=args.model_dir, spacy_model=args.spacy_model)
+    result = run_pipeline(
+        text=args.text,
+        model_dir=args.model_dir,
+        spacy_model=args.spacy_model,
+        validation_mode=args.validation_mode,
+    )
 
     out_path = args.output
     if out_path is None:
