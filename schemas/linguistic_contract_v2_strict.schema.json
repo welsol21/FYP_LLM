@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/linguistic_contract_v2_strict.schema.json",
+  "title": "ELA Linguistic Contract v2 Strict",
+  "type": "object",
+  "additionalProperties": {
+    "$ref": "#/$defs/sentenceNode"
+  },
+  "$defs": {
+    "sourceSpan": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "integer", "minimum": 0},
+        "end": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "typedNote": {
+      "type": "object",
+      "required": ["text", "kind", "confidence", "source"],
+      "properties": {
+        "text": {"type": "string"},
+        "kind": {"type": "string", "enum": ["semantic", "syntactic", "morphological", "discourse"]},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "source": {"type": "string", "enum": ["model", "rule", "fallback"]}
+      },
+      "additionalProperties": false
+    },
+    "rejectedCandidateStat": {
+      "type": "object",
+      "required": ["text", "count", "reasons"],
+      "properties": {
+        "text": {"type": "string"},
+        "count": {"type": "integer", "minimum": 1},
+        "reasons": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "wordNode": {
+      "type": "object",
+      "required": [
+        "type",
+        "content",
+        "tense",
+        "linguistic_notes",
+        "part_of_speech",
+        "linguistic_elements",
+        "node_id",
+        "parent_id",
+        "source_span",
+        "grammatical_role",
+        "schema_version"
+      ],
+      "properties": {
+        "type": {"const": "Word"},
+        "content": {"type": "string"},
+        "tense": {"type": "string"},
+        "aspect": {"type": "string"},
+        "mood": {"type": "string"},
+        "voice": {"type": "string"},
+        "finiteness": {"type": "string"},
+        "linguistic_notes": {"type": "array", "items": {"type": "string"}},
+        "notes": {"type": "array", "items": {"$ref": "#/$defs/typedNote"}},
+        "quality_flags": {"type": "array", "items": {"type": "string"}},
+        "rejected_candidates": {"type": "array", "items": {"type": "string"}},
+        "rejected_candidate_stats": {"type": "array", "items": {"$ref": "#/$defs/rejectedCandidateStat"}},
+        "reason_codes": {"type": "array", "items": {"type": "string"}},
+        "part_of_speech": {"type": "string"},
+        "linguistic_elements": {"type": "array", "maxItems": 0},
+        "features": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        },
+        "node_id": {"type": "string"},
+        "parent_id": {"type": "string"},
+        "source_span": {"$ref": "#/$defs/sourceSpan"},
+        "grammatical_role": {"type": "string"},
+        "dep_label": {"type": "string"},
+        "head_id": {"type": ["string", "null"]},
+        "schema_version": {"type": "string", "const": "v2"}
+      },
+      "additionalProperties": true
+    },
+    "phraseNode": {
+      "type": "object",
+      "required": [
+        "type",
+        "content",
+        "tense",
+        "linguistic_notes",
+        "part_of_speech",
+        "linguistic_elements",
+        "node_id",
+        "parent_id",
+        "source_span",
+        "grammatical_role",
+        "schema_version"
+      ],
+      "properties": {
+        "type": {"const": "Phrase"},
+        "content": {"type": "string"},
+        "tense": {"type": "string"},
+        "aspect": {"type": "string"},
+        "mood": {"type": "string"},
+        "voice": {"type": "string"},
+        "finiteness": {"type": "string"},
+        "linguistic_notes": {"type": "array", "items": {"type": "string"}},
+        "notes": {"type": "array", "items": {"$ref": "#/$defs/typedNote"}},
+        "quality_flags": {"type": "array", "items": {"type": "string"}},
+        "rejected_candidates": {"type": "array", "items": {"type": "string"}},
+        "rejected_candidate_stats": {"type": "array", "items": {"$ref": "#/$defs/rejectedCandidateStat"}},
+        "reason_codes": {"type": "array", "items": {"type": "string"}},
+        "part_of_speech": {"type": "string"},
+        "linguistic_elements": {
+          "type": "array",
+          "minItems": 2,
+          "items": {"$ref": "#/$defs/wordNode"}
+        },
+        "node_id": {"type": "string"},
+        "parent_id": {"type": "string"},
+        "source_span": {"$ref": "#/$defs/sourceSpan"},
+        "grammatical_role": {"type": "string"},
+        "schema_version": {"type": "string", "const": "v2"}
+      },
+      "additionalProperties": true
+    },
+    "sentenceNode": {
+      "type": "object",
+      "required": [
+        "type",
+        "content",
+        "tense",
+        "linguistic_notes",
+        "part_of_speech",
+        "linguistic_elements",
+        "node_id",
+        "parent_id",
+        "source_span",
+        "grammatical_role",
+        "schema_version"
+      ],
+      "properties": {
+        "type": {"const": "Sentence"},
+        "content": {"type": "string"},
+        "tense": {"type": "string"},
+        "aspect": {"type": "string"},
+        "mood": {"type": "string"},
+        "voice": {"type": "string"},
+        "finiteness": {"type": "string"},
+        "linguistic_notes": {"type": "array", "items": {"type": "string"}},
+        "notes": {"type": "array", "items": {"$ref": "#/$defs/typedNote"}},
+        "quality_flags": {"type": "array", "items": {"type": "string"}},
+        "rejected_candidates": {"type": "array", "items": {"type": "string"}},
+        "rejected_candidate_stats": {"type": "array", "items": {"$ref": "#/$defs/rejectedCandidateStat"}},
+        "reason_codes": {"type": "array", "items": {"type": "string"}},
+        "part_of_speech": {"type": "string"},
+        "linguistic_elements": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/phraseNode"}
+        },
+        "node_id": {"type": "string"},
+        "parent_id": {"type": "null"},
+        "source_span": {"$ref": "#/$defs/sourceSpan"},
+        "grammatical_role": {"type": "string"},
+        "schema_version": {"type": "string", "const": "v2"}
+      },
+      "additionalProperties": true
+    }
+  }
+}
