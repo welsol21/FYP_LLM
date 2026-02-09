@@ -5,6 +5,7 @@
 - [x] Enforce phrase length constraints:
   - [x] one-word phrases must be disallowed
   - [x] each `Phrase` node should contain at least 2 word tokens in `linguistic_elements`
+  - [x] exclude simple determiner-led noun chunks (e.g., `the decision`)
 - [x] Add stable graph identity fields:
   - [x] `node_id`
   - [x] `parent_id`
@@ -13,12 +14,12 @@
   - [x] `source_span.end`
 - [x] Add explicit syntactic role metadata:
   - [x] `grammatical_role` (`subject`, `predicate`, `object`, `modifier`, `adjunct`, etc.)
-- Split verbal grammar into separate fields instead of one overloaded `tense`:
-  - `tense`
-  - `aspect`
-  - `mood`
-  - `voice`
-  - `finiteness`
+- [x] Split verbal grammar into separate fields instead of one overloaded `tense`:
+  - [x] `tense`
+  - [x] `aspect`
+  - [x] `mood`
+  - [x] `voice`
+  - [x] `finiteness`
 - [x] Add dependency linkage for word nodes:
   - [x] `dep_label`
   - [x] `head_id`

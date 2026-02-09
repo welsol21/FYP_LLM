@@ -27,6 +27,9 @@ class PipelineTests(unittest.TestCase):
         self.assertIn("source_span", sentence)
         self.assertIn("grammatical_role", sentence)
         self.assertIsInstance(sentence["grammatical_role"], str)
+        for field in ("aspect", "mood", "voice", "finiteness"):
+            self.assertIn(field, sentence)
+            self.assertIsInstance(sentence[field], str)
         self.assertEqual(sentence["source_span"]["start"], 0)
         self.assertEqual(sentence["source_span"]["end"], len(text))
 
@@ -35,16 +38,28 @@ class PipelineTests(unittest.TestCase):
             self.assertIn("source_span", phrase)
             self.assertIn("grammatical_role", phrase)
             self.assertIsInstance(phrase["grammatical_role"], str)
+            for field in ("aspect", "mood", "voice", "finiteness"):
+                self.assertIn(field, phrase)
+                self.assertIsInstance(phrase[field], str)
             for word in phrase.get("linguistic_elements", []):
                 self.assertEqual(word.get("parent_id"), phrase.get("node_id"))
                 self.assertIn("source_span", word)
                 self.assertIn("grammatical_role", word)
                 self.assertIsInstance(word["grammatical_role"], str)
+                for field in ("aspect", "mood", "voice", "finiteness"):
+                    self.assertIn(field, word)
+                    self.assertIsInstance(word[field], str)
                 self.assertIn("dep_label", word)
                 self.assertIsInstance(word["dep_label"], str)
                 self.assertIn("head_id", word)
                 self.assertTrue(word["head_id"] is None or isinstance(word["head_id"], str))
                 self.assertGreaterEqual(word["source_span"]["end"], word["source_span"]["start"])
+
+    def test_pipeline_excludes_simple_determiner_noun_phrases(self):
+        out = run_pipeline("She should have trusted her instincts before making the decision.", model_dir=None)
+        key = next(iter(out))
+        phrase_texts = [p.get("content") for p in out[key].get("linguistic_elements", [])]
+        self.assertNotIn("the decision", phrase_texts)
 
 
 if __name__ == "__main__":

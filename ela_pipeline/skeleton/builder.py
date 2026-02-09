@@ -92,6 +92,39 @@ def _word_tense(token) -> str:
     return "null"
 
 
+def _word_aspect(token) -> str:
+    if token.pos_ not in {"VERB", "AUX"}:
+        return "null"
+    if token.tag_ == "VBG":
+        return "progressive"
+    if token.tag_ == "VBN":
+        return "perfect"
+    return "simple"
+
+
+def _word_mood(token) -> str:
+    if token.pos_ not in {"VERB", "AUX"}:
+        return "null"
+    mood = token.morph.get("Mood")
+    if mood:
+        return mood[0].lower()
+    return "indicative" if "Fin" in token.morph.get("VerbForm") else "null"
+
+
+def _word_voice(token) -> str:
+    if token.pos_ not in {"VERB", "AUX"}:
+        return "null"
+    if token.dep_ == "auxpass":
+        return "passive"
+    return "active"
+
+
+def _word_finiteness(token) -> str:
+    if token.pos_ not in {"VERB", "AUX"}:
+        return "null"
+    return "finite" if "Fin" in token.morph.get("VerbForm") else "non-finite"
+
+
 def _phrase_candidates(sent) -> List[Tuple[int, int, str]]:
     spans: List[Tuple[int, int, str]] = []
     seen: Set[Tuple[int, int]] = set()
@@ -167,6 +200,20 @@ def _phrase_role(span, phrase_pos: str) -> str:
     return PHRASE_DEP_ROLE_MAP.get(head.dep_, "modifier")
 
 
+def _is_simple_determiner_np(span, phrase_pos: str) -> bool:
+    if phrase_pos != "noun phrase":
+        return False
+
+    tokens = [t for t in span if not t.is_space]
+    if len(tokens) < 2:
+        return False
+    if tokens[0].pos_ != "DET":
+        return False
+
+    allowed_pos = {"DET", "ADJ", "NUM", "NOUN", "PROPN"}
+    return all(tok.pos_ in allowed_pos for tok in tokens)
+
+
 def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
     words: List[Dict] = []
     entries: List[Tuple[object, Dict]] = []
@@ -179,6 +226,10 @@ def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
             WORD_POS_MAP.get(token.pos_, "other"),
             tense=_word_tense(token),
         )
+        word_node["aspect"] = _word_aspect(token)
+        word_node["mood"] = _word_mood(token)
+        word_node["voice"] = _word_voice(token)
+        word_node["finiteness"] = _word_finiteness(token)
         _with_metadata(
             word_node,
             node_id=next_id(),
@@ -230,6 +281,8 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
             span = doc[start:end]
             phrase_text = span.text.strip()
             if not phrase_text:
+                continue
+            if _is_simple_determiner_np(span, phrase_pos):
                 continue
 
             phrase_node = blank_node("Phrase", phrase_text, phrase_pos, tense="null")

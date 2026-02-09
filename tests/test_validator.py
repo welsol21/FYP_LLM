@@ -91,6 +91,21 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
+    def test_rejects_invalid_optional_verbal_fields(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["aspect"] = 1
+
+        result = validate_contract(data)
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("aspect" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

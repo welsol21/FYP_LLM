@@ -15,12 +15,14 @@ class TamTests(unittest.TestCase):
         result = detect_tam(sent)
         self.assertEqual(result.tense, "past")
         self.assertEqual(result.voice, "passive")
+        self.assertEqual(result.finiteness, "finite")
 
     def test_future_modal(self):
         doc = self.nlp("The report will be submitted tomorrow.")
         sent = next(doc.sents)
         result = detect_tam(sent)
         self.assertEqual(result.tense, "future")
+        self.assertEqual(result.mood, "modal")
 
 
 if __name__ == "__main__":

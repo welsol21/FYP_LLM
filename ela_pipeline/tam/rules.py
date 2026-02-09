@@ -15,6 +15,8 @@ class TamResult:
     voice: str
     modal: str
     polarity: str
+    mood: str
+    finiteness: str
 
     @property
     def label(self) -> str:
@@ -84,7 +86,17 @@ def detect_tam(tokens: Iterable) -> TamResult:
             tense = "none"
 
     polarity = "negative" if has_neg else "affirmative"
-    return TamResult(tense=tense, aspect=aspect, voice=voice, modal=modal, polarity=polarity)
+    mood = "modal" if modal else "indicative"
+    finiteness = "finite" if tense != "none" else "non-finite"
+    return TamResult(
+        tense=tense,
+        aspect=aspect,
+        voice=voice,
+        modal=modal,
+        polarity=polarity,
+        mood=mood,
+        finiteness=finiteness,
+    )
 
 
 def apply_tam(contract_doc: dict, nlp) -> dict:
@@ -95,6 +107,10 @@ def apply_tam(contract_doc: dict, nlp) -> dict:
 
         sentence_tam = detect_tam(sent)
         sentence_node["tense"] = sentence_tam.short_tense
+        sentence_node["aspect"] = sentence_tam.aspect
+        sentence_node["voice"] = sentence_tam.voice
+        sentence_node["mood"] = sentence_tam.mood
+        sentence_node["finiteness"] = sentence_tam.finiteness
 
         for phrase in sentence_node.get("linguistic_elements", []):
             phrase_text = phrase.get("content", "")
@@ -102,5 +118,9 @@ def apply_tam(contract_doc: dict, nlp) -> dict:
             phrase_sent = next(phrase_doc.sents, phrase_doc[:])
             phrase_tam = detect_tam(phrase_sent)
             phrase["tense"] = phrase_tam.short_tense
+            phrase["aspect"] = phrase_tam.aspect
+            phrase["voice"] = phrase_tam.voice
+            phrase["mood"] = phrase_tam.mood
+            phrase["finiteness"] = phrase_tam.finiteness
 
     return contract_doc

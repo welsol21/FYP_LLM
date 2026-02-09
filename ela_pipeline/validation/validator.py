@@ -72,6 +72,17 @@ def _validate_optional_dependency(node: Dict[str, Any], path: str, errors: List[
             _expect(head_id != node.get("node_id"), errors, f"{path}.head_id", "head_id must not equal node_id")
 
 
+def _validate_optional_verbal_fields(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    for field in ("aspect", "mood", "voice", "finiteness"):
+        if field in node:
+            _expect(
+                isinstance(node.get(field), str),
+                errors,
+                f"{path}.{field}",
+                f"{field} must be string",
+            )
+
+
 def _validate_optional_ids(
     node: Dict[str, Any],
     path: str,
@@ -122,6 +133,7 @@ def _validate_node(
     _validate_optional_source_span(node, path, errors)
     _validate_optional_grammatical_role(node, path, errors)
     _validate_optional_dependency(node, path, errors)
+    _validate_optional_verbal_fields(node, path, errors)
     _validate_optional_ids(node, path, errors, seen_ids, expected_parent_id)
 
     notes = node.get("linguistic_notes")
