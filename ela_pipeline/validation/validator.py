@@ -61,6 +61,12 @@ def _validate_node(node: Dict[str, Any], path: str, errors: List[ValidationError
     if node_type == "Phrase":
         for idx, child in enumerate(children):
             _expect(child.get("type") == "Word", errors, f"{path}.linguistic_elements[{idx}].type", "Phrase can only contain Word")
+        _expect(
+            len(children) >= 2,
+            errors,
+            f"{path}.linguistic_elements",
+            "Phrase must contain at least 2 Word nodes",
+        )
 
 
 def validate_contract(doc: Dict[str, Any]) -> ValidationResult:

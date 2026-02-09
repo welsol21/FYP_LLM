@@ -87,6 +87,21 @@ def _phrase_candidates(sent) -> List[Tuple[int, int, str]]:
     return spans
 
 
+def _build_word_nodes(span) -> List[Dict]:
+    words: List[Dict] = []
+    for token in span:
+        if token.is_space:
+            continue
+        word_node = blank_node(
+            "Word",
+            token.text,
+            WORD_POS_MAP.get(token.pos_, "other"),
+            tense=_word_tense(token),
+        )
+        words.append(word_node)
+    return words
+
+
 def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
     doc = nlp(text)
     output: Dict[str, Dict] = {}
@@ -105,33 +120,20 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
                 continue
 
             phrase_node = blank_node("Phrase", phrase_text, phrase_pos, tense="null")
-            for token in span:
-                if token.is_space:
-                    continue
-                word_node = blank_node(
-                    "Word",
-                    token.text,
-                    WORD_POS_MAP.get(token.pos_, "other"),
-                    tense=_word_tense(token),
-                )
-                phrase_node["linguistic_elements"].append(word_node)
+            phrase_node["linguistic_elements"] = _build_word_nodes(span)
+
+            # Contract rule: do not emit one-word phrases.
+            if len(phrase_node["linguistic_elements"]) < 2:
+                continue
 
             sentence_node["linguistic_elements"].append(phrase_node)
 
         if not sentence_node["linguistic_elements"]:
-            # Fallback: single phrase with all non-space tokens
+            # Fallback: single phrase with all non-space tokens when sentence has at least 2 tokens.
             phrase_node = blank_node("Phrase", sent_text, "clause", tense="null")
-            for token in sent:
-                if token.is_space:
-                    continue
-                word_node = blank_node(
-                    "Word",
-                    token.text,
-                    WORD_POS_MAP.get(token.pos_, "other"),
-                    tense=_word_tense(token),
-                )
-                phrase_node["linguistic_elements"].append(word_node)
-            sentence_node["linguistic_elements"].append(phrase_node)
+            phrase_node["linguistic_elements"] = _build_word_nodes(sent)
+            if len(phrase_node["linguistic_elements"]) >= 2:
+                sentence_node["linguistic_elements"].append(phrase_node)
 
         output[sent_text] = sentence_node
 

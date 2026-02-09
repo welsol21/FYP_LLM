@@ -2,9 +2,9 @@
 
 ## Contract v2 Improvements
 
-- Enforce phrase length constraints:
-  - one-word phrases must be disallowed
-  - each `Phrase` node should contain at least 2 word tokens in `linguistic_elements`
+- [x] Enforce phrase length constraints:
+  - [x] one-word phrases must be disallowed
+  - [x] each `Phrase` node should contain at least 2 word tokens in `linguistic_elements`
 - Add stable graph identity fields:
   - `node_id`
   - `parent_id`

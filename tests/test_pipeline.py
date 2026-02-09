@@ -10,6 +10,13 @@ class PipelineTests(unittest.TestCase):
         key = next(iter(out))
         self.assertEqual(out[key]["type"], "Sentence")
 
+    def test_pipeline_disallows_one_word_phrases(self):
+        out = run_pipeline("I run.", model_dir=None)
+        key = next(iter(out))
+        sentence = out[key]
+        for phrase in sentence.get("linguistic_elements", []):
+            self.assertGreaterEqual(len(phrase.get("linguistic_elements", [])), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
