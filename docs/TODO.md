@@ -41,3 +41,7 @@
 1. [x] Introduce new fields as optional in a backward-compatible `v2`.
 2. [x] Update validators and pipeline to support dual mode (`v1` + `v2`).
 3. [x] Promote core fields (`node_id`, `source_span`, `grammatical_role`) to required in strict `v2`.
+
+## Next Quality Tasks
+
+- [ ] Deduplicate repeated entries in `rejected_candidates` and preserve attempt statistics (`count` or per-candidate reason trace).
