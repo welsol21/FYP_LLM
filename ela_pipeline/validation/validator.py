@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
 
 from ela_pipeline.constants import NODE_TYPES, REQUIRED_NODE_FIELDS
 
@@ -25,7 +25,56 @@ def _expect(condition: bool, errors: List[ValidationErrorItem], path: str, messa
         errors.append(ValidationErrorItem(path=path, message=message))
 
 
-def _validate_node(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+def _validate_optional_source_span(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "source_span" not in node:
+        return
+    span = node.get("source_span")
+    _expect(isinstance(span, dict), errors, f"{path}.source_span", "source_span must be an object")
+    if not isinstance(span, dict):
+        return
+    start = span.get("start")
+    end = span.get("end")
+    _expect(isinstance(start, int), errors, f"{path}.source_span.start", "start must be integer")
+    _expect(isinstance(end, int), errors, f"{path}.source_span.end", "end must be integer")
+    if isinstance(start, int) and isinstance(end, int):
+        _expect(start >= 0, errors, f"{path}.source_span.start", "start must be >= 0")
+        _expect(end >= start, errors, f"{path}.source_span.end", "end must be >= start")
+
+
+def _validate_optional_ids(
+    node: Dict[str, Any],
+    path: str,
+    errors: List[ValidationErrorItem],
+    seen_ids: Set[str],
+    expected_parent_id: str | None,
+) -> None:
+    if "node_id" in node:
+        node_id = node.get("node_id")
+        _expect(isinstance(node_id, str), errors, f"{path}.node_id", "node_id must be string")
+        if isinstance(node_id, str):
+            _expect(node_id not in seen_ids, errors, f"{path}.node_id", "node_id must be unique")
+            seen_ids.add(node_id)
+    if "parent_id" in node:
+        parent_id = node.get("parent_id")
+        _expect(
+            parent_id is None or isinstance(parent_id, str),
+            errors,
+            f"{path}.parent_id",
+            "parent_id must be string or null",
+        )
+        if expected_parent_id is None:
+            _expect(parent_id is None, errors, f"{path}.parent_id", "Sentence parent_id must be null")
+        else:
+            _expect(parent_id == expected_parent_id, errors, f"{path}.parent_id", "parent_id mismatch")
+
+
+def _validate_node(
+    node: Dict[str, Any],
+    path: str,
+    errors: List[ValidationErrorItem],
+    seen_ids: Set[str],
+    expected_parent_id: str | None = None,
+) -> None:
     _expect(isinstance(node, dict), errors, path, "Node must be an object")
     if not isinstance(node, dict):
         return
@@ -39,6 +88,8 @@ def _validate_node(node: Dict[str, Any], path: str, errors: List[ValidationError
     _expect(isinstance(node.get("content"), str), errors, f"{path}.content", "content must be string")
     _expect(isinstance(node.get("tense"), str), errors, f"{path}.tense", "tense must be string")
     _expect(isinstance(node.get("part_of_speech"), str), errors, f"{path}.part_of_speech", "part_of_speech must be string")
+    _validate_optional_source_span(node, path, errors)
+    _validate_optional_ids(node, path, errors, seen_ids, expected_parent_id)
 
     notes = node.get("linguistic_notes")
     _expect(isinstance(notes, list), errors, f"{path}.linguistic_notes", "linguistic_notes must be list")
@@ -53,7 +104,7 @@ def _validate_node(node: Dict[str, Any], path: str, errors: List[ValidationError
 
     for idx, child in enumerate(children):
         child_path = f"{path}.linguistic_elements[{idx}]"
-        _validate_node(child, child_path, errors)
+        _validate_node(child, child_path, errors, seen_ids, expected_parent_id=node.get("node_id"))
 
     if node_type == "Sentence":
         for idx, child in enumerate(children):
@@ -71,12 +122,13 @@ def _validate_node(node: Dict[str, Any], path: str, errors: List[ValidationError
 
 def validate_contract(doc: Dict[str, Any]) -> ValidationResult:
     errors: List[ValidationErrorItem] = []
+    seen_ids: Set[str] = set()
     _expect(isinstance(doc, dict), errors, "$", "Top-level must be an object keyed by sentence content")
 
     if isinstance(doc, dict):
         for sentence_key, sentence_node in doc.items():
             _expect(isinstance(sentence_key, str), errors, "$", "Top-level keys must be strings")
-            _validate_node(sentence_node, f"$.{sentence_key}", errors)
+            _validate_node(sentence_node, f"$.{sentence_key}", errors, seen_ids, expected_parent_id=None)
             if isinstance(sentence_node, dict):
                 _expect(sentence_node.get("type") == "Sentence", errors, f"$.{sentence_key}.type", "Top-level value must be Sentence")
                 _expect(sentence_node.get("content") == sentence_key, errors, f"$.{sentence_key}.content", "Sentence content must match top-level key")
@@ -85,7 +137,7 @@ def validate_contract(doc: Dict[str, Any]) -> ValidationResult:
 
 
 def _freeze_compare(base: Dict[str, Any], candidate: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
-    for field in ("type", "content", "part_of_speech"):
+    for field in ("type", "content", "part_of_speech", "node_id", "parent_id", "source_span"):
         if base.get(field) != candidate.get(field):
             errors.append(ValidationErrorItem(path=f"{path}.{field}", message="Frozen field mismatch"))
 

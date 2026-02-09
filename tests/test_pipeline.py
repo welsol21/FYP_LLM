@@ -17,6 +17,25 @@ class PipelineTests(unittest.TestCase):
         for phrase in sentence.get("linguistic_elements", []):
             self.assertGreaterEqual(len(phrase.get("linguistic_elements", [])), 2)
 
+    def test_pipeline_adds_node_metadata(self):
+        text = "She should have trusted her instincts before making the decision."
+        out = run_pipeline(text, model_dir=None)
+        sentence = out[next(iter(out))]
+        self.assertIn("node_id", sentence)
+        self.assertIn("parent_id", sentence)
+        self.assertIsNone(sentence["parent_id"])
+        self.assertIn("source_span", sentence)
+        self.assertEqual(sentence["source_span"]["start"], 0)
+        self.assertEqual(sentence["source_span"]["end"], len(text))
+
+        for phrase in sentence.get("linguistic_elements", []):
+            self.assertEqual(phrase.get("parent_id"), sentence.get("node_id"))
+            self.assertIn("source_span", phrase)
+            for word in phrase.get("linguistic_elements", []):
+                self.assertEqual(word.get("parent_id"), phrase.get("node_id"))
+                self.assertIn("source_span", word)
+                self.assertGreaterEqual(word["source_span"]["end"], word["source_span"]["start"])
+
 
 if __name__ == "__main__":
     unittest.main()

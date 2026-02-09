@@ -87,7 +87,14 @@ def _phrase_candidates(sent) -> List[Tuple[int, int, str]]:
     return spans
 
 
-def _build_word_nodes(span) -> List[Dict]:
+def _with_metadata(node: Dict, *, node_id: str, parent_id: str | None, start: int, end: int) -> Dict:
+    node["node_id"] = node_id
+    node["parent_id"] = parent_id
+    node["source_span"] = {"start": int(start), "end": int(end)}
+    return node
+
+
+def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
     words: List[Dict] = []
     for token in span:
         if token.is_space:
@@ -98,6 +105,13 @@ def _build_word_nodes(span) -> List[Dict]:
             WORD_POS_MAP.get(token.pos_, "other"),
             tense=_word_tense(token),
         )
+        _with_metadata(
+            word_node,
+            node_id=next_id(),
+            parent_id=parent_id,
+            start=token.idx,
+            end=token.idx + len(token.text),
+        )
         words.append(word_node)
     return words
 
@@ -105,6 +119,12 @@ def _build_word_nodes(span) -> List[Dict]:
 def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
     doc = nlp(text)
     output: Dict[str, Dict] = {}
+    seq = 0
+
+    def next_id() -> str:
+        nonlocal seq
+        seq += 1
+        return f"n{seq}"
 
     for sent in doc.sents:
         sent_text = sent.text.strip()
@@ -112,6 +132,14 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
             continue
 
         sentence_node = blank_node("Sentence", sent_text, "sentence", tense="null")
+        sentence_id = next_id()
+        _with_metadata(
+            sentence_node,
+            node_id=sentence_id,
+            parent_id=None,
+            start=sent.start_char,
+            end=sent.end_char,
+        )
 
         for start, end, phrase_pos in _phrase_candidates(sent):
             span = doc[start:end]
@@ -120,7 +148,19 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
                 continue
 
             phrase_node = blank_node("Phrase", phrase_text, phrase_pos, tense="null")
-            phrase_node["linguistic_elements"] = _build_word_nodes(span)
+            phrase_id = next_id()
+            _with_metadata(
+                phrase_node,
+                node_id=phrase_id,
+                parent_id=sentence_id,
+                start=span.start_char,
+                end=span.end_char,
+            )
+            phrase_node["linguistic_elements"] = _build_word_nodes(
+                span,
+                parent_id=phrase_id,
+                next_id=next_id,
+            )
 
             # Contract rule: do not emit one-word phrases.
             if len(phrase_node["linguistic_elements"]) < 2:
@@ -131,7 +171,19 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
         if not sentence_node["linguistic_elements"]:
             # Fallback: single phrase with all non-space tokens when sentence has at least 2 tokens.
             phrase_node = blank_node("Phrase", sent_text, "clause", tense="null")
-            phrase_node["linguistic_elements"] = _build_word_nodes(sent)
+            phrase_id = next_id()
+            _with_metadata(
+                phrase_node,
+                node_id=phrase_id,
+                parent_id=sentence_id,
+                start=sent.start_char,
+                end=sent.end_char,
+            )
+            phrase_node["linguistic_elements"] = _build_word_nodes(
+                sent,
+                parent_id=phrase_id,
+                next_id=next_id,
+            )
             if len(phrase_node["linguistic_elements"]) >= 2:
                 sentence_node["linguistic_elements"].append(phrase_node)
 
