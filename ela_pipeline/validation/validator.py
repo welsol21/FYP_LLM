@@ -86,6 +86,13 @@ def _validate_optional_verbal_fields(node: Dict[str, Any], path: str, errors: Li
                 f"{path}.{field}",
                 f"{field} must be string",
             )
+    if "aux_function" in node:
+        _expect(
+            isinstance(node.get("aux_function"), str),
+            errors,
+            f"{path}.aux_function",
+            "aux_function must be string",
+        )
 
 
 def _validate_optional_features(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:

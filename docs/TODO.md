@@ -48,6 +48,6 @@
 - [x] Remove `tense` from globally blocked note patterns in quality filter.
 - [x] Adjust fallback template for `auxiliary verb` to avoid conflicts with note-quality validation.
 - [x] Add regression test: fallback note for `auxiliary verb` must always be valid and non-empty.
-- [ ] Add `aux_function` for `Word` nodes with `part_of_speech=auxiliary verb`.
-- [ ] Populate `aux_function` from dependency + morphology (e.g., `modal_auxiliary`, `perfect_auxiliary`, `passive_auxiliary`, `progressive_auxiliary`).
-- [ ] Add tests for `aux_function` presence and type validity.
+- [x] Add `aux_function` for `Word` nodes with `part_of_speech=auxiliary verb`.
+- [x] Populate `aux_function` from dependency + morphology (e.g., `modal_auxiliary`, `perfect_auxiliary`, `passive_auxiliary`, `progressive_auxiliary`).
+- [x] Add tests for `aux_function` presence and type validity.

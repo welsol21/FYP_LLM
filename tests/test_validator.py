@@ -117,6 +117,23 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
+    def test_rejects_invalid_optional_aux_function(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        phrase = sentence["linguistic_elements"][0]
+        word = phrase["linguistic_elements"][0]
+        word["aux_function"] = {"bad": "value"}
+
+        result = validate_contract(data)
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("aux_function" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
     def test_rejects_invalid_optional_features(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)

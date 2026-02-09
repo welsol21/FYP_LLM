@@ -125,6 +125,20 @@ def _word_finiteness(token) -> str:
     return "finite" if "Fin" in token.morph.get("VerbForm") else "non-finite"
 
 
+def _word_aux_function(token) -> str:
+    if token.pos_ != "AUX":
+        return "null"
+    if token.tag_ == "MD":
+        return "modal_auxiliary"
+    if token.lemma_.lower() == "have":
+        return "perfect_auxiliary"
+    if token.dep_ == "auxpass":
+        return "passive_auxiliary"
+    if token.lemma_.lower() == "be" and token.head.tag_ == "VBG":
+        return "progressive_auxiliary"
+    return "auxiliary"
+
+
 def _word_features(token) -> Dict[str, str]:
     feature_map = {
         "number": token.morph.get("Number"),
@@ -244,6 +258,7 @@ def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
         word_node["mood"] = _word_mood(token)
         word_node["voice"] = _word_voice(token)
         word_node["finiteness"] = _word_finiteness(token)
+        word_node["aux_function"] = _word_aux_function(token)
         word_node["features"] = _word_features(token)
         _with_metadata(
             word_node,
