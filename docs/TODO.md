@@ -45,3 +45,6 @@
 ## Next Quality Tasks
 
 - [x] Deduplicate repeated entries in `rejected_candidates` and preserve attempt statistics (`count` + per-candidate reason trace in `rejected_candidate_stats`).
+- [ ] Remove `tense` from globally blocked note patterns in quality filter.
+- [ ] Adjust fallback template for `auxiliary verb` to avoid conflicts with note-quality validation.
+- [ ] Add regression test: fallback note for `auxiliary verb` must always be valid and non-empty.
