@@ -83,6 +83,18 @@ def _validate_optional_verbal_fields(node: Dict[str, Any], path: str, errors: Li
             )
 
 
+def _validate_optional_features(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "features" not in node:
+        return
+    features = node.get("features")
+    _expect(isinstance(features, dict), errors, f"{path}.features", "features must be object")
+    if not isinstance(features, dict):
+        return
+    for key, value in features.items():
+        _expect(isinstance(key, str), errors, f"{path}.features", "feature keys must be string")
+        _expect(isinstance(value, str), errors, f"{path}.features.{key}", "feature values must be string")
+
+
 def _validate_optional_ids(
     node: Dict[str, Any],
     path: str,
@@ -134,6 +146,7 @@ def _validate_node(
     _validate_optional_grammatical_role(node, path, errors)
     _validate_optional_dependency(node, path, errors)
     _validate_optional_verbal_fields(node, path, errors)
+    _validate_optional_features(node, path, errors)
     _validate_optional_ids(node, path, errors, seen_ids, expected_parent_id)
 
     notes = node.get("linguistic_notes")
@@ -192,6 +205,7 @@ def _freeze_compare(base: Dict[str, Any], candidate: Dict[str, Any], path: str, 
         "grammatical_role",
         "dep_label",
         "head_id",
+        "features",
     ):
         if base.get(field) != candidate.get(field):
             errors.append(ValidationErrorItem(path=f"{path}.{field}", message="Frozen field mismatch"))

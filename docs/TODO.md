@@ -23,8 +23,8 @@
 - [x] Add dependency linkage for word nodes:
   - [x] `dep_label`
   - [x] `head_id`
-- Add normalized morphology object:
-  - `features` (`number`, `person`, `case`, `degree`, `definiteness`, `verb_form`, etc.)
+- [x] Add normalized morphology object:
+  - [x] `features` (`number`, `person`, `case`, `degree`, `definiteness`, `verb_form`, etc.)
 - Replace plain `linguistic_notes: [string]` with typed note objects:
   - `notes: [{text, kind, confidence, source}]`
   - where `kind` in `semantic|syntactic|morphological|discourse`

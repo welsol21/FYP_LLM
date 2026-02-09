@@ -125,6 +125,20 @@ def _word_finiteness(token) -> str:
     return "finite" if "Fin" in token.morph.get("VerbForm") else "non-finite"
 
 
+def _word_features(token) -> Dict[str, str]:
+    feature_map = {
+        "number": token.morph.get("Number"),
+        "person": token.morph.get("Person"),
+        "case": token.morph.get("Case"),
+        "degree": token.morph.get("Degree"),
+        "definiteness": token.morph.get("Definite"),
+        "verb_form": token.morph.get("VerbForm"),
+        "gender": token.morph.get("Gender"),
+        "tense_feature": token.morph.get("Tense"),
+    }
+    return {k: (v[0].lower() if v else "null") for k, v in feature_map.items()}
+
+
 def _phrase_candidates(sent) -> List[Tuple[int, int, str]]:
     spans: List[Tuple[int, int, str]] = []
     seen: Set[Tuple[int, int]] = set()
@@ -230,6 +244,7 @@ def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
         word_node["mood"] = _word_mood(token)
         word_node["voice"] = _word_voice(token)
         word_node["finiteness"] = _word_finiteness(token)
+        word_node["features"] = _word_features(token)
         _with_metadata(
             word_node,
             node_id=next_id(),

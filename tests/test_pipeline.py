@@ -53,6 +53,8 @@ class PipelineTests(unittest.TestCase):
                 self.assertIsInstance(word["dep_label"], str)
                 self.assertIn("head_id", word)
                 self.assertTrue(word["head_id"] is None or isinstance(word["head_id"], str))
+                self.assertIn("features", word)
+                self.assertIsInstance(word["features"], dict)
                 self.assertGreaterEqual(word["source_span"]["end"], word["source_span"]["start"])
 
     def test_pipeline_excludes_simple_determiner_noun_phrases(self):
