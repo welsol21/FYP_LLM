@@ -9,7 +9,6 @@ _BAD_PATTERNS = [
     re.compile(r"\bpart_of_speech\b", re.IGNORECASE),
     re.compile(r"\bnode_type\b", re.IGNORECASE),
     re.compile(r"\bcontent\b", re.IGNORECASE),
-    re.compile(r"\btense\b", re.IGNORECASE),
     re.compile(r"^true$", re.IGNORECASE),
     re.compile(r"^false$", re.IGNORECASE),
     re.compile(r"^[\W_]+$"),

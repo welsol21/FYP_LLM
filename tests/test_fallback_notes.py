@@ -59,6 +59,18 @@ class FallbackNotesTests(unittest.TestCase):
         self.assertIn("surface", note.lower())
         self.assertTrue(is_valid_note(note))
 
+    def test_word_fallback_auxiliary_verb_is_valid_and_non_empty(self):
+        node = {
+            "type": "Word",
+            "content": "should",
+            "tense": "null",
+            "part_of_speech": "auxiliary verb",
+        }
+        note = build_fallback_note(node)
+        self.assertNotEqual(note.strip(), "")
+        self.assertIn("'should'", note.lower())
+        self.assertTrue(is_valid_note(note))
+
 
 if __name__ == "__main__":
     unittest.main()

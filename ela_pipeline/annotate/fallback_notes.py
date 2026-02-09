@@ -97,7 +97,7 @@ def _word_note(node: Dict) -> str:
         "proper noun": f"'{content}' is a proper noun referring to a specific named entity.",
         "pronoun": f"'{content}' is a pronoun used to refer to an entity without repeating a full noun phrase.",
         "verb": f"'{content}' is a verb form that contributes core action or state meaning.",
-        "auxiliary verb": f"'{content}' is an auxiliary verb that supports tense, aspect, modality, or voice.",
+        "auxiliary verb": f"'{content}' is an auxiliary verb that supports verbal grammar, modality, or voice interpretation.",
         "adjective": f"'{content}' is an adjective that modifies a noun by adding descriptive information.",
         "adverb": f"'{content}' is an adverb that modifies a verb, adjective, or clause-level meaning.",
         "preposition": f"'{content}' is a preposition that links a noun phrase to another sentence element.",

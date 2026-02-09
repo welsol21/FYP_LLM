@@ -13,6 +13,13 @@ class NotesQualityTests(unittest.TestCase):
     def test_accepts_normal_note(self):
         self.assertTrue(is_valid_note("A noun phrase functioning as the subject of the clause."))
 
+    def test_accepts_note_with_tense_word(self):
+        self.assertTrue(
+            is_valid_note(
+                "This auxiliary verb supports tense and aspect interpretation in the verbal group."
+            )
+        )
+
     def test_rejects_generic_template(self):
         text = "Subordinate clause of concession introduced by a subordinating conjunction."
         self.assertTrue(is_generic_template(text))
