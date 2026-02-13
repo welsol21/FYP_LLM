@@ -71,7 +71,7 @@
 
 - [x] Build clean train/dev splits from `notes` where `source="model"` only (exclude fallback/telemetry fields).
 - [x] Enforce note target style normalization (1-2 sentences, remove generic/template artifacts).
-- [ ] Balance training samples by node type (`Word/Phrase/Sentence`) and TAM construction buckets.
-- [ ] Freeze prompt template format for reproducible T5 training input.
+- [x] Balance training samples by node type (`Word/Phrase/Sentence`) and TAM construction buckets.
+- [x] Freeze prompt template format for reproducible T5 training input.
 - [ ] Add reproducible baseline training config + evaluation report artifacts.
 - [ ] Add hard-negative loop from `rejected_candidates` to improve note quality filters.
