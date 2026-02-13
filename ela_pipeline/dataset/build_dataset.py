@@ -13,12 +13,27 @@ def format_feature_list(features: List[str]) -> str:
     return ", ".join(features).replace("|", ":")
 
 
+def _extract_model_note(targets: Dict[str, Any]) -> str | None:
+    notes = targets.get("notes")
+    if not isinstance(notes, list):
+        return None
+    for note in notes:
+        if not isinstance(note, dict):
+            continue
+        if note.get("source") != "model":
+            continue
+        text = note.get("text")
+        if isinstance(text, str) and text.strip():
+            return text.strip()
+    return None
+
+
 def iter_examples(item: Dict[str, Any]) -> Iterable[Dict[str, str]]:
     sentence = item.get("input", "")
     sent_features = item.get("features", {})
     sent_targets = item.get("targets", {})
 
-    sentence_note = sent_targets.get("linguistic_notes")
+    sentence_note = _extract_model_note(sent_targets)
     if sentence_note:
         prompt = (
             f"sentence: {sentence} "
@@ -30,7 +45,7 @@ def iter_examples(item: Dict[str, Any]) -> Iterable[Dict[str, str]]:
     for phrase in item.get("linguistic_elements", []):
         if phrase.get("type") != "Phrase":
             continue
-        p_note = phrase.get("targets", {}).get("linguistic_notes")
+        p_note = _extract_model_note(phrase.get("targets", {}))
         if p_note:
             pf = phrase.get("features", {})
             prompt = (
@@ -45,7 +60,7 @@ def iter_examples(item: Dict[str, Any]) -> Iterable[Dict[str, str]]:
         for word in phrase.get("linguistic_elements", []):
             if word.get("type") != "Word":
                 continue
-            w_note = word.get("targets", {}).get("linguistic_notes")
+            w_note = _extract_model_note(word.get("targets", {}))
             if not w_note:
                 continue
             wf = word.get("features", {})
