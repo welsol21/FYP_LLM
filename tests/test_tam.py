@@ -24,6 +24,15 @@ class TamTests(unittest.TestCase):
         self.assertEqual(result.tense, "future")
         self.assertEqual(result.mood, "modal")
 
+    def test_modal_perfect_not_labeled_as_past_perfect(self):
+        doc = self.nlp("She should have trusted her instincts.")
+        sent = next(doc.sents)
+        result = detect_tam(sent)
+        self.assertEqual(result.mood, "modal")
+        self.assertEqual(result.aspect, "perfect")
+        self.assertEqual(result.tense, "none")
+        self.assertEqual(result.finiteness, "finite")
+
 
 if __name__ == "__main__":
     unittest.main()

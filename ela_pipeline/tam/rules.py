@@ -39,6 +39,7 @@ def _token_seq(tokens: Iterable) -> List:
 def detect_tam(tokens: Iterable) -> TamResult:
     seq = _token_seq(tokens)
     lowered = [t.lemma_.lower() for t in seq]
+    finite_markers = [t for t in seq if "Fin" in t.morph.get("VerbForm") or t.tag_ == "MD"]
 
     modal = ""
     for t in seq:
@@ -71,11 +72,10 @@ def detect_tam(tokens: Iterable) -> TamResult:
     if future:
         tense = "future"
     elif modal and has_have and has_vbn:
-        # Modal perfect (e.g., "should have trusted") expresses past reference.
-        tense = "past"
+        # Modal perfect (e.g., "should have trusted") is not past perfect (had + VBN).
+        tense = "none"
     else:
-        finite = [t for t in seq if "Fin" in t.morph.get("VerbForm")]
-        head = finite[0] if finite else (seq[0] if seq else None)
+        head = finite_markers[0] if finite_markers else (seq[0] if seq else None)
         if head is None:
             tense = "none"
         elif "Past" in head.morph.get("Tense"):
@@ -87,7 +87,7 @@ def detect_tam(tokens: Iterable) -> TamResult:
 
     polarity = "negative" if has_neg else "affirmative"
     mood = "modal" if modal else "indicative"
-    finiteness = "finite" if tense != "none" else "non-finite"
+    finiteness = "finite" if finite_markers else "non-finite"
     return TamResult(
         tense=tense,
         aspect=aspect,
