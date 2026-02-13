@@ -17,9 +17,29 @@ TELEMETRY_PATTERNS = (
     re.compile(r"\brejected_[a-z_]+\b", re.IGNORECASE),
 )
 
+LOW_QUALITY_NOTE_PATTERNS = (
+    re.compile(r"^\s*node content\.?\s*(part of speech)?\.?\s*$", re.IGNORECASE),
+    re.compile(r"\bpart of speech\b", re.IGNORECASE),
+    re.compile(r"\bverb-?centred phrase expressing what happens to or about the subject\b", re.IGNORECASE),
+    re.compile(r"^\s*sentence:\s*", re.IGNORECASE),
+)
+
 
 def format_feature_list(features: List[str]) -> str:
     return ", ".join(features).replace("|", ":")
+
+
+def _sentence_count(text: str) -> int:
+    parts = [p.strip() for p in re.split(r"[.!?]+", text) if p.strip()]
+    return len(parts)
+
+
+def _is_style_compliant(text: str) -> bool:
+    for pattern in LOW_QUALITY_NOTE_PATTERNS:
+        if pattern.search(text):
+            return False
+    sentence_n = _sentence_count(text)
+    return 1 <= sentence_n <= 2
 
 
 def _sanitize_training_target_text(text: str) -> str | None:
@@ -29,6 +49,8 @@ def _sanitize_training_target_text(text: str) -> str | None:
     for pattern in TELEMETRY_PATTERNS:
         if pattern.search(clean):
             return None
+    if not _is_style_compliant(clean):
+        return None
     return clean
 
 

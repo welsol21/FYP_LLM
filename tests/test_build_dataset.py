@@ -91,6 +91,42 @@ class BuildDatasetTests(unittest.TestCase):
         rows = list(iter_examples(item))
         self.assertEqual(rows, [])
 
+    def test_iter_examples_excludes_low_quality_template_style(self):
+        item = {
+            "input": "Template sentence",
+            "features": {"pos": [], "dep": []},
+            "targets": {
+                "notes": [
+                    {
+                        "text": "Node content. Part of speech.",
+                        "source": "model",
+                    }
+                ]
+            },
+            "linguistic_elements": [],
+        }
+
+        rows = list(iter_examples(item))
+        self.assertEqual(rows, [])
+
+    def test_iter_examples_excludes_targets_longer_than_two_sentences(self):
+        item = {
+            "input": "Long sentence",
+            "features": {"pos": [], "dep": []},
+            "targets": {
+                "notes": [
+                    {
+                        "text": "This note has one sentence. Here is second. And a third.",
+                        "source": "model",
+                    }
+                ]
+            },
+            "linguistic_elements": [],
+        }
+
+        rows = list(iter_examples(item))
+        self.assertEqual(rows, [])
+
 
 if __name__ == "__main__":
     unittest.main()
