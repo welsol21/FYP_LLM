@@ -379,7 +379,7 @@ def _validate_node(
         )
 
 
-def validate_contract(doc: Dict[str, Any], validation_mode: str = "v1") -> ValidationResult:
+def validate_contract(doc: Dict[str, Any], validation_mode: str = "v2_strict") -> ValidationResult:
     errors: List[ValidationErrorItem] = []
     seen_ids: Set[str] = set()
     _expect(validation_mode in VALIDATION_MODES, errors, "$.validation_mode", "validation_mode must be v1 or v2_strict")

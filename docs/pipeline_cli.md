@@ -15,10 +15,11 @@ python -m ela_pipeline.training.train_generator --train data/processed/train.jso
 ## 3) Run production inference
 
 ```bash
-python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --model-dir results_llm_notes_v3_t5-small_phrase/best_model --validation-mode v2_strict
+python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --model-dir results_llm_notes_v3_t5-small_phrase/best_model
 ```
 
-Legacy compatibility mode (`v1`) if needed:
+`v2_strict` is now the default mode.
+Legacy compatibility mode (`v1`) is still available only when explicitly requested:
 
 ```bash
 python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --model-dir results_llm_notes_v3_t5-small_phrase/best_model --validation-mode v1

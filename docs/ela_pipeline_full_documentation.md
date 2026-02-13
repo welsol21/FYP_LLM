@@ -67,10 +67,12 @@ Only enrichment fields (notes/TAM-like metadata) may change.
 - `v1`: backward-compatible baseline
 - `v2_strict`: requires core v2 fields on each node (`node_id`, `source_span`, `grammatical_role`, `schema_version='v2'`)
 
+Default mode is `v2_strict`.
+
 CLI exposure:
 ```bash
-python -m ela_pipeline.inference.run --validation-mode v1
 python -m ela_pipeline.inference.run --validation-mode v2_strict
+python -m ela_pipeline.inference.run --validation-mode v1
 ```
 
 ## 4. Pipeline Stages
@@ -121,6 +123,8 @@ python -m ela_pipeline.inference.run --text "She should have trusted her instinc
 ```bash
 python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --model-dir results_llm_notes_v3_t5-small_phrase/best_model --validation-mode v2_strict
 ```
+
+Note: the same command without `--validation-mode` runs in `v2_strict` by default.
 
 ### 5.5 Annotate existing JSON
 ```bash

@@ -41,7 +41,7 @@ def run_pipeline(
     text: str,
     model_dir: str | None = None,
     spacy_model: str = "en_core_web_sm",
-    validation_mode: str = "v1",
+    validation_mode: str = "v2_strict",
 ) -> dict:
     nlp = load_nlp(spacy_model)
 
@@ -69,7 +69,7 @@ def main() -> None:
     parser.add_argument("--text", required=True)
     parser.add_argument("--model-dir", default=None)
     parser.add_argument("--spacy-model", default="en_core_web_sm")
-    parser.add_argument("--validation-mode", default="v1", choices=["v1", "v2_strict"])
+    parser.add_argument("--validation-mode", default="v2_strict", choices=["v1", "v2_strict"])
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 

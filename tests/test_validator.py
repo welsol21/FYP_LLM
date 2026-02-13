@@ -27,7 +27,7 @@ class ValidatorTests(unittest.TestCase):
     def test_sample_contract_valid(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertTrue(result.ok, msg=str(result.errors))
 
     def test_frozen_detects_content_change(self):
@@ -51,7 +51,7 @@ class ValidatorTests(unittest.TestCase):
             sentence["linguistic_elements"][0]["linguistic_elements"][0]
         ]
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertFalse(result.ok)
         self.assertTrue(
             any("at least 2 Word nodes" in err.message for err in result.errors),
@@ -68,7 +68,7 @@ class ValidatorTests(unittest.TestCase):
         sentence["node_id"] = "n1"
         sentence["parent_id"] = None
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertFalse(result.ok)
         self.assertTrue(
             any("source_span.end" in err.path for err in result.errors),
@@ -83,7 +83,7 @@ class ValidatorTests(unittest.TestCase):
         sentence = data[sentence_key]
         sentence["grammatical_role"] = {"label": "clause"}
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertFalse(result.ok)
         self.assertTrue(
             any("grammatical_role" in err.path for err in result.errors),
@@ -103,7 +103,7 @@ class ValidatorTests(unittest.TestCase):
         word["dep_label"] = {"bad": "value"}
         word["head_id"] = "n100"
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertFalse(result.ok)
         self.assertTrue(
             any("dep_label" in err.path or "head_id" in err.path for err in result.errors),
@@ -118,7 +118,7 @@ class ValidatorTests(unittest.TestCase):
         sentence = data[sentence_key]
         sentence["aspect"] = 1
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertFalse(result.ok)
         self.assertTrue(
             any("aspect" in err.path for err in result.errors),
@@ -133,7 +133,7 @@ class ValidatorTests(unittest.TestCase):
         sentence = data[sentence_key]
         sentence["tam_construction"] = {"bad": "value"}
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertFalse(result.ok)
         self.assertTrue(
             any("tam_construction" in err.path for err in result.errors),
@@ -148,7 +148,7 @@ class ValidatorTests(unittest.TestCase):
         sentence = data[sentence_key]
         sentence["tam_construction"] = "perfect_modal"
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertTrue(result.ok, msg=str(result.errors))
 
     def test_rejects_invalid_optional_features(self):
@@ -161,7 +161,7 @@ class ValidatorTests(unittest.TestCase):
         word = phrase["linguistic_elements"][0]
         word["features"] = {"number": 1}
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertFalse(result.ok)
         self.assertTrue(
             any("features.number" in err.path for err in result.errors),
@@ -183,7 +183,7 @@ class ValidatorTests(unittest.TestCase):
             }
         ]
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertTrue(result.ok, msg=str(result.errors))
 
     def test_rejects_invalid_optional_typed_notes(self):
@@ -201,7 +201,7 @@ class ValidatorTests(unittest.TestCase):
             }
         ]
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertFalse(result.ok)
         self.assertTrue(
             any(".notes[0]." in err.path for err in result.errors),
@@ -218,7 +218,7 @@ class ValidatorTests(unittest.TestCase):
         sentence["rejected_candidates"] = ["Bad template output"]
         sentence["reason_codes"] = ["MODEL_NOTE_ACCEPTED"]
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertTrue(result.ok, msg=str(result.errors))
 
     def test_accepts_valid_optional_rejected_candidate_stats(self):
@@ -235,7 +235,7 @@ class ValidatorTests(unittest.TestCase):
             }
         ]
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertTrue(result.ok, msg=str(result.errors))
 
     def test_rejects_invalid_optional_trace_fields(self):
@@ -248,7 +248,7 @@ class ValidatorTests(unittest.TestCase):
         sentence["rejected_candidates"] = [123]
         sentence["reason_codes"] = [None]
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertFalse(result.ok)
         self.assertTrue(
             any(".quality_flags" in err.path or ".rejected_candidates" in err.path or ".reason_codes" in err.path for err in result.errors),
@@ -269,7 +269,7 @@ class ValidatorTests(unittest.TestCase):
             }
         ]
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertFalse(result.ok)
         self.assertTrue(
             any(".rejected_candidate_stats" in err.path for err in result.errors),
@@ -284,7 +284,7 @@ class ValidatorTests(unittest.TestCase):
         sentence = data[sentence_key]
         sentence["schema_version"] = "v2"
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertTrue(result.ok, msg=str(result.errors))
 
     def test_rejects_invalid_optional_schema_version(self):
@@ -295,7 +295,7 @@ class ValidatorTests(unittest.TestCase):
         sentence = data[sentence_key]
         sentence["schema_version"] = ""
 
-        result = validate_contract(data)
+        result = validate_contract(data, validation_mode="v1")
         self.assertFalse(result.ok)
         self.assertTrue(
             any(".schema_version" in err.path for err in result.errors),
