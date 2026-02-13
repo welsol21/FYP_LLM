@@ -55,7 +55,7 @@
 - [x] Keep backward compatibility for legacy mode while migrating strict mode to real nulls.
 - [x] Fix TAM classification for modal perfect constructions (`should/could/might have + VBN`) so they are not labeled as `past perfect`.
 - [x] Add explicit modal-perfect representation (for example `mood=modal`, `aspect=perfect`, `tense=null`, plus dedicated construction label).
-- [ ] Update strict schema and validator rules to reflect the modal-perfect and real-null policy.
+- [x] Update strict schema and validator rules to reflect the modal-perfect and real-null policy.
 - [ ] Add regression tests covering `had + VBN` vs `should have + VBN` distinction.
 - [ ] Update dataset building to train only on notes with `source=\"model\"` and exclude fallback notes from targets.
 - [ ] Ensure training targets exclude telemetry fields (`quality_flags`, `reason_codes`, `rejected_*`) and contain only note text fields.

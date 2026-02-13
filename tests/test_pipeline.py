@@ -74,6 +74,7 @@ class PipelineTests(unittest.TestCase):
             validation_mode="v2_strict",
         )
         sentence = out[next(iter(out))]
+        self.assertEqual(sentence.get("tam_construction"), "modal_perfect")
 
         def walk(node):
             for field in ("tense", "aspect", "mood", "voice", "finiteness"):

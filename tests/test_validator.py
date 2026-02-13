@@ -140,6 +140,21 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
+    def test_rejects_invalid_tam_construction_value(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["tam_construction"] = "perfect_modal"
+
+        result = validate_contract(data)
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("tam_construction" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
     def test_rejects_invalid_optional_features(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -324,6 +339,25 @@ class ValidatorTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertTrue(
             any("must use real null" in err.message for err in result.errors),
+            msg=str(result.errors),
+        )
+
+    def test_rejects_inconsistent_modal_perfect_policy_in_v2_strict(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        self._inject_minimal_v2_fields(sentence, None, [1])
+        self._normalize_strict_tam_nulls(sentence)
+        sentence["tam_construction"] = "modal_perfect"
+        sentence["mood"] = "modal"
+        sentence["aspect"] = "perfect"
+        sentence["tense"] = "past"
+
+        result = validate_contract(data, validation_mode="v2_strict")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("modal_perfect requires tense=null" in err.message for err in result.errors),
             msg=str(result.errors),
         )
 

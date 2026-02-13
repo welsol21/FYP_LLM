@@ -12,6 +12,7 @@ NOTE_SOURCES = {"model", "rule", "fallback"}
 VALIDATION_MODES = {"v1", "v2_strict"}
 STRICT_V2_REQUIRED_FIELDS = {"node_id", "source_span", "grammatical_role", "schema_version"}
 TAM_FIELDS = ("tense", "aspect", "mood", "voice", "finiteness")
+TAM_CONSTRUCTIONS = {"none", "modal_perfect", "past_perfect", "present_perfect", "future_perfect"}
 
 
 @dataclass
@@ -119,11 +120,36 @@ def _validate_optional_verbal_fields(
         if field in node:
             _validate_tam_field(node, field, path, errors, validation_mode)
     if "tam_construction" in node:
+        value = node.get("tam_construction")
+        _expect(isinstance(value, str), errors, f"{path}.tam_construction", "tam_construction must be string")
+        if isinstance(value, str):
+            _expect(
+                value in TAM_CONSTRUCTIONS,
+                errors,
+                f"{path}.tam_construction",
+                "tam_construction must be one of none|modal_perfect|past_perfect|present_perfect|future_perfect",
+            )
+
+
+def _validate_modal_perfect_policy(
+    node: Dict[str, Any],
+    path: str,
+    errors: List[ValidationErrorItem],
+    validation_mode: str,
+) -> None:
+    if validation_mode != "v2_strict":
+        return
+    construction = node.get("tam_construction")
+    if construction == "modal_perfect":
+        _expect(node.get("mood") == "modal", errors, f"{path}.mood", "modal_perfect requires mood='modal'")
+        _expect(node.get("aspect") == "perfect", errors, f"{path}.aspect", "modal_perfect requires aspect='perfect'")
+        _expect(node.get("tense") is None, errors, f"{path}.tense", "modal_perfect requires tense=null in strict mode")
+    if node.get("mood") == "modal" and node.get("aspect") == "perfect" and node.get("tense") is None:
         _expect(
-            isinstance(node.get("tam_construction"), str),
+            node.get("tam_construction") == "modal_perfect",
             errors,
             f"{path}.tam_construction",
-            "tam_construction must be string",
+            "modal mood + perfect aspect + tense null requires tam_construction='modal_perfect' in strict mode",
         )
 
 
@@ -308,6 +334,7 @@ def _validate_node(
     _validate_optional_grammatical_role(node, path, errors)
     _validate_optional_dependency(node, path, errors)
     _validate_optional_verbal_fields(node, path, errors, validation_mode)
+    _validate_modal_perfect_policy(node, path, errors, validation_mode)
     _validate_optional_features(node, path, errors)
     _validate_optional_notes(node, path, errors)
     _validate_optional_trace_fields(node, path, errors)

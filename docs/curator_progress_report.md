@@ -85,6 +85,10 @@ Source: `schemas/linguistic_contract_v2_strict.schema.json`
         "mood": {"type": ["string", "null"]},
         "voice": {"type": ["string", "null"]},
         "finiteness": {"type": ["string", "null"]},
+        "tam_construction": {
+          "type": "string",
+          "enum": ["none", "modal_perfect", "past_perfect", "present_perfect", "future_perfect"]
+        },
         "linguistic_notes": {"type": "array", "items": {"type": "string"}},
         "notes": {"type": "array", "items": {"$ref": "#/$defs/typedNote"}},
         "quality_flags": {"type": "array", "items": {"type": "string"}},
@@ -130,6 +134,10 @@ Source: `schemas/linguistic_contract_v2_strict.schema.json`
         "mood": {"type": ["string", "null"]},
         "voice": {"type": ["string", "null"]},
         "finiteness": {"type": ["string", "null"]},
+        "tam_construction": {
+          "type": "string",
+          "enum": ["none", "modal_perfect", "past_perfect", "present_perfect", "future_perfect"]
+        },
         "linguistic_notes": {"type": "array", "items": {"type": "string"}},
         "notes": {"type": "array", "items": {"$ref": "#/$defs/typedNote"}},
         "quality_flags": {"type": "array", "items": {"type": "string"}},
@@ -148,6 +156,23 @@ Source: `schemas/linguistic_contract_v2_strict.schema.json`
         "grammatical_role": {"type": "string"},
         "schema_version": {"type": "string", "const": "v2"}
       },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "tam_construction": {"const": "modal_perfect"}
+            },
+            "required": ["tam_construction"]
+          },
+          "then": {
+            "properties": {
+              "mood": {"const": "modal"},
+              "aspect": {"const": "perfect"},
+              "tense": {"type": "null"}
+            }
+          }
+        }
+      ],
       "additionalProperties": true
     },
     "sentenceNode": {
@@ -173,6 +198,10 @@ Source: `schemas/linguistic_contract_v2_strict.schema.json`
         "mood": {"type": ["string", "null"]},
         "voice": {"type": ["string", "null"]},
         "finiteness": {"type": ["string", "null"]},
+        "tam_construction": {
+          "type": "string",
+          "enum": ["none", "modal_perfect", "past_perfect", "present_perfect", "future_perfect"]
+        },
         "linguistic_notes": {"type": "array", "items": {"type": "string"}},
         "notes": {"type": "array", "items": {"$ref": "#/$defs/typedNote"}},
         "quality_flags": {"type": "array", "items": {"type": "string"}},
@@ -190,6 +219,23 @@ Source: `schemas/linguistic_contract_v2_strict.schema.json`
         "grammatical_role": {"type": "string"},
         "schema_version": {"type": "string", "const": "v2"}
       },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "tam_construction": {"const": "modal_perfect"}
+            },
+            "required": ["tam_construction"]
+          },
+          "then": {
+            "properties": {
+              "mood": {"const": "modal"},
+              "aspect": {"const": "perfect"},
+              "tense": {"type": "null"}
+            }
+          }
+        }
+      ],
       "additionalProperties": true
     }
   }
