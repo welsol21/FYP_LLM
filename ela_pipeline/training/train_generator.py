@@ -15,6 +15,7 @@ from transformers import (
     Seq2SeqTrainingArguments,
     T5ForConditionalGeneration,
     T5Tokenizer,
+    set_seed,
 )
 
 
@@ -28,6 +29,11 @@ def load_jsonl(path: str) -> List[Dict[str, str]]:
     return rows
 
 
+def save_json(path: str, payload: Dict) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train local T5 generator for linguistic notes")
     parser.add_argument("--train", default="data/processed/train.jsonl")
@@ -38,8 +44,11 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--max-input", type=int, default=512)
     parser.add_argument("--max-target", type=int, default=128)
+    parser.add_argument("--learning-rate", type=float, default=5e-5)
+    parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
+    set_seed(args.seed)
     train_rows = load_jsonl(args.train)
     dev_rows = load_jsonl(args.dev)
 
@@ -75,11 +84,30 @@ def main() -> None:
         return {"exact_match": round(matches / max(1, len(decoded_preds)), 4)}
 
     os.makedirs(args.output_dir, exist_ok=True)
+    training_config = {
+        "model_name": args.model_name,
+        "train_path": args.train,
+        "dev_path": args.dev,
+        "output_dir": args.output_dir,
+        "num_train_rows": len(train_rows),
+        "num_dev_rows": len(dev_rows),
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "max_input": args.max_input,
+        "max_target": args.max_target,
+        "learning_rate": args.learning_rate,
+        "seed": args.seed,
+    }
+    save_json(os.path.join(args.output_dir, "training_config.json"), training_config)
+
     training_args = Seq2SeqTrainingArguments(
         output_dir=os.path.join(args.output_dir, "trainer_output"),
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
+        learning_rate=args.learning_rate,
+        seed=args.seed,
+        data_seed=args.seed,
         eval_strategy="steps",
         eval_steps=200,
         save_strategy="steps",
@@ -100,11 +128,20 @@ def main() -> None:
         data_collator=DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model),
         compute_metrics=compute_metrics,
     )
-    trainer.train()
+    train_output = trainer.train()
+    eval_metrics = trainer.evaluate()
 
     best_model_dir = os.path.join(args.output_dir, "best_model")
     trainer.save_model(best_model_dir)
     tokenizer.save_pretrained(best_model_dir)
+
+    evaluation_report = {
+        "train_metrics": {k: float(v) for k, v in train_output.metrics.items() if isinstance(v, (int, float))},
+        "eval_metrics": {k: float(v) for k, v in eval_metrics.items() if isinstance(v, (int, float))},
+        "best_model_dir": best_model_dir,
+        "prompt_template_version": "v1",
+    }
+    save_json(os.path.join(args.output_dir, "evaluation_report.json"), evaluation_report)
     print(f"Saved model to {best_model_dir}")
 
 

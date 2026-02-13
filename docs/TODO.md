@@ -73,5 +73,5 @@
 - [x] Enforce note target style normalization (1-2 sentences, remove generic/template artifacts).
 - [x] Balance training samples by node type (`Word/Phrase/Sentence`) and TAM construction buckets.
 - [x] Freeze prompt template format for reproducible T5 training input.
-- [ ] Add reproducible baseline training config + evaluation report artifacts.
-- [ ] Add hard-negative loop from `rejected_candidates` to improve note quality filters.
+- [x] Add reproducible baseline training config + evaluation report artifacts.
+- [x] Add hard-negative loop from `rejected_candidates` to improve note quality filters.

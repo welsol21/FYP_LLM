@@ -9,7 +9,23 @@ python -m ela_pipeline.dataset.build_dataset --input linguistic_hierarchical_300
 ## 2) Train local generator
 
 ```bash
-python -m ela_pipeline.training.train_generator --train data/processed/train.jsonl --dev data/processed/dev.jsonl --output-dir artifacts/models/t5_notes
+python -m ela_pipeline.training.train_generator --train data/processed/train.jsonl --dev data/processed/dev.jsonl --output-dir artifacts/models/t5_notes --seed 42 --learning-rate 5e-5
+```
+
+Training writes reproducibility artifacts:
+- `artifacts/models/t5_notes/training_config.json`
+- `artifacts/models/t5_notes/evaluation_report.json`
+
+Optional hard-negative loop from rejected candidates:
+
+```bash
+python -m ela_pipeline.validation.build_hard_negatives --input inference_results/pipeline_result_latest.json --output artifacts/quality/hard_negative_patterns.json --min-count 2 --max-items 200
+```
+
+To apply these patterns during note validation, set:
+
+```bash
+export ELA_HARD_NEGATIVE_PATTERNS=artifacts/quality/hard_negative_patterns.json
 ```
 
 ## 3) Run production inference
