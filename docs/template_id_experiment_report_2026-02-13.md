@@ -1,9 +1,12 @@
 # Template-ID Experiment Report (2026-02-13)
 
 ## Artifacts
-- Dataset report: `docs/template_id_dataset_report_2026-02-13.md`
-- Training report: `docs/template_id_training_report_2026-02-13.md`
-- Regression comparison: `docs/inference_regression_template_id_vs_refresh_2026-02-13.json`
+- Primary regression comparison: `docs/inference_regression_template_id_vs_refresh_2026-02-13.json`
+- Source registry used for reference-driven work: `docs/grammar_reference_sources_2026-02-13.md`
+- Processed dataset stats:
+  - `data/processed/stats.json`
+  - `data/processed_reference/stats.json`
+  - `data/processed_template_id/stats.json`
 
 ## Dataset status
 - Built with `--use-template-id-targets` into `data/processed_template_id`.
@@ -40,3 +43,6 @@ Source: `docs/inference_regression_template_id_vs_refresh_2026-02-13.json`
 - Template-id pipeline wiring is complete and deterministic.
 - Current template-id dataset is too collapsed (low target diversity), which leads to weaker practical inference quality than refreshed baseline on probe suite.
 - Next iteration should increase template coverage/variants and reduce duplicated targets before retraining.
+
+## Documentation cleanup note
+- Intermediate one-off reports were removed in favor of this consolidated report plus the primary regression JSON.
