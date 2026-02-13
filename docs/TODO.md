@@ -81,3 +81,5 @@
 - [x] Implement deterministic filtering and canonical normalization for `rejected_candidates` and `rejected_candidate_stats`.
 - [x] Add configurable stop-substrings/regex + sentence-prefix whitelist policy in pipeline code.
 - [x] Add unit tests for filtering, whitelist behavior, normalization, deduplication, stats aggregation, length and nonalpha thresholds.
+- [x] Extend sentence-prefix filtering to catch `Sentence ...` without colon and typo-leading variants (`sentense/sensence/sensibilisation`).
+- [x] Apply the same blocklist/quality pre-filter to model note acceptance to prevent low-quality `MODEL_NOTE_ACCEPTED` outputs.

@@ -22,6 +22,13 @@ class RejectedCandidatesProcessingTests(unittest.TestCase):
         self.assertEqual(rejected, [])
         self.assertEqual(stats, [])
 
+    def test_filters_sentence_prefix_without_colon(self):
+        rejected, stats = normalize_and_aggregate_rejected_candidates(
+            rejected_candidates=["Sentence should have trusted her instincts before making the decision."]
+        )
+        self.assertEqual(rejected, [])
+        self.assertEqual(stats, [])
+
     def test_sentence_prefix_whitelist_allowed_only_with_flag(self):
         cfg = RejectedCandidateFilterConfig(allow_sentence_prefix_candidates=True)
         rejected, stats = normalize_and_aggregate_rejected_candidates(

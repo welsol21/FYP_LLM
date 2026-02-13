@@ -39,6 +39,10 @@ DEFAULT_REJECT_STOP_SUBSTRINGS = [
 
 DEFAULT_REJECT_REGEX_PATTERNS = [
     r"^sentence\s*:\s*.+$",
+    r"^\s*sentence\b.*$",
+    r"^\s*senten[cs]e\b.*$",
+    r"^\s*sensence\b.*$",
+    r"^\s*sensibilis(a|z)tion\b.*$",
     r"^node\s+content\b.*$",
     r"^node\s+type\b.*$",
     r"^part\s+of\s+speech\b.*$",
@@ -114,7 +118,7 @@ def _dedup_key(text: str) -> str:
 
 
 def _is_sentence_prefixed(text: str) -> bool:
-    return bool(re.match(r"^sentence\s*:", text, flags=re.IGNORECASE))
+    return bool(re.match(r"^\s*sentence\b", text, flags=re.IGNORECASE))
 
 
 def _is_sentence_prefix_allowed(text: str, whitelist_patterns: Sequence[str]) -> bool:
@@ -149,10 +153,15 @@ def is_rejected_candidate_noise(
             return True
 
     sentence_prefixed = _is_sentence_prefixed(primary)
+    sentence_colon_prefixed = bool(re.match(r"^\s*sentence\s*:", primary, flags=re.IGNORECASE))
     sentence_whitelisted = sentence_prefixed and _is_sentence_prefix_allowed(
         primary, config.sentence_prefix_whitelist_patterns
     )
+    if sentence_whitelisted and config.allow_sentence_prefix_candidates:
+        return False
     for pattern in config.reject_regex_patterns:
+        if sentence_whitelisted and re.match(r"^\^\\s\*sentence\\b", pattern):
+            continue
         if sentence_whitelisted and pattern == r"^sentence\s*:\s*.+$":
             continue
         if re.match(pattern, primary, flags=re.IGNORECASE):
@@ -162,6 +171,8 @@ def is_rejected_candidate_noise(
         if not config.allow_sentence_prefix_candidates:
             return True
         if not sentence_whitelisted:
+            return True
+        if not sentence_colon_prefixed:
             return True
 
     normalized = normalize_candidate_text(primary, use_nfkc=config.use_nfkc_normalization)

@@ -33,6 +33,10 @@ class NotesQualityTests(unittest.TestCase):
         self.assertTrue(nq.is_generic_template(text))
         self.assertFalse(nq.is_valid_note(text))
 
+    def test_rejects_sentence_leading_note(self):
+        text = "Sentence given by a prepositional phrase before making the decision."
+        self.assertFalse(nq.is_valid_note(text))
+
     def test_sanitize_whitespace(self):
         self.assertEqual(nq.sanitize_note("  A   short\nnote   "), "A short note")
 

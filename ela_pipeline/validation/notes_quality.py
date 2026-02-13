@@ -34,6 +34,25 @@ _GENERIC_TEMPLATE_PATTERNS = [
     re.compile(r"\bsensation posed\b", re.IGNORECASE),
 ]
 
+_LEADING_BAD_PREFIX_PATTERNS = [
+    re.compile(r"^\s*sentence\b", re.IGNORECASE),
+    re.compile(r"^\s*senten[cs]e\b", re.IGNORECASE),
+    re.compile(r"^\s*sensence\b", re.IGNORECASE),
+    re.compile(r"^\s*sensibilis(a|z)tion\b", re.IGNORECASE),
+]
+
+_NOISE_TOKENS = {
+    "node",
+    "content",
+    "part",
+    "speech",
+    "sentence",
+    "phrase",
+    "clause",
+    "none",
+    "null",
+}
+
 DEFAULT_HARD_NEGATIVE_PATTERNS_PATH = "artifacts/quality/hard_negative_patterns.json"
 
 
@@ -95,14 +114,24 @@ def is_valid_note(note: str) -> bool:
     if not text:
         return False
 
+    for pattern in _LEADING_BAD_PREFIX_PATTERNS:
+        if pattern.search(text):
+            return False
+
     if len(text) < 12:
         return False
 
-    if len(text.split()) < 3:
+    words = re.findall(r"[a-zA-Z']+", text.lower())
+    if len(words) < 6:
         return False
 
     for pattern in _BAD_PATTERNS:
         if pattern.search(text):
+            return False
+
+    if words:
+        noise_count = sum(1 for w in words if w in _NOISE_TOKENS)
+        if (noise_count / len(words)) > 0.30:
             return False
 
     if is_generic_template(text):
