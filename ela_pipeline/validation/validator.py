@@ -118,6 +118,13 @@ def _validate_optional_verbal_fields(
     for field in ("aspect", "mood", "voice", "finiteness"):
         if field in node:
             _validate_tam_field(node, field, path, errors, validation_mode)
+    if "tam_construction" in node:
+        _expect(
+            isinstance(node.get("tam_construction"), str),
+            errors,
+            f"{path}.tam_construction",
+            "tam_construction must be string",
+        )
 
 
 def _validate_optional_features(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:

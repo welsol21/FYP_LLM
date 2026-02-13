@@ -30,6 +30,8 @@ class PipelineTests(unittest.TestCase):
         for field in ("aspect", "mood", "voice", "finiteness"):
             self.assertIn(field, sentence)
             self.assertIsInstance(sentence[field], str)
+        self.assertIn("tam_construction", sentence)
+        self.assertIsInstance(sentence["tam_construction"], str)
         self.assertEqual(sentence["source_span"]["start"], 0)
         self.assertEqual(sentence["source_span"]["end"], len(text))
 
@@ -41,6 +43,8 @@ class PipelineTests(unittest.TestCase):
             for field in ("aspect", "mood", "voice", "finiteness"):
                 self.assertIn(field, phrase)
                 self.assertIsInstance(phrase[field], str)
+            self.assertIn("tam_construction", phrase)
+            self.assertIsInstance(phrase["tam_construction"], str)
             for word in phrase.get("linguistic_elements", []):
                 self.assertEqual(word.get("parent_id"), phrase.get("node_id"))
                 self.assertIn("source_span", word)
@@ -98,6 +102,15 @@ class PipelineTests(unittest.TestCase):
 
         walk(sentence)
         self.assertTrue(has_string_null)
+
+    def test_pipeline_sets_modal_perfect_construction_label(self):
+        out = run_pipeline(
+            "She should have trusted her instincts before making the decision.",
+            model_dir=None,
+            validation_mode="v1",
+        )
+        sentence = out[next(iter(out))]
+        self.assertEqual(sentence.get("tam_construction"), "modal_perfect")
 
 
 if __name__ == "__main__":

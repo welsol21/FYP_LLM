@@ -54,7 +54,7 @@
 - [x] Replace string sentinel values (`\"null\"`) with real `null` in strict schema and pipeline outputs for `tense/aspect/mood/voice/finiteness`.
 - [x] Keep backward compatibility for legacy mode while migrating strict mode to real nulls.
 - [x] Fix TAM classification for modal perfect constructions (`should/could/might have + VBN`) so they are not labeled as `past perfect`.
-- [ ] Add explicit modal-perfect representation (for example `mood=modal`, `aspect=perfect`, `tense=null`, plus dedicated construction label).
+- [x] Add explicit modal-perfect representation (for example `mood=modal`, `aspect=perfect`, `tense=null`, plus dedicated construction label).
 - [ ] Update strict schema and validator rules to reflect the modal-perfect and real-null policy.
 - [ ] Add regression tests covering `had + VBN` vs `should have + VBN` distinction.
 - [ ] Update dataset building to train only on notes with `source=\"model\"` and exclude fallback notes from targets.

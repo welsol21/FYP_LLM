@@ -32,6 +32,15 @@ class TamTests(unittest.TestCase):
         self.assertEqual(result.aspect, "perfect")
         self.assertEqual(result.tense, "none")
         self.assertEqual(result.finiteness, "finite")
+        self.assertEqual(result.construction, "modal_perfect")
+
+    def test_had_vbn_is_past_perfect_construction(self):
+        doc = self.nlp("She had trusted her instincts.")
+        sent = next(doc.sents)
+        result = detect_tam(sent)
+        self.assertEqual(result.tense, "past")
+        self.assertEqual(result.aspect, "perfect")
+        self.assertEqual(result.construction, "past_perfect")
 
 
 if __name__ == "__main__":
