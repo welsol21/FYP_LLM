@@ -24,6 +24,11 @@ def _normalize_strict_null_sentinels(node: dict) -> None:
     for field in STRICT_NULLABLE_TAM_FIELDS:
         if node.get(field) == "null":
             node[field] = None
+    features = node.get("features")
+    if isinstance(features, dict):
+        for key, value in list(features.items()):
+            if value == "null":
+                features[key] = None
     for child in node.get("linguistic_elements", []):
         if isinstance(child, dict):
             _normalize_strict_null_sentinels(child)

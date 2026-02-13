@@ -74,7 +74,7 @@
         "linguistic_elements": {"type": "array", "maxItems": 0},
         "features": {
           "type": "object",
-          "additionalProperties": {"type": "string"}
+          "additionalProperties": {"type": ["string", "null"]}
         },
         "node_id": {"type": "string"},
         "parent_id": {"type": "string"},

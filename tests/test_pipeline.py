@@ -52,7 +52,7 @@ class PipelineTests(unittest.TestCase):
                 self.assertIsInstance(word["grammatical_role"], str)
                 for field in ("aspect", "mood", "voice", "finiteness"):
                     self.assertIn(field, word)
-                    self.assertIsInstance(word[field], str)
+                    self.assertTrue(word[field] is None or isinstance(word[field], str))
                 self.assertIn("dep_label", word)
                 self.assertIsInstance(word["dep_label"], str)
                 self.assertIn("head_id", word)
@@ -124,6 +124,18 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(modal_sentence.get("tense"), None)
         self.assertEqual(modal_sentence.get("aspect"), "perfect")
         self.assertEqual(modal_sentence.get("mood"), "modal")
+
+        modal_phrase = next(
+            (p for p in modal_sentence.get("linguistic_elements", []) if p.get("tam_construction") == "modal_perfect"),
+            None,
+        )
+        self.assertIsNotNone(modal_phrase)
+        should_word = next(
+            (w for w in modal_phrase.get("linguistic_elements", []) if w.get("content", "").lower() == "should"),
+            None,
+        )
+        self.assertIsNotNone(should_word)
+        self.assertEqual(should_word.get("mood"), "modal")
 
         past_out = run_pipeline(
             "She had trusted her instincts.",

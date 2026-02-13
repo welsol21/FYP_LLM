@@ -14,6 +14,16 @@ class ValidatorTests(unittest.TestCase):
             ValidatorTests._normalize_strict_tam_nulls(child)
 
     @staticmethod
+    def _normalize_strict_feature_nulls(node):
+        features = node.get("features")
+        if isinstance(features, dict):
+            for key, value in list(features.items()):
+                if value == "null":
+                    features[key] = None
+        for child in node.get("linguistic_elements", []):
+            ValidatorTests._normalize_strict_feature_nulls(child)
+
+    @staticmethod
     def _inject_minimal_v2_fields(node, parent_id, next_id):
         node["node_id"] = f"n{next_id[0]}"
         next_id[0] += 1
@@ -319,6 +329,7 @@ class ValidatorTests(unittest.TestCase):
         sentence = data[sentence_key]
         self._inject_minimal_v2_fields(sentence, None, [1])
         self._normalize_strict_tam_nulls(sentence)
+        self._normalize_strict_feature_nulls(sentence)
 
         result = validate_contract(data, validation_mode="v2_strict")
         self.assertTrue(result.ok, msg=str(result.errors))
@@ -356,6 +367,40 @@ class ValidatorTests(unittest.TestCase):
             any("modal_perfect requires tense=null" in err.message for err in result.errors),
             msg=str(result.errors),
         )
+
+    def test_rejects_string_null_feature_values_in_v2_strict(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        self._inject_minimal_v2_fields(sentence, None, [1])
+        self._normalize_strict_tam_nulls(sentence)
+        sentence["linguistic_elements"][0]["linguistic_elements"][0]["features"] = {
+            "number": "null",
+            "verb_form": "fin",
+        }
+
+        result = validate_contract(data, validation_mode="v2_strict")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("feature values must use real null" in err.message for err in result.errors),
+            msg=str(result.errors),
+        )
+
+    def test_accepts_real_null_feature_values_in_v2_strict(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        self._inject_minimal_v2_fields(sentence, None, [1])
+        self._normalize_strict_tam_nulls(sentence)
+        sentence["linguistic_elements"][0]["linguistic_elements"][0]["features"] = {
+            "number": None,
+            "verb_form": "fin",
+        }
+
+        result = validate_contract(data, validation_mode="v2_strict")
+        self.assertTrue(result.ok, msg=str(result.errors))
 
     def test_rejects_real_null_tam_values_in_v1(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:

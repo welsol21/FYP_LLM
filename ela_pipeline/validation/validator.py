@@ -152,7 +152,12 @@ def _validate_modal_perfect_policy(
         )
 
 
-def _validate_optional_features(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+def _validate_optional_features(
+    node: Dict[str, Any],
+    path: str,
+    errors: List[ValidationErrorItem],
+    validation_mode: str,
+) -> None:
     if "features" not in node:
         return
     features = node.get("features")
@@ -161,7 +166,22 @@ def _validate_optional_features(node: Dict[str, Any], path: str, errors: List[Va
         return
     for key, value in features.items():
         _expect(isinstance(key, str), errors, f"{path}.features", "feature keys must be string")
-        _expect(isinstance(value, str), errors, f"{path}.features.{key}", "feature values must be string")
+        if validation_mode == "v2_strict":
+            _expect(
+                value is None or isinstance(value, str),
+                errors,
+                f"{path}.features.{key}",
+                "feature values must be string or null in strict mode",
+            )
+            if isinstance(value, str):
+                _expect(
+                    value.lower() != "null",
+                    errors,
+                    f"{path}.features.{key}",
+                    "feature values must use real null, not string 'null', in strict mode",
+                )
+        else:
+            _expect(isinstance(value, str), errors, f"{path}.features.{key}", "feature values must be string")
 
 
 def _validate_optional_notes(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
@@ -334,7 +354,7 @@ def _validate_node(
     _validate_optional_dependency(node, path, errors)
     _validate_optional_verbal_fields(node, path, errors, validation_mode)
     _validate_modal_perfect_policy(node, path, errors, validation_mode)
-    _validate_optional_features(node, path, errors)
+    _validate_optional_features(node, path, errors, validation_mode)
     _validate_optional_notes(node, path, errors)
     _validate_optional_trace_fields(node, path, errors)
     _validate_optional_rejected_candidate_stats(node, path, errors)

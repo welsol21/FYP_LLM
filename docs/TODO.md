@@ -59,3 +59,19 @@
 - [x] Add regression tests covering `had + VBN` vs `should have + VBN` distinction.
 - [x] Update dataset building to train only on notes with `source=\"model\"` and exclude fallback notes from targets.
 - [x] Ensure training targets exclude telemetry fields (`quality_flags`, `reason_codes`, `rejected_*`) and contain only note text fields.
+
+## v2_strict Finalization (P0)
+
+- [x] Set `mood="modal"` for modal auxiliary word nodes (e.g., `should/could/might`), keeping node-level consistency with `tam_construction=modal_perfect`.
+- [x] Normalize `features` null sentinels to real JSON `null` in `v2_strict` outputs (never string `"null"` in strict mode).
+- [x] Update strict validation/schema to accept `features` values as `string|null` and reject string sentinel `"null"` in strict mode.
+- [x] Add/refresh regression tests for strict-mode feature null normalization and modal auxiliary mood consistency.
+
+## T5-small Fine-tuning Backlog
+
+- [ ] Build clean train/dev splits from `notes` where `source="model"` only (exclude fallback/telemetry fields).
+- [ ] Enforce note target style normalization (1-2 sentences, remove generic/template artifacts).
+- [ ] Balance training samples by node type (`Word/Phrase/Sentence`) and TAM construction buckets.
+- [ ] Freeze prompt template format for reproducible T5 training input.
+- [ ] Add reproducible baseline training config + evaluation report artifacts.
+- [ ] Add hard-negative loop from `rejected_candidates` to improve note quality filters.

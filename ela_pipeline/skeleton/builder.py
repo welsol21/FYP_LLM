@@ -105,6 +105,8 @@ def _word_aspect(token) -> str:
 def _word_mood(token) -> str:
     if token.pos_ not in {"VERB", "AUX"}:
         return "null"
+    if token.tag_ == "MD":
+        return "modal"
     mood = token.morph.get("Mood")
     if mood:
         return mood[0].lower()
