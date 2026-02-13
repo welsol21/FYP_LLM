@@ -27,11 +27,19 @@ class RejectedCandidatesProcessingTests(unittest.TestCase):
         rejected, stats = normalize_and_aggregate_rejected_candidates(
             rejected_candidates=["Sentence should have trusted her instincts before making the decision."]
         )
-        self.assertEqual(
-            rejected,
-            ["Sentence should have trusted her instincts before making the decision."],
+        self.assertEqual(rejected, [])
+        self.assertEqual(stats, [])
+
+    def test_filters_sentence_is_was_in_patterns(self):
+        rejected, stats = normalize_and_aggregate_rejected_candidates(
+            rejected_candidates=[
+                "Sentence is a noun used as the subject of the clause.",
+                "Sentence in her instincts before making the decision.",
+                "Sentence was a given to instincts before making the decision.",
+            ]
         )
-        self.assertEqual(len(stats), 1)
+        self.assertEqual(rejected, [])
+        self.assertEqual(stats, [])
 
     def test_sentence_prefix_whitelist_allowed_only_with_flag(self):
         cfg = RejectedCandidateFilterConfig(
@@ -98,6 +106,9 @@ class RejectedCandidatesProcessingTests(unittest.TestCase):
         rejected, _ = normalize_and_aggregate_rejected_candidates(
             rejected_candidates=[
                 "Persona says this is valid.",
+                "Node type or phrase expressing what happens to or about the subject.",
+                "Node content. Part of speech.",
+                "Sensational use of her instincts before deciding to make the decision.",
                 "This candidate does not use proper grammar.",
                 "You must use this pattern.",
             ]

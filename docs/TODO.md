@@ -92,3 +92,9 @@
 - [x] Implement short-string policy (`min_len=5`) with config-driven `allowlist_short_tokens`.
 - [x] Ensure stable deduplication for `rejected_candidates` and grouped aggregation for `rejected_candidate_stats` (`count` sum, unique sorted `reasons`).
 - [x] Add/refresh unit tests for v3 acceptance criteria (stop-list, `Sentence:` policy, normalization dedup, stats merge, determinism).
+
+## Rejected Candidates v3 Follow-up (Review 2026-02-13)
+
+- [x] Extend sentence-drop rule from only `Sentence:` to sentence-like meta openings (`^senten(?:ce|se)\\b`) with allowlist override.
+- [x] Extend stop-list with observed noisy variant `sensational` and meta patterns (`node type`, `part of speech`) for rejected-candidate filtering.
+- [x] Add regression tests for new noisy patterns from latest inference sample (`Sensational ...`, `Sentence is ...`, `Sentence in ...`, `Sentence was ...`).

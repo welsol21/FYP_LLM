@@ -14,7 +14,10 @@ DEFAULT_STOP_LIST = [
     r"nod to",
     r"none\.?\s*node\s*content",
     r"\bnode\s*content\b",
+    r"\bnode\s*type\b",
+    r"\bpart\s+of\s+speech\b",
     r"\bpersona\b",
+    r"\bsensational\b",
     r"\bmust\b.*\buse\b",
     r"\bdoes not\b.*\buse\b",
 ]
@@ -62,8 +65,8 @@ def norm_key(text: str, *, use_nfkc: bool = True) -> str:
     return out.lower()
 
 
-def _is_sentence_prefixed(text: str) -> bool:
-    return bool(re.match(r"^\s*sentence\s*:", text, flags=re.IGNORECASE))
+def _is_sentence_like_meta(text: str) -> bool:
+    return bool(re.match(r"^\s*senten(?:ce|se)\b", text, flags=re.IGNORECASE))
 
 
 def _matches_stop_list(text: str, stop_list: Sequence[str]) -> bool:
@@ -85,7 +88,7 @@ def keep_candidate(
     if _matches_stop_list(normalized, config.stop_list):
         return False
 
-    if _is_sentence_prefixed(normalized):
+    if _is_sentence_like_meta(normalized):
         if key not in {k.lower() for k in config.allowlist_sentence_templates}:
             return False
 
