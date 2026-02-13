@@ -83,3 +83,12 @@
 - [x] Add unit tests for filtering, whitelist behavior, normalization, deduplication, stats aggregation, length and nonalpha thresholds.
 - [x] Extend sentence-prefix filtering to catch `Sentence ...` without colon and typo-leading variants (`sentense/sensence/sensibilisation`).
 - [x] Apply the same blocklist/quality pre-filter to model note acceptance to prevent low-quality `MODEL_NOTE_ACCEPTED` outputs.
+
+## Rejected Candidates v3 (TZ 2026-02-13)
+
+- [x] Implement v3 normalization pipeline for candidates/stats text (`trim`, whitespace collapse, punctuation spacing, trailing punctuation normalization, deterministic `norm_key`).
+- [x] Implement v3 stop-list filtering with configurable patterns (`sensibilisation|sensibilization|sensence|nod to|none. node content|node content|persona|must.*use|does not.*use`).
+- [x] Implement `Sentence:` default-drop policy with config-driven allowlist (`allowlist_sentence_templates`).
+- [x] Implement short-string policy (`min_len=5`) with config-driven `allowlist_short_tokens`.
+- [x] Ensure stable deduplication for `rejected_candidates` and grouped aggregation for `rejected_candidate_stats` (`count` sum, unique sorted `reasons`).
+- [x] Add/refresh unit tests for v3 acceptance criteria (stop-list, `Sentence:` policy, normalization dedup, stats merge, determinism).
