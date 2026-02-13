@@ -76,9 +76,38 @@ def _matches_stop_list(text: str, stop_list: Sequence[str]) -> bool:
     return False
 
 
+def _is_temporal_before_after_phrase(node_part_of_speech: str | None, node_content: str | None) -> bool:
+    pos = (node_part_of_speech or "").strip().lower()
+    if pos != "prepositional phrase":
+        return False
+    content = (node_content or "").strip().lower()
+    return content.startswith("before ") or content.startswith("after ")
+
+
+def fails_semantic_sanity(
+    candidate_text: str,
+    *,
+    node_type: str | None = None,
+    node_part_of_speech: str | None = None,
+    node_content: str | None = None,
+) -> bool:
+    text = candidate_text.lower()
+    node_type_l = (node_type or "").strip().lower()
+    if node_type_l in {"word", "phrase"} and "subordinate clause" in text:
+        return True
+    if _is_temporal_before_after_phrase(node_part_of_speech, node_content):
+        if "concession" in text or "reason" in text:
+            return True
+    return False
+
+
 def keep_candidate(
     text: str,
     config: RejectedCandidateFilterConfig = DEFAULT_REJECTED_CANDIDATE_FILTER_CONFIG,
+    *,
+    node_type: str | None = None,
+    node_part_of_speech: str | None = None,
+    node_content: str | None = None,
 ) -> bool:
     normalized = normalize_candidate_text(text, use_nfkc=config.use_nfkc_normalization)
     if not normalized:
@@ -95,6 +124,14 @@ def keep_candidate(
     if len(normalized.strip()) < config.min_len and key not in {k.lower() for k in config.allowlist_short_tokens}:
         return False
 
+    if fails_semantic_sanity(
+        normalized,
+        node_type=node_type,
+        node_part_of_speech=node_part_of_speech,
+        node_content=node_content,
+    ):
+        return False
+
     return True
 
 
@@ -102,6 +139,10 @@ def normalize_and_aggregate_rejected_candidates(
     rejected_candidates: Sequence[str] | None = None,
     rejected_items: Sequence[Dict[str, str]] | None = None,
     config: RejectedCandidateFilterConfig = DEFAULT_REJECTED_CANDIDATE_FILTER_CONFIG,
+    *,
+    node_type: str | None = None,
+    node_part_of_speech: str | None = None,
+    node_content: str | None = None,
 ) -> Tuple[List[str], List[Dict[str, object]]]:
     allow_sentence_keys = {k.lower() for k in config.allowlist_sentence_templates}
     allow_short_keys = {k.lower() for k in config.allowlist_short_tokens}
@@ -117,7 +158,13 @@ def normalize_and_aggregate_rejected_candidates(
     order: List[str] = []
 
     def upsert(raw_text: str, reason: str | None, count_delta: int) -> None:
-        if not keep_candidate(raw_text, config=local_config):
+        if not keep_candidate(
+            raw_text,
+            config=local_config,
+            node_type=node_type,
+            node_part_of_speech=node_part_of_speech,
+            node_content=node_content,
+        ):
             return
         normalized = normalize_candidate_text(raw_text, use_nfkc=local_config.use_nfkc_normalization)
         key = norm_key(normalized, use_nfkc=False)

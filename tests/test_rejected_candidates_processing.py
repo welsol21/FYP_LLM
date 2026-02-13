@@ -128,6 +128,33 @@ class RejectedCandidatesProcessingTests(unittest.TestCase):
         self.assertEqual(r1, r2)
         self.assertEqual(s1, s2)
 
+    def test_filters_semantic_mismatch_for_temporal_prepositional_phrase(self):
+        rejected, stats = normalize_and_aggregate_rejected_candidates(
+            rejected_candidates=[
+                "Subordinate clause of concession introduced by a subordinating conjunction.",
+                "Subordinate clause of reason introduced by a subordinating conjunction.",
+                "Verb-centred phrase expressing what happens to or about the subject.",
+            ],
+            node_type="Phrase",
+            node_part_of_speech="prepositional phrase",
+            node_content="before making the decision",
+        )
+        self.assertEqual(rejected, ["Verb-centred phrase expressing what happens to or about the subject."])
+        self.assertEqual(len(stats), 1)
+
+    def test_filters_subordinate_clause_labels_for_word_nodes(self):
+        rejected, stats = normalize_and_aggregate_rejected_candidates(
+            rejected_candidates=[
+                "Subordinate clause of reason modifying the main clause.",
+                "Verb-centred phrase expressing what happens to or about the subject.",
+            ],
+            node_type="Word",
+            node_part_of_speech="noun",
+            node_content="instincts",
+        )
+        self.assertEqual(rejected, ["Verb-centred phrase expressing what happens to or about the subject."])
+        self.assertEqual(len(stats), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

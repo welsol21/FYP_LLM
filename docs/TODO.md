@@ -98,3 +98,10 @@
 - [x] Extend sentence-drop rule from only `Sentence:` to sentence-like meta openings (`^senten(?:ce|se)\\b`) with allowlist override.
 - [x] Extend stop-list with observed noisy variant `sensational` and meta patterns (`node type`, `part of speech`) for rejected-candidate filtering.
 - [x] Add regression tests for new noisy patterns from latest inference sample (`Sensational ...`, `Sentence is ...`, `Sentence in ...`, `Sentence was ...`).
+
+## Semantic Sanity Checks (Review 2026-02-13)
+
+- [x] Add rule-based semantic sanity checks for candidate text using node context (`part_of_speech`, phrase content).
+- [x] For `prepositional phrase` nodes with temporal heads (`before/after`), drop or mark candidates that label them as `concession`/`reason`.
+- [x] Apply sanity checks both in note suitability gate and rejected-candidate normalization path to keep diagnostics clean.
+- [x] Add regression tests for semantic mismatch cases (e.g., `before + V-ing` incorrectly labeled as `subordinate clause of concession/reason`).

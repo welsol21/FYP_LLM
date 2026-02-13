@@ -13,6 +13,7 @@ from ela_pipeline.annotate.fallback_notes import build_fallback_note
 from ela_pipeline.annotate.rejected_candidates import (
     DEFAULT_REJECTED_CANDIDATE_FILTER_CONFIG,
     RejectedCandidateFilterConfig,
+    fails_semantic_sanity,
     normalize_and_aggregate_rejected_candidates,
 )
 from ela_pipeline.validation.notes_quality import is_valid_note, sanitize_note
@@ -96,12 +97,15 @@ class LocalT5Annotator:
                 return note, rejected
         return "", rejected
 
-    def _build_rejection_stats(self, rejected_items: List[Dict[str, str]]) -> tuple[List[str], List[Dict[str, object]]]:
+    def _build_rejection_stats(self, node: Dict, rejected_items: List[Dict[str, str]]) -> tuple[List[str], List[Dict[str, object]]]:
         config = getattr(self, "rejection_filter_config", DEFAULT_REJECTED_CANDIDATE_FILTER_CONFIG)
         return normalize_and_aggregate_rejected_candidates(
             rejected_candidates=[],
             rejected_items=rejected_items,
             config=config,
+            node_type=node.get("type"),
+            node_part_of_speech=node.get("part_of_speech"),
+            node_content=node.get("content"),
         )
 
     def _is_note_suitable_for_node(self, node: Dict, note: str) -> bool:
@@ -111,6 +115,14 @@ class LocalT5Annotator:
         node_type = (node.get("type") or "").strip()
         content = sanitize_note(str(node.get("content", ""))).lower()
         note_l = sanitize_note(note).lower()
+
+        if fails_semantic_sanity(
+            note_l,
+            node_type=node.get("type"),
+            node_part_of_speech=node.get("part_of_speech"),
+            node_content=node.get("content"),
+        ):
+            return False
 
         if node_type == "Word":
             # Force strict lexical anchoring in quoted form to suppress generic noise.
@@ -215,7 +227,7 @@ class LocalT5Annotator:
                 node["quality_flags"] = ["no_note"]
                 node["reason_codes"].append("NO_VALID_NOTE")
 
-        deduped_rejected, rejected_stats = self._build_rejection_stats(rejected_items)
+        deduped_rejected, rejected_stats = self._build_rejection_stats(node, rejected_items)
         node["rejected_candidates"] = deduped_rejected
         node["rejected_candidate_stats"] = rejected_stats
 
