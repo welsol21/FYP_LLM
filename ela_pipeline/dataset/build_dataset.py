@@ -740,6 +740,34 @@ def _extract_template_id(target: str) -> str:
     return "none"
 
 
+def evaluate_quality_gates(
+    *,
+    target_stats_after_balance: Dict[str, Any],
+    template_id_distribution_after_balance: Dict[str, int],
+    min_unique_targets: int = 0,
+    max_top1_share: float = 1.0,
+    min_active_template_ids: int = 0,
+) -> List[str]:
+    failures: List[str] = []
+    total = int(target_stats_after_balance.get("total", 0) or 0)
+    unique_targets = int(target_stats_after_balance.get("unique_targets", 0) or 0)
+    top = target_stats_after_balance.get("top_repeated_targets", []) or []
+    top1_count = int(top[0].get("count", 0)) if top else 0
+    top1_share = (top1_count / total) if total > 0 else 0.0
+    active_template_ids = sum(
+        1 for template_id, count in template_id_distribution_after_balance.items() if template_id != "none" and count > 0
+    )
+
+    if min_unique_targets > 0 and unique_targets < min_unique_targets:
+        failures.append(f"min_unique_targets violated: {unique_targets} < {min_unique_targets}")
+    if 0.0 <= max_top1_share < 1.0 and top1_share > max_top1_share:
+        failures.append(f"max_top1_share violated: {top1_share:.6f} > {max_top1_share:.6f}")
+    if min_active_template_ids > 0 and active_template_ids < min_active_template_ids:
+        failures.append(f"min_active_template_ids violated: {active_template_ids} < {min_active_template_ids}")
+
+    return failures
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build train/dev/test JSONL from hierarchical dataset")
     parser.add_argument("--input", default="linguistic_hierarchical_3000_v3.json")
@@ -771,6 +799,19 @@ def main() -> None:
         action=argparse.BooleanOptionalAction,
         default=False,
         help="Generate target notes as `template_id|note` from fixed deterministic templates.",
+    )
+    parser.add_argument("--min-unique-targets", type=int, default=0, help="Fail build if unique targets after balance are below threshold.")
+    parser.add_argument(
+        "--max-top1-share",
+        type=float,
+        default=1.0,
+        help="Fail build if top repeated target share after balance is above threshold (0..1).",
+    )
+    parser.add_argument(
+        "--min-active-template-ids",
+        type=int,
+        default=0,
+        help="Fail build if active template IDs after balance are below threshold.",
     )
     args = parser.parse_args()
 
@@ -872,8 +913,26 @@ def main() -> None:
             },
         },
     }
+
+    quality_gate_failures = evaluate_quality_gates(
+        target_stats_after_balance=stats["target_stats"]["after_balance"],
+        template_id_distribution_after_balance=stats["distributions"]["after_balance"]["template_id"],
+        min_unique_targets=int(args.min_unique_targets),
+        max_top1_share=float(args.max_top1_share),
+        min_active_template_ids=int(args.min_active_template_ids),
+    )
+    stats["quality_gates"] = {
+        "min_unique_targets": int(args.min_unique_targets),
+        "max_top1_share": float(args.max_top1_share),
+        "min_active_template_ids": int(args.min_active_template_ids),
+        "failures": quality_gate_failures,
+        "passed": len(quality_gate_failures) == 0,
+    }
     with open(os.path.join(args.output_dir, "stats.json"), "w", encoding="utf-8") as f:
         json.dump(stats, f, indent=2)
+
+    if quality_gate_failures:
+        raise SystemExit("Dataset quality gates failed: " + "; ".join(quality_gate_failures))
 
     print(json.dumps(stats, indent=2))
 

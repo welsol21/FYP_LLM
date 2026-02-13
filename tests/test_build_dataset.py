@@ -4,6 +4,7 @@ from ela_pipeline.dataset.build_dataset import (
     balance_rows_by_level_tam,
     dedup_and_cap_rows,
     detect_dataset_schema,
+    evaluate_quality_gates,
     iter_examples,
 )
 
@@ -271,6 +272,37 @@ class BuildDatasetTests(unittest.TestCase):
         rows = list(iter_examples(item, use_reference_templates=True, use_template_id_targets=True))
         self.assertEqual(len(rows), 1)
         self.assertTrue(rows[0]["target"].startswith("SENTENCE_FINITE_CLAUSE|"))
+
+    def test_quality_gates_pass_for_good_distribution(self):
+        failures = evaluate_quality_gates(
+            target_stats_after_balance={
+                "total": 100,
+                "unique_targets": 40,
+                "top_repeated_targets": [{"target": "a", "count": 20}],
+            },
+            template_id_distribution_after_balance={"SENTENCE_FINITE_CLAUSE": 20, "WORD_NOUN_COMMON": 30, "none": 0},
+            min_unique_targets=30,
+            max_top1_share=0.25,
+            min_active_template_ids=2,
+        )
+        self.assertEqual(failures, [])
+
+    def test_quality_gates_fail_for_collapsed_distribution(self):
+        failures = evaluate_quality_gates(
+            target_stats_after_balance={
+                "total": 100,
+                "unique_targets": 5,
+                "top_repeated_targets": [{"target": "a", "count": 80}],
+            },
+            template_id_distribution_after_balance={"SENTENCE_FINITE_CLAUSE": 1, "none": 99},
+            min_unique_targets=30,
+            max_top1_share=0.5,
+            min_active_template_ids=2,
+        )
+        self.assertEqual(len(failures), 3)
+        self.assertTrue(any("min_unique_targets violated" in f for f in failures))
+        self.assertTrue(any("max_top1_share violated" in f for f in failures))
+        self.assertTrue(any("min_active_template_ids violated" in f for f in failures))
 
 
 if __name__ == "__main__":

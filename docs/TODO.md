@@ -165,8 +165,8 @@
 - [ ] Define canonical context key and hierarchical matching policy (`L1 exact`, `L2 drop TAM`, `L3 level+POS`, `L4 level fallback`).
 - [ ] Build versioned template registry v1 with deterministic rules and 5-15 note variants per active template.
 - [ ] Implement deterministic selector (`template_only`) in inference pipeline with selection trace logging.
-- [ ] Add dataset quality gates that block training when diversity collapses (`min_unique_targets`, `max_top1_share`, `min_active_template_ids`).
-- [ ] Add regression report with required KPIs: `accepted_note_rate`, `fallback_rate`, `rejected_nodes_total`, `L1-L4 coverage`.
+- [x] Add dataset quality gates that block training when diversity collapses (`min_unique_targets`, `max_top1_share`, `min_active_template_ids`).
+- [x] Add regression report with required KPIs: `accepted_note_rate`, `fallback_rate`, `rejected_nodes_total`, `L1-L4 coverage`.
 
 ### P1 (should-have)
 
