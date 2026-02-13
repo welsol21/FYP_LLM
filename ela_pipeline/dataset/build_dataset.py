@@ -6,11 +6,30 @@ import argparse
 import json
 import os
 import random
+import re
 from typing import Any, Dict, Iterable, List
+
+TELEMETRY_PATTERNS = (
+    re.compile(r"\bquality_flags\b", re.IGNORECASE),
+    re.compile(r"\breason_codes\b", re.IGNORECASE),
+    re.compile(r"\brejected_candidates\b", re.IGNORECASE),
+    re.compile(r"\brejected_candidate_stats\b", re.IGNORECASE),
+    re.compile(r"\brejected_[a-z_]+\b", re.IGNORECASE),
+)
 
 
 def format_feature_list(features: List[str]) -> str:
     return ", ".join(features).replace("|", ":")
+
+
+def _sanitize_training_target_text(text: str) -> str | None:
+    clean = text.strip()
+    if not clean:
+        return None
+    for pattern in TELEMETRY_PATTERNS:
+        if pattern.search(clean):
+            return None
+    return clean
 
 
 def _extract_model_note(targets: Dict[str, Any]) -> str | None:
@@ -23,8 +42,10 @@ def _extract_model_note(targets: Dict[str, Any]) -> str | None:
         if note.get("source") != "model":
             continue
         text = note.get("text")
-        if isinstance(text, str) and text.strip():
-            return text.strip()
+        if isinstance(text, str):
+            sanitized = _sanitize_training_target_text(text)
+            if sanitized:
+                return sanitized
     return None
 
 

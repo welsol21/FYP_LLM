@@ -73,6 +73,24 @@ class BuildDatasetTests(unittest.TestCase):
         rows = list(iter_examples(item))
         self.assertEqual(rows, [])
 
+    def test_iter_examples_excludes_telemetry_like_note_text(self):
+        item = {
+            "input": "Telemetry sentence",
+            "features": {"pos": [], "dep": []},
+            "targets": {
+                "notes": [
+                    {
+                        "text": "quality_flags=['fallback_used']; reason_codes=['MODEL_OUTPUT_LOW_QUALITY']",
+                        "source": "model",
+                    }
+                ]
+            },
+            "linguistic_elements": [],
+        }
+
+        rows = list(iter_examples(item))
+        self.assertEqual(rows, [])
+
 
 if __name__ == "__main__":
     unittest.main()
