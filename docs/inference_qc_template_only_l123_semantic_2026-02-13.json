@@ -1,0 +1,80 @@
+{
+  "model_dir": "results_llm_notes_ingested_template_id_e1/best_model",
+  "probe_count": 5,
+  "probes": [
+    {
+      "text": "She should have trusted her instincts before making the decision.",
+      "nodes": 15,
+      "model_notes": 15,
+      "fallback_notes": 0,
+      "rejected_nodes": 0,
+      "l1_exact": 10,
+      "l2_drop_tam": 5,
+      "l3_level_pos": 0,
+      "l4_fallback": 0,
+      "semantic_mismatch_nodes": 0
+    },
+    {
+      "text": "The team often works in the office.",
+      "nodes": 5,
+      "model_notes": 5,
+      "fallback_notes": 0,
+      "rejected_nodes": 0,
+      "l1_exact": 2,
+      "l2_drop_tam": 3,
+      "l3_level_pos": 0,
+      "l4_fallback": 0,
+      "semantic_mismatch_nodes": 0
+    },
+    {
+      "text": "Although the weather was cold, they continued the study.",
+      "nodes": 5,
+      "model_notes": 5,
+      "fallback_notes": 0,
+      "rejected_nodes": 0,
+      "l1_exact": 3,
+      "l2_drop_tam": 2,
+      "l3_level_pos": 0,
+      "l4_fallback": 0,
+      "semantic_mismatch_nodes": 0
+    },
+    {
+      "text": "This analysis is very important for the project.",
+      "nodes": 9,
+      "model_notes": 9,
+      "fallback_notes": 0,
+      "rejected_nodes": 0,
+      "l1_exact": 5,
+      "l2_drop_tam": 3,
+      "l3_level_pos": 0,
+      "l4_fallback": 1,
+      "semantic_mismatch_nodes": 0
+    },
+    {
+      "text": "Managers analyze complex data in the city.",
+      "nodes": 12,
+      "model_notes": 12,
+      "fallback_notes": 0,
+      "rejected_nodes": 0,
+      "l1_exact": 7,
+      "l2_drop_tam": 5,
+      "l3_level_pos": 0,
+      "l4_fallback": 0,
+      "semantic_mismatch_nodes": 0
+    }
+  ],
+  "aggregate": {
+    "total_nodes": 46,
+    "total_model_notes": 46,
+    "total_fallback_notes": 0,
+    "rejected_nodes_total": 0,
+    "coverage_l1_exact": 0.586957,
+    "coverage_l2_drop_tam": 0.391304,
+    "coverage_l3_level_pos": 0.0,
+    "coverage_l4_level_fallback": 0.021739,
+    "semantic_mismatch_nodes": 0,
+    "accepted_note_rate": 1.0,
+    "fallback_rate": 0.0,
+    "semantic_mismatch_rate": 0.0
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "total_rows": 3000,
+  "kept_rows": 2973,
+  "dropped_duplicates": 1,
+  "dropped_length": 26,
+  "by_source": {
+    "ud_ewt": {
+      "quota": 1200,
+      "read_rows": 1200,
+      "kept_rows": 1190,
+      "dropped_duplicates": 0,
+      "dropped_length": 10
+    },
+    "tatoeba": {
+      "quota": 1200,
+      "read_rows": 1200,
+      "kept_rows": 1190,
+      "dropped_duplicates": 1,
+      "dropped_length": 9
+    },
+    "wikinews": {
+      "quota": 600,
+      "read_rows": 600,
+      "kept_rows": 593,
+      "dropped_duplicates": 0,
+      "dropped_length": 7
+    }
+  },
+  "generated_at": "2026-02-13T22:27:02.638911+00:00"
+}

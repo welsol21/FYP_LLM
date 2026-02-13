@@ -1,0 +1,107 @@
+{
+  "paths": {
+    "ingested_jsonl": "data/raw_sources/ingested_sentences.jsonl",
+    "nodes_dir": "data/processed_ingested_nodes"
+  },
+  "counts": {
+    "ingested_rows": 2973,
+    "sentences": 3000,
+    "phrases": 8544,
+    "words": 18000,
+    "duplicate_sentences_norm": 0,
+    "duplicate_ratio_norm": 0.0
+  },
+  "license_coverage": {
+    "missing_license_rows": 0,
+    "missing_source_rows": 0,
+    "license_coverage_ratio": 1.0
+  },
+  "per_source_contribution": {
+    "tatoeba": 1190,
+    "ud_ewt": 1190,
+    "wikinews": 593
+  },
+  "distributions": {
+    "level": {
+      "Sentence": 3000,
+      "Phrase": 8544,
+      "Word": 18000
+    },
+    "part_of_speech_top20": {
+      "noun": 3803,
+      "prepositional phrase": 3656,
+      "proper noun": 3092,
+      "sentence": 3000,
+      "preposition": 2861,
+      "noun phrase": 2537,
+      "verb phrase": 2159,
+      "adjective": 1585,
+      "article": 1582,
+      "verb": 1164,
+      "punctuation": 850,
+      "pronoun": 788,
+      "auxiliary verb": 648,
+      "adverb": 442,
+      "particle": 409,
+      "coordinating conjunction": 364,
+      "numeral": 338,
+      "clause": 192,
+      "subordinating conjunction": 46,
+      "other": 24
+    },
+    "dep_label_top20": {
+      "None": 11544,
+      "pobj": 3242,
+      "prep": 2669,
+      "compound": 1686,
+      "det": 1563,
+      "amod": 1560,
+      "punct": 875,
+      "ROOT": 784,
+      "dobj": 708,
+      "poss": 633,
+      "conj": 485,
+      "nsubj": 458,
+      "advmod": 455,
+      "aux": 436,
+      "cc": 361,
+      "case": 233,
+      "nummod": 232,
+      "attr": 186,
+      "nmod": 159,
+      "appos": 132
+    },
+    "tam_top20": {
+      "tense=null|aspect=null|mood=null|voice=null|finiteness=null": 27732,
+      "tense=past participle|aspect=perfect|mood=null|voice=active|finiteness=non-finite": 341,
+      "tense=present|aspect=simple|mood=ind|voice=active|finiteness=finite": 324,
+      "tense=present participle|aspect=progressive|mood=null|voice=active|finiteness=non-finite": 276,
+      "tense=null|aspect=simple|mood=null|voice=active|finiteness=non-finite": 267,
+      "tense=past|aspect=simple|mood=indicative|voice=active|finiteness=finite": 200,
+      "tense=present|aspect=simple|mood=indicative|voice=active|finiteness=finite": 115,
+      "tense=null|aspect=simple|mood=modal|voice=active|finiteness=finite": 97,
+      "tense=past|aspect=simple|mood=ind|voice=active|finiteness=finite": 71,
+      "tense=past|aspect=simple|mood=ind|voice=passive|finiteness=finite": 48,
+      "tense=past participle|aspect=perfect|mood=null|voice=passive|finiteness=non-finite": 20,
+      "tense=present|aspect=simple|mood=ind|voice=passive|finiteness=finite": 19,
+      "tense=null|aspect=simple|mood=null|voice=passive|finiteness=non-finite": 19,
+      "tense=null|aspect=simple|mood=modal|voice=active|finiteness=non-finite": 7,
+      "tense=null|aspect=progressive|mood=null|voice=passive|finiteness=non-finite": 4,
+      "tense=null|aspect=progressive|mood=null|voice=active|finiteness=non-finite": 3,
+      "tense=present|aspect=simple|mood=indicative|voice=passive|finiteness=finite": 1
+    }
+  },
+  "parse_quality": {
+    "parse_errors": 0,
+    "quotas": {
+      "sentence": 3000,
+      "phrase": 9000,
+      "word": 18000
+    },
+    "saved": {
+      "sentence": 3000,
+      "phrase": 8544,
+      "word": 18000
+    }
+  }
+}

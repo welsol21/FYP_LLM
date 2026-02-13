@@ -1,0 +1,73 @@
+{
+  "model_dir": "results_llm_notes_ingested_template_id_e1/best_model",
+  "probe_count": 5,
+  "probes": [
+    {
+      "text": "She should have trusted her instincts before making the decision.",
+      "nodes": 15,
+      "model_notes": 2,
+      "fallback_notes": 13,
+      "rejected_nodes": 0,
+      "l1_exact": 2,
+      "l2_drop_tam": 0,
+      "l3_level_pos": 0,
+      "l4_fallback": 13
+    },
+    {
+      "text": "The team often works in the office.",
+      "nodes": 5,
+      "model_notes": 0,
+      "fallback_notes": 5,
+      "rejected_nodes": 0,
+      "l1_exact": 0,
+      "l2_drop_tam": 0,
+      "l3_level_pos": 0,
+      "l4_fallback": 5
+    },
+    {
+      "text": "Although the weather was cold, they continued the study.",
+      "nodes": 5,
+      "model_notes": 0,
+      "fallback_notes": 5,
+      "rejected_nodes": 0,
+      "l1_exact": 0,
+      "l2_drop_tam": 0,
+      "l3_level_pos": 0,
+      "l4_fallback": 5
+    },
+    {
+      "text": "This analysis is very important for the project.",
+      "nodes": 9,
+      "model_notes": 0,
+      "fallback_notes": 9,
+      "rejected_nodes": 0,
+      "l1_exact": 0,
+      "l2_drop_tam": 0,
+      "l3_level_pos": 0,
+      "l4_fallback": 9
+    },
+    {
+      "text": "Managers analyze complex data in the city.",
+      "nodes": 12,
+      "model_notes": 0,
+      "fallback_notes": 12,
+      "rejected_nodes": 0,
+      "l1_exact": 0,
+      "l2_drop_tam": 0,
+      "l3_level_pos": 0,
+      "l4_fallback": 12
+    }
+  ],
+  "aggregate": {
+    "total_nodes": 46,
+    "total_model_notes": 2,
+    "total_fallback_notes": 44,
+    "rejected_nodes_total": 0,
+    "coverage_l1_exact": 0.043478,
+    "coverage_l2_drop_tam": 0.0,
+    "coverage_l3_level_pos": 0.0,
+    "coverage_l4_level_fallback": 0.956522,
+    "accepted_note_rate": 0.043478,
+    "fallback_rate": 0.956522
+  }
+}

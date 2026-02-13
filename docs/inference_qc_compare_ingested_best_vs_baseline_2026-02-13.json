@@ -1,0 +1,26 @@
+{
+  "new_model": "results_llm_notes_ingested_template_id_e1/best_model",
+  "baseline_model": "results_llm_notes_template_id_e2/best_model",
+  "metrics": {
+    "accepted_note_rate": {
+      "new": 0.021739,
+      "baseline": 0.0,
+      "delta": 0.021739
+    },
+    "fallback_rate": {
+      "new": 0.978261,
+      "baseline": 1.0,
+      "delta": -0.021739
+    },
+    "rejected_nodes_total": {
+      "new": 21,
+      "baseline": 0,
+      "delta": 21
+    },
+    "total_model_notes": {
+      "new": 1,
+      "baseline": 0,
+      "delta": 1
+    }
+  }
+}

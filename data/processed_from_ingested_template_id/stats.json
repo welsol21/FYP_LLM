@@ -1,0 +1,392 @@
+{
+  "prompt_template_version": "v1",
+  "input_nodes_dir": "data/processed_ingested_nodes",
+  "total_before_dedup": 29544,
+  "total_after_dedup": 23049,
+  "total_after_balance": 23049,
+  "balance_level_tam": true,
+  "max_per_target": 0,
+  "dedup_exact_input_target": true,
+  "dedup_report": {
+    "skipped_exact_input_target_duplicates": 6495,
+    "skipped_by_target_cap": 0
+  },
+  "quality_counters": {
+    "rows_emitted": 29544,
+    "template_targets_used": 29544
+  },
+  "train": 18441,
+  "dev": 2304,
+  "test": 2304,
+  "target_stats": {
+    "before_dedup": {
+      "total": 29544,
+      "unique_targets": 18,
+      "duplicate_ratio": 0.9993907392363932,
+      "top_repeated_targets": [
+        {
+          "target": "word_noun_common|this word is a common noun naming an entity in context.",
+          "count": 12404
+        },
+        {
+          "target": "pp_general_linking|this prepositional phrase links a complement to the clause.",
+          "count": 3650
+        },
+        {
+          "target": "sentence_finite_clause|this is a finite clause expressing a complete proposition.",
+          "count": 2920
+        },
+        {
+          "target": "word_preposition|this word is a preposition linking a complement to another element.",
+          "count": 2861
+        },
+        {
+          "target": "np_determiner_noun|this noun phrase combines a determiner with a noun head.",
+          "count": 2180
+        },
+        {
+          "target": "vp_auxiliary|this verb phrase uses an auxiliary to support tense or mood.",
+          "count": 2053
+        },
+        {
+          "target": "word_article_definite|this word is the definite article specifying a known referent.",
+          "count": 1017
+        },
+        {
+          "target": "word_verb_participle|this word is a participle verb form in the verbal group.",
+          "count": 885
+        },
+        {
+          "target": "np_possessive|this noun phrase marks possession inside the noun group.",
+          "count": 634
+        },
+        {
+          "target": "word_pronoun_possessive|this word is a possessive pronoun or determiner in a noun phrase.",
+          "count": 403
+        },
+        {
+          "target": "word_verb_ing|this word is an -ing verb form with non-finite function.",
+          "count": 279
+        },
+        {
+          "target": "word_aux_modal|this word is a modal auxiliary marking speaker stance or obligation.",
+          "count": 96
+        },
+        {
+          "target": "word_aux_have|this word is auxiliary 'have' supporting perfect construction.",
+          "count": 55
+        },
+        {
+          "target": "clause_subordinate_time|this clause marks a time relation inside the sentence.",
+          "count": 44
+        },
+        {
+          "target": "clause_subordinate_reason|this clause expresses a reason for the main event.",
+          "count": 29
+        },
+        {
+          "target": "vp_modal_perfect|this verb phrase shows modal meaning with perfect aspect.",
+          "count": 20
+        },
+        {
+          "target": "clause_subordinate_concession|this clause marks concession against the main statement.",
+          "count": 7
+        },
+        {
+          "target": "pp_time_before_ing|this prepositional phrase marks time with 'before' plus an -ing form.",
+          "count": 7
+        }
+      ]
+    },
+    "after_dedup": {
+      "total": 23049,
+      "unique_targets": 18,
+      "duplicate_ratio": 0.9992190550566185,
+      "top_repeated_targets": [
+        {
+          "target": "word_noun_common|this word is a common noun naming an entity in context.",
+          "count": 7985
+        },
+        {
+          "target": "pp_general_linking|this prepositional phrase links a complement to the clause.",
+          "count": 3639
+        },
+        {
+          "target": "sentence_finite_clause|this is a finite clause expressing a complete proposition.",
+          "count": 2855
+        },
+        {
+          "target": "np_determiner_noun|this noun phrase combines a determiner with a noun head.",
+          "count": 2143
+        },
+        {
+          "target": "vp_auxiliary|this verb phrase uses an auxiliary to support tense or mood.",
+          "count": 2051
+        },
+        {
+          "target": "word_preposition|this word is a preposition linking a complement to another element.",
+          "count": 1815
+        },
+        {
+          "target": "word_verb_participle|this word is a participle verb form in the verbal group.",
+          "count": 793
+        },
+        {
+          "target": "np_possessive|this noun phrase marks possession inside the noun group.",
+          "count": 630
+        },
+        {
+          "target": "word_article_definite|this word is the definite article specifying a known referent.",
+          "count": 475
+        },
+        {
+          "target": "word_verb_ing|this word is an -ing verb form with non-finite function.",
+          "count": 216
+        },
+        {
+          "target": "word_pronoun_possessive|this word is a possessive pronoun or determiner in a noun phrase.",
+          "count": 200
+        },
+        {
+          "target": "word_aux_modal|this word is a modal auxiliary marking speaker stance or obligation.",
+          "count": 92
+        },
+        {
+          "target": "word_aux_have|this word is auxiliary 'have' supporting perfect construction.",
+          "count": 49
+        },
+        {
+          "target": "clause_subordinate_time|this clause marks a time relation inside the sentence.",
+          "count": 44
+        },
+        {
+          "target": "clause_subordinate_reason|this clause expresses a reason for the main event.",
+          "count": 28
+        },
+        {
+          "target": "vp_modal_perfect|this verb phrase shows modal meaning with perfect aspect.",
+          "count": 20
+        },
+        {
+          "target": "clause_subordinate_concession|this clause marks concession against the main statement.",
+          "count": 7
+        },
+        {
+          "target": "pp_time_before_ing|this prepositional phrase marks time with 'before' plus an -ing form.",
+          "count": 7
+        }
+      ]
+    },
+    "after_balance": {
+      "total": 23049,
+      "unique_targets": 18,
+      "duplicate_ratio": 0.9992190550566185,
+      "top_repeated_targets": [
+        {
+          "target": "word_noun_common|this word is a common noun naming an entity in context.",
+          "count": 7985
+        },
+        {
+          "target": "pp_general_linking|this prepositional phrase links a complement to the clause.",
+          "count": 3639
+        },
+        {
+          "target": "sentence_finite_clause|this is a finite clause expressing a complete proposition.",
+          "count": 2855
+        },
+        {
+          "target": "np_determiner_noun|this noun phrase combines a determiner with a noun head.",
+          "count": 2143
+        },
+        {
+          "target": "vp_auxiliary|this verb phrase uses an auxiliary to support tense or mood.",
+          "count": 2051
+        },
+        {
+          "target": "word_preposition|this word is a preposition linking a complement to another element.",
+          "count": 1815
+        },
+        {
+          "target": "word_verb_participle|this word is a participle verb form in the verbal group.",
+          "count": 793
+        },
+        {
+          "target": "np_possessive|this noun phrase marks possession inside the noun group.",
+          "count": 630
+        },
+        {
+          "target": "word_article_definite|this word is the definite article specifying a known referent.",
+          "count": 475
+        },
+        {
+          "target": "word_verb_ing|this word is an -ing verb form with non-finite function.",
+          "count": 216
+        },
+        {
+          "target": "word_pronoun_possessive|this word is a possessive pronoun or determiner in a noun phrase.",
+          "count": 200
+        },
+        {
+          "target": "word_aux_modal|this word is a modal auxiliary marking speaker stance or obligation.",
+          "count": 92
+        },
+        {
+          "target": "word_aux_have|this word is auxiliary 'have' supporting perfect construction.",
+          "count": 49
+        },
+        {
+          "target": "clause_subordinate_time|this clause marks a time relation inside the sentence.",
+          "count": 44
+        },
+        {
+          "target": "clause_subordinate_reason|this clause expresses a reason for the main event.",
+          "count": 28
+        },
+        {
+          "target": "vp_modal_perfect|this verb phrase shows modal meaning with perfect aspect.",
+          "count": 20
+        },
+        {
+          "target": "clause_subordinate_concession|this clause marks concession against the main statement.",
+          "count": 7
+        },
+        {
+          "target": "pp_time_before_ing|this prepositional phrase marks time with 'before' plus an -ing form.",
+          "count": 7
+        }
+      ]
+    }
+  },
+  "distributions": {
+    "before_dedup": {
+      "level": {
+        "Phrase": 8544,
+        "Sentence": 3000,
+        "Word": 18000
+      },
+      "tam_bucket": {
+        "none": 29544
+      },
+      "template_id": {
+        "CLAUSE_SUBORDINATE_CONCESSION": 7,
+        "CLAUSE_SUBORDINATE_REASON": 29,
+        "CLAUSE_SUBORDINATE_TIME": 44,
+        "NP_DETERMINER_NOUN": 2180,
+        "NP_POSSESSIVE": 634,
+        "PP_GENERAL_LINKING": 3650,
+        "PP_TIME_BEFORE_ING": 7,
+        "SENTENCE_FINITE_CLAUSE": 2920,
+        "VP_AUXILIARY": 2053,
+        "VP_MODAL_PERFECT": 20,
+        "WORD_ARTICLE_DEFINITE": 1017,
+        "WORD_AUX_HAVE": 55,
+        "WORD_AUX_MODAL": 96,
+        "WORD_NOUN_COMMON": 12404,
+        "WORD_PREPOSITION": 2861,
+        "WORD_PRONOUN_POSSESSIVE": 403,
+        "WORD_VERB_ING": 279,
+        "WORD_VERB_PARTICIPLE": 885
+      },
+      "level_tam": {
+        "Phrase": {
+          "none": 8544
+        },
+        "Sentence": {
+          "none": 3000
+        },
+        "Word": {
+          "none": 18000
+        }
+      }
+    },
+    "after_dedup": {
+      "level": {
+        "Phrase": 8490,
+        "Sentence": 2934,
+        "Word": 11625
+      },
+      "tam_bucket": {
+        "none": 23049
+      },
+      "template_id": {
+        "CLAUSE_SUBORDINATE_CONCESSION": 7,
+        "CLAUSE_SUBORDINATE_REASON": 28,
+        "CLAUSE_SUBORDINATE_TIME": 44,
+        "NP_DETERMINER_NOUN": 2143,
+        "NP_POSSESSIVE": 630,
+        "PP_GENERAL_LINKING": 3639,
+        "PP_TIME_BEFORE_ING": 7,
+        "SENTENCE_FINITE_CLAUSE": 2855,
+        "VP_AUXILIARY": 2051,
+        "VP_MODAL_PERFECT": 20,
+        "WORD_ARTICLE_DEFINITE": 475,
+        "WORD_AUX_HAVE": 49,
+        "WORD_AUX_MODAL": 92,
+        "WORD_NOUN_COMMON": 7985,
+        "WORD_PREPOSITION": 1815,
+        "WORD_PRONOUN_POSSESSIVE": 200,
+        "WORD_VERB_ING": 216,
+        "WORD_VERB_PARTICIPLE": 793
+      },
+      "level_tam": {
+        "Phrase": {
+          "none": 8490
+        },
+        "Sentence": {
+          "none": 2934
+        },
+        "Word": {
+          "none": 11625
+        }
+      }
+    },
+    "after_balance": {
+      "level": {
+        "Phrase": 8490,
+        "Sentence": 2934,
+        "Word": 11625
+      },
+      "tam_bucket": {
+        "none": 23049
+      },
+      "template_id": {
+        "CLAUSE_SUBORDINATE_CONCESSION": 7,
+        "CLAUSE_SUBORDINATE_REASON": 28,
+        "CLAUSE_SUBORDINATE_TIME": 44,
+        "NP_DETERMINER_NOUN": 2143,
+        "NP_POSSESSIVE": 630,
+        "PP_GENERAL_LINKING": 3639,
+        "PP_TIME_BEFORE_ING": 7,
+        "SENTENCE_FINITE_CLAUSE": 2855,
+        "VP_AUXILIARY": 2051,
+        "VP_MODAL_PERFECT": 20,
+        "WORD_ARTICLE_DEFINITE": 475,
+        "WORD_AUX_HAVE": 49,
+        "WORD_AUX_MODAL": 92,
+        "WORD_NOUN_COMMON": 7985,
+        "WORD_PREPOSITION": 1815,
+        "WORD_PRONOUN_POSSESSIVE": 200,
+        "WORD_VERB_ING": 216,
+        "WORD_VERB_PARTICIPLE": 793
+      },
+      "level_tam": {
+        "Phrase": {
+          "none": 8490
+        },
+        "Sentence": {
+          "none": 2934
+        },
+        "Word": {
+          "none": 11625
+        }
+      }
+    }
+  },
+  "quality_gates": {
+    "min_unique_targets": 12,
+    "max_top1_share": 0.45,
+    "min_active_template_ids": 12,
+    "failures": [],
+    "passed": true
+  }
+}

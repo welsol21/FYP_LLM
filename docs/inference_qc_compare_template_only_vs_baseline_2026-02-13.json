@@ -1,0 +1,32 @@
+{
+  "mode": "template_only",
+  "new": {
+    "total_nodes": 46,
+    "total_model_notes": 46,
+    "total_fallback_notes": 0,
+    "rejected_nodes_total": 0,
+    "coverage_l1_exact": 0.043478,
+    "coverage_l2_drop_tam": 0.0,
+    "coverage_l3_level_pos": 0.0,
+    "coverage_l4_level_fallback": 0.956522,
+    "accepted_note_rate": 1.0,
+    "fallback_rate": 0.0
+  },
+  "baseline": {
+    "total_nodes": 46,
+    "total_model_notes": 0,
+    "total_fallback_notes": 46,
+    "rejected_nodes_total": 0,
+    "coverage_l1_exact": 0.0,
+    "coverage_l2_drop_tam": 0.0,
+    "coverage_l3_level_pos": 0.0,
+    "coverage_l4_level_fallback": 0.0,
+    "accepted_note_rate": 0.0,
+    "fallback_rate": 1.0
+  },
+  "delta": {
+    "accepted_note_rate": 1.0,
+    "fallback_rate": -1.0,
+    "rejected_nodes_total": 0
+  }
+}

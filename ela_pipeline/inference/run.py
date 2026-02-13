@@ -47,6 +47,7 @@ def run_pipeline(
     model_dir: str | None = None,
     spacy_model: str = "en_core_web_sm",
     validation_mode: str = "v2_strict",
+    note_mode: str = "template_only",
 ) -> dict:
     nlp = load_nlp(spacy_model)
 
@@ -61,7 +62,7 @@ def run_pipeline(
     if model_dir:
         from ela_pipeline.annotate.local_generator import LocalT5Annotator
 
-        annotator = LocalT5Annotator(model_dir=model_dir)
+        annotator = LocalT5Annotator(model_dir=model_dir, note_mode=note_mode)
         annotator.annotate(enriched)
 
     raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
@@ -75,6 +76,12 @@ def main() -> None:
     parser.add_argument("--model-dir", default=None)
     parser.add_argument("--spacy-model", default="en_core_web_sm")
     parser.add_argument("--validation-mode", default="v2_strict", choices=["v1", "v2_strict"])
+    parser.add_argument(
+        "--note-mode",
+        default="template_only",
+        choices=["template_only", "llm", "hybrid"],
+        help="Inference note mode: deterministic template selector, LLM-only, or hybrid template->LLM fallback.",
+    )
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
@@ -83,6 +90,7 @@ def main() -> None:
         model_dir=args.model_dir,
         spacy_model=args.spacy_model,
         validation_mode=args.validation_mode,
+        note_mode=args.note_mode,
     )
 
     out_path = args.output

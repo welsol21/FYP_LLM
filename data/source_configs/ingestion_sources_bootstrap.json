@@ -1,0 +1,37 @@
+{
+  "sources": [
+    {
+      "name": "ud_ewt",
+      "input_path": "data/raw_sources/ud_ewt_sentences.jsonl",
+      "source_url": "https://universaldependencies.org/treebanks/en_ewt/index.html",
+      "license": "CC BY-SA 4.0",
+      "attribution_required": true,
+      "quota": 1200,
+      "format": "jsonl",
+      "text_field": "text",
+      "id_prefix": "udewt"
+    },
+    {
+      "name": "tatoeba",
+      "input_path": "data/raw_sources/tatoeba_en_sentences.jsonl",
+      "source_url": "https://www.manythings.org/anki/",
+      "license": "CC BY 2.0 FR (Tatoeba-derived via ManyThings)",
+      "attribution_required": true,
+      "quota": 1200,
+      "format": "jsonl",
+      "text_field": "text",
+      "id_prefix": "tat"
+    },
+    {
+      "name": "wikinews",
+      "input_path": "data/raw_sources/wikinews_en_sentences.jsonl",
+      "source_url": "https://en.wikinews.org/wiki/Wikinews:Citation_guidelines",
+      "license": "CC BY",
+      "attribution_required": true,
+      "quota": 600,
+      "format": "jsonl",
+      "text_field": "text",
+      "id_prefix": "wnews"
+    }
+  ]
+}

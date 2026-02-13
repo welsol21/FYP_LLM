@@ -1,12 +1,56 @@
 # ELA Pipeline CLI
 
-## 1) Build dataset splits
+## 1) Fetch raw source files
 
 ```bash
-python -m ela_pipeline.dataset.build_dataset --input linguistic_hierarchical_3000_v3.json --output-dir data/processed
+python -m ela_pipeline.dataset.fetch_raw_sources \
+  --output-dir data/raw_sources \
+  --ud-limit 1200 --tatoeba-limit 1200 --wikinews-limit 600
 ```
 
-## 2) Train local generator
+## 2) Build licensed ingestion corpus
+
+```bash
+python -m ela_pipeline.dataset.build_ingestion_corpus \
+  --config data/source_configs/ingestion_sources_bootstrap.json \
+  --output-jsonl data/raw_sources/ingested_sentences.jsonl \
+  --report-json docs/ingestion_report_2026-02-13.json
+```
+
+## 3) Extract sentence/phrase/word nodes (3k/9k/18k)
+
+```bash
+python -m ela_pipeline.dataset.extract_ingested_nodes \
+  --input-jsonl data/raw_sources/ingested_sentences.jsonl \
+  --output-dir data/processed_ingested_nodes \
+  --sentence-quota 3000 --phrase-quota 9000 --word-quota 18000
+```
+
+## 4) Ingestion QA report
+
+```bash
+python -m ela_pipeline.dataset.report_ingestion_quality \
+  --ingested-jsonl data/raw_sources/ingested_sentences.jsonl \
+  --nodes-dir data/processed_ingested_nodes \
+  --output-json docs/ingestion_quality_report_2026-02-13.json
+```
+
+## 5) Build training dataset from ingested nodes
+
+```bash
+python -m ela_pipeline.dataset.build_dataset_from_ingested \
+  --nodes-dir data/processed_ingested_nodes \
+  --output-dir data/processed_from_ingested_template_id \
+  --min-unique-targets 12 --max-top1-share 0.45 --min-active-template-ids 12
+```
+
+## 6) Build dataset splits (legacy hierarchical input)
+
+```bash
+python -m ela_pipeline.dataset.build_dataset --input <hierarchical_input.json> --output-dir data/processed
+```
+
+## 7) Train local generator
 
 ```bash
 python -m ela_pipeline.training.train_generator --train data/processed/train.jsonl --dev data/processed/dev.jsonl --output-dir artifacts/models/t5_notes --seed 42 --learning-rate 5e-5
@@ -28,10 +72,10 @@ To apply these patterns during note validation, set:
 export ELA_HARD_NEGATIVE_PATTERNS=artifacts/quality/hard_negative_patterns.json
 ```
 
-## 3) Run production inference
+## 8) Run production inference
 
 ```bash
-python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --model-dir results_llm_notes_v3_t5-small_phrase/best_model
+python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --model-dir results_llm_notes_v3_t5-small_phrase/best_model --note-mode template_only
 ```
 
 `v2_strict` is now the default mode.

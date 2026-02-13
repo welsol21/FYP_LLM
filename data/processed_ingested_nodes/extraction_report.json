@@ -1,0 +1,15 @@
+{
+  "input_jsonl": "data/raw_sources/ingested_sentences.jsonl",
+  "spacy_model": "en_core_web_sm",
+  "quotas": {
+    "sentence": 3000,
+    "phrase": 9000,
+    "word": 18000
+  },
+  "saved": {
+    "sentence": 3000,
+    "phrase": 8544,
+    "word": 18000
+  },
+  "parse_errors": 0
+}

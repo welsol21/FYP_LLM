@@ -1,0 +1,41 @@
+{
+  "pipeline": "new_corpus_ingestion_chain",
+  "ingestion_rows": 2973,
+  "ingestion_by_source": {
+    "ud_ewt": {
+      "quota": 1200,
+      "read_rows": 1200,
+      "kept_rows": 1190,
+      "dropped_duplicates": 0,
+      "dropped_length": 10
+    },
+    "tatoeba": {
+      "quota": 1200,
+      "read_rows": 1200,
+      "kept_rows": 1190,
+      "dropped_duplicates": 1,
+      "dropped_length": 9
+    },
+    "wikinews": {
+      "quota": 600,
+      "read_rows": 600,
+      "kept_rows": 593,
+      "dropped_duplicates": 0,
+      "dropped_length": 7
+    }
+  },
+  "nodes_saved": {
+    "ingested_rows": 2973,
+    "sentences": 3000,
+    "phrases": 8544,
+    "words": 18000,
+    "duplicate_sentences_norm": 0,
+    "duplicate_ratio_norm": 0.0
+  },
+  "dataset_after_balance": 23049,
+  "unique_targets_after_balance": 18,
+  "active_template_ids_after_balance": 18,
+  "top1_share_after_balance": 0.34643585405006727,
+  "quality_gates_passed": true,
+  "quality_gate_failures": []
+}
