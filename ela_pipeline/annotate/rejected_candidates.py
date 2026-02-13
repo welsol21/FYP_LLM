@@ -18,6 +18,19 @@ DEFAULT_STOP_LIST = [
     r"\bpart\s+of\s+speech\b",
     r"\bpersona\b",
     r"\bsensational\b",
+    r"\bsensibilite\b",
+    r"\bsensibilit[aä]t\b",
+    r"\bin\s+english\b",
+    r"\bnatural\s+english\b",
+    r"\bbooleans?\b",
+    r"\bjson\s+fragments?\b",
+    r"\bplaceholders?\b",
+    r"\bnode,\s*label\b",
+    r"\bsentence\s*:",
+    r"\bsensitence\b",
+    r"\benglish\b.*\bfrench\b",
+    r"\bacademic\s+and\s+professional\s+development\b",
+    r"\bnode\s*[:;]",
     r"\bmust\b.*\buse\b",
     r"\bdoes not\b.*\buse\b",
 ]
@@ -76,6 +89,34 @@ def _matches_stop_list(text: str, stop_list: Sequence[str]) -> bool:
     return False
 
 
+def _fails_repetition_quality(text: str) -> bool:
+    tokens = re.findall(r"[a-zA-Z']+", text.lower())
+    token_count = len(tokens)
+    if token_count < 10:
+        return False
+
+    unique_ratio = len(set(tokens)) / token_count
+    if unique_ratio < 0.45:
+        return True
+
+    counts: Dict[str, int] = {}
+    for tok in tokens:
+        counts[tok] = counts.get(tok, 0) + 1
+
+    spam_terms = {"noun", "verb", "phrase", "sentence", "clause", "word"}
+    spam_hits = sum(counts.get(t, 0) for t in spam_terms)
+    if spam_hits / token_count > 0.35:
+        return True
+
+    return False
+
+
+def _fails_label_spam(text: str) -> bool:
+    lowered = text.lower()
+    matches = re.findall(r"\b(node|form|tense|word|pos|type)\s*[:;]", lowered)
+    return len(matches) >= 3
+
+
 def _is_temporal_before_after_phrase(node_part_of_speech: str | None, node_content: str | None) -> bool:
     pos = (node_part_of_speech or "").strip().lower()
     if pos != "prepositional phrase":
@@ -114,11 +155,22 @@ def keep_candidate(
         return False
 
     key = norm_key(normalized, use_nfkc=False)
-    if _matches_stop_list(normalized, config.stop_list):
+    allow_sentence_keys = {k.lower() for k in config.allowlist_sentence_templates}
+    is_allowlisted_sentence_template = bool(
+        re.match(r"^\s*sentence\s*:", normalized, flags=re.IGNORECASE) and key in allow_sentence_keys
+    )
+
+    if _matches_stop_list(normalized, config.stop_list) and not is_allowlisted_sentence_template:
+        return False
+
+    if _fails_repetition_quality(normalized):
+        return False
+
+    if _fails_label_spam(normalized):
         return False
 
     if _is_sentence_like_meta(normalized):
-        if key not in {k.lower() for k in config.allowlist_sentence_templates}:
+        if key not in allow_sentence_keys:
             return False
 
     if len(normalized.strip()) < config.min_len and key not in {k.lower() for k in config.allowlist_short_tokens}:

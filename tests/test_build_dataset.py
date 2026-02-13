@@ -1,6 +1,11 @@
 import unittest
 
-from ela_pipeline.dataset.build_dataset import balance_rows_by_level_tam, iter_examples
+from ela_pipeline.dataset.build_dataset import (
+    balance_rows_by_level_tam,
+    dedup_and_cap_rows,
+    detect_dataset_schema,
+    iter_examples,
+)
 
 
 class BuildDatasetTests(unittest.TestCase):
@@ -75,7 +80,7 @@ class BuildDatasetTests(unittest.TestCase):
         self.assertEqual(tam_by_target["Model phrase note"], "modal_perfect")
         self.assertEqual(tam_by_target["Model word note"], "modal")
 
-    def test_iter_examples_ignores_legacy_linguistic_notes_without_source(self):
+    def test_iter_examples_supports_legacy_linguistic_notes_schema(self):
         item = {
             "input": "Legacy sentence",
             "features": {"pos": [], "dep": []},
@@ -84,7 +89,9 @@ class BuildDatasetTests(unittest.TestCase):
         }
 
         rows = list(iter_examples(item))
-        self.assertEqual(rows, [])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["target"], "Legacy note")
+        self.assertEqual(rows[0]["level"], "Sentence")
 
     def test_iter_examples_excludes_telemetry_like_note_text(self):
         item = {
@@ -163,6 +170,107 @@ class BuildDatasetTests(unittest.TestCase):
         self.assertEqual(len(phrase_none), 1)
         self.assertEqual(len(phrase_past), 1)
         self.assertEqual(len(sentence_none), 1)
+
+    def test_dedup_and_cap_rows_limits_repeated_targets(self):
+        rows = [
+            {"input": "i1", "target": "A target", "level": "Word", "tam_bucket": "none"},
+            {"input": "i2", "target": "A target", "level": "Word", "tam_bucket": "none"},
+            {"input": "i3", "target": "A target", "level": "Word", "tam_bucket": "none"},
+            {"input": "i4", "target": "B target", "level": "Word", "tam_bucket": "none"},
+        ]
+        out, report = dedup_and_cap_rows(rows, max_per_target=2, dedup_exact_input_target=False)
+        self.assertEqual(len(out), 3)
+        self.assertEqual(report["skipped_by_target_cap"], 1)
+
+    def test_detect_dataset_schema_legacy(self):
+        raw = [
+            {
+                "input": "Legacy sentence",
+                "targets": {"linguistic_notes": "Legacy note"},
+                "linguistic_elements": [],
+            }
+        ]
+        report = detect_dataset_schema(raw)
+        self.assertEqual(report["detected_schema"], "legacy_linguistic_notes")
+
+    def test_iter_examples_reference_templates_mode(self):
+        item = {
+            "type": "Sentence",
+            "input": "The team works in the office.",
+            "features": {"pos": ["DET", "NOUN", "VERB", "ADP", "DET", "NOUN"], "dep": ["det", "nsubj", "ROOT"]},
+            "targets": {},
+            "linguistic_elements": [
+                {
+                    "type": "Phrase",
+                    "input": "in the office",
+                    "features": {"pos": ["ADP", "DET", "NOUN"], "dep": ["prep"]},
+                    "targets": {},
+                    "linguistic_elements": [
+                        {
+                            "type": "Word",
+                            "input": "office",
+                            "features": {"pos": ["NOUN"], "dep": ["pobj"], "tag": ["NN"], "morph": ["Number=Sing"]},
+                            "targets": {},
+                        }
+                    ],
+                }
+            ],
+        }
+        rows = list(iter_examples(item, use_reference_templates=True))
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all(row["target"] for row in rows))
+        self.assertTrue(any("prepositional phrase" in row["target"] for row in rows if row["level"] == "Phrase"))
+
+    def test_iter_examples_template_id_mode(self):
+        item = {
+            "type": "Sentence",
+            "input": "She should have trusted her instincts before making the decision.",
+            "features": {"pos": ["PRON", "AUX", "AUX", "VERB"], "dep": ["nsubj", "aux", "aux", "ROOT"]},
+            "targets": {
+                "notes": [{"text": "Model sentence note", "source": "model"}],
+                "tam_construction": "modal_perfect",
+            },
+            "linguistic_elements": [
+                {
+                    "type": "Phrase",
+                    "input": "before making the decision",
+                    "features": {
+                        "pos": ["ADP", "VERB", "DET", "NOUN"],
+                        "dep": ["prep", "pcomp", "det", "dobj"],
+                        "tag": ["IN", "VBG", "DT", "NN"],
+                    },
+                    "targets": {"notes": [{"text": "Model phrase note", "source": "model"}]},
+                    "linguistic_elements": [
+                        {
+                            "type": "Word",
+                            "input": "before",
+                            "features": {"pos": ["ADP"], "dep": ["prep"], "tag": ["IN"], "morph": []},
+                            "targets": {"notes": [{"text": "Model word note", "source": "model"}]},
+                        }
+                    ],
+                }
+            ],
+        }
+        rows = list(iter_examples(item, use_template_id_targets=True))
+        self.assertEqual(len(rows), 3)
+        self.assertTrue(all("|" in row["target"] for row in rows))
+        self.assertTrue(any(row["target"].startswith("SENTENCE_FINITE_CLAUSE|") for row in rows))
+        self.assertTrue(any(row["target"].startswith("PP_TIME_BEFORE_ING|") for row in rows))
+        self.assertTrue(any(row["target"].startswith("WORD_PREPOSITION|") for row in rows))
+
+    def test_template_id_mode_has_priority_over_reference_templates(self):
+        item = {
+            "type": "Sentence",
+            "input": "The team works in the office.",
+            "features": {"pos": ["DET", "NOUN", "VERB"], "dep": ["det", "nsubj", "ROOT"]},
+            "targets": {
+                "notes": [{"text": "Model sentence note", "source": "model"}],
+            },
+            "linguistic_elements": [],
+        }
+        rows = list(iter_examples(item, use_reference_templates=True, use_template_id_targets=True))
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(rows[0]["target"].startswith("SENTENCE_FINITE_CLAUSE|"))
 
 
 if __name__ == "__main__":

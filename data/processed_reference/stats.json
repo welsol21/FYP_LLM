@@ -1,0 +1,296 @@
+{
+  "prompt_template_version": "v1",
+  "input_path": "/home/vlad/Dev/FYP_LLM/linguistic_hierarchical_3000_v3.json",
+  "use_reference_templates": true,
+  "schema_report": {
+    "nodes_total": 31642,
+    "nodes_with_targets": 31642,
+    "nodes_with_notes_array": 0,
+    "nodes_with_legacy_linguistic_notes": 31642,
+    "detected_schema": "legacy_linguistic_notes"
+  },
+  "total_before_dedup": 30981,
+  "total_after_dedup": 708,
+  "total_after_balance": 708,
+  "balance_level_tam": true,
+  "max_per_target": 40,
+  "dedup_exact_input_target": true,
+  "dedup_report": {
+    "skipped_exact_input_target_duplicates": 27216,
+    "skipped_by_target_cap": 3057
+  },
+  "quality_counters": {
+    "rows_emitted": 30981
+  },
+  "train": 568,
+  "dev": 70,
+  "test": 70,
+  "target_stats": {
+    "before_dedup": {
+      "total": 30981,
+      "unique_targets": 110,
+      "duplicate_ratio": 0.996449,
+      "top_repeated_targets": [
+        {
+          "target": "'the' is a determiner contributing to the clause as determiner dependency.",
+          "count": 4959
+        },
+        {
+          "target": "the sentence encodes a complete clause-level meaning with finite structure and tam bucket 'none'.",
+          "count": 1558
+        },
+        {
+          "target": "this sentence is a finite clause with a none tam profile, expressing a complete proposition.",
+          "count": 1442
+        },
+        {
+          "target": "'data' is a noun contributing to the clause as obj.",
+          "count": 1332
+        },
+        {
+          "target": "'in' is a preposition contributing to the clause as prepositional linker.",
+          "count": 1316
+        },
+        {
+          "target": "'is' is a auxiliary verb contributing to the clause as auxiliary dependency.",
+          "count": 1000
+        },
+        {
+          "target": "'city' is a noun contributing to the clause as object of a preposition.",
+          "count": 986
+        },
+        {
+          "target": "in this sentence, 'study' is used as a verb with a root dependency role.",
+          "count": 769
+        },
+        {
+          "target": "'analyze' functions as a verb and serves as clause head in the clause.",
+          "count": 739
+        },
+        {
+          "target": "'is' functions as a auxiliary verb and serves as clause head in the clause.",
+          "count": 677
+        },
+        {
+          "target": "'although' functions as a subordinating conjunction and serves as mark in the clause.",
+          "count": 676
+        },
+        {
+          "target": "'complex' functions as a adjective and serves as advcl in the clause.",
+          "count": 676
+        },
+        {
+          "target": "'managers' is a noun contributing to the clause as subject.",
+          "count": 662
+        },
+        {
+          "target": "'people' is a noun contributing to the clause as subject.",
+          "count": 373
+        },
+        {
+          "target": "'this' functions as a determiner and serves as determiner dependency in the clause.",
+          "count": 352
+        }
+      ]
+    },
+    "after_dedup": {
+      "total": 708,
+      "unique_targets": 110,
+      "duplicate_ratio": 0.844633,
+      "top_repeated_targets": [
+        {
+          "target": "this sentence is a finite clause with a none tam profile, expressing a complete proposition.",
+          "count": 40
+        },
+        {
+          "target": "'this' functions as a determiner and serves as determiner dependency in the clause.",
+          "count": 40
+        },
+        {
+          "target": "'is' functions as a auxiliary verb and serves as clause head in the clause.",
+          "count": 40
+        },
+        {
+          "target": "'very' functions as a adverb and serves as adverbial modifier in the clause.",
+          "count": 40
+        },
+        {
+          "target": "'the' is a determiner contributing to the clause as determiner dependency.",
+          "count": 40
+        },
+        {
+          "target": "the sentence encodes a complete clause-level meaning with finite structure and tam bucket 'none'.",
+          "count": 38
+        },
+        {
+          "target": "'in' is a preposition contributing to the clause as prepositional linker.",
+          "count": 37
+        },
+        {
+          "target": "'team' functions as a noun and serves as subject in the clause.",
+          "count": 20
+        },
+        {
+          "target": "in this sentence, 'often' is used as a adverb with a advmod dependency role.",
+          "count": 20
+        },
+        {
+          "target": "'office' functions as a noun and serves as object of a preposition in the clause.",
+          "count": 20
+        },
+        {
+          "target": "'city' is a noun contributing to the clause as object of a preposition.",
+          "count": 17
+        },
+        {
+          "target": "the phrase 'is in the city' is a prepositional phrase functioning as clause head in the sentence.",
+          "count": 12
+        },
+        {
+          "target": "the phrase 'is very good' is a verb phrase functioning as clause head in the sentence.",
+          "count": 11
+        },
+        {
+          "target": "'good' functions as a adjective and serves as adjectival complement in the clause.",
+          "count": 11
+        },
+        {
+          "target": "'is very big' forms a verb phrase and contributes a clause head role in clause structure.",
+          "count": 11
+        }
+      ]
+    },
+    "after_balance": {
+      "total": 708,
+      "unique_targets": 110,
+      "duplicate_ratio": 0.844633,
+      "top_repeated_targets": [
+        {
+          "target": "'very' functions as a adverb and serves as adverbial modifier in the clause.",
+          "count": 40
+        },
+        {
+          "target": "'this' functions as a determiner and serves as determiner dependency in the clause.",
+          "count": 40
+        },
+        {
+          "target": "this sentence is a finite clause with a none tam profile, expressing a complete proposition.",
+          "count": 40
+        },
+        {
+          "target": "'the' is a determiner contributing to the clause as determiner dependency.",
+          "count": 40
+        },
+        {
+          "target": "'is' functions as a auxiliary verb and serves as clause head in the clause.",
+          "count": 40
+        },
+        {
+          "target": "the sentence encodes a complete clause-level meaning with finite structure and tam bucket 'none'.",
+          "count": 38
+        },
+        {
+          "target": "'in' is a preposition contributing to the clause as prepositional linker.",
+          "count": 37
+        },
+        {
+          "target": "in this sentence, 'often' is used as a adverb with a advmod dependency role.",
+          "count": 20
+        },
+        {
+          "target": "'office' functions as a noun and serves as object of a preposition in the clause.",
+          "count": 20
+        },
+        {
+          "target": "'team' functions as a noun and serves as subject in the clause.",
+          "count": 20
+        },
+        {
+          "target": "'city' is a noun contributing to the clause as object of a preposition.",
+          "count": 17
+        },
+        {
+          "target": "the phrase 'is in the city' is a prepositional phrase functioning as clause head in the sentence.",
+          "count": 12
+        },
+        {
+          "target": "in this sentence, 'busy' is used as a adjective with a acomp dependency role.",
+          "count": 11
+        },
+        {
+          "target": "the phrase 'is very good' is a verb phrase functioning as clause head in the sentence.",
+          "count": 11
+        },
+        {
+          "target": "'is very big' forms a verb phrase and contributes a clause head role in clause structure.",
+          "count": 11
+        }
+      ]
+    }
+  },
+  "distributions": {
+    "before_dedup": {
+      "level": {
+        "Phrase": 5339,
+        "Sentence": 3000,
+        "Word": 22642
+      },
+      "tam_bucket": {
+        "none": 30981
+      },
+      "level_tam": {
+        "Phrase": {
+          "none": 5339
+        },
+        "Sentence": {
+          "none": 3000
+        },
+        "Word": {
+          "none": 22642
+        }
+      }
+    },
+    "after_dedup": {
+      "level": {
+        "Phrase": 165,
+        "Sentence": 78,
+        "Word": 465
+      },
+      "tam_bucket": {
+        "none": 708
+      },
+      "level_tam": {
+        "Phrase": {
+          "none": 165
+        },
+        "Sentence": {
+          "none": 78
+        },
+        "Word": {
+          "none": 465
+        }
+      }
+    },
+    "after_balance": {
+      "level": {
+        "Phrase": 165,
+        "Sentence": 78,
+        "Word": 465
+      },
+      "tam_bucket": {
+        "none": 708
+      },
+      "level_tam": {
+        "Phrase": {
+          "none": 165
+        },
+        "Sentence": {
+          "none": 78
+        },
+        "Word": {
+          "none": 465
+        }
+      }
+    }
+  }
+}

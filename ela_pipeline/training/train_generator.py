@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import os
+from pathlib import Path
 from typing import Dict, List
 
 import numpy as np
@@ -34,6 +36,35 @@ def save_json(path: str, payload: Dict) -> None:
         json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=True)
 
 
+def _validate_processed_rows(rows: List[Dict[str, str]], split: str) -> None:
+    if not rows:
+        raise ValueError(f"{split} dataset is empty")
+    required_fields = {"input", "target", "level", "tam_bucket", "prompt_template_version"}
+    for idx, row in enumerate(rows[:200]):
+        missing = required_fields.difference(row.keys())
+        if missing:
+            raise ValueError(
+                f"{split} dataset is incompatible with current pipeline; "
+                f"missing fields {sorted(missing)} in row {idx}"
+            )
+
+
+def _validate_processed_freshness(train_path: str, dev_path: str) -> Dict:
+    base_dir = Path(train_path).resolve().parent
+    if base_dir != Path(dev_path).resolve().parent:
+        raise ValueError("Train/dev JSONL must come from the same processed directory")
+    stats_path = base_dir / "stats.json"
+    if not stats_path.exists():
+        raise ValueError(f"Missing processed stats file: {stats_path}")
+    with open(stats_path, "r", encoding="utf-8") as f:
+        stats = json.load(f)
+    if stats.get("prompt_template_version") != "v1":
+        raise ValueError("Incompatible processed stats: unexpected prompt_template_version")
+    if int(stats.get("total_after_balance", 0)) <= 0:
+        raise ValueError("Processed stats indicate zero training rows")
+    return stats
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train local T5 generator for linguistic notes")
     parser.add_argument("--train", default="data/processed/train.jsonl")
@@ -51,6 +82,9 @@ def main() -> None:
     set_seed(args.seed)
     train_rows = load_jsonl(args.train)
     dev_rows = load_jsonl(args.dev)
+    _validate_processed_rows(train_rows, split="train")
+    _validate_processed_rows(dev_rows, split="dev")
+    processed_stats = _validate_processed_freshness(args.train, args.dev)
 
     tokenizer = T5Tokenizer.from_pretrained(args.model_name)
     model = T5ForConditionalGeneration.from_pretrained(args.model_name)
@@ -97,6 +131,8 @@ def main() -> None:
         "max_target": args.max_target,
         "learning_rate": args.learning_rate,
         "seed": args.seed,
+        "processed_stats_path": str((Path(args.train).resolve().parent / "stats.json")),
+        "processed_total_after_balance": int(processed_stats.get("total_after_balance", 0)),
     }
     save_json(os.path.join(args.output_dir, "training_config.json"), training_config)
 
@@ -119,15 +155,21 @@ def main() -> None:
         report_to="none",
     )
 
-    trainer = Seq2SeqTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_tok,
-        eval_dataset=dev_tok,
-        tokenizer=tokenizer,
-        data_collator=DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model),
-        compute_metrics=compute_metrics,
-    )
+    trainer_kwargs = {
+        "model": model,
+        "args": training_args,
+        "train_dataset": train_tok,
+        "eval_dataset": dev_tok,
+        "data_collator": DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model),
+        "compute_metrics": compute_metrics,
+    }
+    trainer_sig = inspect.signature(Seq2SeqTrainer.__init__)
+    if "tokenizer" in trainer_sig.parameters:
+        trainer_kwargs["tokenizer"] = tokenizer
+    elif "processing_class" in trainer_sig.parameters:
+        trainer_kwargs["processing_class"] = tokenizer
+
+    trainer = Seq2SeqTrainer(**trainer_kwargs)
     train_output = trainer.train()
     eval_metrics = trainer.evaluate()
 

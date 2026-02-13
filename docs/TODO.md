@@ -105,3 +105,55 @@
 - [x] For `prepositional phrase` nodes with temporal heads (`before/after`), drop or mark candidates that label them as `concession`/`reason`.
 - [x] Apply sanity checks both in note suitability gate and rejected-candidate normalization path to keep diagnostics clean.
 - [x] Add regression tests for semantic mismatch cases (e.g., `before + V-ing` incorrectly labeled as `subordinate clause of concession/reason`).
+
+## Rejected Candidates Noise Expansion (Review 2026-02-13)
+
+- [x] Expand stop-list with newly observed noisy variants from latest inference output (`sensibilite`, `sensibilität`) and cover them with regression tests.
+
+## Dataset + Training Refresh (Review 2026-02-13)
+
+- [x] Add compatibility layer in dataset builder for legacy `targets.linguistic_notes` and current `notes[{text, source}]` schemas (single unified extraction path).
+- [x] Add explicit dataset schema detection + fail-fast diagnostics (stop run if extracted rows are zero or schema mismatch is detected).
+- [x] Regenerate `data/processed/{train,dev,test}.jsonl` from a single canonical source using current builder and save fresh `stats.json` with level/TAM distributions.
+- [x] Add target dedup controls for training data (global dedup by normalized target + configurable max examples per identical target string).
+- [x] Add low-quality target filters for legacy template artifacts (`verb-centred ...`, `subordinate clause of concession ...`, similar generic templates).
+- [x] Extend `stats.json` with quality counters (unique target count, duplicate ratio, top repeated targets) to prevent silent dataset collapse.
+- [x] Update training entrypoint to validate processed dataset freshness/compatibility before training starts (block on stale or incompatible JSONL format).
+- [x] Retrain baseline `t5-small` on refreshed dataset and save comparable `evaluation_report.json` before/after refresh.
+- [x] Run regression inference suite on fixed probe sentences and document quality delta in `docs/` (accepted-note rate, fallback rate, key error classes).
+
+## Inference Noise Loop (Review 2026-02-13, 16:51)
+
+- [x] Expand rejected-candidate stop-list for prompt-leak noise observed in latest inference (`in English`, `natural English`, `booleans/JSON fragments`, repetitive `Noun. Noun...` patterns).
+- [x] Add structural heuristic to drop repetition-heavy candidates (low unique-token ratio / repeated POS-token spam).
+- [x] Add regression tests for new prompt-leak and repetition-noise patterns.
+- [x] Re-run inference probe and verify cleaned `rejected_candidates` while preserving valid diagnostics.
+
+## Reference-Based Dataset (Network Sources)
+
+- [x] Collect authoritative English grammar references (Cambridge, Oxford, Merriam-Webster, Purdue OWL, British Council, etc.) and save a source registry with links.
+- [x] Build a normalized grammar concept inventory (POS roles, clause types, TAM patterns, dependency-role phrasing) from the references.
+- [x] Add deterministic target-template library derived from the concept inventory (multiple high-quality variants per concept).
+- [x] Generate refreshed training targets using reference-backed templates with diversity constraints (per POS, per level, per pattern caps).
+- [x] Rebuild processed dataset and verify quality gates (`duplicate_ratio`, `top_20_target_share`, coverage by level/POS/TAM buckets).
+- [x] Retrain `t5-small` on the reference-backed dataset and compare regression metrics against current baseline.
+- [x] Document source list, derivation rules, and before/after metrics in `docs/`.
+
+## Template-ID Dataset Mode (T5-small)
+
+- [x] Add strict template-id mapping for Sentence/Phrase/Word nodes (fixed template library, no dynamic IDs).
+- [x] Add dataset builder mode that emits `target = template_id|note` with short, low-variance notes (<=30 words, 1 sentence preferred).
+- [x] Enforce hard target rules in builder (no banned prefixes/tokens/placeholders; feature-consistent notes only).
+- [x] Wire template-id mode into `iter_examples` and CLI flags (`--use-template-id-targets`) with deterministic priority over raw notes/reference templates.
+- [x] Extend dataset stats with template-id coverage/distribution and template-target quality counters.
+- [x] Add unit tests for template-id target generation, hard-rule compliance, and CLI mode behavior.
+- [x] Rebuild processed dataset in template-id mode and compare diversity/quality stats to current reference dataset.
+- [x] Retrain `t5-small` on template-id dataset and compare regression metrics (`accepted_note_rate`, `fallback_rate`, `rejected_nodes_total`).
+  - [x] Retrain `t5-small` on `data/processed_template_id` and store metrics artifact.
+  - [x] Run stable regression inference comparison (`accepted_note_rate`, `fallback_rate`, `rejected_nodes_total`) for template-id model vs refreshed baseline.
+- [x] Document template-id experiment results in `docs/`.
+
+## Inference Runtime Policy
+
+- [x] Enforce GPU-only inference for local T5 annotator (no silent CPU fallback).
+- [x] Return explicit runtime error when CUDA is unavailable during inference with `--model-dir`.

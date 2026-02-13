@@ -34,7 +34,13 @@ class LocalT5Annotator:
                 "Run training first or pass an existing local model directory."
             )
 
-        self.device = torch.device("cpu")
+        if not torch.cuda.is_available():
+            raise RuntimeError(
+                "CUDA is required for inference with LocalT5Annotator, but no GPU is available. "
+                "Run inference on a machine/session with visible NVIDIA GPU and CUDA-enabled PyTorch."
+            )
+
+        self.device = torch.device("cuda")
         self.max_input_length = max_input_length
         self.max_target_length = max_target_length
         self.max_retries = max_retries

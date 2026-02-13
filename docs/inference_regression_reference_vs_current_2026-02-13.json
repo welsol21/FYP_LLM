@@ -1,0 +1,20 @@
+{
+  "results_llm_notes_refresh_data_processed_e2/best_model": {
+    "probe_count": 5,
+    "total_nodes": 46,
+    "total_model_notes": 0,
+    "total_fallback_notes": 46,
+    "accepted_note_rate": 0.0,
+    "fallback_rate": 1.0,
+    "rejected_nodes_total": 1
+  },
+  "results_llm_notes_reference_templates_e2/best_model": {
+    "probe_count": 5,
+    "total_nodes": 46,
+    "total_model_notes": 0,
+    "total_fallback_notes": 46,
+    "accepted_note_rate": 0.0,
+    "fallback_rate": 1.0,
+    "rejected_nodes_total": 1
+  }
+}

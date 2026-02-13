@@ -109,11 +109,37 @@ class RejectedCandidatesProcessingTests(unittest.TestCase):
                 "Node type or phrase expressing what happens to or about the subject.",
                 "Node content. Part of speech.",
                 "Sensational use of her instincts before deciding to make the decision.",
+                "Sensibilite to the subject before making the decision.",
+                "Sensibilität: Her instincts are not based on her instincts.",
                 "This candidate does not use proper grammar.",
                 "You must use this pattern.",
+                "and grammar in English. Notes are intended for academic and professional development.",
+                "This output in natural English should avoid booleans or JSON fragments.",
+                "Node, label, placeholders, or other items. Sentence: She should have trusted her instincts.",
+                "Sensitence: she should have trusted her instincts before making the decision.",
+                "Node - English. - French. Nouns.",
             ]
         )
         self.assertEqual(rejected, [])
+
+    def test_filters_repetition_heavy_prompt_leak_candidates(self):
+        rejected, stats = normalize_and_aggregate_rejected_candidates(
+            rejected_candidates=[
+                "in English. Noun. Noun. Noun. Noun. Noun. Noun. Noun. Noun. Noun. Noun.",
+                ". Noun phrase. Tense: None. Noun phrase. Noun phrase. Noun phrase. Noun phrase.",
+            ]
+        )
+        self.assertEqual(rejected, [])
+        self.assertEqual(stats, [])
+
+    def test_filters_label_spam_patterns(self):
+        rejected, stats = normalize_and_aggregate_rejected_candidates(
+            rejected_candidates=[
+                "or context.;;. Use verb. Node; verb. Form: Noun. Tense: None. Node: instincts. Node; Node: instincts.",
+            ]
+        )
+        self.assertEqual(rejected, [])
+        self.assertEqual(stats, [])
 
     def test_is_deterministic(self):
         data = [
