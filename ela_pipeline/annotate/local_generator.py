@@ -10,6 +10,11 @@ import torch
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
 from ela_pipeline.annotate.fallback_notes import build_fallback_note
+from ela_pipeline.annotate.template_registry import (
+    is_template_semantically_compatible,
+    render_template_note,
+    select_template_candidates,
+)
 from ela_pipeline.annotate.rejected_candidates import (
     DEFAULT_REJECTED_CANDIDATE_FILTER_CONFIG,
     RejectedCandidateFilterConfig,
@@ -23,32 +28,39 @@ class LocalT5Annotator:
     def __init__(
         self,
         model_dir: str,
+        note_mode: str = "template_only",
         max_input_length: int = 512,
         max_target_length: int = 128,
         max_retries: int = 2,
         rejection_filter_config: RejectedCandidateFilterConfig = DEFAULT_REJECTED_CANDIDATE_FILTER_CONFIG,
     ):
-        if not os.path.isdir(model_dir):
-            raise FileNotFoundError(
-                f"Model directory not found: {model_dir}. "
-                "Run training first or pass an existing local model directory."
-            )
+        self.note_mode = (note_mode or "template_only").strip().lower()
+        if self.note_mode not in {"template_only", "llm", "hybrid"}:
+            raise ValueError("note_mode must be one of: template_only | llm | hybrid")
 
-        if not torch.cuda.is_available():
-            raise RuntimeError(
-                "CUDA is required for inference with LocalT5Annotator, but no GPU is available. "
-                "Run inference on a machine/session with visible NVIDIA GPU and CUDA-enabled PyTorch."
-            )
-
-        self.device = torch.device("cuda")
+        self.device = None
         self.max_input_length = max_input_length
         self.max_target_length = max_target_length
         self.max_retries = max_retries
         self.rejection_filter_config = rejection_filter_config
 
-        self.tokenizer = T5Tokenizer.from_pretrained(model_dir)
-        self.model = T5ForConditionalGeneration.from_pretrained(model_dir).to(self.device)
-        self.model.eval()
+        self.tokenizer = None
+        self.model = None
+        if self.note_mode in {"llm", "hybrid"}:
+            if not os.path.isdir(model_dir):
+                raise FileNotFoundError(
+                    f"Model directory not found: {model_dir}. "
+                    "Run training first or pass an existing local model directory."
+                )
+            if not torch.cuda.is_available():
+                raise RuntimeError(
+                    "CUDA is required for inference with LocalT5Annotator in llm/hybrid mode, but no GPU is available. "
+                    "Run inference on a machine/session with visible NVIDIA GPU and CUDA-enabled PyTorch."
+                )
+            self.device = torch.device("cuda")
+            self.tokenizer = T5Tokenizer.from_pretrained(model_dir)
+            self.model = T5ForConditionalGeneration.from_pretrained(model_dir).to(self.device)
+            self.model.eval()
 
     def _build_prompt(self, sentence: str, node: Dict) -> str:
         return (
@@ -60,6 +72,41 @@ class LocalT5Annotator:
             f"Tense: {node['tense']}. "
             f"Node content: {node['content']}"
         )
+
+    def _generate_template_note(self, node: Dict) -> tuple[str, str, Dict[str, object]]:
+        candidates = select_template_candidates(node)
+        rejected_semantic = []
+        for selection in candidates:
+            template_id = (selection.template_id or "").strip()
+            if not template_id:
+                continue
+            if not is_template_semantically_compatible(node, template_id):
+                rejected_semantic.append({"template_id": template_id, "level": selection.level})
+                continue
+            note = render_template_note(template_id, node, selection.matched_key or "")
+            trace = {
+                "level": selection.level,
+                "template_id": selection.template_id,
+                "matched_key": selection.matched_key,
+                "registry_version": selection.registry_version,
+                "context_key_l1": selection.context_key_l1,
+                "context_key_l2": selection.context_key_l2,
+                "context_key_l3": selection.context_key_l3,
+            }
+            if rejected_semantic:
+                trace["semantic_rejects"] = rejected_semantic
+            return template_id, sanitize_note(note), trace
+        fallback = candidates[-1]
+        return "", "", {
+            "level": fallback.level,
+            "template_id": None,
+            "matched_key": fallback.matched_key,
+            "registry_version": fallback.registry_version,
+            "context_key_l1": fallback.context_key_l1,
+            "context_key_l2": fallback.context_key_l2,
+            "context_key_l3": fallback.context_key_l3,
+            "semantic_rejects": rejected_semantic,
+        }
 
     def _generate(self, prompt: str, *, do_sample: bool, temperature: float) -> str:
         enc = self.tokenizer(
@@ -181,6 +228,52 @@ class LocalT5Annotator:
         return contract_doc
 
     def _annotate_node(self, sentence_text: str, node: Dict, seen_notes: Set[str]) -> None:
+        node["quality_flags"] = []
+        node["rejected_candidates"] = []
+        node["rejected_candidate_stats"] = []
+        node["reason_codes"] = []
+
+        # Stage A/B deterministic path: classify template_id -> render note.
+        if self.note_mode in {"template_only", "hybrid"}:
+            template_id, template_note, template_trace = self._generate_template_note(node)
+            norm_template_note = sanitize_note(template_note).lower()
+            node_type = (node.get("type") or "").strip()
+            should_dedupe = node_type != "Word"
+            template_is_new = (norm_template_note not in seen_notes) if should_dedupe else True
+            if template_note and self._is_note_suitable_for_node(node, template_note) and template_is_new:
+                node["linguistic_notes"] = [template_note]
+                node["notes"] = [self._build_typed_note(node, template_note, source="rule")]
+                node["quality_flags"] = ["note_generated", "rule_used", "template_selected"]
+                node["reason_codes"] = ["RULE_TEMPLATE_NOTE_ACCEPTED"]
+                node["template_selection"] = template_trace
+                if should_dedupe:
+                    seen_notes.add(norm_template_note)
+                for child in node.get("linguistic_elements", []):
+                    self._annotate_node(sentence_text, child, seen_notes)
+                return
+            if self.note_mode == "template_only":
+                fallback_note = build_fallback_note(node)
+                fallback_norm = sanitize_note(fallback_note).lower()
+                fallback_is_new = (fallback_norm not in seen_notes) if should_dedupe else True
+                if self._is_note_suitable_for_node(node, fallback_note) and fallback_is_new:
+                    node["linguistic_notes"] = [fallback_note]
+                    node["notes"] = [self._build_typed_note(node, fallback_note, source="rule")]
+                    node["quality_flags"] = ["note_generated", "rule_used", "template_fallback"]
+                    node["reason_codes"] = ["RULE_TEMPLATE_MISS", "RULE_TEMPLATE_FALLBACK_ACCEPTED"]
+                    node["template_selection"] = template_trace
+                    if should_dedupe:
+                        seen_notes.add(fallback_norm)
+                else:
+                    node["linguistic_notes"] = []
+                    node["notes"] = []
+                    node["quality_flags"] = ["no_note"]
+                    node["reason_codes"] = ["RULE_TEMPLATE_MISS", "NO_VALID_NOTE"]
+                    node["template_selection"] = template_trace
+                for child in node.get("linguistic_elements", []):
+                    self._annotate_node(sentence_text, child, seen_notes)
+                return
+
+        # LLM path (legacy) with retry + fallback.
         prompt = self._build_prompt(sentence_text, node)
         note, rejected_items = self._generate_note_with_retry(prompt)
         norm_note = sanitize_note(note).lower()
@@ -189,11 +282,6 @@ class LocalT5Annotator:
         note_is_valid = is_valid_note(note)
         note_is_suitable = self._is_note_suitable_for_node(node, note)
         is_new_note = (norm_note not in seen_notes) if should_dedupe else True
-
-        node["quality_flags"] = []
-        node["rejected_candidates"] = []
-        node["rejected_candidate_stats"] = []
-        node["reason_codes"] = []
 
         if note_is_valid and note_is_suitable and is_new_note:
             node["linguistic_notes"] = [note]

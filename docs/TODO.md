@@ -162,18 +162,34 @@
 
 ### P0 (must-have)
 
-- [ ] Define canonical context key and hierarchical matching policy (`L1 exact`, `L2 drop TAM`, `L3 level+POS`, `L4 level fallback`).
-- [ ] Build versioned template registry v1 with deterministic rules and 5-15 note variants per active template.
-- [ ] Implement deterministic selector (`template_only`) in inference pipeline with selection trace logging.
+- [x] Define canonical context key and hierarchical matching policy (`L1 exact`, `L2 drop TAM`, `L3 level+POS`, `L4 level fallback`).
+- [x] Implement canonical context-key builder in runtime (`level|pos|dep|tam|lex`) with deterministic normalized keys and trace payload.
+- [x] Add hierarchical selector that searches registry in order `L1 -> L2 -> L3 -> L4` and logs matched key per node.
+- [x] Build versioned template registry v1 with deterministic rules and 5-15 note variants per active template.
+- [x] Expand registry entries for active node families (Sentence/Phrase/Word) to raise non-fallback coverage on real inference probes.
+- [x] Implement deterministic selector (`template_only`) in inference pipeline with selection trace logging.
 - [x] Add dataset quality gates that block training when diversity collapses (`min_unique_targets`, `max_top1_share`, `min_active_template_ids`).
 - [x] Add regression report with required KPIs: `accepted_note_rate`, `fallback_rate`, `rejected_nodes_total`, `L1-L4 coverage`.
 
 ### P1 (should-have)
 
 - [ ] Build RAG corpus/index from vetted grammar references with provenance metadata.
+- [x] Curate licensed source list for large-scale data ingestion (target: 3k sentences / 9k phrases / 18k words) with explicit allow/deny policy per source.
+- [x] Build source ingestion plan for target scale (3000 sentence / 9000 phrase / 18000 word) with per-source quotas and license metadata requirements.
+- [x] Implement corpus ingestion script(s) that export normalized JSONL with provenance fields (`source_name`, `source_url`, `license`, `collected_at`).
+- [x] Add extraction pipeline to derive phrase/word records from ingested sentences via spaCy parse and deterministic context-key mapping.
+- [x] Add ingestion QA report (license coverage, parse success rate, duplicate ratio, POS/dep/TAM distribution, per-source contribution).
+- [x] Regenerate template-id training dataset from ingested corpus and run quality gates before training.
+- [x] Run end-to-end dataset refresh strictly via ingestion chain (`raw_sources` -> `build_ingestion_corpus` -> `extract_ingested_nodes` -> QA) for the new corpus only.
+- [x] Run GPU-only retraining + regression inference QC on refreshed dataset and publish comparison report vs current baseline.
+  - [x] Interim checkpoint-level QC comparison published (`docs/inference_qc_compare_ingested_checkpoint800_vs_baseline_2026-02-13.json`).
+  - [x] Finalize full-run `best_model` QC comparison after training completion.
 - [ ] Implement `hybrid_rag` mode: retrieve candidates by context key + rerank deterministically + strict rule filtering.
 - [ ] Add unmatched-context logging and weekly template expansion loop.
 - [ ] Expand template coverage to activate all target template families present in schema (current gap: inactive template IDs).
+- [x] Add template semantic compatibility rules (`template_id` vs POS/dep/TAM/content) and reject incompatible matches before note emit.
+- [x] Add semantic mismatch metric to QC report and make it a regression gate.
+- [x] Expand registry mappings for top unresolved contexts from latest QC to reduce `L4` without semantic degradation.
 
 ### P2 (nice-to-have)
 
