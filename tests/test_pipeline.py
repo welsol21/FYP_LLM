@@ -79,6 +79,26 @@ class PipelineTests(unittest.TestCase):
 
         walk(sentence)
 
+    def test_pipeline_v1_keeps_string_null_tam_values(self):
+        out = run_pipeline(
+            "She should have trusted her instincts before making the decision.",
+            model_dir=None,
+            validation_mode="v1",
+        )
+        sentence = out[next(iter(out))]
+        has_string_null = False
+
+        def walk(node):
+            nonlocal has_string_null
+            for field in ("tense", "aspect", "mood", "voice", "finiteness"):
+                if node.get(field) == "null":
+                    has_string_null = True
+            for child in node.get("linguistic_elements", []):
+                walk(child)
+
+        walk(sentence)
+        self.assertTrue(has_string_null)
+
 
 if __name__ == "__main__":
     unittest.main()
