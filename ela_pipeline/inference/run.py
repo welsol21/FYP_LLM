@@ -17,6 +17,25 @@ from ela_pipeline.validation.validator import (
     validate_frozen_structure,
 )
 
+STRICT_NULLABLE_TAM_FIELDS = {"tense", "aspect", "mood", "voice", "finiteness"}
+
+
+def _normalize_strict_null_sentinels(node: dict) -> None:
+    for field in STRICT_NULLABLE_TAM_FIELDS:
+        if node.get(field) == "null":
+            node[field] = None
+    for child in node.get("linguistic_elements", []):
+        if isinstance(child, dict):
+            _normalize_strict_null_sentinels(child)
+
+
+def _apply_strict_null_normalization(doc: dict, validation_mode: str) -> None:
+    if validation_mode != "v2_strict":
+        return
+    for sentence_node in doc.values():
+        if isinstance(sentence_node, dict):
+            _normalize_strict_null_sentinels(sentence_node)
+
 
 def run_pipeline(
     text: str,
@@ -27,10 +46,12 @@ def run_pipeline(
     nlp = load_nlp(spacy_model)
 
     skeleton = build_skeleton(text, nlp)
+    _apply_strict_null_normalization(skeleton, validation_mode)
     raise_if_invalid(validate_contract(skeleton, validation_mode=validation_mode))
 
     enriched = deep_copy_contract(skeleton)
     apply_tam(enriched, nlp)
+    _apply_strict_null_normalization(enriched, validation_mode)
 
     if model_dir:
         from ela_pipeline.annotate.local_generator import LocalT5Annotator

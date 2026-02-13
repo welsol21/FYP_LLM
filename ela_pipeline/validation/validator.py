@@ -11,6 +11,7 @@ NOTE_KINDS = {"semantic", "syntactic", "morphological", "discourse"}
 NOTE_SOURCES = {"model", "rule", "fallback"}
 VALIDATION_MODES = {"v1", "v2_strict"}
 STRICT_V2_REQUIRED_FIELDS = {"node_id", "source_span", "grammatical_role", "schema_version"}
+TAM_FIELDS = ("tense", "aspect", "mood", "voice", "finiteness")
 
 
 @dataclass
@@ -77,15 +78,46 @@ def _validate_optional_dependency(node: Dict[str, Any], path: str, errors: List[
             _expect(head_id != node.get("node_id"), errors, f"{path}.head_id", "head_id must not equal node_id")
 
 
-def _validate_optional_verbal_fields(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
-    for field in ("aspect", "mood", "voice", "finiteness"):
-        if field in node:
+def _validate_tam_field(
+    node: Dict[str, Any],
+    field: str,
+    path: str,
+    errors: List[ValidationErrorItem],
+    validation_mode: str,
+) -> None:
+    value = node.get(field)
+    if validation_mode == "v2_strict":
+        _expect(
+            value is None or isinstance(value, str),
+            errors,
+            f"{path}.{field}",
+            f"{field} must be string or null in strict mode",
+        )
+        if isinstance(value, str):
             _expect(
-                isinstance(node.get(field), str),
+                value.lower() != "null",
                 errors,
                 f"{path}.{field}",
-                f"{field} must be string",
+                f"{field} must use real null, not string 'null', in strict mode",
             )
+        return
+    _expect(
+        isinstance(value, str),
+        errors,
+        f"{path}.{field}",
+        f"{field} must be string",
+    )
+
+
+def _validate_optional_verbal_fields(
+    node: Dict[str, Any],
+    path: str,
+    errors: List[ValidationErrorItem],
+    validation_mode: str,
+) -> None:
+    for field in ("aspect", "mood", "voice", "finiteness"):
+        if field in node:
+            _validate_tam_field(node, field, path, errors, validation_mode)
 
 
 def _validate_optional_features(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
@@ -263,12 +295,12 @@ def _validate_node(
     _expect(node_type in NODE_TYPES, errors, f"{path}.type", "Invalid node type")
 
     _expect(isinstance(node.get("content"), str), errors, f"{path}.content", "content must be string")
-    _expect(isinstance(node.get("tense"), str), errors, f"{path}.tense", "tense must be string")
+    _validate_tam_field(node, "tense", path, errors, validation_mode)
     _expect(isinstance(node.get("part_of_speech"), str), errors, f"{path}.part_of_speech", "part_of_speech must be string")
     _validate_optional_source_span(node, path, errors)
     _validate_optional_grammatical_role(node, path, errors)
     _validate_optional_dependency(node, path, errors)
-    _validate_optional_verbal_fields(node, path, errors)
+    _validate_optional_verbal_fields(node, path, errors, validation_mode)
     _validate_optional_features(node, path, errors)
     _validate_optional_notes(node, path, errors)
     _validate_optional_trace_fields(node, path, errors)

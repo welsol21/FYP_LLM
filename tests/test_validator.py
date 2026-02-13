@@ -6,6 +6,14 @@ from ela_pipeline.validation.validator import validate_contract, validate_frozen
 
 class ValidatorTests(unittest.TestCase):
     @staticmethod
+    def _normalize_strict_tam_nulls(node):
+        for field in ("tense", "aspect", "mood", "voice", "finiteness"):
+            if node.get(field) == "null":
+                node[field] = None
+        for child in node.get("linguistic_elements", []):
+            ValidatorTests._normalize_strict_tam_nulls(child)
+
+    @staticmethod
     def _inject_minimal_v2_fields(node, parent_id, next_id):
         node["node_id"] = f"n{next_id[0]}"
         next_id[0] += 1
@@ -284,9 +292,25 @@ class ValidatorTests(unittest.TestCase):
         sentence_key = next(iter(data))
         sentence = data[sentence_key]
         self._inject_minimal_v2_fields(sentence, None, [1])
+        self._normalize_strict_tam_nulls(sentence)
 
         result = validate_contract(data, validation_mode="v2_strict")
         self.assertTrue(result.ok, msg=str(result.errors))
+
+    def test_rejects_string_null_tam_values_in_v2_strict(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        self._inject_minimal_v2_fields(sentence, None, [1])
+        sentence["tense"] = "null"
+
+        result = validate_contract(data, validation_mode="v2_strict")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("must use real null" in err.message for err in result.errors),
+            msg=str(result.errors),
+        )
 
 
 if __name__ == "__main__":

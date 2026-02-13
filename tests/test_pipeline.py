@@ -63,6 +63,22 @@ class PipelineTests(unittest.TestCase):
         phrase_texts = [p.get("content") for p in out[key].get("linguistic_elements", [])]
         self.assertNotIn("the decision", phrase_texts)
 
+    def test_pipeline_strict_mode_uses_real_null_for_tam_fields(self):
+        out = run_pipeline(
+            "She should have trusted her instincts before making the decision.",
+            model_dir=None,
+            validation_mode="v2_strict",
+        )
+        sentence = out[next(iter(out))]
+
+        def walk(node):
+            for field in ("tense", "aspect", "mood", "voice", "finiteness"):
+                self.assertNotEqual(node.get(field), "null")
+            for child in node.get("linguistic_elements", []):
+                walk(child)
+
+        walk(sentence)
+
 
 if __name__ == "__main__":
     unittest.main()
