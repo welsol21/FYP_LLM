@@ -10,6 +10,11 @@ import torch
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
 from ela_pipeline.annotate.fallback_notes import build_fallback_note
+from ela_pipeline.annotate.rejected_candidates import (
+    DEFAULT_REJECTED_CANDIDATE_FILTER_CONFIG,
+    RejectedCandidateFilterConfig,
+    normalize_and_aggregate_rejected_candidates,
+)
 from ela_pipeline.validation.notes_quality import is_valid_note, sanitize_note
 
 
@@ -20,6 +25,7 @@ class LocalT5Annotator:
         max_input_length: int = 512,
         max_target_length: int = 128,
         max_retries: int = 2,
+        rejection_filter_config: RejectedCandidateFilterConfig = DEFAULT_REJECTED_CANDIDATE_FILTER_CONFIG,
     ):
         if not os.path.isdir(model_dir):
             raise FileNotFoundError(
@@ -31,6 +37,7 @@ class LocalT5Annotator:
         self.max_input_length = max_input_length
         self.max_target_length = max_target_length
         self.max_retries = max_retries
+        self.rejection_filter_config = rejection_filter_config
 
         self.tokenizer = T5Tokenizer.from_pretrained(model_dir)
         self.model = T5ForConditionalGeneration.from_pretrained(model_dir).to(self.device)
@@ -90,25 +97,12 @@ class LocalT5Annotator:
         return "", rejected
 
     def _build_rejection_stats(self, rejected_items: List[Dict[str, str]]) -> tuple[List[str], List[Dict[str, object]]]:
-        merged: Dict[str, Dict[str, object]] = {}
-        order: List[str] = []
-
-        for item in rejected_items:
-            text = sanitize_note(str(item.get("text", "")))
-            reason = sanitize_note(str(item.get("reason", "")))
-            if not text:
-                continue
-            key = text.lower()
-            if key not in merged:
-                merged[key] = {"text": text, "count": 0, "reasons": []}
-                order.append(key)
-            merged[key]["count"] = int(merged[key]["count"]) + 1
-            if reason and reason not in merged[key]["reasons"]:
-                merged[key]["reasons"].append(reason)
-
-        stats = [merged[key] for key in order]
-        deduped = [item["text"] for item in stats]
-        return deduped, stats
+        config = getattr(self, "rejection_filter_config", DEFAULT_REJECTED_CANDIDATE_FILTER_CONFIG)
+        return normalize_and_aggregate_rejected_candidates(
+            rejected_candidates=[],
+            rejected_items=rejected_items,
+            config=config,
+        )
 
     def _is_note_suitable_for_node(self, node: Dict, note: str) -> bool:
         if not is_valid_note(note):

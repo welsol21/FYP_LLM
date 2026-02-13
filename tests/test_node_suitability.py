@@ -52,7 +52,7 @@ class NodeSuitabilityTests(unittest.TestCase):
         deduped, stats = self.annotator._build_rejection_stats(rejected_items)
         self.assertEqual(
             deduped,
-            ["Verb-centred phrase expressing what happens to or about the subject."],
+            ["Verb-centred phrase expressing what happens to or about the subject"],
         )
         self.assertEqual(len(stats), 1)
         self.assertEqual(stats[0]["count"], 3)

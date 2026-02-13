@@ -75,3 +75,9 @@
 - [x] Freeze prompt template format for reproducible T5 training input.
 - [x] Add reproducible baseline training config + evaluation report artifacts.
 - [x] Add hard-negative loop from `rejected_candidates` to improve note quality filters.
+
+## Rejected Candidates Cleanup (TZ 2026-02-13)
+
+- [x] Implement deterministic filtering and canonical normalization for `rejected_candidates` and `rejected_candidate_stats`.
+- [x] Add configurable stop-substrings/regex + sentence-prefix whitelist policy in pipeline code.
+- [x] Add unit tests for filtering, whitelist behavior, normalization, deduplication, stats aggregation, length and nonalpha thresholds.
