@@ -12,7 +12,6 @@ NOTE_SOURCES = {"model", "rule", "fallback"}
 VALIDATION_MODES = {"v1", "v2_strict"}
 STRICT_V2_REQUIRED_FIELDS = {"node_id", "source_span", "grammatical_role", "schema_version"}
 TAM_FIELDS = ("tense", "aspect", "mood", "voice", "finiteness")
-TAM_CONSTRUCTIONS = {"none", "modal_perfect", "past_perfect", "present_perfect", "future_perfect"}
 
 
 @dataclass
@@ -124,10 +123,10 @@ def _validate_optional_verbal_fields(
         _expect(isinstance(value, str), errors, f"{path}.tam_construction", "tam_construction must be string")
         if isinstance(value, str):
             _expect(
-                value in TAM_CONSTRUCTIONS,
+                value.strip() != "",
                 errors,
                 f"{path}.tam_construction",
-                "tam_construction must be one of none|modal_perfect|past_perfect|present_perfect|future_perfect",
+                "tam_construction must be non-empty string",
             )
 
 

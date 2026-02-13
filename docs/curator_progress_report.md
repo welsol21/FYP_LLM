@@ -85,10 +85,7 @@ Source: `schemas/linguistic_contract_v2_strict.schema.json`
         "mood": {"type": ["string", "null"]},
         "voice": {"type": ["string", "null"]},
         "finiteness": {"type": ["string", "null"]},
-        "tam_construction": {
-          "type": "string",
-          "enum": ["none", "modal_perfect", "past_perfect", "present_perfect", "future_perfect"]
-        },
+        "tam_construction": {"type": "string", "minLength": 1},
         "linguistic_notes": {"type": "array", "items": {"type": "string"}},
         "notes": {"type": "array", "items": {"$ref": "#/$defs/typedNote"}},
         "quality_flags": {"type": "array", "items": {"type": "string"}},
@@ -134,10 +131,7 @@ Source: `schemas/linguistic_contract_v2_strict.schema.json`
         "mood": {"type": ["string", "null"]},
         "voice": {"type": ["string", "null"]},
         "finiteness": {"type": ["string", "null"]},
-        "tam_construction": {
-          "type": "string",
-          "enum": ["none", "modal_perfect", "past_perfect", "present_perfect", "future_perfect"]
-        },
+        "tam_construction": {"type": "string", "minLength": 1},
         "linguistic_notes": {"type": "array", "items": {"type": "string"}},
         "notes": {"type": "array", "items": {"$ref": "#/$defs/typedNote"}},
         "quality_flags": {"type": "array", "items": {"type": "string"}},
@@ -198,10 +192,7 @@ Source: `schemas/linguistic_contract_v2_strict.schema.json`
         "mood": {"type": ["string", "null"]},
         "voice": {"type": ["string", "null"]},
         "finiteness": {"type": ["string", "null"]},
-        "tam_construction": {
-          "type": "string",
-          "enum": ["none", "modal_perfect", "past_perfect", "present_perfect", "future_perfect"]
-        },
+        "tam_construction": {"type": "string", "minLength": 1},
         "linguistic_notes": {"type": "array", "items": {"type": "string"}},
         "notes": {"type": "array", "items": {"$ref": "#/$defs/typedNote"}},
         "quality_flags": {"type": "array", "items": {"type": "string"}},

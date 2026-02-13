@@ -57,15 +57,16 @@ python -m ela_pipeline.inference.run --text "She should have trusted her instinc
 ```bash
 python -m ela_pipeline.inference.run \
   --text "The young scientist in the white coat carefully examined the strange artifact on the table." \
-  --model-dir results_llm_notes_v3_t5-small_phrase/best_model
+  --model-dir results_llm_notes_v3_t5-small_phrase/best_model \
+  --validation-mode v2_strict
 ```
 
-### 5) Strict contract validation mode
+### 5) Legacy v1 compatibility mode (optional)
 ```bash
 python -m ela_pipeline.inference.run \
   --text "She should have trusted her instincts before making the decision." \
   --model-dir results_llm_notes_v3_t5-small_phrase/best_model \
-  --validation-mode v2_strict
+  --validation-mode v1
 ```
 
 ## Main Commands

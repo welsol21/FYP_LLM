@@ -140,7 +140,7 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
-    def test_rejects_invalid_tam_construction_value(self):
+    def test_accepts_arbitrary_tam_construction_value(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)
 
@@ -149,11 +149,7 @@ class ValidatorTests(unittest.TestCase):
         sentence["tam_construction"] = "perfect_modal"
 
         result = validate_contract(data)
-        self.assertFalse(result.ok)
-        self.assertTrue(
-            any("tam_construction" in err.path for err in result.errors),
-            msg=str(result.errors),
-        )
+        self.assertTrue(result.ok, msg=str(result.errors))
 
     def test_rejects_invalid_optional_features(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
