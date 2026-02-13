@@ -113,6 +113,29 @@ class PipelineTests(unittest.TestCase):
         sentence = out[next(iter(out))]
         self.assertEqual(sentence.get("tam_construction"), "modal_perfect")
 
+    def test_regression_had_vbn_vs_should_have_vbn(self):
+        modal_out = run_pipeline(
+            "She should have trusted her instincts.",
+            model_dir=None,
+            validation_mode="v2_strict",
+        )
+        modal_sentence = modal_out[next(iter(modal_out))]
+        self.assertEqual(modal_sentence.get("tam_construction"), "modal_perfect")
+        self.assertEqual(modal_sentence.get("tense"), None)
+        self.assertEqual(modal_sentence.get("aspect"), "perfect")
+        self.assertEqual(modal_sentence.get("mood"), "modal")
+
+        past_out = run_pipeline(
+            "She had trusted her instincts.",
+            model_dir=None,
+            validation_mode="v2_strict",
+        )
+        past_sentence = past_out[next(iter(past_out))]
+        self.assertEqual(past_sentence.get("tam_construction"), "past_perfect")
+        self.assertEqual(past_sentence.get("tense"), "past perfect")
+        self.assertEqual(past_sentence.get("aspect"), "perfect")
+        self.assertEqual(past_sentence.get("mood"), "indicative")
+
 
 if __name__ == "__main__":
     unittest.main()
