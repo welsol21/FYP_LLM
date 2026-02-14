@@ -393,11 +393,16 @@ class LocalT5Annotator:
             )
             sentence_node["backoff_nodes_count"] = len(backoff_node_ids)
             sentence_node["backoff_leaf_nodes_count"] = len(backoff_leaf_node_ids)
+            sentence_node["backoff_aggregate_nodes_count"] = max(
+                0,
+                sentence_node["backoff_nodes_count"] - sentence_node["backoff_leaf_nodes_count"],
+            )
             sentence_node["backoff_unique_spans_count"] = len(unique_spans)
             if self.backoff_debug_summary:
                 sentence_node["backoff_summary"] = {
                     "nodes": backoff_node_ids,
                     "leaf_nodes": backoff_leaf_node_ids,
+                    "aggregate_nodes_count": sentence_node["backoff_aggregate_nodes_count"],
                     "unique_spans": unique_spans,
                     "reasons": backoff_reasons,
                 }

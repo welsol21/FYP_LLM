@@ -316,13 +316,18 @@ def _validate_optional_template_selection(node: Dict[str, Any], path: str, error
 
 
 def _validate_optional_backoff_summary(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    backoff_nodes_count = node.get("backoff_nodes_count")
+    backoff_leaf_nodes_count = node.get("backoff_leaf_nodes_count")
+    backoff_aggregate_nodes_count = node.get("backoff_aggregate_nodes_count")
+    backoff_unique_spans_count = node.get("backoff_unique_spans_count")
+
     if "backoff_nodes_count" in node:
-        count = node.get("backoff_nodes_count")
+        count = backoff_nodes_count
         _expect(isinstance(count, int), errors, f"{path}.backoff_nodes_count", "backoff_nodes_count must be integer")
         if isinstance(count, int):
             _expect(count >= 0, errors, f"{path}.backoff_nodes_count", "backoff_nodes_count must be >= 0")
     if "backoff_leaf_nodes_count" in node:
-        count = node.get("backoff_leaf_nodes_count")
+        count = backoff_leaf_nodes_count
         _expect(
             isinstance(count, int),
             errors,
@@ -336,8 +341,23 @@ def _validate_optional_backoff_summary(node: Dict[str, Any], path: str, errors: 
                 f"{path}.backoff_leaf_nodes_count",
                 "backoff_leaf_nodes_count must be >= 0",
             )
+    if "backoff_aggregate_nodes_count" in node:
+        count = backoff_aggregate_nodes_count
+        _expect(
+            isinstance(count, int),
+            errors,
+            f"{path}.backoff_aggregate_nodes_count",
+            "backoff_aggregate_nodes_count must be integer",
+        )
+        if isinstance(count, int):
+            _expect(
+                count >= 0,
+                errors,
+                f"{path}.backoff_aggregate_nodes_count",
+                "backoff_aggregate_nodes_count must be >= 0",
+            )
     if "backoff_unique_spans_count" in node:
-        count = node.get("backoff_unique_spans_count")
+        count = backoff_unique_spans_count
         _expect(
             isinstance(count, int),
             errors,
@@ -351,6 +371,24 @@ def _validate_optional_backoff_summary(node: Dict[str, Any], path: str, errors: 
                 f"{path}.backoff_unique_spans_count",
                 "backoff_unique_spans_count must be >= 0",
             )
+    if isinstance(backoff_leaf_nodes_count, int) and isinstance(backoff_unique_spans_count, int):
+        _expect(
+            backoff_unique_spans_count <= backoff_leaf_nodes_count,
+            errors,
+            f"{path}.backoff_unique_spans_count",
+            "backoff_unique_spans_count must be <= backoff_leaf_nodes_count",
+        )
+    if (
+        isinstance(backoff_nodes_count, int)
+        and isinstance(backoff_leaf_nodes_count, int)
+        and isinstance(backoff_aggregate_nodes_count, int)
+    ):
+        _expect(
+            backoff_nodes_count == (backoff_leaf_nodes_count + backoff_aggregate_nodes_count),
+            errors,
+            f"{path}.backoff_aggregate_nodes_count",
+            "backoff_nodes_count must equal backoff_leaf_nodes_count + backoff_aggregate_nodes_count",
+        )
 
     if "backoff_summary" not in node:
         return
@@ -382,6 +420,22 @@ def _validate_optional_backoff_summary(node: Dict[str, Any], path: str, errors: 
                     f"{path}.backoff_summary.leaf_nodes[{idx}]",
                     "node id must be string",
                 )
+
+    aggregate_nodes_count = summary.get("aggregate_nodes_count")
+    if aggregate_nodes_count is not None:
+        _expect(
+            isinstance(aggregate_nodes_count, int),
+            errors,
+            f"{path}.backoff_summary.aggregate_nodes_count",
+            "aggregate_nodes_count must be integer",
+        )
+        if isinstance(aggregate_nodes_count, int):
+            _expect(
+                aggregate_nodes_count >= 0,
+                errors,
+                f"{path}.backoff_summary.aggregate_nodes_count",
+                "aggregate_nodes_count must be >= 0",
+            )
 
     unique_spans = summary.get("unique_spans")
     if unique_spans is not None:

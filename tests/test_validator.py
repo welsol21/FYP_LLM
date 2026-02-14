@@ -495,10 +495,12 @@ class ValidatorTests(unittest.TestCase):
         sentence = data[sentence_key]
         sentence["backoff_nodes_count"] = 2
         sentence["backoff_leaf_nodes_count"] = 1
+        sentence["backoff_aggregate_nodes_count"] = 1
         sentence["backoff_unique_spans_count"] = 1
         sentence["backoff_summary"] = {
             "nodes": ["n1", "n2"],
             "leaf_nodes": ["n2"],
+            "aggregate_nodes_count": 1,
             "unique_spans": ["10:12"],
             "reasons": ["tam_dropped"],
         }
@@ -513,10 +515,12 @@ class ValidatorTests(unittest.TestCase):
         sentence = data[sentence_key]
         sentence["backoff_nodes_count"] = "2"
         sentence["backoff_leaf_nodes_count"] = "1"
+        sentence["backoff_aggregate_nodes_count"] = "1"
         sentence["backoff_unique_spans_count"] = "1"
         sentence["backoff_summary"] = {
             "nodes": [1],
             "leaf_nodes": [2],
+            "aggregate_nodes_count": "1",
             "unique_spans": [3],
             "reasons": [None],
         }
@@ -525,6 +529,27 @@ class ValidatorTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertTrue(
             any(".backoff_nodes_count" in err.path or ".backoff_summary" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
+    def test_rejects_inconsistent_backoff_counters(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["backoff_nodes_count"] = 3
+        sentence["backoff_leaf_nodes_count"] = 2
+        sentence["backoff_aggregate_nodes_count"] = 2
+        sentence["backoff_unique_spans_count"] = 3
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("backoff_nodes_count must equal" in err.message for err in result.errors),
+            msg=str(result.errors),
+        )
+        self.assertTrue(
+            any("backoff_unique_spans_count must be <=" in err.message for err in result.errors),
             msg=str(result.errors),
         )
 

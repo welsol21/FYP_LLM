@@ -74,8 +74,11 @@ Only enrichment fields (notes/TAM-like metadata) may change.
 - Sentence-level backoff diagnostics:
   - `backoff_nodes_count`: count of all nodes with `backoff_used` in sentence tree (including the sentence node itself, if flagged).
   - `backoff_leaf_nodes_count`: count of non-sentence nodes with `backoff_used` (node-based, not deduplicated by span).
+  - `backoff_aggregate_nodes_count`: count of aggregate backoff nodes (currently sentence-level own-node backoff only).
   - `backoff_unique_spans_count`: count of unique source spans among backoff leaf nodes.
-  - optional `backoff_summary` (debug mode): `nodes`, `leaf_nodes`, `unique_spans`, `reasons`.
+  - Counter contract: `backoff_nodes_count = backoff_leaf_nodes_count + backoff_aggregate_nodes_count`.
+  - Sentence aggregate rule: sentence is counted as aggregate backoff only when its own `template_selection.level != L1_EXACT`.
+  - optional `backoff_summary` (debug mode): `nodes`, `leaf_nodes`, `aggregate_nodes_count`, `unique_spans`, `reasons`.
 
 ## 3. Validation Modes
 `validate_contract` supports two modes:

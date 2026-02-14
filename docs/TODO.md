@@ -225,6 +225,9 @@
 - [x] Extend debug summary with `leaf_nodes` for direct leaf-level audit.
 - [x] Clarify contract that `backoff_leaf_nodes_count` is node-based (duplicates by span are allowed).
 - [x] Add `backoff_unique_spans_count` for deduplicated span-level backoff metric.
+- [x] Add explicit `backoff_aggregate_nodes_count` to separate aggregate-node effects from leaf-node effects.
+- [x] Formalize aggregate counting policy: sentence aggregate backoff is own-level only (`template_selection.level != L1_EXACT`).
+- [x] Add validator consistency checks for backoff counters (`nodes = leaf + aggregate`, `unique_spans <= leaf`).
 - [x] Document `dep_label` semantics as source-parse dependency label (not phrase-internal dependency role).
 
 ## Documentation Hygiene
