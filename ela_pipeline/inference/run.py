@@ -79,8 +79,8 @@ def main() -> None:
     parser.add_argument(
         "--note-mode",
         default="template_only",
-        choices=["template_only", "llm", "hybrid"],
-        help="Inference note mode: deterministic template selector, LLM-only, or hybrid template->LLM fallback.",
+        choices=["template_only", "llm", "hybrid", "two_stage"],
+        help="Inference mode: template_only, llm, hybrid, or two_stage (model template_id -> rule note render).",
     )
     parser.add_argument("--output", default=None)
     args = parser.parse_args()

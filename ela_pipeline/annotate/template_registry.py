@@ -560,3 +560,9 @@ def render_template_note(template_id: str, node: Dict[str, object], matched_key:
     idx = _variant_index(template_id, content, matched_key or "", len(variants))
     raw = variants[idx].format(content=content)
     return sanitize_note(raw)
+
+
+def all_template_ids() -> List[str]:
+    ids = set(TEMPLATE_VARIANTS.keys())
+    ids.update({"CLAUSE_SUBORDINATE_TIME", "CLAUSE_SUBORDINATE_REASON", "CLAUSE_SUBORDINATE_CONCESSION"})
+    return sorted(ids)

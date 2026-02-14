@@ -11,6 +11,7 @@ from transformers import T5ForConditionalGeneration, T5Tokenizer
 
 from ela_pipeline.annotate.fallback_notes import build_fallback_note
 from ela_pipeline.annotate.template_registry import (
+    all_template_ids,
     is_template_semantically_compatible,
     render_template_note,
     select_template_candidates,
@@ -35,8 +36,8 @@ class LocalT5Annotator:
         rejection_filter_config: RejectedCandidateFilterConfig = DEFAULT_REJECTED_CANDIDATE_FILTER_CONFIG,
     ):
         self.note_mode = (note_mode or "template_only").strip().lower()
-        if self.note_mode not in {"template_only", "llm", "hybrid"}:
-            raise ValueError("note_mode must be one of: template_only | llm | hybrid")
+        if self.note_mode not in {"template_only", "llm", "hybrid", "two_stage"}:
+            raise ValueError("note_mode must be one of: template_only | llm | hybrid | two_stage")
 
         self.device = None
         self.max_input_length = max_input_length
@@ -46,7 +47,8 @@ class LocalT5Annotator:
 
         self.tokenizer = None
         self.model = None
-        if self.note_mode in {"llm", "hybrid"}:
+        self._template_ids = set(all_template_ids())
+        if self.note_mode in {"llm", "hybrid", "two_stage"}:
             if not os.path.isdir(model_dir):
                 raise FileNotFoundError(
                     f"Model directory not found: {model_dir}. "
@@ -54,7 +56,7 @@ class LocalT5Annotator:
                 )
             if not torch.cuda.is_available():
                 raise RuntimeError(
-                    "CUDA is required for inference with LocalT5Annotator in llm/hybrid mode, but no GPU is available. "
+                    "CUDA is required for inference with LocalT5Annotator in llm/hybrid/two_stage mode, but no GPU is available. "
                     "Run inference on a machine/session with visible NVIDIA GPU and CUDA-enabled PyTorch."
                 )
             self.device = torch.device("cuda")
@@ -73,6 +75,35 @@ class LocalT5Annotator:
             f"Node content: {node['content']}"
         )
 
+    def _build_template_id_prompt(self, sentence: str, node: Dict) -> str:
+        return (
+            "Predict exactly one template_id for this linguistic node. "
+            "Output only the template_id token and nothing else. "
+            f"Sentence: {sentence} "
+            f"Node type: {node.get('type')} "
+            f"Part of speech: {node.get('part_of_speech')} "
+            f"Dependency: {node.get('dep_label') or node.get('grammatical_role')} "
+            f"Tense: {node.get('tense')} "
+            f"Aspect: {node.get('aspect')} "
+            f"Mood: {node.get('mood')} "
+            f"Node content: {node.get('content')}"
+        )
+
+    def _extract_template_id(self, raw: str) -> str:
+        text = sanitize_note(raw).strip()
+        if not text:
+            return ""
+        first = text.split("|", 1)[0].strip().upper()
+        if first in self._template_ids:
+            return first
+        whole = text.upper()
+        if whole in self._template_ids:
+            return whole
+        for token in re.findall(r"[A-Z_]{4,}", whole):
+            if token in self._template_ids:
+                return token
+        return ""
+
     def _generate_template_note(self, node: Dict) -> tuple[str, str, Dict[str, object]]:
         candidates = select_template_candidates(node)
         rejected_semantic = []
@@ -84,29 +115,15 @@ class LocalT5Annotator:
                 rejected_semantic.append({"template_id": template_id, "level": selection.level})
                 continue
             note = render_template_note(template_id, node, selection.matched_key or "")
-            trace = {
-                "level": selection.level,
-                "template_id": selection.template_id,
-                "matched_key": selection.matched_key,
-                "registry_version": selection.registry_version,
-                "context_key_l1": selection.context_key_l1,
-                "context_key_l2": selection.context_key_l2,
-                "context_key_l3": selection.context_key_l3,
-            }
+            trace = self._trace_from_selection(selection, selection_mode="rule_fallback")
             if rejected_semantic:
                 trace["semantic_rejects"] = rejected_semantic
             return template_id, sanitize_note(note), trace
         fallback = candidates[-1]
-        return "", "", {
-            "level": fallback.level,
-            "template_id": None,
-            "matched_key": fallback.matched_key,
-            "registry_version": fallback.registry_version,
-            "context_key_l1": fallback.context_key_l1,
-            "context_key_l2": fallback.context_key_l2,
-            "context_key_l3": fallback.context_key_l3,
-            "semantic_rejects": rejected_semantic,
-        }
+        trace = self._trace_from_selection(fallback, selection_mode="rule_fallback")
+        trace["template_id"] = None
+        trace["semantic_rejects"] = rejected_semantic
+        return "", "", trace
 
     def _generate(self, prompt: str, *, do_sample: bool, temperature: float) -> str:
         enc = self.tokenizer(
@@ -150,6 +167,24 @@ class LocalT5Annotator:
                 return note, rejected
         return "", rejected
 
+    def _predict_template_id_with_retry(self, prompt: str) -> tuple[str, List[Dict[str, str]]]:
+        rejected: List[Dict[str, str]] = []
+        attempts = max(1, self.max_retries + 1)
+        seen_tokens: Set[str] = set()
+        for attempt in range(attempts):
+            do_sample = attempt > 0
+            temperature = 0.7 + (0.1 * attempt)
+            raw = self._generate(prompt, do_sample=do_sample, temperature=temperature)
+            template_id = self._extract_template_id(raw)
+            if template_id:
+                return template_id, rejected
+            # Keep only template-like tokens in rejection diagnostics; drop free-form model text noise.
+            token = sanitize_note(raw).strip().upper()
+            if token and re.fullmatch(r"[A-Z_]{4,}", token) and token not in seen_tokens:
+                seen_tokens.add(token)
+                rejected.append({"text": token, "reason": "MODEL_OUTPUT_LOW_QUALITY"})
+        return "", rejected
+
     def _build_rejection_stats(self, node: Dict, rejected_items: List[Dict[str, str]]) -> tuple[List[str], List[Dict[str, object]]]:
         config = getattr(self, "rejection_filter_config", DEFAULT_REJECTED_CANDIDATE_FILTER_CONFIG)
         return normalize_and_aggregate_rejected_candidates(
@@ -160,6 +195,33 @@ class LocalT5Annotator:
             node_part_of_speech=node.get("part_of_speech"),
             node_content=node.get("content"),
         )
+
+    @staticmethod
+    def _trace_from_selection(selection, *, selection_mode: str) -> Dict[str, object]:
+        trace = {
+            "level": selection.level,
+            "template_id": selection.template_id,
+            "matched_key": selection.matched_key,
+            "registry_version": selection.registry_version,
+            "context_key_l1": selection.context_key_l1,
+            "context_key_l2": selection.context_key_l2,
+            "context_key_l3": selection.context_key_l3,
+            "selection_mode": selection_mode,
+        }
+        if selection.level == "L2_DROP_TAM":
+            trace["matched_level_reason"] = "tam_dropped"
+        return trace
+
+    def _match_selection_for_template_id(self, node: Dict, template_id: str) -> Dict[str, object]:
+        candidates = select_template_candidates(node)
+        for c in candidates:
+            if (c.template_id or "").strip() == template_id:
+                return self._trace_from_selection(c, selection_mode="model_predicted_template")
+        fallback = candidates[-1]
+        trace = self._trace_from_selection(fallback, selection_mode="model_predicted_template")
+        trace["level"] = "MODEL_PREDICTED"
+        trace["template_id"] = template_id
+        return trace
 
     def _is_note_suitable_for_node(self, node: Dict, note: str) -> bool:
         if not is_valid_note(note):
@@ -271,6 +333,85 @@ class LocalT5Annotator:
         node["rejected_candidates"] = []
         node["rejected_candidate_stats"] = []
         node["reason_codes"] = []
+
+        if self.note_mode == "two_stage":
+            node_type = (node.get("type") or "").strip()
+            should_dedupe = node_type != "Word"
+            candidates = select_template_candidates(node)
+            top = candidates[0] if candidates else None
+
+            # Prefer exact deterministic mapping in production two-stage mode.
+            if top and top.template_id and top.level in {"L1_EXACT", "L2_DROP_TAM"}:
+                trace = self._trace_from_selection(top, selection_mode="rule_exact")
+                note = render_template_note(top.template_id, node, top.matched_key or "")
+                note_norm = sanitize_note(note).lower()
+                is_new = (note_norm not in seen_notes) if should_dedupe else True
+                if note and self._is_note_suitable_for_node(node, note) and is_new:
+                    node["linguistic_notes"] = [note]
+                    node["notes"] = [self._build_typed_note(node, note, source="rule", template_id=top.template_id)]
+                    node["quality_flags"] = ["template_selected", "rule_used"]
+                    node["reason_codes"] = ["RULE_TEMPLATE_ACCEPTED"]
+                    node["template_selection"] = trace
+                    if should_dedupe:
+                        seen_notes.add(note_norm)
+                else:
+                    node["linguistic_notes"] = []
+                    node["notes"] = []
+                    node["quality_flags"] = ["no_note"]
+                    node["reason_codes"] = ["NO_TEMPLATE_FOUND"]
+                    node["template_selection"] = trace
+                node["rejected_candidates"] = []
+                node["rejected_candidate_stats"] = []
+                for child in node.get("linguistic_elements", []):
+                    self._annotate_node(sentence_text, child, seen_notes)
+                return
+
+            prompt = self._build_template_id_prompt(sentence_text, node)
+            predicted_template_id, rejected_items = self._predict_template_id_with_retry(prompt)
+            if predicted_template_id and is_template_semantically_compatible(node, predicted_template_id):
+                selection = self._match_selection_for_template_id(node, predicted_template_id)
+                note = render_template_note(predicted_template_id, node, str(selection.get("matched_key") or ""))
+                note_norm = sanitize_note(note).lower()
+                is_new = (note_norm not in seen_notes) if should_dedupe else True
+                if note and self._is_note_suitable_for_node(node, note) and is_new:
+                    node["linguistic_notes"] = [note]
+                    node["notes"] = [self._build_typed_note(node, note, source="rule", template_id=predicted_template_id)]
+                    node["quality_flags"] = ["model_predicted_template", "template_selected"]
+                    node["reason_codes"] = ["MODEL_TEMPLATE_ACCEPTED"]
+                    node["template_selection"] = selection
+                    if should_dedupe:
+                        seen_notes.add(note_norm)
+                else:
+                    node["linguistic_notes"] = []
+                    node["notes"] = []
+                    node["quality_flags"] = ["no_note"]
+                    node["reason_codes"] = ["NO_TEMPLATE_FOUND"]
+                    node["template_selection"] = selection
+            else:
+                fallback_template_id, fallback_note, fallback_trace = self._generate_template_note(node)
+                fallback_norm = sanitize_note(fallback_note).lower()
+                fallback_is_new = (fallback_norm not in seen_notes) if should_dedupe else True
+                if fallback_note and fallback_is_new:
+                    node["linguistic_notes"] = [fallback_note]
+                    node["notes"] = [self._build_typed_note(node, fallback_note, source="rule", template_id=fallback_template_id)]
+                    node["quality_flags"] = ["template_selected", "rule_used"]
+                    node["reason_codes"] = ["RULE_TEMPLATE_ACCEPTED"]
+                    node["template_selection"] = fallback_trace
+                    if should_dedupe:
+                        seen_notes.add(fallback_norm)
+                else:
+                    node["linguistic_notes"] = []
+                    node["notes"] = []
+                    node["quality_flags"] = ["no_note"]
+                    node["reason_codes"] = ["NO_TEMPLATE_FOUND"]
+                    node["template_selection"] = fallback_trace
+
+            deduped_rejected, rejected_stats = self._build_rejection_stats(node, rejected_items)
+            node["rejected_candidates"] = deduped_rejected
+            node["rejected_candidate_stats"] = rejected_stats
+            for child in node.get("linguistic_elements", []):
+                self._annotate_node(sentence_text, child, seen_notes)
+            return
 
         # Stage A/B deterministic path: classify template_id -> render note.
         if self.note_mode in {"template_only", "hybrid"}:

@@ -78,6 +78,11 @@ export ELA_HARD_NEGATIVE_PATTERNS=artifacts/quality/hard_negative_patterns.json
 python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --model-dir results_llm_notes_v3_t5-small_phrase/best_model --note-mode template_only
 ```
 
+2-stage mode (model predicts `template_id`, rule engine renders note):
+```bash
+python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --model-dir results_llm_notes_v3_t5-small_phrase/best_model --note-mode two_stage
+```
+
 `v2_strict` is now the default mode.
 Legacy compatibility mode (`v1`) is still available only when explicitly requested:
 

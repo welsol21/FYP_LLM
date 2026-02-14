@@ -202,6 +202,10 @@
 - [x] Zero irrelevant TAM fields for NP/PP/Word nodes (keep only context-relevant grammatical dimensions).
 - [x] Enforce deterministic `note.kind` mapping by template family (`SENTENCE_*`, `PHRASE_*`, `WORD_*`).
 - [x] Replace generic sentence note for `modal_perfect` with TAM-informative explanation text.
+- [x] Switch inference pipeline to two-stage mode: `model predicts template_id` -> `rule engine renders note text`.
+- [x] Standardize two-stage telemetry: `selection_mode`, non-contradictory `quality_flags/reason_codes`, and single terminal reason code.
+- [x] Enforce template-only diagnostics in two-stage rejections (no free-form text in `rejected_candidates`).
+- [x] Add rule-priority in `two_stage` (`L1/L2` rule match skips model call) to avoid noisy model rejections.
 
 ## Documentation Hygiene
 

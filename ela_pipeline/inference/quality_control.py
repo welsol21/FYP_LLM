@@ -43,6 +43,7 @@ def _extract_probe_stats(result: Dict[str, Any]) -> Dict[str, int]:
         quality_flags = node.get("quality_flags", []) or []
         if (
             "model_used" in quality_flags
+            or "model_predicted_template" in quality_flags
             or "rule_used" in quality_flags
             or ("note_generated" in quality_flags and "fallback_used" not in quality_flags)
         ):
@@ -99,7 +100,7 @@ def main() -> None:
     parser.add_argument(
         "--note-mode",
         default="template_only",
-        choices=["template_only", "llm", "hybrid"],
+        choices=["template_only", "llm", "hybrid", "two_stage"],
     )
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
