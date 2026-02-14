@@ -173,7 +173,6 @@
 
 ### P1 (should-have)
 
-- [ ] Build RAG corpus/index from vetted grammar references with provenance metadata.
 - [x] Curate licensed source list for large-scale data ingestion (target: 3k sentences / 9k phrases / 18k words) with explicit allow/deny policy per source.
 - [x] Build source ingestion plan for target scale (3000 sentence / 9000 phrase / 18000 word) with per-source quotas and license metadata requirements.
 - [x] Implement corpus ingestion script(s) that export normalized JSONL with provenance fields (`source_name`, `source_url`, `license`, `collected_at`).
@@ -184,18 +183,12 @@
 - [x] Run GPU-only retraining + regression inference QC on refreshed dataset and publish comparison report vs current baseline.
   - [x] Interim checkpoint-level QC comparison published (`docs/inference_qc_compare_ingested_checkpoint800_vs_baseline_2026-02-13.json`).
   - [x] Finalize full-run `best_model` QC comparison after training completion.
-- [ ] Implement `hybrid_rag` mode: retrieve candidates by context key + rerank deterministically + strict rule filtering.
-- [ ] Add unmatched-context logging and weekly template expansion loop.
-- [ ] Expand template coverage to activate all target template families present in schema (current gap: inactive template IDs).
 - [x] Add template semantic compatibility rules (`template_id` vs POS/dep/TAM/content) and reject incompatible matches before note emit.
 - [x] Add semantic mismatch metric to QC report and make it a regression gate.
 - [x] Expand registry mappings for top unresolved contexts from latest QC to reduce `L4` without semantic degradation.
 
 ### P2 (nice-to-have)
 
-- [ ] Split pipeline into two-stage inference (`template_id` classification -> note rendering) and compare against current single-stage approach.
-- [ ] Add confidence calibration for template selection and semantic mismatch penalties.
-- [ ] Introduce canary rollout flag (`note_mode`) and automated A/B report generation in CI.
 
 ## Note Quality Hardening (Current)
 
