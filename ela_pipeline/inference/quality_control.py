@@ -38,6 +38,8 @@ def _extract_probe_stats(result: Dict[str, Any]) -> Dict[str, int]:
     l2 = 0
     l3 = 0
     l4 = 0
+    backoff_nodes = 0
+    tam_drop_nodes = 0
     semantic_mismatch = 0
     for node in nodes:
         quality_flags = node.get("quality_flags", []) or []
@@ -62,6 +64,10 @@ def _extract_probe_stats(result: Dict[str, Any]) -> Dict[str, int]:
             l3 += 1
         elif level == "L4_FALLBACK":
             l4 += 1
+        if level and level != "L1_EXACT":
+            backoff_nodes += 1
+        if str(sel.get("matched_level_reason") or "") == "tam_dropped":
+            tam_drop_nodes += 1
         template_id = str(sel.get("template_id") or "").strip()
         if template_id and not is_template_semantically_compatible(node, template_id):
             semantic_mismatch += 1
@@ -74,6 +80,8 @@ def _extract_probe_stats(result: Dict[str, Any]) -> Dict[str, int]:
         "l2_drop_tam": l2,
         "l3_level_pos": l3,
         "l4_fallback": l4,
+        "backoff_nodes": backoff_nodes,
+        "tam_drop_nodes": tam_drop_nodes,
         "semantic_mismatch_nodes": semantic_mismatch,
     }
 
@@ -126,6 +134,8 @@ def main() -> None:
             "coverage_l2_drop_tam": 0.0,
             "coverage_l3_level_pos": 0.0,
             "coverage_l4_level_fallback": 0.0,
+            "backoff_nodes_total": 0,
+            "tam_drop_nodes_total": 0,
             "semantic_mismatch_nodes": 0,
         },
     }
@@ -148,6 +158,8 @@ def main() -> None:
         report["aggregate"]["coverage_l2_drop_tam"] += stats["l2_drop_tam"]
         report["aggregate"]["coverage_l3_level_pos"] += stats["l3_level_pos"]
         report["aggregate"]["coverage_l4_level_fallback"] += stats["l4_fallback"]
+        report["aggregate"]["backoff_nodes_total"] += stats["backoff_nodes"]
+        report["aggregate"]["tam_drop_nodes_total"] += stats["tam_drop_nodes"]
         report["aggregate"]["semantic_mismatch_nodes"] += stats["semantic_mismatch_nodes"]
 
     total_nodes = report["aggregate"]["total_nodes"]
@@ -159,6 +171,12 @@ def main() -> None:
     )
     report["aggregate"]["semantic_mismatch_rate"] = (
         round(report["aggregate"]["semantic_mismatch_nodes"] / total_nodes, 6) if total_nodes else 0.0
+    )
+    report["aggregate"]["backoff_rate"] = (
+        round(report["aggregate"]["backoff_nodes_total"] / total_nodes, 6) if total_nodes else 0.0
+    )
+    report["aggregate"]["tam_drop_rate"] = (
+        round(report["aggregate"]["tam_drop_nodes_total"] / total_nodes, 6) if total_nodes else 0.0
     )
     if total_nodes:
         report["aggregate"]["coverage_l1_exact"] = round(report["aggregate"]["coverage_l1_exact"] / total_nodes, 6)

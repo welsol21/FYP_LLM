@@ -416,6 +416,42 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
+    def test_accepts_tam_dropped_for_tam_relevant_node(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["template_selection"] = {
+            "level": "L2_DROP_TAM",
+            "template_id": "SENTENCE_FINITE_CLAUSE",
+            "matched_level_reason": "tam_dropped",
+        }
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertTrue(result.ok, msg=str(result.errors))
+
+    def test_rejects_tam_dropped_for_non_tam_relevant_node(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        word = sentence["linguistic_elements"][0]["linguistic_elements"][0]
+        word["type"] = "Word"
+        word["part_of_speech"] = "noun"
+        word["tam_construction"] = "none"
+        word["template_selection"] = {
+            "level": "L2_DROP_TAM",
+            "template_id": "WORD_NOUN_COMMON",
+            "matched_level_reason": "tam_dropped",
+        }
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("only allowed for TAM-relevant nodes" in err.message for err in result.errors),
+            msg=str(result.errors),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,9 +1,23 @@
 import unittest
 
+from ela_pipeline.annotate.local_generator import LocalT5Annotator
 from ela_pipeline.inference.run import run_pipeline
 
 
 class PipelineTests(unittest.TestCase):
+    def test_backoff_flag_added_for_non_l1_levels(self):
+        flags = LocalT5Annotator._with_backoff_flag(
+            ["template_selected", "rule_used"],
+            {"level": "L2_DROP_TAM"},
+        )
+        self.assertIn("backoff_used", flags)
+
+        flags_l1 = LocalT5Annotator._with_backoff_flag(
+            ["template_selected", "rule_used"],
+            {"level": "L1_EXACT"},
+        )
+        self.assertNotIn("backoff_used", flags_l1)
+
     def test_pipeline_without_generator(self):
         out = run_pipeline("She should have trusted her instincts before making the decision.", model_dir=None)
         self.assertIsInstance(out, dict)

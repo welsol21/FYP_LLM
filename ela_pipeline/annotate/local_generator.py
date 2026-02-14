@@ -374,6 +374,14 @@ class LocalT5Annotator:
             "source": source,
         }
 
+    @staticmethod
+    def _with_backoff_flag(base_flags: List[str], template_trace: Dict[str, object] | None) -> List[str]:
+        flags = list(base_flags)
+        level = str((template_trace or {}).get("level") or "").upper()
+        if level and level != "L1_EXACT" and "backoff_used" not in flags:
+            flags.append("backoff_used")
+        return flags
+
     def annotate(self, contract_doc: Dict[str, Dict]) -> Dict[str, Dict]:
         for sentence_text, sentence_node in contract_doc.items():
             seen_notes: Set[str] = set()
@@ -406,7 +414,7 @@ class LocalT5Annotator:
                 if note and self._is_note_suitable_for_node(node, note) and is_new:
                     node["linguistic_notes"] = [note]
                     node["notes"] = [self._build_typed_note(node, note, source="rule", template_id=top.template_id)]
-                    node["quality_flags"] = ["template_selected", "rule_used"]
+                    node["quality_flags"] = self._with_backoff_flag(["template_selected", "rule_used"], trace)
                     node["reason_codes"] = ["RULE_TEMPLATE_ACCEPTED"]
                     node["template_selection"] = trace
                     if should_dedupe:
@@ -433,7 +441,10 @@ class LocalT5Annotator:
                 if note and self._is_note_suitable_for_node(node, note) and is_new:
                     node["linguistic_notes"] = [note]
                     node["notes"] = [self._build_typed_note(node, note, source="rule", template_id=predicted_template_id)]
-                    node["quality_flags"] = ["model_predicted_template", "template_selected"]
+                    node["quality_flags"] = self._with_backoff_flag(
+                        ["model_predicted_template", "template_selected"],
+                        selection,
+                    )
                     node["reason_codes"] = ["MODEL_TEMPLATE_ACCEPTED"]
                     node["template_selection"] = selection
                     if should_dedupe:
@@ -451,7 +462,7 @@ class LocalT5Annotator:
                 if fallback_note and fallback_is_new:
                     node["linguistic_notes"] = [fallback_note]
                     node["notes"] = [self._build_typed_note(node, fallback_note, source="rule", template_id=fallback_template_id)]
-                    node["quality_flags"] = ["template_selected", "rule_used"]
+                    node["quality_flags"] = self._with_backoff_flag(["template_selected", "rule_used"], fallback_trace)
                     node["reason_codes"] = ["RULE_TEMPLATE_ACCEPTED"]
                     node["template_selection"] = fallback_trace
                     if should_dedupe:
@@ -480,7 +491,10 @@ class LocalT5Annotator:
             if template_note and self._is_note_suitable_for_node(node, template_note) and template_is_new:
                 node["linguistic_notes"] = [template_note]
                 node["notes"] = [self._build_typed_note(node, template_note, source="rule", template_id=template_id)]
-                node["quality_flags"] = ["note_generated", "rule_used", "template_selected"]
+                node["quality_flags"] = self._with_backoff_flag(
+                    ["note_generated", "rule_used", "template_selected"],
+                    template_trace,
+                )
                 node["reason_codes"] = ["RULE_TEMPLATE_NOTE_ACCEPTED"]
                 node["template_selection"] = template_trace
                 if should_dedupe:

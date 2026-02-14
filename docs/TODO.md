@@ -213,6 +213,9 @@
 - [x] Add `context_key_matched` into `template_selection` trace to make selected context explicit.
 - [x] Normalize duplicate span nodes with `ref_node_id` links (keep canonical node + mark duplicate references).
 - [x] Emit `matched_level_reason="tam_dropped"` only for TAM-relevant node families.
+- [x] Add validator guard: `matched_level_reason="tam_dropped"` allowed only for TAM-relevant nodes.
+- [x] Add `quality_flags=["backoff_used"]` when template selection level is not `L1_EXACT`.
+- [x] Add QC aggregate metrics: `backoff_rate` and `tam_drop_rate`.
 
 ## Documentation Hygiene
 

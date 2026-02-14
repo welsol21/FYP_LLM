@@ -232,6 +232,69 @@ def _validate_optional_trace_fields(node: Dict[str, Any], path: str, errors: Lis
             )
 
 
+def _is_tam_relevant_node(node: Dict[str, Any]) -> bool:
+    node_type = str(node.get("type") or "").strip().lower()
+    pos = str(node.get("part_of_speech") or "").strip().lower()
+    tam_construction = str(node.get("tam_construction") or "").strip().lower()
+    if node_type == "sentence":
+        return True
+    if pos in {"verb phrase", "clause", "verb", "auxiliary verb"}:
+        return True
+    return tam_construction not in {"", "none", "null"}
+
+
+def _validate_optional_template_selection(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "template_selection" not in node:
+        return
+    selection = node.get("template_selection")
+    _expect(isinstance(selection, dict), errors, f"{path}.template_selection", "template_selection must be object")
+    if not isinstance(selection, dict):
+        return
+
+    for key in (
+        "level",
+        "template_id",
+        "matched_key",
+        "registry_version",
+        "context_key_l1",
+        "context_key_l2",
+        "context_key_l3",
+        "context_key_matched",
+        "selection_mode",
+    ):
+        if key in selection:
+            value = selection.get(key)
+            _expect(
+                value is None or isinstance(value, str),
+                errors,
+                f"{path}.template_selection.{key}",
+                f"{key} must be string or null",
+            )
+
+    reason = selection.get("matched_level_reason")
+    if reason is not None:
+        _expect(
+            isinstance(reason, str),
+            errors,
+            f"{path}.template_selection.matched_level_reason",
+            "matched_level_reason must be string",
+        )
+        level = str(selection.get("level") or "").upper()
+        if isinstance(reason, str) and reason == "tam_dropped":
+            _expect(
+                level == "L2_DROP_TAM",
+                errors,
+                f"{path}.template_selection.level",
+                "matched_level_reason='tam_dropped' requires level='L2_DROP_TAM'",
+            )
+            _expect(
+                _is_tam_relevant_node(node),
+                errors,
+                f"{path}.template_selection.matched_level_reason",
+                "matched_level_reason='tam_dropped' is only allowed for TAM-relevant nodes",
+            )
+
+
 def _validate_optional_rejected_candidate_stats(
     node: Dict[str, Any],
     path: str,
@@ -357,6 +420,7 @@ def _validate_node(
     _validate_optional_features(node, path, errors, validation_mode)
     _validate_optional_notes(node, path, errors)
     _validate_optional_trace_fields(node, path, errors)
+    _validate_optional_template_selection(node, path, errors)
     _validate_optional_rejected_candidate_stats(node, path, errors)
     _validate_optional_schema_version(node, path, errors)
     if validation_mode == "v2_strict":
