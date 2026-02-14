@@ -207,6 +207,13 @@
 - [x] Enforce template-only diagnostics in two-stage rejections (no free-form text in `rejected_candidates`).
 - [x] Add rule-priority in `two_stage` (`L1/L2` rule match skips model call) to avoid noisy model rejections.
 
+## Two-Stage Logging + Structure Hardening (Review 2026-02-14)
+
+- [x] Align `selection_mode` with matched level (`rule_l1_exact`, `rule_l2_drop_tam`, `rule_l3_backoff`).
+- [x] Add `context_key_matched` into `template_selection` trace to make selected context explicit.
+- [x] Normalize duplicate span nodes with `ref_node_id` links (keep canonical node + mark duplicate references).
+- [x] Emit `matched_level_reason="tam_dropped"` only for TAM-relevant node families.
+
 ## Documentation Hygiene
 
 - [x] Consolidate template-id experiment narrative into one canonical report (`docs/template_id_experiment_report_2026-02-13.md`).

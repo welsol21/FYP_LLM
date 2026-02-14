@@ -26,6 +26,8 @@ from ela_pipeline.validation.notes_quality import is_valid_note, sanitize_note
 
 
 class LocalT5Annotator:
+    _TAM_RELEVANT_POS = {"sentence", "verb phrase", "verb", "auxiliary verb"}
+
     def __init__(
         self,
         model_dir: str,
@@ -115,12 +117,20 @@ class LocalT5Annotator:
                 rejected_semantic.append({"template_id": template_id, "level": selection.level})
                 continue
             note = render_template_note(template_id, node, selection.matched_key or "")
-            trace = self._trace_from_selection(selection, selection_mode="rule_fallback")
+            trace = self._trace_from_selection(
+                selection,
+                selection_mode=self._selection_mode_for_rule(selection),
+                node=node,
+            )
             if rejected_semantic:
                 trace["semantic_rejects"] = rejected_semantic
             return template_id, sanitize_note(note), trace
         fallback = candidates[-1]
-        trace = self._trace_from_selection(fallback, selection_mode="rule_fallback")
+        trace = self._trace_from_selection(
+            fallback,
+            selection_mode=self._selection_mode_for_rule(fallback),
+            node=node,
+        )
         trace["template_id"] = None
         trace["semantic_rejects"] = rejected_semantic
         return "", "", trace
@@ -197,7 +207,41 @@ class LocalT5Annotator:
         )
 
     @staticmethod
-    def _trace_from_selection(selection, *, selection_mode: str) -> Dict[str, object]:
+    def _matched_context_key(selection) -> str | None:
+        level = (selection.level or "").strip().upper()
+        if level == "L1_EXACT":
+            return selection.context_key_l1
+        if level == "L2_DROP_TAM":
+            return selection.context_key_l2
+        if level.startswith("L3"):
+            return selection.context_key_l3
+        return selection.matched_key
+
+    def _selection_mode_for_rule(self, selection) -> str:
+        level = (selection.level or "").strip().upper()
+        if level == "L1_EXACT":
+            return "rule_l1_exact"
+        if level == "L2_DROP_TAM":
+            return "rule_l2_drop_tam"
+        if level.startswith("L3"):
+            return "rule_l3_backoff"
+        return "rule_fallback"
+
+    def _selection_mode_for_model(self, selection) -> str:
+        level = (selection.level or "").strip().upper()
+        if level == "L1_EXACT":
+            return "model_l1_exact"
+        if level == "L2_DROP_TAM":
+            return "model_l2_drop_tam"
+        if level.startswith("L3"):
+            return "model_l3_backoff"
+        return "model_predicted_template"
+
+    def _is_tam_relevant_node(self, node: Dict) -> bool:
+        node_pos = str(node.get("part_of_speech") or "").strip().lower()
+        return node_pos in self._TAM_RELEVANT_POS
+
+    def _trace_from_selection(self, selection, *, selection_mode: str, node: Dict | None = None) -> Dict[str, object]:
         trace = {
             "level": selection.level,
             "template_id": selection.template_id,
@@ -206,9 +250,10 @@ class LocalT5Annotator:
             "context_key_l1": selection.context_key_l1,
             "context_key_l2": selection.context_key_l2,
             "context_key_l3": selection.context_key_l3,
+            "context_key_matched": self._matched_context_key(selection),
             "selection_mode": selection_mode,
         }
-        if selection.level == "L2_DROP_TAM":
+        if selection.level == "L2_DROP_TAM" and node and self._is_tam_relevant_node(node):
             trace["matched_level_reason"] = "tam_dropped"
         return trace
 
@@ -216,9 +261,17 @@ class LocalT5Annotator:
         candidates = select_template_candidates(node)
         for c in candidates:
             if (c.template_id or "").strip() == template_id:
-                return self._trace_from_selection(c, selection_mode="model_predicted_template")
+                return self._trace_from_selection(
+                    c,
+                    selection_mode=self._selection_mode_for_model(c),
+                    node=node,
+                )
         fallback = candidates[-1]
-        trace = self._trace_from_selection(fallback, selection_mode="model_predicted_template")
+        trace = self._trace_from_selection(
+            fallback,
+            selection_mode=self._selection_mode_for_model(fallback),
+            node=node,
+        )
         trace["level"] = "MODEL_PREDICTED"
         trace["template_id"] = template_id
         return trace
@@ -342,7 +395,11 @@ class LocalT5Annotator:
 
             # Prefer exact deterministic mapping in production two-stage mode.
             if top and top.template_id and top.level in {"L1_EXACT", "L2_DROP_TAM"}:
-                trace = self._trace_from_selection(top, selection_mode="rule_exact")
+                trace = self._trace_from_selection(
+                    top,
+                    selection_mode=self._selection_mode_for_rule(top),
+                    node=node,
+                )
                 note = render_template_note(top.template_id, node, top.matched_key or "")
                 note_norm = sanitize_note(note).lower()
                 is_new = (note_norm not in seen_notes) if should_dedupe else True

@@ -268,6 +268,42 @@ def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
     return words
 
 
+def _mark_ref_duplicates(sentence_node: Dict) -> None:
+    """Mark duplicate span/content nodes with ref_node_id without changing tree shape."""
+    seen: Dict[Tuple[str, int, int, str, str], str] = {}
+    for phrase in sentence_node.get("linguistic_elements", []):
+        p_span = phrase.get("source_span") or {}
+        p_key = (
+            "Phrase",
+            int(p_span.get("start", -1)),
+            int(p_span.get("end", -1)),
+            str(phrase.get("content") or ""),
+            str(phrase.get("part_of_speech") or ""),
+        )
+        first_phrase_id = seen.get(p_key)
+        if first_phrase_id is None:
+            seen[p_key] = phrase.get("node_id")
+            phrase.pop("ref_node_id", None)
+        else:
+            phrase["ref_node_id"] = first_phrase_id
+
+        for word in phrase.get("linguistic_elements", []):
+            w_span = word.get("source_span") or {}
+            w_key = (
+                "Word",
+                int(w_span.get("start", -1)),
+                int(w_span.get("end", -1)),
+                str(word.get("content") or ""),
+                str(word.get("part_of_speech") or ""),
+            )
+            first_word_id = seen.get(w_key)
+            if first_word_id is None:
+                seen[w_key] = word.get("node_id")
+                word.pop("ref_node_id", None)
+            else:
+                word["ref_node_id"] = first_word_id
+
+
 def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
     doc = nlp(text)
     output: Dict[str, Dict] = {}
@@ -344,6 +380,7 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
             if len(phrase_node["linguistic_elements"]) >= 2:
                 sentence_node["linguistic_elements"].append(phrase_node)
 
+        _mark_ref_duplicates(sentence_node)
         output[sent_text] = sentence_node
 
     return output

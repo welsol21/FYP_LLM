@@ -113,6 +113,28 @@ class PipelineTests(unittest.TestCase):
         sentence = out[next(iter(out))]
         self.assertEqual(sentence.get("tam_construction"), "modal_perfect")
 
+    def test_pipeline_marks_duplicate_spans_with_ref_node_id(self):
+        out = run_pipeline(
+            "She should have trusted her instincts before making the decision.",
+            model_dir=None,
+            validation_mode="v2_strict",
+        )
+        sentence = out[next(iter(out))]
+
+        words_by_id = {}
+        for phrase in sentence.get("linguistic_elements", []):
+            for word in phrase.get("linguistic_elements", []):
+                words_by_id[word.get("node_id")] = word
+
+        ref_words = [w for w in words_by_id.values() if isinstance(w.get("ref_node_id"), str)]
+        self.assertTrue(ref_words)
+        for word in ref_words:
+            ref_id = word["ref_node_id"]
+            self.assertIn(ref_id, words_by_id)
+            canonical = words_by_id[ref_id]
+            self.assertEqual(word.get("content"), canonical.get("content"))
+            self.assertEqual(word.get("source_span"), canonical.get("source_span"))
+
     def test_regression_had_vbn_vs_should_have_vbn(self):
         modal_out = run_pipeline(
             "She should have trusted her instincts.",
