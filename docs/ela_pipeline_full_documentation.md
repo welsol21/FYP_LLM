@@ -71,8 +71,9 @@ Only enrichment fields (notes/TAM-like metadata) may change.
   - `backoff_used` must not appear when `template_selection.level == L1_EXACT`.
 - `matched_level_reason="tam_dropped"` is only valid for TAM-relevant nodes.
 - Sentence-level backoff diagnostics:
-  - `backoff_nodes_count`: count of nodes with `backoff_used` in sentence tree.
-  - optional `backoff_summary` (debug mode): node ids + reasons.
+  - `backoff_nodes_count`: count of all nodes with `backoff_used` in sentence tree (including the sentence node itself, if flagged).
+  - `backoff_leaf_nodes_count`: count of non-sentence nodes with `backoff_used`.
+  - optional `backoff_summary` (debug mode): `nodes`, `leaf_nodes`, `reasons`.
 
 ## 3. Validation Modes
 `validate_contract` supports two modes:

@@ -321,6 +321,21 @@ def _validate_optional_backoff_summary(node: Dict[str, Any], path: str, errors: 
         _expect(isinstance(count, int), errors, f"{path}.backoff_nodes_count", "backoff_nodes_count must be integer")
         if isinstance(count, int):
             _expect(count >= 0, errors, f"{path}.backoff_nodes_count", "backoff_nodes_count must be >= 0")
+    if "backoff_leaf_nodes_count" in node:
+        count = node.get("backoff_leaf_nodes_count")
+        _expect(
+            isinstance(count, int),
+            errors,
+            f"{path}.backoff_leaf_nodes_count",
+            "backoff_leaf_nodes_count must be integer",
+        )
+        if isinstance(count, int):
+            _expect(
+                count >= 0,
+                errors,
+                f"{path}.backoff_leaf_nodes_count",
+                "backoff_leaf_nodes_count must be >= 0",
+            )
 
     if "backoff_summary" not in node:
         return
@@ -340,6 +355,18 @@ def _validate_optional_backoff_summary(node: Dict[str, Any], path: str, errors: 
                 f"{path}.backoff_summary.nodes[{idx}]",
                 "node id must be string",
             )
+
+    leaf_nodes = summary.get("leaf_nodes")
+    if leaf_nodes is not None:
+        _expect(isinstance(leaf_nodes, list), errors, f"{path}.backoff_summary.leaf_nodes", "leaf_nodes must be list")
+        if isinstance(leaf_nodes, list):
+            for idx, item in enumerate(leaf_nodes):
+                _expect(
+                    isinstance(item, str),
+                    errors,
+                    f"{path}.backoff_summary.leaf_nodes[{idx}]",
+                    "node id must be string",
+                )
 
     reasons = summary.get("reasons")
     _expect(isinstance(reasons, list), errors, f"{path}.backoff_summary.reasons", "reasons must be list")

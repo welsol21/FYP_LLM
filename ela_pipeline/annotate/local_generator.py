@@ -388,11 +388,13 @@ class LocalT5Annotator:
         for sentence_text, sentence_node in contract_doc.items():
             seen_notes: Set[str] = set()
             self._annotate_node(sentence_text, sentence_node, seen_notes)
-            backoff_node_ids, backoff_reasons = self._collect_backoff_summary(sentence_node)
+            backoff_node_ids, backoff_leaf_node_ids, backoff_reasons = self._collect_backoff_summary(sentence_node)
             sentence_node["backoff_nodes_count"] = len(backoff_node_ids)
+            sentence_node["backoff_leaf_nodes_count"] = len(backoff_leaf_node_ids)
             if self.backoff_debug_summary:
                 sentence_node["backoff_summary"] = {
                     "nodes": backoff_node_ids,
+                    "leaf_nodes": backoff_leaf_node_ids,
                     "reasons": backoff_reasons,
                 }
             else:
@@ -400,8 +402,9 @@ class LocalT5Annotator:
         return contract_doc
 
     @staticmethod
-    def _collect_backoff_summary(node: Dict) -> tuple[List[str], List[str]]:
+    def _collect_backoff_summary(node: Dict) -> tuple[List[str], List[str], List[str]]:
         node_ids: List[str] = []
+        leaf_node_ids: List[str] = []
         reasons: Set[str] = set()
 
         def walk(cur: Dict) -> None:
@@ -410,6 +413,8 @@ class LocalT5Annotator:
                 node_id = cur.get("node_id")
                 if isinstance(node_id, str):
                     node_ids.append(node_id)
+                    if str(cur.get("type") or "").strip() != "Sentence":
+                        leaf_node_ids.append(node_id)
                 reason = str((cur.get("template_selection") or {}).get("matched_level_reason") or "").strip()
                 if reason:
                     reasons.add(reason)
@@ -420,7 +425,7 @@ class LocalT5Annotator:
                     walk(child)
 
         walk(node)
-        return node_ids, sorted(reasons)
+        return node_ids, leaf_node_ids, sorted(reasons)
 
     def _annotate_node(self, sentence_text: str, node: Dict, seen_notes: Set[str]) -> None:
         self._normalize_tam_for_node(node)

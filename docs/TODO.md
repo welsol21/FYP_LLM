@@ -221,6 +221,8 @@
 - [x] Add sentence-level `backoff_nodes_count` for quick backoff diagnostics in large trees.
 - [x] Add optional debug `backoff_summary` (`nodes`, `reasons`) behind CLI flag `--backoff-debug-summary`.
 - [x] Document and test sentence-level backoff diagnostics fields.
+- [x] Formalize counting contract: `backoff_nodes_count` includes sentence node; add explicit `backoff_leaf_nodes_count`.
+- [x] Extend debug summary with `leaf_nodes` for direct leaf-level audit.
 
 ## Documentation Hygiene
 

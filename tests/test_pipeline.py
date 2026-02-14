@@ -32,10 +32,13 @@ class PipelineTests(unittest.TestCase):
 
         sentence = doc[next(iter(doc))]
         self.assertIsInstance(sentence.get("backoff_nodes_count"), int)
+        self.assertIsInstance(sentence.get("backoff_leaf_nodes_count"), int)
         self.assertGreaterEqual(sentence.get("backoff_nodes_count"), 1)
+        self.assertLessEqual(sentence.get("backoff_leaf_nodes_count"), sentence.get("backoff_nodes_count"))
         summary = sentence.get("backoff_summary")
         self.assertIsInstance(summary, dict)
         self.assertIsInstance(summary.get("nodes"), list)
+        self.assertIsInstance(summary.get("leaf_nodes"), list)
         self.assertIsInstance(summary.get("reasons"), list)
 
     def test_pipeline_without_generator(self):
