@@ -35,6 +35,8 @@ class PipelineTests(unittest.TestCase):
         self.assertIsInstance(sentence.get("backoff_leaf_nodes_count"), int)
         self.assertIsInstance(sentence.get("backoff_aggregate_nodes_count"), int)
         self.assertIsInstance(sentence.get("backoff_unique_spans_count"), int)
+        self.assertIsInstance(sentence.get("backoff_in_subtree"), bool)
+        self.assertTrue(sentence.get("backoff_in_subtree"))
         self.assertGreaterEqual(sentence.get("backoff_nodes_count"), 1)
         self.assertEqual(
             sentence.get("backoff_nodes_count"),
@@ -49,6 +51,18 @@ class PipelineTests(unittest.TestCase):
         self.assertIsInstance(summary.get("aggregate_nodes_count"), int)
         self.assertIsInstance(summary.get("unique_spans"), list)
         self.assertIsInstance(summary.get("reasons"), list)
+
+        leaf_backoff_node = None
+        for phrase in sentence.get("linguistic_elements", []):
+            for word in phrase.get("linguistic_elements", []):
+                if word.get("node_id") == "n9":
+                    leaf_backoff_node = word
+                    break
+            if leaf_backoff_node:
+                break
+        self.assertIsNotNone(leaf_backoff_node)
+        self.assertIn("backoff_used", leaf_backoff_node.get("quality_flags", []))
+        self.assertIs(leaf_backoff_node.get("backoff_in_subtree"), False)
 
     def test_pipeline_without_generator(self):
         out = run_pipeline("She should have trusted her instincts before making the decision.", model_dir=None)

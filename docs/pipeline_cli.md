@@ -90,6 +90,7 @@ python -m ela_pipeline.inference.run --text "She should have trusted her instinc
 This adds sentence-level `backoff_summary` (`nodes`, `leaf_nodes`, `aggregate_nodes_count`, `unique_spans`, `reasons`)
 in addition to always-on counters:
 `backoff_nodes_count`, `backoff_leaf_nodes_count`, `backoff_aggregate_nodes_count`, and `backoff_unique_spans_count`.
+Each node also carries `backoff_in_subtree` to indicate descendant-level backoff independently of local `backoff_used`.
 
 `v2_strict` is now the default mode.
 Legacy compatibility mode (`v1`) is still available only when explicitly requested:

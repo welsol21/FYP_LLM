@@ -228,6 +228,9 @@
 - [x] Add explicit `backoff_aggregate_nodes_count` to separate aggregate-node effects from leaf-node effects.
 - [x] Formalize aggregate counting policy: sentence aggregate backoff is own-level only (`template_selection.level != L1_EXACT`).
 - [x] Add validator consistency checks for backoff counters (`nodes = leaf + aggregate`, `unique_spans <= leaf`).
+- [x] Add node-level aggregate signal `backoff_in_subtree` (descendant backoff only) without changing `backoff_used` local semantics.
+- [x] Add validator checks for `backoff_in_subtree` consistency with descendant signals.
+- [x] Document local vs subtree backoff semantics to avoid metric drift.
 - [x] Document `dep_label` semantics as source-parse dependency label (not phrase-internal dependency role).
 
 ## Documentation Hygiene

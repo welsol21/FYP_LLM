@@ -508,6 +508,21 @@ class ValidatorTests(unittest.TestCase):
         result = validate_contract(data, validation_mode="v1")
         self.assertTrue(result.ok, msg=str(result.errors))
 
+    def test_accepts_valid_optional_backoff_in_subtree(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["backoff_in_subtree"] = True
+        first_phrase = sentence["linguistic_elements"][0]
+        first_phrase["backoff_in_subtree"] = True
+        first_word = first_phrase["linguistic_elements"][0]
+        first_word["quality_flags"] = ["template_selected", "rule_used", "backoff_used"]
+        first_word["backoff_in_subtree"] = False
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertTrue(result.ok, msg=str(result.errors))
+
     def test_rejects_invalid_optional_backoff_summary(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -529,6 +544,27 @@ class ValidatorTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertTrue(
             any(".backoff_nodes_count" in err.path or ".backoff_summary" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
+    def test_rejects_invalid_optional_backoff_in_subtree(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["backoff_in_subtree"] = True
+        for phrase in sentence.get("linguistic_elements", []):
+            phrase["backoff_in_subtree"] = False
+            for word in phrase.get("linguistic_elements", []):
+                word["backoff_in_subtree"] = False
+                word["quality_flags"] = ["template_selected", "rule_used"]
+                if word.get("template_selection"):
+                    word["template_selection"]["level"] = "L1_EXACT"
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any(".backoff_in_subtree" in err.path for err in result.errors),
             msg=str(result.errors),
         )
 

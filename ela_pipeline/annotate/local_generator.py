@@ -388,6 +388,7 @@ class LocalT5Annotator:
         for sentence_text, sentence_node in contract_doc.items():
             seen_notes: Set[str] = set()
             self._annotate_node(sentence_text, sentence_node, seen_notes)
+            self._mark_backoff_in_subtree(sentence_node)
             backoff_node_ids, backoff_leaf_node_ids, backoff_reasons, unique_spans = self._collect_backoff_summary(
                 sentence_node
             )
@@ -409,6 +410,20 @@ class LocalT5Annotator:
             else:
                 sentence_node.pop("backoff_summary", None)
         return contract_doc
+
+    @staticmethod
+    def _mark_backoff_in_subtree(node: Dict) -> bool:
+        local_backoff = "backoff_used" in (node.get("quality_flags") or [])
+        has_descendant_backoff = False
+
+        for child in node.get("linguistic_elements", []) or []:
+            if not isinstance(child, dict):
+                continue
+            if LocalT5Annotator._mark_backoff_in_subtree(child):
+                has_descendant_backoff = True
+
+        node["backoff_in_subtree"] = has_descendant_backoff
+        return local_backoff or has_descendant_backoff
 
     @staticmethod
     def _collect_backoff_summary(node: Dict) -> tuple[List[str], List[str], List[str], List[str]]:

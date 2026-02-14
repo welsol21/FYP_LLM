@@ -466,6 +466,51 @@ def _validate_optional_backoff_summary(node: Dict[str, Any], path: str, errors: 
             )
 
 
+def _validate_optional_backoff_in_subtree(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "backoff_in_subtree" not in node:
+        return
+
+    backoff_in_subtree = node.get("backoff_in_subtree")
+    _expect(
+        isinstance(backoff_in_subtree, bool),
+        errors,
+        f"{path}.backoff_in_subtree",
+        "backoff_in_subtree must be boolean",
+    )
+    if not isinstance(backoff_in_subtree, bool):
+        return
+
+    children = node.get("linguistic_elements")
+    if not isinstance(children, list):
+        return
+
+    child_has_backoff_signal = False
+    for child in children:
+        if not isinstance(child, dict):
+            continue
+        child_flags = child.get("quality_flags") or []
+        has_local_backoff = isinstance(child_flags, list) and "backoff_used" in child_flags
+        has_subtree_backoff = bool(child.get("backoff_in_subtree"))
+        if has_local_backoff or has_subtree_backoff:
+            child_has_backoff_signal = True
+            break
+
+    if backoff_in_subtree:
+        _expect(
+            child_has_backoff_signal,
+            errors,
+            f"{path}.backoff_in_subtree",
+            "backoff_in_subtree=true requires at least one descendant backoff signal",
+        )
+    else:
+        _expect(
+            not child_has_backoff_signal,
+            errors,
+            f"{path}.backoff_in_subtree",
+            "backoff_in_subtree=false is inconsistent with descendant backoff signals",
+        )
+
+
 def _validate_optional_rejected_candidate_stats(
     node: Dict[str, Any],
     path: str,
@@ -592,6 +637,7 @@ def _validate_node(
     _validate_optional_notes(node, path, errors)
     _validate_optional_trace_fields(node, path, errors)
     _validate_optional_template_selection(node, path, errors)
+    _validate_optional_backoff_in_subtree(node, path, errors)
     _validate_optional_backoff_summary(node, path, errors)
     _validate_optional_rejected_candidate_stats(node, path, errors)
     _validate_optional_schema_version(node, path, errors)

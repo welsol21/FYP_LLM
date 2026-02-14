@@ -70,6 +70,7 @@ Only enrichment fields (notes/TAM-like metadata) may change.
 - `quality_flags` contract:
   - `backoff_used` is required when `template_selection.level != L1_EXACT`.
   - `backoff_used` must not appear when `template_selection.level == L1_EXACT`.
+  - `backoff_in_subtree` is a separate aggregate signal: `true` only when at least one descendant has local/subtree backoff.
 - `matched_level_reason="tam_dropped"` is only valid for TAM-relevant nodes.
 - Sentence-level backoff diagnostics:
   - `backoff_nodes_count`: count of all nodes with `backoff_used` in sentence tree (including the sentence node itself, if flagged).
