@@ -32,6 +32,7 @@ class LocalT5Annotator:
         self,
         model_dir: str,
         note_mode: str = "template_only",
+        backoff_debug_summary: bool = False,
         max_input_length: int = 512,
         max_target_length: int = 128,
         max_retries: int = 2,
@@ -42,6 +43,7 @@ class LocalT5Annotator:
             raise ValueError("note_mode must be one of: template_only | llm | hybrid | two_stage")
 
         self.device = None
+        self.backoff_debug_summary = bool(backoff_debug_summary)
         self.max_input_length = max_input_length
         self.max_target_length = max_target_length
         self.max_retries = max_retries
@@ -386,7 +388,39 @@ class LocalT5Annotator:
         for sentence_text, sentence_node in contract_doc.items():
             seen_notes: Set[str] = set()
             self._annotate_node(sentence_text, sentence_node, seen_notes)
+            backoff_node_ids, backoff_reasons = self._collect_backoff_summary(sentence_node)
+            sentence_node["backoff_nodes_count"] = len(backoff_node_ids)
+            if self.backoff_debug_summary:
+                sentence_node["backoff_summary"] = {
+                    "nodes": backoff_node_ids,
+                    "reasons": backoff_reasons,
+                }
+            else:
+                sentence_node.pop("backoff_summary", None)
         return contract_doc
+
+    @staticmethod
+    def _collect_backoff_summary(node: Dict) -> tuple[List[str], List[str]]:
+        node_ids: List[str] = []
+        reasons: Set[str] = set()
+
+        def walk(cur: Dict) -> None:
+            flags = cur.get("quality_flags") or []
+            if isinstance(flags, list) and "backoff_used" in flags:
+                node_id = cur.get("node_id")
+                if isinstance(node_id, str):
+                    node_ids.append(node_id)
+                reason = str((cur.get("template_selection") or {}).get("matched_level_reason") or "").strip()
+                if reason:
+                    reasons.add(reason)
+                else:
+                    reasons.add("level_backoff")
+            for child in cur.get("linguistic_elements", []) or []:
+                if isinstance(child, dict):
+                    walk(child)
+
+        walk(node)
+        return node_ids, sorted(reasons)
 
     def _annotate_node(self, sentence_text: str, node: Dict, seen_notes: Set[str]) -> None:
         self._normalize_tam_for_node(node)

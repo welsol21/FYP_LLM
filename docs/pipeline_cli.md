@@ -83,6 +83,11 @@ python -m ela_pipeline.inference.run --text "She should have trusted her instinc
 python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --model-dir results_llm_notes_v3_t5-small_phrase/best_model --note-mode two_stage
 ```
 
+Optional debug trace for sentence-level backoff diagnostics:
+```bash
+python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --model-dir results_llm_notes_v3_t5-small_phrase/best_model --note-mode two_stage --backoff-debug-summary
+```
+
 `v2_strict` is now the default mode.
 Legacy compatibility mode (`v1`) is still available only when explicitly requested:
 

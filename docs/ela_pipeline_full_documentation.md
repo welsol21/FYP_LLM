@@ -62,6 +62,18 @@ After skeleton creation, enrichment cannot change:
 
 Only enrichment fields (notes/TAM-like metadata) may change.
 
+### 2.8 Template Selection Trace Semantics
+- `context_key_l1/l2/l3` are candidate context keys (what was attempted).
+- `context_key_matched` is the effective key used for selection analytics.
+- `tam_construction` remains the authoritative TAM channel even when `matched_key` is generic after `L2_DROP_TAM`.
+- `quality_flags` contract:
+  - `backoff_used` is required when `template_selection.level != L1_EXACT`.
+  - `backoff_used` must not appear when `template_selection.level == L1_EXACT`.
+- `matched_level_reason="tam_dropped"` is only valid for TAM-relevant nodes.
+- Sentence-level backoff diagnostics:
+  - `backoff_nodes_count`: count of nodes with `backoff_used` in sentence tree.
+  - optional `backoff_summary` (debug mode): node ids + reasons.
+
 ## 3. Validation Modes
 `validate_contract` supports two modes:
 - `v1`: backward-compatible baseline

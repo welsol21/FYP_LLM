@@ -216,6 +216,11 @@
 - [x] Add validator guard: `matched_level_reason="tam_dropped"` allowed only for TAM-relevant nodes.
 - [x] Add `quality_flags=["backoff_used"]` when template selection level is not `L1_EXACT`.
 - [x] Add QC aggregate metrics: `backoff_rate` and `tam_drop_rate`.
+- [x] Codify validator contract for `backoff_used` consistency with `template_selection.level`.
+- [x] Document trace semantics: `context_key_matched` as source of truth, `tam_construction` as separate TAM channel.
+- [x] Add sentence-level `backoff_nodes_count` for quick backoff diagnostics in large trees.
+- [x] Add optional debug `backoff_summary` (`nodes`, `reasons`) behind CLI flag `--backoff-debug-summary`.
+- [x] Document and test sentence-level backoff diagnostics fields.
 
 ## Documentation Hygiene
 

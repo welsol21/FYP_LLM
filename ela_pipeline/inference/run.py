@@ -48,6 +48,7 @@ def run_pipeline(
     spacy_model: str = "en_core_web_sm",
     validation_mode: str = "v2_strict",
     note_mode: str = "template_only",
+    backoff_debug_summary: bool = False,
 ) -> dict:
     nlp = load_nlp(spacy_model)
 
@@ -62,7 +63,11 @@ def run_pipeline(
     if model_dir:
         from ela_pipeline.annotate.local_generator import LocalT5Annotator
 
-        annotator = LocalT5Annotator(model_dir=model_dir, note_mode=note_mode)
+        annotator = LocalT5Annotator(
+            model_dir=model_dir,
+            note_mode=note_mode,
+            backoff_debug_summary=backoff_debug_summary,
+        )
         annotator.annotate(enriched)
 
     raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
@@ -82,6 +87,11 @@ def main() -> None:
         choices=["template_only", "llm", "hybrid", "two_stage"],
         help="Inference mode: template_only, llm, hybrid, or two_stage (model template_id -> rule note render).",
     )
+    parser.add_argument(
+        "--backoff-debug-summary",
+        action="store_true",
+        help="Attach sentence-level backoff_summary with node ids/reasons for debugging.",
+    )
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
@@ -91,6 +101,7 @@ def main() -> None:
         spacy_model=args.spacy_model,
         validation_mode=args.validation_mode,
         note_mode=args.note_mode,
+        backoff_debug_summary=args.backoff_debug_summary,
     )
 
     out_path = args.output

@@ -294,6 +294,64 @@ def _validate_optional_template_selection(node: Dict[str, Any], path: str, error
                 "matched_level_reason='tam_dropped' is only allowed for TAM-relevant nodes",
             )
 
+    level = str(selection.get("level") or "").upper()
+    quality_flags = node.get("quality_flags")
+    if isinstance(quality_flags, list):
+        has_backoff = "backoff_used" in quality_flags
+        is_backoff_level = bool(level and level != "L1_EXACT")
+        if is_backoff_level:
+            _expect(
+                has_backoff,
+                errors,
+                f"{path}.quality_flags",
+                "backoff_used is required when template_selection.level is not L1_EXACT",
+            )
+        elif level == "L1_EXACT":
+            _expect(
+                not has_backoff,
+                errors,
+                f"{path}.quality_flags",
+                "backoff_used is not allowed when template_selection.level is L1_EXACT",
+            )
+
+
+def _validate_optional_backoff_summary(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "backoff_nodes_count" in node:
+        count = node.get("backoff_nodes_count")
+        _expect(isinstance(count, int), errors, f"{path}.backoff_nodes_count", "backoff_nodes_count must be integer")
+        if isinstance(count, int):
+            _expect(count >= 0, errors, f"{path}.backoff_nodes_count", "backoff_nodes_count must be >= 0")
+
+    if "backoff_summary" not in node:
+        return
+
+    summary = node.get("backoff_summary")
+    _expect(isinstance(summary, dict), errors, f"{path}.backoff_summary", "backoff_summary must be object")
+    if not isinstance(summary, dict):
+        return
+
+    nodes = summary.get("nodes")
+    _expect(isinstance(nodes, list), errors, f"{path}.backoff_summary.nodes", "nodes must be list")
+    if isinstance(nodes, list):
+        for idx, item in enumerate(nodes):
+            _expect(
+                isinstance(item, str),
+                errors,
+                f"{path}.backoff_summary.nodes[{idx}]",
+                "node id must be string",
+            )
+
+    reasons = summary.get("reasons")
+    _expect(isinstance(reasons, list), errors, f"{path}.backoff_summary.reasons", "reasons must be list")
+    if isinstance(reasons, list):
+        for idx, item in enumerate(reasons):
+            _expect(
+                isinstance(item, str),
+                errors,
+                f"{path}.backoff_summary.reasons[{idx}]",
+                "reason must be string",
+            )
+
 
 def _validate_optional_rejected_candidate_stats(
     node: Dict[str, Any],
@@ -421,6 +479,7 @@ def _validate_node(
     _validate_optional_notes(node, path, errors)
     _validate_optional_trace_fields(node, path, errors)
     _validate_optional_template_selection(node, path, errors)
+    _validate_optional_backoff_summary(node, path, errors)
     _validate_optional_rejected_candidate_stats(node, path, errors)
     _validate_optional_schema_version(node, path, errors)
     if validation_mode == "v2_strict":

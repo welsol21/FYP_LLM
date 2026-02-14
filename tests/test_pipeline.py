@@ -2,6 +2,9 @@ import unittest
 
 from ela_pipeline.annotate.local_generator import LocalT5Annotator
 from ela_pipeline.inference.run import run_pipeline
+from ela_pipeline.parse.spacy_parser import load_nlp
+from ela_pipeline.skeleton.builder import build_skeleton
+from ela_pipeline.tam.rules import apply_tam
 
 
 class PipelineTests(unittest.TestCase):
@@ -17,6 +20,23 @@ class PipelineTests(unittest.TestCase):
             {"level": "L1_EXACT"},
         )
         self.assertNotIn("backoff_used", flags_l1)
+
+    def test_sentence_backoff_summary_fields(self):
+        text = "She should have trusted her instincts before making the decision."
+        nlp = load_nlp("en_core_web_sm")
+        doc = build_skeleton(text, nlp)
+        apply_tam(doc, nlp)
+
+        annotator = LocalT5Annotator(model_dir=".", note_mode="template_only", backoff_debug_summary=True)
+        annotator.annotate(doc)
+
+        sentence = doc[next(iter(doc))]
+        self.assertIsInstance(sentence.get("backoff_nodes_count"), int)
+        self.assertGreaterEqual(sentence.get("backoff_nodes_count"), 1)
+        summary = sentence.get("backoff_summary")
+        self.assertIsInstance(summary, dict)
+        self.assertIsInstance(summary.get("nodes"), list)
+        self.assertIsInstance(summary.get("reasons"), list)
 
     def test_pipeline_without_generator(self):
         out = run_pipeline("She should have trusted her instincts before making the decision.", model_dir=None)

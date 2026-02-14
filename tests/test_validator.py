@@ -452,6 +452,74 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
+    def test_rejects_missing_backoff_used_for_non_l1_level(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["quality_flags"] = ["template_selected", "rule_used"]
+        sentence["template_selection"] = {
+            "level": "L2_DROP_TAM",
+            "template_id": "SENTENCE_FINITE_CLAUSE",
+        }
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("backoff_used is required" in err.message for err in result.errors),
+            msg=str(result.errors),
+        )
+
+    def test_rejects_backoff_used_for_l1_exact(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["quality_flags"] = ["template_selected", "rule_used", "backoff_used"]
+        sentence["template_selection"] = {
+            "level": "L1_EXACT",
+            "template_id": "SENTENCE_FINITE_CLAUSE",
+        }
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("backoff_used is not allowed" in err.message for err in result.errors),
+            msg=str(result.errors),
+        )
+
+    def test_accepts_valid_optional_backoff_summary(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["backoff_nodes_count"] = 2
+        sentence["backoff_summary"] = {
+            "nodes": ["n1", "n2"],
+            "reasons": ["tam_dropped"],
+        }
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertTrue(result.ok, msg=str(result.errors))
+
+    def test_rejects_invalid_optional_backoff_summary(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["backoff_nodes_count"] = "2"
+        sentence["backoff_summary"] = {
+            "nodes": [1],
+            "reasons": [None],
+        }
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any(".backoff_nodes_count" in err.path or ".backoff_summary" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
