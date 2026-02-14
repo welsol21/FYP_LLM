@@ -197,6 +197,12 @@
 - [ ] Add confidence calibration for template selection and semantic mismatch penalties.
 - [ ] Introduce canary rollout flag (`note_mode`) and automated A/B report generation in CI.
 
+## Note Quality Hardening (Current)
+
+- [x] Zero irrelevant TAM fields for NP/PP/Word nodes (keep only context-relevant grammatical dimensions).
+- [x] Enforce deterministic `note.kind` mapping by template family (`SENTENCE_*`, `PHRASE_*`, `WORD_*`).
+- [x] Replace generic sentence note for `modal_perfect` with TAM-informative explanation text.
+
 ## Documentation Hygiene
 
 - [x] Consolidate template-id experiment narrative into one canonical report (`docs/template_id_experiment_report_2026-02-13.md`).

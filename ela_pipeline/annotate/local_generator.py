@@ -203,7 +203,45 @@ class LocalT5Annotator:
 
         return True
 
-    def _infer_note_kind(self, node: Dict, note: str) -> str:
+    @staticmethod
+    def _normalize_tam_for_node(node: Dict) -> None:
+        node_type = str(node.get("type", "")).strip().lower()
+        pos = str(node.get("part_of_speech", "")).strip().lower()
+
+        if node_type == "word":
+            if pos not in {"verb", "auxiliary verb"}:
+                for field in ("tense", "aspect", "mood", "voice", "finiteness"):
+                    node[field] = None
+            return
+
+        if node_type == "phrase":
+            if pos in {"noun phrase", "prepositional phrase"}:
+                for field in ("tense", "aspect", "mood", "voice", "finiteness"):
+                    node[field] = None
+                return
+
+            # For non-verbal phrases, mood/voice/finiteness are usually not meaningful.
+            if pos not in {"verb phrase"}:
+                for field in ("mood", "voice", "finiteness"):
+                    node[field] = None
+
+    @staticmethod
+    def _kind_from_template_id(template_id: str) -> str | None:
+        tid = (template_id or "").strip().upper()
+        if not tid:
+            return None
+        if tid.startswith("WORD_"):
+            return "morphological"
+        if tid.startswith("SENTENCE_") or tid.startswith("CLAUSE_"):
+            return "syntactic"
+        if tid.startswith(("VP_", "NP_", "PP_", "PHRASE_")):
+            return "syntactic"
+        return None
+
+    def _infer_note_kind(self, node: Dict, note: str, template_id: str | None = None) -> str:
+        template_kind = self._kind_from_template_id(template_id or "")
+        if template_kind:
+            return template_kind
         note_l = sanitize_note(note).lower()
         if any(marker in note_l for marker in ("tense", "aspect", "voice", "mood", "verb form", "plural", "singular")):
             return "morphological"
@@ -213,10 +251,10 @@ class LocalT5Annotator:
             return "discourse"
         return "semantic"
 
-    def _build_typed_note(self, node: Dict, note: str, source: str) -> Dict[str, object]:
+    def _build_typed_note(self, node: Dict, note: str, source: str, template_id: str | None = None) -> Dict[str, object]:
         return {
             "text": note,
-            "kind": self._infer_note_kind(node, note),
+            "kind": self._infer_note_kind(node, note, template_id=template_id),
             "confidence": 0.85 if source == "model" else 0.65,
             "source": source,
         }
@@ -228,6 +266,7 @@ class LocalT5Annotator:
         return contract_doc
 
     def _annotate_node(self, sentence_text: str, node: Dict, seen_notes: Set[str]) -> None:
+        self._normalize_tam_for_node(node)
         node["quality_flags"] = []
         node["rejected_candidates"] = []
         node["rejected_candidate_stats"] = []
@@ -242,7 +281,7 @@ class LocalT5Annotator:
             template_is_new = (norm_template_note not in seen_notes) if should_dedupe else True
             if template_note and self._is_note_suitable_for_node(node, template_note) and template_is_new:
                 node["linguistic_notes"] = [template_note]
-                node["notes"] = [self._build_typed_note(node, template_note, source="rule")]
+                node["notes"] = [self._build_typed_note(node, template_note, source="rule", template_id=template_id)]
                 node["quality_flags"] = ["note_generated", "rule_used", "template_selected"]
                 node["reason_codes"] = ["RULE_TEMPLATE_NOTE_ACCEPTED"]
                 node["template_selection"] = template_trace
@@ -257,7 +296,7 @@ class LocalT5Annotator:
                 fallback_is_new = (fallback_norm not in seen_notes) if should_dedupe else True
                 if self._is_note_suitable_for_node(node, fallback_note) and fallback_is_new:
                     node["linguistic_notes"] = [fallback_note]
-                    node["notes"] = [self._build_typed_note(node, fallback_note, source="rule")]
+                    node["notes"] = [self._build_typed_note(node, fallback_note, source="rule", template_id=None)]
                     node["quality_flags"] = ["note_generated", "rule_used", "template_fallback"]
                     node["reason_codes"] = ["RULE_TEMPLATE_MISS", "RULE_TEMPLATE_FALLBACK_ACCEPTED"]
                     node["template_selection"] = template_trace

@@ -351,6 +351,12 @@ TEMPLATE_VARIANTS: Dict[str, List[str]] = {
     ],
 }
 
+SENTENCE_MODAL_PERFECT_VARIANTS: List[str] = [
+    "This sentence uses a modal perfect form to express regret or criticism about a past unrealized action.",
+    "The sentence shows modal perfect meaning, often evaluating what should have happened in the past.",
+    "This sentence encodes modal perfect interpretation about a past action that did not occur as expected.",
+]
+
 
 @dataclass(frozen=True)
 class TemplateSelection:
@@ -544,6 +550,9 @@ def _variant_index(template_id: str, content: str, matched_key: str, modulo: int
 
 
 def render_template_note(template_id: str, node: Dict[str, object], matched_key: str) -> str:
+    if template_id == "SENTENCE_FINITE_CLAUSE" and _tam(node) == "modal_perfect":
+        idx = _variant_index(template_id, str(node.get("content", "")), matched_key or "", len(SENTENCE_MODAL_PERFECT_VARIANTS))
+        return sanitize_note(SENTENCE_MODAL_PERFECT_VARIANTS[idx])
     variants = TEMPLATE_VARIANTS.get(template_id) or []
     if not variants:
         return ""
