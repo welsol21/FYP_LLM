@@ -38,6 +38,7 @@ Allowed types only:
 - `source_span.start`, `source_span.end`
 - `grammatical_role`
 - `dep_label`, `head_id` (Word)
+  - `dep_label` is the original dependency label from source parse (not phrase-internal relabeling)
 - `features` (normalized morphology)
 - `notes` typed objects: `{text, kind, confidence, source}`
 - note trace fields: `quality_flags`, `rejected_candidates`, `rejected_candidate_stats`, `reason_codes`
@@ -72,8 +73,9 @@ Only enrichment fields (notes/TAM-like metadata) may change.
 - `matched_level_reason="tam_dropped"` is only valid for TAM-relevant nodes.
 - Sentence-level backoff diagnostics:
   - `backoff_nodes_count`: count of all nodes with `backoff_used` in sentence tree (including the sentence node itself, if flagged).
-  - `backoff_leaf_nodes_count`: count of non-sentence nodes with `backoff_used`.
-  - optional `backoff_summary` (debug mode): `nodes`, `leaf_nodes`, `reasons`.
+  - `backoff_leaf_nodes_count`: count of non-sentence nodes with `backoff_used` (node-based, not deduplicated by span).
+  - `backoff_unique_spans_count`: count of unique source spans among backoff leaf nodes.
+  - optional `backoff_summary` (debug mode): `nodes`, `leaf_nodes`, `unique_spans`, `reasons`.
 
 ## 3. Validation Modes
 `validate_contract` supports two modes:

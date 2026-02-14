@@ -88,7 +88,7 @@ Optional debug trace for sentence-level backoff diagnostics:
 python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --model-dir results_llm_notes_v3_t5-small_phrase/best_model --note-mode two_stage --backoff-debug-summary
 ```
 This adds sentence-level `backoff_summary` (`nodes`, `leaf_nodes`, `reasons`) in addition to always-on counters:
-`backoff_nodes_count` and `backoff_leaf_nodes_count`.
+`backoff_nodes_count`, `backoff_leaf_nodes_count`, and `backoff_unique_spans_count`.
 
 `v2_strict` is now the default mode.
 Legacy compatibility mode (`v1`) is still available only when explicitly requested:

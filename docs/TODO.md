@@ -223,6 +223,9 @@
 - [x] Document and test sentence-level backoff diagnostics fields.
 - [x] Formalize counting contract: `backoff_nodes_count` includes sentence node; add explicit `backoff_leaf_nodes_count`.
 - [x] Extend debug summary with `leaf_nodes` for direct leaf-level audit.
+- [x] Clarify contract that `backoff_leaf_nodes_count` is node-based (duplicates by span are allowed).
+- [x] Add `backoff_unique_spans_count` for deduplicated span-level backoff metric.
+- [x] Document `dep_label` semantics as source-parse dependency label (not phrase-internal dependency role).
 
 ## Documentation Hygiene
 

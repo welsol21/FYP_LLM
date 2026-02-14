@@ -336,6 +336,21 @@ def _validate_optional_backoff_summary(node: Dict[str, Any], path: str, errors: 
                 f"{path}.backoff_leaf_nodes_count",
                 "backoff_leaf_nodes_count must be >= 0",
             )
+    if "backoff_unique_spans_count" in node:
+        count = node.get("backoff_unique_spans_count")
+        _expect(
+            isinstance(count, int),
+            errors,
+            f"{path}.backoff_unique_spans_count",
+            "backoff_unique_spans_count must be integer",
+        )
+        if isinstance(count, int):
+            _expect(
+                count >= 0,
+                errors,
+                f"{path}.backoff_unique_spans_count",
+                "backoff_unique_spans_count must be >= 0",
+            )
 
     if "backoff_summary" not in node:
         return
@@ -366,6 +381,23 @@ def _validate_optional_backoff_summary(node: Dict[str, Any], path: str, errors: 
                     errors,
                     f"{path}.backoff_summary.leaf_nodes[{idx}]",
                     "node id must be string",
+                )
+
+    unique_spans = summary.get("unique_spans")
+    if unique_spans is not None:
+        _expect(
+            isinstance(unique_spans, list),
+            errors,
+            f"{path}.backoff_summary.unique_spans",
+            "unique_spans must be list",
+        )
+        if isinstance(unique_spans, list):
+            for idx, item in enumerate(unique_spans):
+                _expect(
+                    isinstance(item, str),
+                    errors,
+                    f"{path}.backoff_summary.unique_spans[{idx}]",
+                    "span key must be string",
                 )
 
     reasons = summary.get("reasons")

@@ -495,9 +495,11 @@ class ValidatorTests(unittest.TestCase):
         sentence = data[sentence_key]
         sentence["backoff_nodes_count"] = 2
         sentence["backoff_leaf_nodes_count"] = 1
+        sentence["backoff_unique_spans_count"] = 1
         sentence["backoff_summary"] = {
             "nodes": ["n1", "n2"],
             "leaf_nodes": ["n2"],
+            "unique_spans": ["10:12"],
             "reasons": ["tam_dropped"],
         }
 
@@ -511,9 +513,11 @@ class ValidatorTests(unittest.TestCase):
         sentence = data[sentence_key]
         sentence["backoff_nodes_count"] = "2"
         sentence["backoff_leaf_nodes_count"] = "1"
+        sentence["backoff_unique_spans_count"] = "1"
         sentence["backoff_summary"] = {
             "nodes": [1],
             "leaf_nodes": [2],
+            "unique_spans": [3],
             "reasons": [None],
         }
 
