@@ -181,7 +181,7 @@
 - [x] Regenerate template-id training dataset from ingested corpus and run quality gates before training.
 - [x] Run end-to-end dataset refresh strictly via ingestion chain (`raw_sources` -> `build_ingestion_corpus` -> `extract_ingested_nodes` -> QA) for the new corpus only.
 - [x] Run GPU-only retraining + regression inference QC on refreshed dataset and publish comparison report vs current baseline.
-  - [x] Interim checkpoint-level QC comparison published (`docs/inference_qc_compare_ingested_checkpoint800_vs_baseline_2026-02-13.json`).
+  - [x] Interim checkpoint-level QC comparison published (`docs/reports/2026-02-13/inference_qc_compare_ingested_checkpoint800_vs_baseline_2026-02-13.json`).
   - [x] Finalize full-run `best_model` QC comparison after training completion.
 - [x] Add template semantic compatibility rules (`template_id` vs POS/dep/TAM/content) and reject incompatible matches before note emit.
 - [x] Add semantic mismatch metric to QC report and make it a regression gate.

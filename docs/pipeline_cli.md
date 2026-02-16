@@ -14,7 +14,7 @@ python -m ela_pipeline.dataset.fetch_raw_sources \
 python -m ela_pipeline.dataset.build_ingestion_corpus \
   --config data/source_configs/ingestion_sources_bootstrap.json \
   --output-jsonl data/raw_sources/ingested_sentences.jsonl \
-  --report-json docs/ingestion_report_2026-02-13.json
+  --report-json docs/reports/2026-02-13/ingestion_report_2026-02-13.json
 ```
 
 ## 3) Extract sentence/phrase/word nodes (3k/9k/18k)
@@ -32,7 +32,7 @@ python -m ela_pipeline.dataset.extract_ingested_nodes \
 python -m ela_pipeline.dataset.report_ingestion_quality \
   --ingested-jsonl data/raw_sources/ingested_sentences.jsonl \
   --nodes-dir data/processed_ingested_nodes \
-  --output-json docs/ingestion_quality_report_2026-02-13.json
+  --output-json docs/reports/2026-02-13/ingestion_quality_report_2026-02-13.json
 ```
 
 ## 5) Build training dataset from ingested nodes

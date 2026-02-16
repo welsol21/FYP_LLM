@@ -1,7 +1,7 @@
 # Template-ID Experiment Report (2026-02-13)
 
 ## Artifacts
-- Primary regression comparison: `docs/inference_regression_template_id_vs_refresh_2026-02-13.json`
+- Primary regression comparison: `docs/reports/2026-02-13/inference_regression_template_id_vs_refresh_2026-02-13.json`
 - Source registry used for reference-driven work: `docs/grammar_reference_sources_2026-02-13.md`
 - Processed dataset stats:
   - `data/processed/stats.json`
@@ -23,7 +23,7 @@
   - `eval_exact_match=0.0`
 
 ## Regression vs refreshed baseline
-Source: `docs/inference_regression_template_id_vs_refresh_2026-02-13.json`
+Source: `docs/reports/2026-02-13/inference_regression_template_id_vs_refresh_2026-02-13.json`
 
 - `results_llm_notes_refresh_data_processed_e2/best_model`
   - probe_count: `5`
