@@ -28,6 +28,7 @@ Primary dependencies from `requirements.txt` and runtime code:
 | `requests` | HTTP for ingestion scripts | Apache-2.0 |
 | `rouge-score` | text-quality metric tooling | Apache-2.0 |
 | `sentencepiece` | tokenizer backend (used by M2M100/T5 tokenizers) | Apache-2.0 |
+| `nltk` | lexical resources / WordNet synonym enrichment | Apache-2.0 |
 
 Notes:
 - `sentencepiece` and `rouge-score` metadata in local wheels can have empty `License` field; license type above is taken from upstream project/license declarations.
@@ -39,6 +40,7 @@ Notes:
 |---|---|---|
 | `t5-small` (base for local fine-tuned note models) | note generation experiments/pipeline models | Apache-2.0 |
 | `facebook/m2m100_418M` | multilingual translation stage (EN->RU first) | MIT |
+| `WordNet` lexical database (via NLTK) | synonym stage (EN) | WordNet License (permissive) |
 
 ## 4) Data-source licensing (corpus/reference layer)
 

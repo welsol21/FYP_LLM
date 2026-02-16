@@ -176,6 +176,165 @@ def _attach_phonetic(
                 transcribe_node(child)
 
 
+def _normalize_synonym_values(values: list[str], source_text: str, top_k: int) -> list[str]:
+    normalized_source = " ".join((source_text or "").strip().lower().split())
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        candidate = " ".join(value.strip().split())
+        if not candidate:
+            continue
+        low = candidate.lower()
+        if low == normalized_source:
+            continue
+        if low in seen:
+            continue
+        seen.add(low)
+        out.append(candidate)
+        if len(out) >= top_k:
+            break
+    return out
+
+
+_VERB_PARTICLE_MAP = {
+    "bank": "on",
+    "rely": "on",
+    "count": "on",
+    "depend": "on",
+}
+
+_IRREGULAR_PAST_PARTICIPLE = {
+    "be": "been",
+    "become": "become",
+    "begin": "begun",
+    "break": "broken",
+    "bring": "brought",
+    "buy": "bought",
+    "come": "come",
+    "do": "done",
+    "drink": "drunk",
+    "drive": "driven",
+    "eat": "eaten",
+    "fall": "fallen",
+    "feel": "felt",
+    "find": "found",
+    "get": "gotten",
+    "give": "given",
+    "go": "gone",
+    "know": "known",
+    "leave": "left",
+    "make": "made",
+    "read": "read",
+    "run": "run",
+    "say": "said",
+    "see": "seen",
+    "speak": "spoken",
+    "swear": "sworn",
+    "take": "taken",
+    "write": "written",
+}
+
+
+def _to_past_participle(lemma: str) -> str:
+    base = (lemma or "").strip().lower()
+    if not base:
+        return base
+    if base in _IRREGULAR_PAST_PARTICIPLE:
+        return _IRREGULAR_PAST_PARTICIPLE[base]
+    if base.endswith("e"):
+        return f"{base}d"
+    if len(base) > 1 and base.endswith("y") and base[-2] not in "aeiou":
+        return f"{base[:-1]}ied"
+    return f"{base}ed"
+
+
+def _postprocess_synonyms_for_node(node: dict, raw_synonyms: list[str], source_text: str) -> list[str]:
+    pos = str(node.get("part_of_speech") or "").strip().lower()
+    features = node.get("features") if isinstance(node.get("features"), dict) else {}
+    verb_form = str(features.get("verb_form") or "").strip().lower()
+    tense_feature = str(features.get("tense_feature") or "").strip().lower()
+
+    out: list[str] = []
+    for value in raw_synonyms:
+        if not isinstance(value, str):
+            continue
+        candidate = " ".join(value.strip().split()).lower()
+        if not candidate:
+            continue
+
+        if pos == "verb":
+            tokens = candidate.split()
+            head = tokens[0]
+            # Expand known phrasal-verb heads to reduce out-of-context bare lemmas (e.g., bank -> bank on).
+            if head in _VERB_PARTICLE_MAP and len(tokens) == 1:
+                candidate = f"{head} {_VERB_PARTICLE_MAP[head]}"
+                tokens = candidate.split()
+                head = tokens[0]
+            # Align with source non-finite past participle form when available.
+            if verb_form == "part" and tense_feature == "past":
+                inflected = _to_past_participle(head)
+                candidate = " ".join([inflected, *tokens[1:]])
+
+        out.append(candidate)
+
+    return _normalize_synonym_values(out, source_text, top_k=max(1, len(out) or 1))
+
+
+def _attach_synonyms(
+    doc: dict,
+    provider: Any,
+    top_k: int = 5,
+    include_node_synonyms: bool = True,
+) -> None:
+    k = max(1, int(top_k))
+    for sentence_node in doc.values():
+        if not isinstance(sentence_node, dict):
+            continue
+
+        sentence_text = str(sentence_node.get("content") or "")
+        sentence_pos = sentence_node.get("part_of_speech")
+        sentence_raw = provider.get_synonyms(sentence_text, pos=sentence_pos, top_k=k)
+        sentence_node["synonyms"] = _normalize_synonym_values(sentence_raw, sentence_text, k)
+
+        if not include_node_synonyms:
+            continue
+
+        synonyms_by_node_id: dict[str, list[str]] = {}
+        synonyms_by_source_key: dict[str, list[str]] = {}
+
+        def enrich_node(node: dict) -> None:
+            node_id = node.get("node_id")
+            ref_node_id = node.get("ref_node_id")
+
+            if isinstance(ref_node_id, str) and ref_node_id in synonyms_by_node_id:
+                syns = synonyms_by_node_id[ref_node_id]
+            else:
+                source_text = _node_source_text(node, sentence_text)
+                node_pos = node.get("part_of_speech")
+                source_key = f"{source_text.strip().lower()}|{str(node_pos or '').strip().lower()}"
+                if source_key in synonyms_by_source_key:
+                    syns = synonyms_by_source_key[source_key]
+                else:
+                    raw_syns = provider.get_synonyms(source_text, pos=node_pos, top_k=k)
+                    syns = _postprocess_synonyms_for_node(node, raw_syns, source_text)
+                    syns = syns[:k]
+                    synonyms_by_source_key[source_key] = syns
+
+            node["synonyms"] = list(syns)
+            if isinstance(node_id, str):
+                synonyms_by_node_id[node_id] = syns
+
+            for child in node.get("linguistic_elements", []) or []:
+                if isinstance(child, dict):
+                    enrich_node(child)
+
+        for child in sentence_node.get("linguistic_elements", []) or []:
+            if isinstance(child, dict):
+                enrich_node(child)
+
+
 def _enforce_linguistic_elements_last(doc: dict) -> None:
     def reorder_node(node: dict) -> None:
         children = node.get("linguistic_elements", [])
@@ -219,6 +378,10 @@ def run_pipeline(
     phonetic_provider: str = "espeak",
     phonetic_binary: str = "auto",
     phonetic_nodes: bool = True,
+    enable_synonyms: bool = False,
+    synonyms_provider: str = "wordnet",
+    synonyms_top_k: int = 5,
+    synonym_nodes: bool = True,
 ) -> dict:
     nlp = load_nlp(spacy_model)
 
@@ -268,6 +431,19 @@ def run_pipeline(
             enriched,
             transcriber=transcriber,
             include_node_phonetic=phonetic_nodes,
+        )
+
+    if enable_synonyms:
+        if synonyms_provider != "wordnet":
+            raise ValueError("synonyms_provider must be 'wordnet'")
+        from ela_pipeline.synonyms import WordNetSynonymProvider
+
+        provider = WordNetSynonymProvider()
+        _attach_synonyms(
+            enriched,
+            provider=provider,
+            top_k=synonyms_top_k,
+            include_node_synonyms=synonym_nodes,
         )
 
     raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
@@ -339,6 +515,24 @@ def main() -> None:
         action="store_true",
         help="Attach phonetic field to sentence only (skip phrase/word node phonetics).",
     )
+    parser.add_argument("--synonyms", action="store_true", help="Enable synonym enrichment.")
+    parser.add_argument(
+        "--synonyms-provider",
+        default="wordnet",
+        choices=["wordnet"],
+        help="Synonym backend provider (extensible).",
+    )
+    parser.add_argument(
+        "--synonyms-top-k",
+        type=int,
+        default=5,
+        help="Maximum synonyms per node (>=1).",
+    )
+    parser.add_argument(
+        "--no-synonym-nodes",
+        action="store_true",
+        help="Attach synonyms to sentence only (skip phrase/word node synonyms).",
+    )
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
@@ -360,6 +554,10 @@ def main() -> None:
         phonetic_provider=args.phonetic_provider,
         phonetic_binary=args.phonetic_binary,
         phonetic_nodes=not args.no_phonetic_nodes,
+        enable_synonyms=args.synonyms,
+        synonyms_provider=args.synonyms_provider,
+        synonyms_top_k=args.synonyms_top_k,
+        synonym_nodes=not args.no_synonym_nodes,
     )
 
     out_path = args.output

@@ -263,6 +263,27 @@ def _validate_optional_phonetic(node: Dict[str, Any], path: str, errors: List[Va
             _expect(value.strip() != "", errors, f"{path}.phonetic.{key}", f"{key} must be non-empty")
 
 
+def _validate_optional_synonyms(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "synonyms" not in node:
+        return
+    synonyms = node.get("synonyms")
+    _expect(isinstance(synonyms, list), errors, f"{path}.synonyms", "synonyms must be list")
+    if not isinstance(synonyms, list):
+        return
+    seen: set[str] = set()
+    for idx, value in enumerate(synonyms):
+        item_path = f"{path}.synonyms[{idx}]"
+        _expect(isinstance(value, str), errors, item_path, "synonym item must be string")
+        if not isinstance(value, str):
+            continue
+        normalized = " ".join(value.strip().lower().split())
+        _expect(normalized != "", errors, item_path, "synonym item must be non-empty")
+        if not normalized:
+            continue
+        _expect(normalized not in seen, errors, item_path, "synonym items must be unique")
+        seen.add(normalized)
+
+
 def _validate_optional_trace_fields(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
     for field in ("quality_flags", "rejected_candidates", "reason_codes"):
         if field not in node:
@@ -685,6 +706,7 @@ def _validate_node(
     _validate_optional_notes(node, path, errors)
     _validate_optional_translation(node, path, errors, validation_mode)
     _validate_optional_phonetic(node, path, errors)
+    _validate_optional_synonyms(node, path, errors)
     _validate_optional_trace_fields(node, path, errors)
     _validate_optional_template_selection(node, path, errors)
     _validate_optional_backoff_in_subtree(node, path, errors)

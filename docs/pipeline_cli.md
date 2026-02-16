@@ -159,6 +159,28 @@ Phonetic quality regression suite (UK/US structure checks):
   --phonetic-nodes
 ```
 
+Optional synonym enrichment (EN, WordNet):
+WordNet prerequisite (one-time):
+```bash
+.venv/bin/python -m nltk.downloader wordnet omw-1.4
+```
+
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --synonyms \
+  --synonyms-provider wordnet \
+  --synonyms-top-k 5
+```
+
+Sentence-only synonyms:
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --synonyms \
+  --no-synonym-nodes
+```
+
 `v2_strict` is now the default mode.
 Legacy compatibility mode (`v1`) is still available only when explicitly requested:
 

@@ -7,6 +7,7 @@ This project converts English text into a validated hierarchical linguistic JSON
 - optional local T5 note generation
 - optional multilingual translation enrichment (current provider: `m2m100`, EN->RU first)
 - optional phonetic enrichment (UK/US transcription via `espeak` backend)
+- optional synonym enrichment (WordNet-backed, EN)
 - strict validation and frozen-structure checks
 
 Authoritative contract reference: `docs/sample.json`.
@@ -43,6 +44,8 @@ Each node always keeps required contract fields and may include optional v2 fiel
 - trace fields for note-generation quality
 - `translation` payloads (sentence + optional node level)
 - `phonetic` payloads (sentence + optional node level): `{uk, us}`
+- `synonyms` payloads (sentence + optional node level): `[string, ...]`
+  - synonym output applies context filters for function words and basic verb-form normalization.
 
 ## Quick Start
 
@@ -125,6 +128,28 @@ Sentence-only phonetics:
   --phonetic-provider espeak \
   --phonetic-binary auto \
   --phonetic-nodes
+```
+
+### 10) Inference with synonyms (EN)
+WordNet prerequisite (one-time):
+```bash
+.venv/bin/python -m nltk.downloader wordnet omw-1.4
+```
+
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --synonyms \
+  --synonyms-provider wordnet \
+  --synonyms-top-k 5
+```
+
+Sentence-only synonyms:
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --synonyms \
+  --no-synonym-nodes
 ```
 
 ## Main Commands

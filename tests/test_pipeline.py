@@ -4,6 +4,7 @@ from unittest.mock import patch
 from ela_pipeline.annotate.local_generator import LocalT5Annotator
 from ela_pipeline.inference.run import (
     _attach_phonetic,
+    _attach_synonyms,
     _attach_translation,
     _resolve_translation_model_name,
     run_pipeline,
@@ -184,6 +185,70 @@ class PipelineTests(unittest.TestCase):
         trusted_us_calls = [c for c in FakePhonetic.calls if c == ("trusted", "us")]
         self.assertEqual(len(trusted_uk_calls), 1)
         self.assertEqual(len(trusted_us_calls), 1)
+
+    def test_attach_synonyms_enriches_sentence_and_nodes_with_dedup(self):
+        doc = {
+            "She trusted him.": {
+                "type": "Sentence",
+                "content": "She trusted him.",
+                "part_of_speech": "sentence",
+                "source_span": {"start": 0, "end": 15},
+                "linguistic_elements": [
+                    {
+                        "type": "Phrase",
+                        "content": "trusted him",
+                        "part_of_speech": "verb phrase",
+                        "source_span": {"start": 4, "end": 15},
+                        "linguistic_elements": [
+                            {
+                                "type": "Word",
+                                "content": "trusted",
+                                "part_of_speech": "verb",
+                                "features": {"verb_form": "part", "tense_feature": "past"},
+                                "source_span": {"start": 4, "end": 11},
+                                "linguistic_elements": [],
+                            },
+                            {
+                                "type": "Word",
+                                "content": "trusted",
+                                "part_of_speech": "verb",
+                                "features": {"verb_form": "part", "tense_feature": "past"},
+                                "source_span": {"start": 4, "end": 11},
+                                "ref_node_id": "n_word_1",
+                                "linguistic_elements": [],
+                            },
+                        ],
+                    }
+                ],
+            }
+        }
+        doc["She trusted him."]["node_id"] = "n_sentence"
+        phrase = doc["She trusted him."]["linguistic_elements"][0]
+        phrase["node_id"] = "n_phrase_1"
+        phrase["linguistic_elements"][0]["node_id"] = "n_word_1"
+        phrase["linguistic_elements"][1]["node_id"] = "n_word_2"
+
+        class FakeSynonyms:
+            calls = []
+
+            @classmethod
+            def get_synonyms(cls, text: str, pos: str | None, top_k: int) -> list[str]:
+                cls.calls.append((text, pos, top_k))
+                if text.strip().lower() == "trusted":
+                    return ["trust", "swear", "rely", "bank", "believe"]
+                return ["alt1", "alt2", "alt3"]
+
+        _attach_synonyms(doc, provider=FakeSynonyms(), top_k=2, include_node_synonyms=True)
+
+        sentence = doc["She trusted him."]
+        self.assertEqual(sentence["synonyms"], ["alt1", "alt2"])
+        phrase = sentence["linguistic_elements"][0]
+        word = phrase["linguistic_elements"][0]
+        dup_word = phrase["linguistic_elements"][1]
+        self.assertEqual(word["synonyms"], ["sworn", "relied on"])
+        self.assertEqual(dup_word["synonyms"], ["sworn", "relied on"])
+        trusted_calls = [c for c in FakeSynonyms.calls if c[0] == "trusted"]
+        self.assertEqual(len(trusted_calls), 1)
 
     def test_backoff_flag_added_for_non_l1_levels(self):
         flags = LocalT5Annotator._with_backoff_flag(

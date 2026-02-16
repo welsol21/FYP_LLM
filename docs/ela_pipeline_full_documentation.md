@@ -48,6 +48,8 @@ Allowed types only:
 - `translation` object:
   - sentence-level: `{source_lang, target_lang, model, text}`
   - node-level: `{source_lang, target_lang, text}`
+- `phonetic` object: `{uk, us}`
+- `synonyms` list: `[string, ...]`
 
 ### 2.5 Nesting Rules
 - `Sentence` can contain only `Phrase`
@@ -157,6 +159,21 @@ If `--model-dir` is omitted:
   - reuse canonical phonetic entry via `ref_node_id`,
   - deduplicate calls for identical source spans/text within sentence.
 
+### 4.7 Synonym Enrichment (`ela_pipeline/synonyms/engine.py`)
+- Optional runtime stage behind CLI flag `--synonyms`.
+- Current provider: `wordnet` (`nltk.corpus.wordnet`).
+- One-time lexical data download: `.venv/bin/python -m nltk.downloader wordnet omw-1.4`.
+- Output field:
+  - `synonyms`: list of normalized strings (optionally attached to sentence and node levels).
+- Node synonym strategy:
+  - prefer `source_span` projection from sentence text over free node content,
+  - reuse canonical synonyms via `ref_node_id`,
+  - deduplicate by normalized source text + POS and enforce `top_k` cap,
+  - return empty list for function POS (for example `auxiliary verb`, `article`, `preposition`) to avoid semantic noise,
+  - apply verb post-processing for context stability:
+    - expand known phrasal heads (for example `bank` -> `bank on`),
+    - inflect verb synonym head to node form for `past participle` contexts.
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset
@@ -215,6 +232,16 @@ One-time local model preparation:
   --phonetic-provider espeak \
   --phonetic-binary auto \
   --phonetic-nodes
+```
+
+### 5.9 Synonym inference (WordNet)
+```bash
+.venv/bin/python -m nltk.downloader wordnet omw-1.4
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --synonyms \
+  --synonyms-provider wordnet \
+  --synonyms-top-k 5
 ```
 
 ## 6. Testing

@@ -272,6 +272,17 @@
 - [x] Document phonetic stage in sample contract (`docs/sample.json`).
 - [ ] Add final license gate before production enablement of chosen phonetic backend (per `docs/licenses_inventory.md`).
 
+## Synonyms Rollout (EN, WordNet)
+
+- [x] Define contract extension for synonyms on node levels using `synonyms: [string, ...]`.
+- [x] Add CLI controls for optional synonym enrichment (`--synonyms`, provider, top-k, node toggle).
+- [x] Introduce synonym provider interface and first implementation (`wordnet` via NLTK).
+- [x] Add source-span/ref-node aware deduplication for synonym generation (reuse by `ref_node_id` and normalized source key).
+- [x] Add context-aware synonym post-processing for verbs (phrasal expansion + participle-form alignment) to reduce out-of-context lemmas.
+- [x] Add validator rules for optional `synonyms` fields (list of non-empty unique strings).
+- [x] Add TDD regression tests for synonym enrichment + validator checks.
+- [x] Document WordNet prerequisite (`nltk.downloader wordnet omw-1.4`) in docs.
+
 ## DB Persistence (Deferred, Postgres-only)
 
 - [ ] Document decision: PostgreSQL is primary storage (no MongoDB in current architecture).
