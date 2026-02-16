@@ -1,5 +1,10 @@
 # ELA Pipeline CLI
 
+## Licensing note
+
+- Approved multilingual translation model for upcoming EN->RU stage: `facebook/m2m100_418M` (MIT).
+- Centralized license inventory for all project tools/models/data: `docs/licenses_inventory.md`.
+
 ## 1) Fetch raw source files
 
 ```bash
@@ -91,6 +96,22 @@ This adds sentence-level `backoff_summary` (`nodes`, `leaf_nodes`, `aggregate_no
 in addition to always-on counters:
 `backoff_nodes_count`, `backoff_leaf_nodes_count`, `backoff_aggregate_nodes_count`, and `backoff_unique_spans_count`.
 Each node also carries `backoff_in_subtree` to indicate descendant-level backoff independently of local `backoff_used`.
+
+Optional multilingual translation enrichment (first pair: EN->RU, provider `m2m100`):
+```bash
+python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --translate \
+  --translation-provider m2m100 \
+  --translation-model facebook/m2m100_418M \
+  --translation-source-lang en \
+  --translation-target-lang ru
+```
+
+Sentence-only translation (skip phrase/word node translations):
+```bash
+python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --translate --no-translate-nodes
+```
 
 `v2_strict` is now the default mode.
 Legacy compatibility mode (`v1`) is still available only when explicitly requested:

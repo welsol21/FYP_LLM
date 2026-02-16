@@ -38,7 +38,7 @@ Notes:
 | Model family | In-project usage | License type |
 |---|---|---|
 | `t5-small` (base for local fine-tuned note models) | note generation experiments/pipeline models | Apache-2.0 |
-| `facebook/m2m100_418M` | planned EN->RU translation stage | MIT |
+| `facebook/m2m100_418M` | multilingual translation stage (EN->RU first) | MIT |
 
 ## 4) Data-source licensing (corpus/reference layer)
 

@@ -230,3 +230,13 @@
 
 - [x] Consolidate template-id experiment narrative into one canonical report (`docs/template_id_experiment_report_2026-02-13.md`).
 - [x] Remove intermediate duplicate reports and keep only primary regression artifact + consolidated summary.
+- [x] Add consolidated tool/model/data license inventory with explicit allowed MT model (`facebook/m2m100_418M`, MIT).
+
+## Multilingual Translation Rollout
+
+- [x] Add multilingual translation stage scaffold in inference pipeline with provider interface.
+- [x] Integrate `m2m100` provider (`facebook/m2m100_418M`, MIT) with CLI controls (`--translate`, source/target language, device).
+- [x] Emit translation payload into output JSON at sentence level and optional node level.
+- [ ] Add alignment-aware phrase/word translation projection (instead of independent node translation).
+- [ ] Add translation quality regression suite (EN->RU first, then extend language pairs).
+- [ ] Add translation-field validation contract in strict mode.

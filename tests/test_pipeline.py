@@ -1,13 +1,56 @@
 import unittest
 
 from ela_pipeline.annotate.local_generator import LocalT5Annotator
-from ela_pipeline.inference.run import run_pipeline
+from ela_pipeline.inference.run import _attach_translation, run_pipeline
 from ela_pipeline.parse.spacy_parser import load_nlp
 from ela_pipeline.skeleton.builder import build_skeleton
 from ela_pipeline.tam.rules import apply_tam
 
 
 class PipelineTests(unittest.TestCase):
+    def test_attach_translation_enriches_sentence_and_nodes(self):
+        doc = {
+            "She trusted him.": {
+                "type": "Sentence",
+                "content": "She trusted him.",
+                "linguistic_elements": [
+                    {
+                        "type": "Phrase",
+                        "content": "trusted him",
+                        "linguistic_elements": [
+                            {
+                                "type": "Word",
+                                "content": "trusted",
+                                "linguistic_elements": [],
+                            }
+                        ],
+                    }
+                ],
+            }
+        }
+
+        class FakeTranslator:
+            model_name = "fake-model"
+
+            @staticmethod
+            def translate_text(text: str, source_lang: str, target_lang: str) -> str:
+                return f"{target_lang}:{text}"
+
+        _attach_translation(
+            doc,
+            translator=FakeTranslator(),
+            source_lang="en",
+            target_lang="ru",
+            include_node_translations=True,
+        )
+
+        sentence = doc["She trusted him."]
+        self.assertEqual(sentence["translation"]["text"], "ru:She trusted him.")
+        phrase = sentence["linguistic_elements"][0]
+        word = phrase["linguistic_elements"][0]
+        self.assertEqual(phrase["translation"]["text"], "ru:trusted him")
+        self.assertEqual(word["translation"]["text"], "ru:trusted")
+
     def test_backoff_flag_added_for_non_l1_levels(self):
         flags = LocalT5Annotator._with_backoff_flag(
             ["template_selected", "rule_used"],

@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 from datetime import datetime
+from typing import Any
 
 from ela_pipeline.contract import deep_copy_contract
 from ela_pipeline.parse.spacy_parser import load_nlp
@@ -42,6 +43,46 @@ def _apply_strict_null_normalization(doc: dict, validation_mode: str) -> None:
             _normalize_strict_null_sentinels(sentence_node)
 
 
+def _walk_nodes(node: dict):
+    yield node
+    for child in node.get("linguistic_elements", []) or []:
+        if isinstance(child, dict):
+            yield from _walk_nodes(child)
+
+
+def _attach_translation(
+    doc: dict,
+    translator: Any,
+    source_lang: str,
+    target_lang: str,
+    include_node_translations: bool = True,
+) -> None:
+    for sentence_node in doc.values():
+        if not isinstance(sentence_node, dict):
+            continue
+
+        sentence_text = str(sentence_node.get("content") or "")
+        sentence_translation = translator.translate_text(sentence_text, source_lang=source_lang, target_lang=target_lang)
+        sentence_node["translation"] = {
+            "source_lang": source_lang,
+            "target_lang": target_lang,
+            "model": getattr(translator, "model_name", "unknown"),
+            "text": sentence_translation,
+        }
+
+        if not include_node_translations:
+            continue
+
+        for node in _walk_nodes(sentence_node):
+            content = str(node.get("content") or "")
+            translated = translator.translate_text(content, source_lang=source_lang, target_lang=target_lang)
+            node["translation"] = {
+                "source_lang": source_lang,
+                "target_lang": target_lang,
+                "text": translated,
+            }
+
+
 def run_pipeline(
     text: str,
     model_dir: str | None = None,
@@ -49,6 +90,13 @@ def run_pipeline(
     validation_mode: str = "v2_strict",
     note_mode: str = "template_only",
     backoff_debug_summary: bool = False,
+    enable_translation: bool = False,
+    translation_provider: str = "m2m100",
+    translation_model: str = "facebook/m2m100_418M",
+    translation_source_lang: str = "en",
+    translation_target_lang: str = "ru",
+    translation_device: str = "auto",
+    translate_nodes: bool = True,
 ) -> dict:
     nlp = load_nlp(spacy_model)
 
@@ -69,6 +117,23 @@ def run_pipeline(
             backoff_debug_summary=backoff_debug_summary,
         )
         annotator.annotate(enriched)
+
+    if enable_translation:
+        if translation_provider != "m2m100":
+            raise ValueError("translation_provider must be 'm2m100'")
+        from ela_pipeline.translate import M2M100Translator
+
+        translator = M2M100Translator(
+            model_name=translation_model,
+            device=translation_device,
+        )
+        _attach_translation(
+            enriched,
+            translator=translator,
+            source_lang=translation_source_lang,
+            target_lang=translation_target_lang,
+            include_node_translations=translate_nodes,
+        )
 
     raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
     raise_if_invalid(validate_frozen_structure(skeleton, enriched))
@@ -92,6 +157,31 @@ def main() -> None:
         action="store_true",
         help="Attach sentence-level backoff_summary with node ids/reasons for debugging.",
     )
+    parser.add_argument("--translate", action="store_true", help="Enable multilingual translation enrichment.")
+    parser.add_argument(
+        "--translation-provider",
+        default="m2m100",
+        choices=["m2m100"],
+        help="Translation backend provider (extensible).",
+    )
+    parser.add_argument(
+        "--translation-model",
+        default="facebook/m2m100_418M",
+        help="Hugging Face model id for translation backend.",
+    )
+    parser.add_argument("--translation-source-lang", default="en", help="Source language code.")
+    parser.add_argument("--translation-target-lang", default="ru", help="Target language code.")
+    parser.add_argument(
+        "--translation-device",
+        default="auto",
+        choices=["auto", "cpu", "cuda"],
+        help="Device for translation model execution.",
+    )
+    parser.add_argument(
+        "--no-translate-nodes",
+        action="store_true",
+        help="Translate sentence only (skip phrase/word node content translation).",
+    )
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
@@ -102,6 +192,13 @@ def main() -> None:
         validation_mode=args.validation_mode,
         note_mode=args.note_mode,
         backoff_debug_summary=args.backoff_debug_summary,
+        enable_translation=args.translate,
+        translation_provider=args.translation_provider,
+        translation_model=args.translation_model,
+        translation_source_lang=args.translation_source_lang,
+        translation_target_lang=args.translation_target_lang,
+        translation_device=args.translation_device,
+        translate_nodes=not args.no_translate_nodes,
     )
 
     out_path = args.output

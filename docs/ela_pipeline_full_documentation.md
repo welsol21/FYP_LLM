@@ -8,9 +8,11 @@ End-to-end flow:
 2. deterministic skeleton building
 3. TAM enrichment (rule-based)
 4. optional local T5 note generation
-5. validation (schema + frozen structure)
+5. optional multilingual translation enrichment
+6. validation (schema + frozen structure)
 
 Authoritative compatibility contract: `docs/sample.json`.
+Tool/model/data license registry: `docs/licenses_inventory.md`.
 
 ## 2. Contract Model
 
@@ -120,6 +122,13 @@ If `--model-dir` is omitted:
 - field type/range checks
 - mode-aware strictness
 - frozen structure integrity after enrichment
+
+### 4.5 Translation Enrichment (`ela_pipeline/translate/engine.py`)
+- Optional runtime stage behind CLI flag `--translate`.
+- Current provider: `m2m100` (`facebook/m2m100_418M`, MIT).
+- Current output fields:
+  - sentence-level `translation`: `{source_lang, target_lang, model, text}`
+  - node-level `translation`: `{source_lang, target_lang, text}` (when node translation is enabled)
 
 ## 5. CLI Usage
 
