@@ -53,6 +53,7 @@ Allowed types only:
 - `Sentence` can contain only `Phrase`
 - `Phrase` can contain only `Word`
 - `Word` must have an empty `linguistic_elements`
+- serialization order rule: `linguistic_elements` is emitted as the last field in each node object (`Sentence`, `Phrase`, `Word`) for stable readability.
 
 ### 2.6 Phrase Quality Rules
 - one-word phrases are disallowed

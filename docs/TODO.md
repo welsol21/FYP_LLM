@@ -229,6 +229,7 @@
 - [x] Add validator checks for `backoff_in_subtree` consistency with descendant signals.
 - [x] Document local vs subtree backoff semantics to avoid metric drift.
 - [x] Document `dep_label` semantics as source-parse dependency label (not phrase-internal dependency role).
+- [x] Enforce node serialization order with `linguistic_elements` as the last field for `Sentence`/`Phrase`/`Word`.
 
 ## Documentation Hygiene
 
@@ -262,3 +263,10 @@
 - [ ] Implement idempotent upsert by `sentence_key` (`ON CONFLICT` flow).
 - [ ] Add DB integration tests (TDD): insert, dedup, query by metrics.
 - [ ] Optional later: add Redis cache for translation hot-path.
+
+## Long-Term Backlog (Far Future)
+
+- [ ] Introduce dual translation channels in contract:
+  - [ ] `translation_literary` (baseline from `m2m100`)
+  - [ ] `translation_idiomatic` (rule-based rewrite layer with literary fallback)
+  - [ ] Keep both as top-level sibling fields per node (no nested alternatives array).

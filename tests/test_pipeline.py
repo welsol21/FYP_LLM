@@ -289,6 +289,22 @@ class PipelineTests(unittest.TestCase):
         sentence = out[next(iter(out))]
         self.assertEqual(sentence.get("tam_construction"), "modal_perfect")
 
+    def test_pipeline_keeps_linguistic_elements_as_last_field(self):
+        out = run_pipeline(
+            "She should have trusted her instincts before making the decision.",
+            model_dir=None,
+            validation_mode="v2_strict",
+        )
+        sentence = out[next(iter(out))]
+
+        def walk(node: dict) -> None:
+            if "linguistic_elements" in node:
+                self.assertEqual(list(node.keys())[-1], "linguistic_elements")
+            for child in node.get("linguistic_elements", []):
+                walk(child)
+
+        walk(sentence)
+
     def test_pipeline_marks_duplicate_spans_with_ref_node_id(self):
         out = run_pipeline(
             "She should have trusted her instincts before making the decision.",

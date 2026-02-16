@@ -121,6 +121,21 @@ def _attach_translation(
                 translate_node(child)
 
 
+def _enforce_linguistic_elements_last(doc: dict) -> None:
+    def reorder_node(node: dict) -> None:
+        children = node.get("linguistic_elements", [])
+        if isinstance(children, list):
+            for child in children:
+                if isinstance(child, dict):
+                    reorder_node(child)
+            value = node.pop("linguistic_elements")
+            node["linguistic_elements"] = value
+
+    for sentence_node in doc.values():
+        if isinstance(sentence_node, dict):
+            reorder_node(sentence_node)
+
+
 def _resolve_translation_model_name(
     translation_model: str,
     local_model_dir: str = DEFAULT_LOCAL_TRANSLATION_MODEL_DIR,
@@ -186,6 +201,7 @@ def run_pipeline(
 
     raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
     raise_if_invalid(validate_frozen_structure(skeleton, enriched))
+    _enforce_linguistic_elements_last(enriched)
     return enriched
 
 
