@@ -239,4 +239,21 @@
 - [x] Emit translation payload into output JSON at sentence level and optional node level.
 - [x] Add alignment-aware phrase/word translation projection (source-span/ref-node based, with deduplicated translation calls).
 - [ ] Add translation quality regression suite (EN->RU first, then extend language pairs).
-- [ ] Add translation-field validation contract in strict mode.
+- [x] Add translation-field validation contract in strict mode.
+
+## DB Persistence (Deferred, Postgres-only)
+
+- [ ] Document decision: PostgreSQL is primary storage (no MongoDB in current architecture).
+- [ ] Add deterministic `sentence_key` for sentence-level identity.
+- [ ] Define and document `canonical_text` normalization (trim, whitespace collapse, Unicode NFC).
+- [ ] Add `hash_version` (for example `v1`) for key schema evolution.
+- [ ] Implement key formula: `sha256(canonical_text + source_lang + target_lang + pipeline/model context)`.
+- [ ] Add `UNIQUE` index on `sentence_key`.
+- [ ] Design minimal PostgreSQL schema: `runs`, `sentences`, `artifacts(jsonb)`.
+- [ ] Store full pipeline contract payload in `jsonb`.
+- [ ] Promote analytics-critical fields to columns (`tam_construction`, `backoff_*`, `language_pair`, etc.).
+- [ ] Add DB migrations for schema creation and upgrades.
+- [ ] Add repository/DAO layer for write/read.
+- [ ] Implement idempotent upsert by `sentence_key` (`ON CONFLICT` flow).
+- [ ] Add DB integration tests (TDD): insert, dedup, query by metrics.
+- [ ] Optional later: add Redis cache for translation hot-path.

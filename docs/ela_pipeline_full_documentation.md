@@ -45,6 +45,9 @@ Allowed types only:
 - `notes` typed objects: `{text, kind, confidence, source}`
 - note trace fields: `quality_flags`, `rejected_candidates`, `rejected_candidate_stats`, `reason_codes`
 - `schema_version`
+- `translation` object:
+  - sentence-level: `{source_lang, target_lang, model, text}`
+  - node-level: `{source_lang, target_lang, text}`
 
 ### 2.5 Nesting Rules
 - `Sentence` can contain only `Phrase`
@@ -89,6 +92,10 @@ Only enrichment fields (notes/TAM-like metadata) may change.
 - `v2_strict`: requires core v2 fields on each node (`node_id`, `source_span`, `grammatical_role`, `schema_version='v2'`)
 
 Default mode is `v2_strict`.
+
+Translation validation rules:
+- if `translation` exists, it must be an object with non-empty `source_lang`, `target_lang`, and `text`.
+- in `v2_strict`, `Sentence.translation.model` is required and must be non-empty.
 
 CLI exposure:
 ```bash

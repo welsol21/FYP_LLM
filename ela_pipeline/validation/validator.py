@@ -215,6 +215,40 @@ def _validate_optional_notes(node: Dict[str, Any], path: str, errors: List[Valid
         _expect(note.get("source") in NOTE_SOURCES, errors, f"{item_path}.source", "source must be one of model|rule|fallback")
 
 
+def _validate_optional_translation(
+    node: Dict[str, Any],
+    path: str,
+    errors: List[ValidationErrorItem],
+    validation_mode: str,
+) -> None:
+    if "translation" not in node:
+        return
+    tr = node.get("translation")
+    _expect(isinstance(tr, dict), errors, f"{path}.translation", "translation must be object")
+    if not isinstance(tr, dict):
+        return
+
+    for key in ("source_lang", "target_lang", "text"):
+        value = tr.get(key)
+        _expect(isinstance(value, str), errors, f"{path}.translation.{key}", f"{key} must be string")
+        if isinstance(value, str):
+            _expect(value.strip() != "", errors, f"{path}.translation.{key}", f"{key} must be non-empty")
+
+    model = tr.get("model")
+    if model is not None:
+        _expect(isinstance(model, str), errors, f"{path}.translation.model", "model must be string")
+        if isinstance(model, str):
+            _expect(model.strip() != "", errors, f"{path}.translation.model", "model must be non-empty")
+
+    if validation_mode == "v2_strict" and str(node.get("type") or "") == "Sentence":
+        _expect(
+            isinstance(model, str) and model.strip() != "",
+            errors,
+            f"{path}.translation.model",
+            "translation.model is required for Sentence in strict mode",
+        )
+
+
 def _validate_optional_trace_fields(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
     for field in ("quality_flags", "rejected_candidates", "reason_codes"):
         if field not in node:
@@ -635,6 +669,7 @@ def _validate_node(
     _validate_modal_perfect_policy(node, path, errors, validation_mode)
     _validate_optional_features(node, path, errors, validation_mode)
     _validate_optional_notes(node, path, errors)
+    _validate_optional_translation(node, path, errors, validation_mode)
     _validate_optional_trace_fields(node, path, errors)
     _validate_optional_template_selection(node, path, errors)
     _validate_optional_backoff_in_subtree(node, path, errors)
