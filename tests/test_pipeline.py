@@ -1,13 +1,28 @@
 import unittest
+from unittest.mock import patch
 
 from ela_pipeline.annotate.local_generator import LocalT5Annotator
-from ela_pipeline.inference.run import _attach_translation, run_pipeline
+from ela_pipeline.inference.run import (
+    _attach_translation,
+    _resolve_translation_model_name,
+    run_pipeline,
+)
 from ela_pipeline.parse.spacy_parser import load_nlp
 from ela_pipeline.skeleton.builder import build_skeleton
 from ela_pipeline.tam.rules import apply_tam
 
 
 class PipelineTests(unittest.TestCase):
+    def test_translation_model_prefers_local_project_copy_for_default_hf_id(self):
+        with patch("ela_pipeline.inference.run.os.path.isdir", return_value=True):
+            resolved = _resolve_translation_model_name("facebook/m2m100_418M")
+        self.assertEqual(resolved, "artifacts/models/m2m100_418M")
+
+    def test_translation_model_keeps_explicit_custom_model_name(self):
+        with patch("ela_pipeline.inference.run.os.path.isdir", return_value=True):
+            resolved = _resolve_translation_model_name("custom-org/custom-model")
+        self.assertEqual(resolved, "custom-org/custom-model")
+
     def test_attach_translation_enriches_sentence_and_nodes(self):
         doc = {
             "She trusted him.": {

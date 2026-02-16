@@ -1,5 +1,9 @@
 # TODO
 
+## Working Environment Notes
+
+- [x] Use project virtualenv for all commands: prefer `.venv/bin/python -m ...` (or `.venv/bin/pip ...`), avoid plain `python`.
+
 ## Contract v2 Improvements
 
 - [x] Enforce phrase length constraints:
@@ -236,6 +240,7 @@
 
 - [x] Add multilingual translation stage scaffold in inference pipeline with provider interface.
 - [x] Integrate `m2m100` provider (`facebook/m2m100_418M`, MIT) with CLI controls (`--translate`, source/target language, device).
+- [x] Add project-local model bootstrap command (`.venv/bin/python -m ela_pipeline.translate.prepare_m2m100`) and auto-resolve local `artifacts/models/m2m100_418M` for default translation runs.
 - [x] Emit translation payload into output JSON at sentence level and optional node level.
 - [x] Add alignment-aware phrase/word translation projection (source-span/ref-node based, with deduplicated translation calls).
 - [x] Add translation quality regression suite (EN->RU first, then extend language pairs).

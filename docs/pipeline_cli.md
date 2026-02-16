@@ -2,8 +2,9 @@
 
 ## Licensing note
 
-- Approved multilingual translation model for upcoming EN->RU stage: `facebook/m2m100_418M` (MIT).
+- Approved multilingual translation model for current EN->RU stage: `facebook/m2m100_418M` (MIT).
 - Centralized license inventory for all project tools/models/data: `docs/licenses_inventory.md`.
+- Run commands with project virtualenv interpreter: `.venv/bin/python -m ...`.
 
 ## 1) Fetch raw source files
 
@@ -99,27 +100,32 @@ Each node also carries `backoff_in_subtree` to indicate descendant-level backoff
 
 Optional multilingual translation enrichment (first pair: EN->RU, provider `m2m100`):
 ```bash
-python -m ela_pipeline.inference.run \
+.venv/bin/python -m ela_pipeline.translate.prepare_m2m100
+```
+This saves a project-local model copy to `artifacts/models/m2m100_418M`.
+
+Translation inference:
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
   --text "She should have trusted her instincts before making the decision." \
   --translate \
   --translation-provider m2m100 \
-  --translation-model facebook/m2m100_418M \
   --translation-source-lang en \
   --translation-target-lang ru
 ```
+If `artifacts/models/m2m100_418M` exists and `--translation-model` is not overridden, it is used automatically.
 
 Sentence-only translation (skip phrase/word node translations):
 ```bash
-python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --translate --no-translate-nodes
+.venv/bin/python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --translate --no-translate-nodes
 ```
 
 Translation quality regression suite (EN->RU default):
 ```bash
-python -m ela_pipeline.inference.translation_quality_control \
+.venv/bin/python -m ela_pipeline.inference.translation_quality_control \
   --source-lang en \
   --target-lang ru \
   --translation-provider m2m100 \
-  --translation-model facebook/m2m100_418M \
   --translate-nodes
 ```
 

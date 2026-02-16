@@ -133,6 +133,10 @@ If `--model-dir` is omitted:
 ### 4.5 Translation Enrichment (`ela_pipeline/translate/engine.py`)
 - Optional runtime stage behind CLI flag `--translate`.
 - Current provider: `m2m100` (`facebook/m2m100_418M`, MIT).
+- Local deployment helper: `ela_pipeline/translate/prepare_m2m100.py` saves model to `artifacts/models/m2m100_418M`.
+- Runtime model resolution policy:
+  - if `--translation-model` is default (`facebook/m2m100_418M`) and local `artifacts/models/m2m100_418M` exists, local directory is used;
+  - explicit custom `--translation-model` value always takes priority.
 - Current output fields:
   - sentence-level `translation`: `{source_lang, target_lang, model, text}`
   - node-level `translation`: `{source_lang, target_lang, text}` (when node translation is enabled)
@@ -170,10 +174,24 @@ Note: the same command without `--validation-mode` runs in `v2_strict` by defaul
 python -m ela_pipeline.annotate.llm_annotator --input docs/sample.json --output inference_results/sample_with_notes.json --model-dir results_llm_notes_v3_t5-small_phrase/best_model
 ```
 
+### 5.6 Translation quality regression
+```bash
+.venv/bin/python -m ela_pipeline.inference.translation_quality_control \
+  --source-lang en \
+  --target-lang ru \
+  --translation-provider m2m100 \
+  --translate-nodes
+```
+
+One-time local model preparation:
+```bash
+.venv/bin/python -m ela_pipeline.translate.prepare_m2m100
+```
+
 ## 6. Testing
 Run in activated `.venv`:
 ```bash
-python -m unittest discover -s tests -v
+.venv/bin/python -m unittest discover -s tests -v
 ```
 
 Main tested areas:
@@ -183,6 +201,7 @@ Main tested areas:
 - phrase quality constraints
 - notes quality and fallback logic
 - inference pipeline smoke tests
+- translation projection and translation-contract validation
 
 ## 7. Practical Notes
 1. Use `.venv` to avoid dependency mismatch.

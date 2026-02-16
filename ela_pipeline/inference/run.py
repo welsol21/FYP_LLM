@@ -19,6 +19,8 @@ from ela_pipeline.validation.validator import (
 )
 
 STRICT_NULLABLE_TAM_FIELDS = {"tense", "aspect", "mood", "voice", "finiteness"}
+DEFAULT_TRANSLATION_MODEL = "facebook/m2m100_418M"
+DEFAULT_LOCAL_TRANSLATION_MODEL_DIR = "artifacts/models/m2m100_418M"
 
 
 def _normalize_strict_null_sentinels(node: dict) -> None:
@@ -119,6 +121,16 @@ def _attach_translation(
                 translate_node(child)
 
 
+def _resolve_translation_model_name(
+    translation_model: str,
+    local_model_dir: str = DEFAULT_LOCAL_TRANSLATION_MODEL_DIR,
+) -> str:
+    model_name = (translation_model or "").strip() or DEFAULT_TRANSLATION_MODEL
+    if model_name == DEFAULT_TRANSLATION_MODEL and os.path.isdir(local_model_dir):
+        return local_model_dir
+    return model_name
+
+
 def run_pipeline(
     text: str,
     model_dir: str | None = None,
@@ -128,7 +140,7 @@ def run_pipeline(
     backoff_debug_summary: bool = False,
     enable_translation: bool = False,
     translation_provider: str = "m2m100",
-    translation_model: str = "facebook/m2m100_418M",
+    translation_model: str = DEFAULT_TRANSLATION_MODEL,
     translation_source_lang: str = "en",
     translation_target_lang: str = "ru",
     translation_device: str = "auto",
@@ -159,8 +171,9 @@ def run_pipeline(
             raise ValueError("translation_provider must be 'm2m100'")
         from ela_pipeline.translate import M2M100Translator
 
+        resolved_translation_model = _resolve_translation_model_name(translation_model)
         translator = M2M100Translator(
-            model_name=translation_model,
+            model_name=resolved_translation_model,
             device=translation_device,
         )
         _attach_translation(
@@ -202,8 +215,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--translation-model",
-        default="facebook/m2m100_418M",
-        help="Hugging Face model id for translation backend.",
+        default=DEFAULT_TRANSLATION_MODEL,
+        help=(
+            "Hugging Face model id or local path for translation backend. "
+            f"If omitted and `{DEFAULT_LOCAL_TRANSLATION_MODEL_DIR}` exists, it is used automatically."
+        ),
     )
     parser.add_argument("--translation-source-lang", default="en", help="Source language code.")
     parser.add_argument("--translation-target-lang", default="ru", help="Target language code.")

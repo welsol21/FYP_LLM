@@ -5,9 +5,11 @@ This project converts English text into a validated hierarchical linguistic JSON
 - `Sentence -> Phrase -> Word` structure
 - deterministic parsing and rule-based enrichment
 - optional local T5 note generation
+- optional multilingual translation enrichment (current provider: `m2m100`, EN->RU first)
 - strict validation and frozen-structure checks
 
 Authoritative contract reference: `docs/sample.json`.
+Tool/model/data license inventory: `docs/licenses_inventory.md`.
 
 ## What Has Been Improved
 - Contract v2 metadata added and validated (`node_id`, `parent_id`, `source_span`, `grammatical_role`, dependency links, morphology features).
@@ -18,7 +20,12 @@ Authoritative contract reference: `docs/sample.json`.
 - Notes quality pipeline improved:
   - typed notes (`notes[{text, kind, confidence, source}]`) alongside legacy `linguistic_notes`
   - fallback notes strengthened
-  - validation trace fields added (`quality_flags`, `rejected_candidates`, `rejected_candidate_stats`, `reason_codes`)
+- validation trace fields added (`quality_flags`, `rejected_candidates`, `rejected_candidate_stats`, `reason_codes`)
+- Translation rollout completed:
+  - sentence/node translation payloads
+  - source-span/ref-node aware node translation projection
+  - strict translation contract validation in `v2_strict`
+  - translation quality regression suite (`ela_pipeline.inference.translation_quality_control`)
 - Dual validation modes implemented:
   - `v1` (backward-compatible)
   - `v2_strict` (core v2 fields required)
@@ -33,6 +40,7 @@ Each node always keeps required contract fields and may include optional v2 fiel
 - `features` (normalized morphology)
 - `notes` (typed note objects)
 - trace fields for note-generation quality
+- `translation` payloads (sentence + optional node level)
 
 ## Quick Start
 
@@ -45,17 +53,17 @@ pip install -r requirements.txt
 
 ### 2) Run tests
 ```bash
-python -m unittest discover -s tests -v
+.venv/bin/python -m unittest discover -s tests -v
 ```
 
 ### 3) Inference without generator
 ```bash
-python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision."
+.venv/bin/python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision."
 ```
 
 ### 4) Inference with local model
 ```bash
-python -m ela_pipeline.inference.run \
+.venv/bin/python -m ela_pipeline.inference.run \
   --text "The young scientist in the white coat carefully examined the strange artifact on the table." \
   --model-dir results_llm_notes_v3_t5-small_phrase/best_model
 ```
@@ -64,24 +72,41 @@ python -m ela_pipeline.inference.run \
 
 ### 5) Legacy v1 compatibility mode (optional)
 ```bash
-python -m ela_pipeline.inference.run \
+.venv/bin/python -m ela_pipeline.inference.run \
   --text "She should have trusted her instincts before making the decision." \
   --model-dir results_llm_notes_v3_t5-small_phrase/best_model \
   --validation-mode v1
+```
+
+### 6) Prepare local translation model (one-time)
+```bash
+.venv/bin/python -m ela_pipeline.translate.prepare_m2m100
+```
+
+Model files are saved into `artifacts/models/m2m100_418M`. When this path exists, inference uses it automatically for default translation settings.
+
+### 7) Inference with translation (EN->RU)
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --translate \
+  --translation-provider m2m100 \
+  --translation-source-lang en \
+  --translation-target-lang ru
 ```
 
 ## Main Commands
 
 ### Build dataset splits
 ```bash
-python -m ela_pipeline.dataset.build_dataset \
+.venv/bin/python -m ela_pipeline.dataset.build_dataset \
   --input linguistic_hierarchical_3000_v3.json \
   --output-dir data/processed
 ```
 
 ### Train local generator
 ```bash
-python -m ela_pipeline.training.train_generator \
+.venv/bin/python -m ela_pipeline.training.train_generator \
   --train data/processed/train.jsonl \
   --dev data/processed/dev.jsonl \
   --output-dir artifacts/models/t5_notes
@@ -89,13 +114,23 @@ python -m ela_pipeline.training.train_generator \
 
 ### Build skeleton and apply TAM from JSONL
 ```bash
-python -m ela_pipeline.build_skeleton --input input.jsonl --output skeleton.jsonl
-python -m ela_pipeline.run_tam --input skeleton.jsonl --output tam.jsonl
+.venv/bin/python -m ela_pipeline.build_skeleton --input input.jsonl --output skeleton.jsonl
+.venv/bin/python -m ela_pipeline.run_tam --input skeleton.jsonl --output tam.jsonl
+```
+
+### Run translation quality regression (EN->RU)
+```bash
+.venv/bin/python -m ela_pipeline.inference.translation_quality_control \
+  --source-lang en \
+  --target-lang ru \
+  --translation-provider m2m100 \
+  --translate-nodes
 ```
 
 ## Documentation
 - Full documentation: `docs/ela_pipeline_full_documentation.md`
 - CLI usage: `docs/pipeline_cli.md`
+- License inventory: `docs/licenses_inventory.md`
 - Implementation proposal: `docs/implementation_proposal.md`
 - Progress TODO: `docs/TODO.md`
 - Curator summary report: `docs/curator_progress_report.md`
