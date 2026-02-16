@@ -50,6 +50,17 @@ def _walk_nodes(node: dict):
             yield from _walk_nodes(child)
 
 
+def _node_source_text(node: dict, sentence_text: str) -> str:
+    span = node.get("source_span")
+    if isinstance(span, dict):
+        start = span.get("start")
+        end = span.get("end")
+        if isinstance(start, int) and isinstance(end, int):
+            if 0 <= start <= end <= len(sentence_text):
+                return sentence_text[start:end]
+    return str(node.get("content") or "")
+
+
 def _attach_translation(
     doc: dict,
     translator: Any,
@@ -73,14 +84,39 @@ def _attach_translation(
         if not include_node_translations:
             continue
 
-        for node in _walk_nodes(sentence_node):
-            content = str(node.get("content") or "")
-            translated = translator.translate_text(content, source_lang=source_lang, target_lang=target_lang)
+        translated_by_node_id: dict[str, str] = {}
+        translated_by_source_key: dict[str, str] = {}
+
+        def translate_node(node: dict) -> None:
+            node_id = node.get("node_id")
+            ref_node_id = node.get("ref_node_id")
+
+            if isinstance(ref_node_id, str) and ref_node_id in translated_by_node_id:
+                translated = translated_by_node_id[ref_node_id]
+            else:
+                source_text = _node_source_text(node, sentence_text)
+                source_key = source_text.strip()
+                if source_key in translated_by_source_key:
+                    translated = translated_by_source_key[source_key]
+                else:
+                    translated = translator.translate_text(source_text, source_lang=source_lang, target_lang=target_lang)
+                    translated_by_source_key[source_key] = translated
+
             node["translation"] = {
                 "source_lang": source_lang,
                 "target_lang": target_lang,
                 "text": translated,
             }
+            if isinstance(node_id, str):
+                translated_by_node_id[node_id] = translated
+
+            for child in node.get("linguistic_elements", []) or []:
+                if isinstance(child, dict):
+                    translate_node(child)
+
+        for child in sentence_node.get("linguistic_elements", []) or []:
+            if isinstance(child, dict):
+                translate_node(child)
 
 
 def run_pipeline(

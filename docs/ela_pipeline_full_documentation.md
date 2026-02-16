@@ -129,6 +129,10 @@ If `--model-dir` is omitted:
 - Current output fields:
   - sentence-level `translation`: `{source_lang, target_lang, model, text}`
   - node-level `translation`: `{source_lang, target_lang, text}` (when node translation is enabled)
+- Node translation strategy:
+  - prefer `source_span` projection from sentence text over free node content translation,
+  - reuse canonical translation via `ref_node_id`,
+  - deduplicate calls for identical source spans/text within sentence.
 
 ## 5. CLI Usage
 

@@ -237,6 +237,6 @@
 - [x] Add multilingual translation stage scaffold in inference pipeline with provider interface.
 - [x] Integrate `m2m100` provider (`facebook/m2m100_418M`, MIT) with CLI controls (`--translate`, source/target language, device).
 - [x] Emit translation payload into output JSON at sentence level and optional node level.
-- [ ] Add alignment-aware phrase/word translation projection (instead of independent node translation).
+- [x] Add alignment-aware phrase/word translation projection (source-span/ref-node based, with deduplicated translation calls).
 - [ ] Add translation quality regression suite (EN->RU first, then extend language pairs).
 - [ ] Add translation-field validation contract in strict mode.

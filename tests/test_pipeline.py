@@ -13,14 +13,24 @@ class PipelineTests(unittest.TestCase):
             "She trusted him.": {
                 "type": "Sentence",
                 "content": "She trusted him.",
+                "source_span": {"start": 0, "end": 15},
                 "linguistic_elements": [
                     {
                         "type": "Phrase",
                         "content": "trusted him",
+                        "source_span": {"start": 4, "end": 15},
                         "linguistic_elements": [
                             {
                                 "type": "Word",
                                 "content": "trusted",
+                                "source_span": {"start": 4, "end": 11},
+                                "linguistic_elements": [],
+                            },
+                            {
+                                "type": "Word",
+                                "content": "trusted",
+                                "source_span": {"start": 4, "end": 11},
+                                "ref_node_id": "n_word_1",
                                 "linguistic_elements": [],
                             }
                         ],
@@ -28,12 +38,19 @@ class PipelineTests(unittest.TestCase):
                 ],
             }
         }
+        doc["She trusted him."]["node_id"] = "n_sentence"
+        phrase = doc["She trusted him."]["linguistic_elements"][0]
+        phrase["node_id"] = "n_phrase_1"
+        phrase["linguistic_elements"][0]["node_id"] = "n_word_1"
+        phrase["linguistic_elements"][1]["node_id"] = "n_word_2"
 
         class FakeTranslator:
             model_name = "fake-model"
+            calls = []
 
-            @staticmethod
-            def translate_text(text: str, source_lang: str, target_lang: str) -> str:
+            @classmethod
+            def translate_text(cls, text: str, source_lang: str, target_lang: str) -> str:
+                cls.calls.append(text)
                 return f"{target_lang}:{text}"
 
         _attach_translation(
@@ -48,8 +65,49 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(sentence["translation"]["text"], "ru:She trusted him.")
         phrase = sentence["linguistic_elements"][0]
         word = phrase["linguistic_elements"][0]
+        dup_word = phrase["linguistic_elements"][1]
         self.assertEqual(phrase["translation"]["text"], "ru:trusted him")
         self.assertEqual(word["translation"]["text"], "ru:trusted")
+        self.assertEqual(dup_word["translation"]["text"], "ru:trusted")
+
+        self.assertEqual(
+            FakeTranslator.calls.count("trusted"),
+            1,
+            msg=f"Expected one translation call for duplicate span/ref node, got {FakeTranslator.calls}",
+        )
+
+    def test_attach_translation_prefers_source_span_over_content(self):
+        doc = {
+            "He, however, left.": {
+                "type": "Sentence",
+                "node_id": "s1",
+                "content": "He, however, left.",
+                "source_span": {"start": 0, "end": 17},
+                "linguistic_elements": [
+                    {
+                        "type": "Phrase",
+                        "node_id": "p1",
+                        "content": "however",
+                        "source_span": {"start": 4, "end": 11},
+                        "linguistic_elements": [],
+                    }
+                ],
+            }
+        }
+
+        class CaptureTranslator:
+            model_name = "fake-model"
+            calls = []
+
+            @classmethod
+            def translate_text(cls, text: str, source_lang: str, target_lang: str) -> str:
+                cls.calls.append(text)
+                return text
+
+        _attach_translation(doc, CaptureTranslator(), "en", "ru", include_node_translations=True)
+        # sentence + phrase span
+        self.assertIn("He, however, left.", CaptureTranslator.calls)
+        self.assertIn("however", CaptureTranslator.calls)
 
     def test_backoff_flag_added_for_non_l1_levels(self):
         flags = LocalT5Annotator._with_backoff_flag(
