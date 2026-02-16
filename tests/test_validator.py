@@ -266,6 +266,35 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
+    def test_accepts_valid_optional_phonetic_fields(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["phonetic"] = {
+            "uk": "ʃi ʃʊd hæv ˈtrʌstɪd",
+            "us": "ʃi ʃʊd hæv ˈtrʌstɪd",
+        }
+        first_word = sentence["linguistic_elements"][0]["linguistic_elements"][0]
+        first_word["phonetic"] = {"uk": "ʃʊd", "us": "ʃʊd"}
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertTrue(result.ok, msg=str(result.errors))
+
+    def test_rejects_invalid_optional_phonetic_fields(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["phonetic"] = {"uk": "", "us": None}
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any(".phonetic." in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
     def test_rejects_missing_sentence_translation_model_in_v2_strict(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)

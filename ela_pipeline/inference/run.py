@@ -121,6 +121,61 @@ def _attach_translation(
                 translate_node(child)
 
 
+def _attach_phonetic(
+    doc: dict,
+    transcriber: Any,
+    include_node_phonetic: bool = True,
+) -> None:
+    for sentence_node in doc.values():
+        if not isinstance(sentence_node, dict):
+            continue
+
+        sentence_text = str(sentence_node.get("content") or "")
+        sentence_node["phonetic"] = {
+            "uk": transcriber.transcribe_text(sentence_text, accent="uk"),
+            "us": transcriber.transcribe_text(sentence_text, accent="us"),
+        }
+
+        if not include_node_phonetic:
+            continue
+
+        phonetic_by_node_id: dict[str, dict[str, str]] = {}
+        phonetic_by_source_key: dict[str, dict[str, str]] = {}
+
+        def transcribe_node(node: dict) -> None:
+            node_id = node.get("node_id")
+            ref_node_id = node.get("ref_node_id")
+
+            if isinstance(ref_node_id, str) and ref_node_id in phonetic_by_node_id:
+                node_phonetic = phonetic_by_node_id[ref_node_id]
+            else:
+                source_text = _node_source_text(node, sentence_text)
+                source_key = source_text.strip()
+                if source_key in phonetic_by_source_key:
+                    node_phonetic = phonetic_by_source_key[source_key]
+                else:
+                    node_phonetic = {
+                        "uk": transcriber.transcribe_text(source_text, accent="uk"),
+                        "us": transcriber.transcribe_text(source_text, accent="us"),
+                    }
+                    phonetic_by_source_key[source_key] = node_phonetic
+
+            node["phonetic"] = {
+                "uk": node_phonetic["uk"],
+                "us": node_phonetic["us"],
+            }
+            if isinstance(node_id, str):
+                phonetic_by_node_id[node_id] = node_phonetic
+
+            for child in node.get("linguistic_elements", []) or []:
+                if isinstance(child, dict):
+                    transcribe_node(child)
+
+        for child in sentence_node.get("linguistic_elements", []) or []:
+            if isinstance(child, dict):
+                transcribe_node(child)
+
+
 def _enforce_linguistic_elements_last(doc: dict) -> None:
     def reorder_node(node: dict) -> None:
         children = node.get("linguistic_elements", [])
@@ -160,6 +215,10 @@ def run_pipeline(
     translation_target_lang: str = "ru",
     translation_device: str = "auto",
     translate_nodes: bool = True,
+    enable_phonetic: bool = False,
+    phonetic_provider: str = "espeak",
+    phonetic_binary: str = "auto",
+    phonetic_nodes: bool = True,
 ) -> dict:
     nlp = load_nlp(spacy_model)
 
@@ -197,6 +256,18 @@ def run_pipeline(
             source_lang=translation_source_lang,
             target_lang=translation_target_lang,
             include_node_translations=translate_nodes,
+        )
+
+    if enable_phonetic:
+        if phonetic_provider != "espeak":
+            raise ValueError("phonetic_provider must be 'espeak'")
+        from ela_pipeline.phonetic import EspeakPhoneticTranscriber
+
+        transcriber = EspeakPhoneticTranscriber(binary=phonetic_binary)
+        _attach_phonetic(
+            enriched,
+            transcriber=transcriber,
+            include_node_phonetic=phonetic_nodes,
         )
 
     raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
@@ -250,6 +321,24 @@ def main() -> None:
         action="store_true",
         help="Translate sentence only (skip phrase/word node content translation).",
     )
+    parser.add_argument("--phonetic", action="store_true", help="Enable phonetic transcription enrichment (UK/US).")
+    parser.add_argument(
+        "--phonetic-provider",
+        default="espeak",
+        choices=["espeak"],
+        help="Phonetic backend provider (extensible).",
+    )
+    parser.add_argument(
+        "--phonetic-binary",
+        default="auto",
+        choices=["auto", "espeak", "espeak-ng"],
+        help="Binary resolver for phonetic backend.",
+    )
+    parser.add_argument(
+        "--no-phonetic-nodes",
+        action="store_true",
+        help="Attach phonetic field to sentence only (skip phrase/word node phonetics).",
+    )
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
@@ -267,6 +356,10 @@ def main() -> None:
         translation_target_lang=args.translation_target_lang,
         translation_device=args.translation_device,
         translate_nodes=not args.no_translate_nodes,
+        enable_phonetic=args.phonetic,
+        phonetic_provider=args.phonetic_provider,
+        phonetic_binary=args.phonetic_binary,
+        phonetic_nodes=not args.no_phonetic_nodes,
     )
 
     out_path = args.output

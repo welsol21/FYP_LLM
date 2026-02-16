@@ -55,3 +55,21 @@ This includes tracked licenses for UD/OANC/Tatoeba/Wikinews and ingestion proven
   1. add license type,
   2. add source URL,
   3. note usage context in this repository.
+
+## 6) GPL Components Policy (phonetics track)
+
+Planned phonetic stack candidates discussed for UK/US transcription:
+- `espeak-ng` (GPL-3.0-or-later)
+- `phonemizer` (GPL-3.0)
+
+Commercial deployment policy for GPL components in this project:
+- Allowed by default: backend-only/SaaS execution where users receive only API/JSON results.
+- Legal review required before release: any customer-distributed artifacts (on-prem package, Docker image, desktop bundle, embedded appliance).
+- Mandatory before enabling a GPL-backed feature in production:
+  1. record component/version/license/source here,
+  2. mark deployment mode (`backend-only` vs `distributed`) in release notes,
+  3. pass legal/compliance gate for distributed deployments.
+
+Implementation note:
+- Output data (for example, phonetic strings inside our JSON contract) is treated as service output.
+- This does not replace legal advice; enterprise/on-prem release must include formal legal review.

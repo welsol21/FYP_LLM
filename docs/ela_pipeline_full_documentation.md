@@ -146,6 +146,17 @@ If `--model-dir` is omitted:
   - reuse canonical translation via `ref_node_id`,
   - deduplicate calls for identical source spans/text within sentence.
 
+### 4.6 Phonetic Enrichment (`ela_pipeline/phonetic/engine.py`)
+- Optional runtime stage behind CLI flag `--phonetic`.
+- Current provider: `espeak` wrapper (`espeak-ng`/`espeak` binary in PATH).
+- Ubuntu install example: `sudo apt-get update && sudo apt-get install -y --no-install-recommends espeak-ng`.
+- Output field:
+  - `phonetic`: `{uk, us}` on sentence and (optionally) node levels.
+- Node phonetic strategy:
+  - prefer `source_span` projection from sentence text over free node content,
+  - reuse canonical phonetic entry via `ref_node_id`,
+  - deduplicate calls for identical source spans/text within sentence.
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset
@@ -187,6 +198,23 @@ python -m ela_pipeline.annotate.llm_annotator --input docs/sample.json --output 
 One-time local model preparation:
 ```bash
 .venv/bin/python -m ela_pipeline.translate.prepare_m2m100
+```
+
+### 5.7 Phonetic inference (UK/US)
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --phonetic \
+  --phonetic-provider espeak \
+  --phonetic-binary auto
+```
+
+### 5.8 Phonetic quality regression
+```bash
+.venv/bin/python -m ela_pipeline.inference.phonetic_quality_control \
+  --phonetic-provider espeak \
+  --phonetic-binary auto \
+  --phonetic-nodes
 ```
 
 ## 6. Testing

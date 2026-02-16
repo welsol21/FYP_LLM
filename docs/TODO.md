@@ -4,6 +4,12 @@
 
 - [x] Use project virtualenv for all commands: prefer `.venv/bin/python -m ...` (or `.venv/bin/pip ...`), avoid plain `python`.
 
+## License Compliance Workflow
+
+- [x] Define GPL policy for planned phonetics stack in `docs/licenses_inventory.md` (backend-only allowed, distributed delivery requires legal gate).
+- [ ] Add pre-merge checklist item: every new dependency/model must include license entry + deployment mode note.
+- [ ] Add release checklist item: block on-prem/distributed releases until license-compliance review is marked passed.
+
 ## Contract v2 Improvements
 
 - [x] Enforce phrase length constraints:
@@ -246,6 +252,25 @@
 - [x] Add alignment-aware phrase/word translation projection (source-span/ref-node based, with deduplicated translation calls).
 - [x] Add translation quality regression suite (EN->RU first, then extend language pairs).
 - [x] Add translation-field validation contract in strict mode.
+
+## Phonetic Transcription Rollout (EN, UK/US)
+
+- [x] Define contract extension for phonetics on all node levels (`Sentence`, `Phrase`, `Word`):
+  - [x] `phonetic.uk` (IPA-like UK pronunciation)
+  - [x] `phonetic.us` (IPA-like US pronunciation)
+  - [x] Keep `linguistic_elements` as the final field after phonetic enrichment.
+- [x] Add CLI controls for optional phonetic enrichment (`--phonetic`, provider/binary, node toggle).
+- [x] Introduce phonetic provider interface and first implementation for EN UK/US output.
+- [x] Add source-span/ref-node aware deduplication for phonetic generation (reuse by `ref_node_id` and normalized text).
+- [x] Add strict validator rules for `phonetic` fields in `v2_strict` (shape/types/non-empty constraints).
+- [x] Add TDD regression tests:
+  - [x] sentence/phrase/word phonetic payload presence,
+  - [x] UK/US pair consistency,
+  - [x] dedup behavior for duplicate spans/ref nodes,
+  - [x] serialization order invariant (`linguistic_elements` last).
+- [x] Add phonetic quality-control script/report (smoke set + structural checks).
+- [x] Document phonetic stage in sample contract (`docs/sample.json`).
+- [ ] Add final license gate before production enablement of chosen phonetic backend (per `docs/licenses_inventory.md`).
 
 ## DB Persistence (Deferred, Postgres-only)
 

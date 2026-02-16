@@ -249,6 +249,20 @@ def _validate_optional_translation(
         )
 
 
+def _validate_optional_phonetic(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "phonetic" not in node:
+        return
+    ph = node.get("phonetic")
+    _expect(isinstance(ph, dict), errors, f"{path}.phonetic", "phonetic must be object")
+    if not isinstance(ph, dict):
+        return
+    for key in ("uk", "us"):
+        value = ph.get(key)
+        _expect(isinstance(value, str), errors, f"{path}.phonetic.{key}", f"{key} must be string")
+        if isinstance(value, str):
+            _expect(value.strip() != "", errors, f"{path}.phonetic.{key}", f"{key} must be non-empty")
+
+
 def _validate_optional_trace_fields(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
     for field in ("quality_flags", "rejected_candidates", "reason_codes"):
         if field not in node:
@@ -670,6 +684,7 @@ def _validate_node(
     _validate_optional_features(node, path, errors, validation_mode)
     _validate_optional_notes(node, path, errors)
     _validate_optional_translation(node, path, errors, validation_mode)
+    _validate_optional_phonetic(node, path, errors)
     _validate_optional_trace_fields(node, path, errors)
     _validate_optional_template_selection(node, path, errors)
     _validate_optional_backoff_in_subtree(node, path, errors)

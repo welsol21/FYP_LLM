@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from ela_pipeline.annotate.local_generator import LocalT5Annotator
 from ela_pipeline.inference.run import (
+    _attach_phonetic,
     _attach_translation,
     _resolve_translation_model_name,
     run_pipeline,
@@ -123,6 +124,66 @@ class PipelineTests(unittest.TestCase):
         # sentence + phrase span
         self.assertIn("He, however, left.", CaptureTranslator.calls)
         self.assertIn("however", CaptureTranslator.calls)
+
+    def test_attach_phonetic_enriches_sentence_and_nodes_with_dedup(self):
+        doc = {
+            "She trusted him.": {
+                "type": "Sentence",
+                "content": "She trusted him.",
+                "source_span": {"start": 0, "end": 15},
+                "linguistic_elements": [
+                    {
+                        "type": "Phrase",
+                        "content": "trusted him",
+                        "source_span": {"start": 4, "end": 15},
+                        "linguistic_elements": [
+                            {
+                                "type": "Word",
+                                "content": "trusted",
+                                "source_span": {"start": 4, "end": 11},
+                                "linguistic_elements": [],
+                            },
+                            {
+                                "type": "Word",
+                                "content": "trusted",
+                                "source_span": {"start": 4, "end": 11},
+                                "ref_node_id": "n_word_1",
+                                "linguistic_elements": [],
+                            },
+                        ],
+                    }
+                ],
+            }
+        }
+        doc["She trusted him."]["node_id"] = "n_sentence"
+        phrase = doc["She trusted him."]["linguistic_elements"][0]
+        phrase["node_id"] = "n_phrase_1"
+        phrase["linguistic_elements"][0]["node_id"] = "n_word_1"
+        phrase["linguistic_elements"][1]["node_id"] = "n_word_2"
+
+        class FakePhonetic:
+            calls = []
+
+            @classmethod
+            def transcribe_text(cls, text: str, accent: str) -> str:
+                cls.calls.append((text, accent))
+                return f"{accent}:{text}"
+
+        _attach_phonetic(doc, transcriber=FakePhonetic(), include_node_phonetic=True)
+
+        sentence = doc["She trusted him."]
+        self.assertEqual(sentence["phonetic"]["uk"], "uk:She trusted him.")
+        self.assertEqual(sentence["phonetic"]["us"], "us:She trusted him.")
+        phrase = sentence["linguistic_elements"][0]
+        word = phrase["linguistic_elements"][0]
+        dup_word = phrase["linguistic_elements"][1]
+        self.assertEqual(phrase["phonetic"]["uk"], "uk:trusted him")
+        self.assertEqual(word["phonetic"]["uk"], "uk:trusted")
+        self.assertEqual(dup_word["phonetic"]["uk"], "uk:trusted")
+        trusted_uk_calls = [c for c in FakePhonetic.calls if c == ("trusted", "uk")]
+        trusted_us_calls = [c for c in FakePhonetic.calls if c == ("trusted", "us")]
+        self.assertEqual(len(trusted_uk_calls), 1)
+        self.assertEqual(len(trusted_us_calls), 1)
 
     def test_backoff_flag_added_for_non_l1_levels(self):
         flags = LocalT5Annotator._with_backoff_flag(

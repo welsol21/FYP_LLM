@@ -129,6 +129,36 @@ Translation quality regression suite (EN->RU default):
   --translate-nodes
 ```
 
+Optional phonetic enrichment (EN UK/US; backend `espeak`):
+System prerequisite (Ubuntu):
+```bash
+sudo apt-get update && sudo apt-get install -y --no-install-recommends espeak-ng
+```
+
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --phonetic \
+  --phonetic-provider espeak \
+  --phonetic-binary auto
+```
+
+Sentence-only phonetics:
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --phonetic \
+  --no-phonetic-nodes
+```
+
+Phonetic quality regression suite (UK/US structure checks):
+```bash
+.venv/bin/python -m ela_pipeline.inference.phonetic_quality_control \
+  --phonetic-provider espeak \
+  --phonetic-binary auto \
+  --phonetic-nodes
+```
+
 `v2_strict` is now the default mode.
 Legacy compatibility mode (`v1`) is still available only when explicitly requested:
 

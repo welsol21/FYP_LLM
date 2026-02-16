@@ -6,6 +6,7 @@ This project converts English text into a validated hierarchical linguistic JSON
 - deterministic parsing and rule-based enrichment
 - optional local T5 note generation
 - optional multilingual translation enrichment (current provider: `m2m100`, EN->RU first)
+- optional phonetic enrichment (UK/US transcription via `espeak` backend)
 - strict validation and frozen-structure checks
 
 Authoritative contract reference: `docs/sample.json`.
@@ -41,6 +42,7 @@ Each node always keeps required contract fields and may include optional v2 fiel
 - `notes` (typed note objects)
 - trace fields for note-generation quality
 - `translation` payloads (sentence + optional node level)
+- `phonetic` payloads (sentence + optional node level): `{uk, us}`
 
 ## Quick Start
 
@@ -93,6 +95,36 @@ Model files are saved into `artifacts/models/m2m100_418M`. When this path exists
   --translation-provider m2m100 \
   --translation-source-lang en \
   --translation-target-lang ru
+```
+
+### 8) Inference with phonetic transcription (EN UK/US)
+Requires `espeak-ng` or `espeak` available in PATH.
+Ubuntu quick install:
+```bash
+sudo apt-get update && sudo apt-get install -y --no-install-recommends espeak-ng
+```
+
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --phonetic \
+  --phonetic-provider espeak
+```
+
+Sentence-only phonetics:
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --phonetic \
+  --no-phonetic-nodes
+```
+
+### 9) Run phonetic quality regression (EN UK/US)
+```bash
+.venv/bin/python -m ela_pipeline.inference.phonetic_quality_control \
+  --phonetic-provider espeak \
+  --phonetic-binary auto \
+  --phonetic-nodes
 ```
 
 ## Main Commands
