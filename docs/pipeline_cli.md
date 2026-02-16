@@ -113,6 +113,16 @@ Sentence-only translation (skip phrase/word node translations):
 python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --translate --no-translate-nodes
 ```
 
+Translation quality regression suite (EN->RU default):
+```bash
+python -m ela_pipeline.inference.translation_quality_control \
+  --source-lang en \
+  --target-lang ru \
+  --translation-provider m2m100 \
+  --translation-model facebook/m2m100_418M \
+  --translate-nodes
+```
+
 `v2_strict` is now the default mode.
 Legacy compatibility mode (`v1`) is still available only when explicitly requested:
 
