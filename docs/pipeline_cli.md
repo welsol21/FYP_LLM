@@ -158,6 +158,8 @@ Framework-agnostic JSON API for frontend integration:
 .venv/bin/python -m ela_pipeline.runtime.client_api --db-path artifacts/client_state.sqlite3 backend-jobs
 .venv/bin/python -m ela_pipeline.runtime.client_api --db-path artifacts/client_state.sqlite3 queue-missing-content --source-text "New sentence not in shared corpus."
 .venv/bin/python -m ela_pipeline.runtime.client_api --db-path artifacts/client_state.sqlite3 sync-queue
+.venv/bin/python -m ela_pipeline.runtime.client_api --db-path artifacts/client_state.sqlite3 visualizer-payload --input-json inference_results/pipeline_result_latest.json
+.venv/bin/python -m ela_pipeline.runtime.client_api --db-path artifacts/client_state.sqlite3 apply-edit --input-json inference_results/pipeline_result_latest.json --output-json inference_results/pipeline_result_edited.json --sentence-text "She trusted him." --node-id p1 --field-path notes[0].text --new-value-json "\"Updated note\""
 ```
 
 Optional multilingual translation enrichment (first pair: EN->RU, provider `m2m100`):

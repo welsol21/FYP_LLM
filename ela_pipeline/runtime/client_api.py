@@ -6,6 +6,10 @@ import argparse
 import json
 from pathlib import Path
 
+from ela_pipeline.legacy_bridge import (
+    apply_node_edit,
+    build_visualizer_payload_for_document,
+)
 from .service import RuntimeMediaService
 from .sync_service import SyncService
 
@@ -41,6 +45,17 @@ def main() -> None:
 
     sync_list = sub.add_parser("sync-queue", help="List sync queue.")
     sync_list.add_argument("--limit", type=int, default=None)
+
+    viz_payload = sub.add_parser("visualizer-payload", help="Build visualizer payload from contract JSON file.")
+    viz_payload.add_argument("--input-json", required=True)
+
+    apply_edit = sub.add_parser("apply-edit", help="Apply node edit to contract JSON and save output.")
+    apply_edit.add_argument("--input-json", required=True)
+    apply_edit.add_argument("--output-json", required=True)
+    apply_edit.add_argument("--sentence-text", required=True)
+    apply_edit.add_argument("--node-id", required=True)
+    apply_edit.add_argument("--field-path", required=True)
+    apply_edit.add_argument("--new-value-json", required=True, help="JSON literal for new value.")
 
     args = parser.parse_args()
     db_path = Path(args.db_path)
@@ -81,6 +96,28 @@ def main() -> None:
 
     if args.cmd == "sync-queue":
         _print_json(sync_service.list_queued(limit=args.limit))
+        return
+
+    if args.cmd == "visualizer-payload":
+        with open(args.input_json, "r", encoding="utf-8") as f:
+            doc = json.load(f)
+        _print_json(build_visualizer_payload_for_document(doc))
+        return
+
+    if args.cmd == "apply-edit":
+        with open(args.input_json, "r", encoding="utf-8") as f:
+            doc = json.load(f)
+        new_value = json.loads(args.new_value_json)
+        updated = apply_node_edit(
+            doc,
+            sentence_text=args.sentence_text,
+            node_id=args.node_id,
+            field_path=args.field_path,
+            new_value=new_value,
+        )
+        with open(args.output_json, "w", encoding="utf-8") as f:
+            json.dump(updated, f, ensure_ascii=False, indent=2)
+        _print_json({"status": "ok", "output_json": args.output_json})
         return
 
     raise RuntimeError(f"Unknown command: {args.cmd}")

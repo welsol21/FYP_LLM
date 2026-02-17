@@ -392,6 +392,8 @@ Simple usage pattern:
   - `backend-jobs`
   - `queue-missing-content`
   - `sync-queue`
+  - `visualizer-payload` (build UI tree payload from contract JSON)
+  - `apply-edit` (apply node patch and save edited JSON)
 - Benefit:
   - frontend can integrate quickly without reimplementing runtime rules in UI code.
 
