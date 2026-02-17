@@ -3,6 +3,9 @@
 Last updated: 2026-02-16  
 Scope: runtime/training tooling used in this repository, selected model assets, and data-source policy docs.
 
+Operational checklists:
+- `docs/license_compliance_checklists.md` (pre-merge and release gates)
+
 ## 1) Selected model policy
 
 - Translation model (approved): `facebook/m2m100_418M`

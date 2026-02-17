@@ -7,8 +7,9 @@
 ## License Compliance Workflow
 
 - [x] Define GPL policy for planned phonetics stack in `docs/licenses_inventory.md` (backend-only allowed, distributed delivery requires legal gate).
-- [ ] Add pre-merge checklist item: every new dependency/model must include license entry + deployment mode note.
-- [ ] Add release checklist item: block on-prem/distributed releases until license-compliance review is marked passed.
+- [x] Add pre-merge checklist item: every new dependency/model must include license entry + deployment mode note.
+- [x] Add release checklist item: block on-prem/distributed releases until license-compliance review is marked passed.
+  - [x] Checklists documented in `docs/license_compliance_checklists.md`.
 
 ## Contract v2 Improvements
 
@@ -299,7 +300,8 @@
 - [x] Extend corpus dataset builder with CEFR mode (`ela_pipeline.dataset.build_dataset --task cefr_level`) to rebuild train/dev/test from CEFR-annotated hierarchical corpus.
 - [x] Rebuild CEFR dataset splits from updated corpus (`data/processed_cefr*`) through the standard dataset pipeline.
 - [x] Add CEFR quality-control script (coverage + class distribution + sanity checks).
-- [ ] Publish CEFR quality-control report artifact in `docs/reports/`.
+- [x] Publish CEFR quality-control report artifact in `docs/reports/`.
+  - [x] `docs/reports/cefr_qc_2026-02-17_13-30-05.json` (T5 provider, anomaly_rate=0.0).
 - [x] Add TDD regression tests for CEFR stage (sentence/phrase/word, ordering invariants, deterministic behavior).
 - [x] Document CEFR stage in README/CLI/full docs/sample contract.
 
@@ -326,3 +328,13 @@
   - [ ] `translation_literary` (baseline from `m2m100`)
   - [ ] `translation_idiomatic` (rule-based rewrite layer with literary fallback)
   - [ ] Keep both as top-level sibling fields per node (no nested alternatives array).
+
+## Human-in-the-Loop Corrections (Planned)
+
+- [ ] Add editable-review schema for key fields in contract (`notes`, `translation`, `phonetic`, `synonyms`, `cefr_level`, critical grammar tags).
+- [ ] Add reviewer metadata model (`reviewed_by`, `reviewed_at`, `change_reason`, `confidence`) on every manual correction.
+- [ ] Implement diff logger that stores `before/after` for every corrected node field.
+- [ ] Build correction export pipeline: accepted edits -> normalized feedback dataset (JSONL) for retraining.
+- [ ] Add dataset quality gates for human-feedback export (dedup, invalid-label filter, license/provenance consistency).
+- [ ] Add training pipeline mode to mix base corpus + human-feedback dataset with configurable weighting.
+- [ ] Add regression checks proving that model quality improves after feedback retraining and does not break contract validity.
