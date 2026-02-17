@@ -354,3 +354,26 @@
   - [x] Initial implementation in trainer CLI: `--feedback-train` + `--feedback-weight`.
 - [x] Add regression checks proving that model quality improves after feedback retraining and does not break contract validity.
   - [x] Added gate CLI: `ela_pipeline.training.feedback_regression` (compares train metrics + inference QC and fails on degradation).
+
+## Next Stage: Productization (Client-First, Offline-First)
+
+- [x] Fix and document next-stage product scope in `docs/next_stage_product_spec_2026-02-17.md`.
+- [x] Fix legacy feature source mapping (`feature -> source project -> source files`) in `docs/legacy_feature_source_map_2026-02-17.md`.
+- [ ] Reuse ELA `main_menu` UX as canonical navigation baseline (no full redesign from scratch).
+- [ ] Build frontend migration map screen-by-screen (`Projects -> Files -> Analyze -> Vocabulary`) and bind to current backend contracts.
+- [ ] Implement local client persistence (SQLite) for projects/files/local edits/workspace state.
+- [ ] Define and implement offline/online capability matrix in runtime + UI (feature flags and graceful degradation).
+- [ ] Enforce media routing policy:
+  - [ ] local processing for files <= 15 minutes,
+  - [ ] backend async job path for files > 15 minutes.
+- [ ] Add media file size limits for both paths (configurable env/runtime thresholds):
+  - [ ] reject local jobs above `MEDIA_MAX_SIZE_LOCAL_MB`,
+  - [ ] reject backend jobs above `MEDIA_MAX_SIZE_BACKEND_MB`,
+  - [ ] fail-fast validation message must include actual file duration/size and active limits.
+- [ ] Implement backend temporary media retention policy (TTL cleanup, no permanent storage of user final media).
+- [ ] Enforce minimal backend identity policy (phone-linked account only, no extra PII by default).
+- [ ] Add sync flow for user-submitted new content that is missing from shared corpus.
+- [ ] Keep a single unified output contract and add legacy format adapters at ingestion boundaries.
+- [ ] Integrate legacy visualizer and editor features into the new app flow (without model duplication).
+- [ ] Add explicit license-gated runtime switch for phonetics by deployment mode (offline/distributed/backend).
+- [ ] Update docs with end-user limitations in offline mode (phonetics unavailability and large-media delegation).

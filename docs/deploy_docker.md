@@ -19,7 +19,7 @@ Run the project in containers with stable service boundaries:
 cp .env.example .env
 ```
 
-Adjust `.env` values for production secrets and host port mapping.
+Adjust `.env` values for production secrets, host port mapping, and media thresholds if needed.
 
 Compose CLI requirement:
 - use Docker Compose v2 (`docker compose ...`).
@@ -29,6 +29,11 @@ CPU-only container profile:
 - Docker image installs `torch` from CPU index (`download.pytorch.org/whl/cpu`).
 - This prevents pulling NVIDIA CUDA wheel stacks during `docker compose build`.
 - Torch version is configurable via `.env`: `TORCH_VERSION=2.5.1`.
+
+Media limits (default profile):
+- `MEDIA_MAX_DURATION_MIN=15`
+- `MEDIA_MAX_SIZE_LOCAL_MB=250` (targeting ~15 min medium-quality source files)
+- `MEDIA_MAX_SIZE_BACKEND_MB=2048` (hard cap for backend async path)
 
 ## 2) Build and start
 
