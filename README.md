@@ -47,7 +47,8 @@ Each node always keeps required contract fields and may include optional v2 fiel
 - `translation` payloads (sentence + optional node level)
 - `phonetic` payloads (sentence + optional node level): `{uk, us}`
 - `synonyms` payloads (sentence + optional node level): `[string, ...]`
-  - synonym output applies context filters for function words and basic verb-form normalization.
+  - synonym output applies context filters for function words; empty list is valid for function-word nodes, while content words should keep non-empty synonym sets.
+  - basic verb-form normalization is applied for better contextual fit.
 - `cefr_level` payload (sentence + optional node level): one of `A1|A2|B1|B2|C1|C2`
 
 ## Quick Start
@@ -173,6 +174,15 @@ ML mode (requires model artifact):
   --cefr-model-path artifacts/models/t5_cefr/best_model
 ```
 Note: CEFR T5 inference follows GPU-only policy (CUDA required, no CPU fallback).
+
+### 12) Run CEFR quality regression
+```bash
+.venv/bin/python -m ela_pipeline.inference.cefr_quality_control \
+  --cefr-provider t5 \
+  --cefr-model-path artifacts/models/t5_cefr/best_model \
+  --cefr-nodes
+```
+If CUDA is unavailable, use `--cefr-provider rule` for a structural sanity pass.
 
 ## Main Commands
 

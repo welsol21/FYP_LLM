@@ -63,3 +63,40 @@ class EnrichmentQualityControlTests(unittest.TestCase):
         self.assertEqual(stats["node_fields"]["cefr_level"]["valid"], 2)
         self.assertEqual(stats["node_fields"]["cefr_level"]["invalid"], 1)
 
+    def test_synonyms_allows_empty_for_function_words_only(self):
+        result = {
+            "S.": {
+                "type": "Sentence",
+                "content": "S.",
+                "translation": {"source_lang": "en", "target_lang": "ru", "text": "S"},
+                "phonetic": {"uk": "s", "us": "s"},
+                "synonyms": [],
+                "cefr_level": "A1",
+                "linguistic_elements": [
+                    {
+                        "type": "Word",
+                        "content": "the",
+                        "part_of_speech": "article",
+                        "translation": {"source_lang": "en", "target_lang": "ru", "text": "the"},
+                        "phonetic": {"uk": "ðə", "us": "ðə"},
+                        "synonyms": [],
+                        "cefr_level": "A1",
+                        "linguistic_elements": [],
+                    },
+                    {
+                        "type": "Word",
+                        "content": "decision",
+                        "part_of_speech": "noun",
+                        "translation": {"source_lang": "en", "target_lang": "ru", "text": "decision"},
+                        "phonetic": {"uk": "d", "us": "d"},
+                        "synonyms": [],
+                        "cefr_level": "B1",
+                        "linguistic_elements": [],
+                    },
+                ],
+            }
+        }
+        stats = _extract_enrichment_probe_stats(result)
+        self.assertTrue(stats["sentence"]["synonyms_ok"])
+        self.assertEqual(stats["node_fields"]["synonyms"]["valid"], 1)
+        self.assertEqual(stats["node_fields"]["synonyms"]["invalid"], 1)

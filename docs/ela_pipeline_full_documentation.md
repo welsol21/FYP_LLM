@@ -170,7 +170,8 @@ If `--model-dir` is omitted:
   - prefer `source_span` projection from sentence text over free node content,
   - reuse canonical synonyms via `ref_node_id`,
   - deduplicate by normalized source text + POS and enforce `top_k` cap,
-  - return empty list for function POS (for example `auxiliary verb`, `article`, `preposition`) to avoid semantic noise,
+  - return empty list for function POS (for example `auxiliary verb`, `article`, `preposition`) to avoid semantic noise; this is a valid contract outcome,
+  - for content-word nodes (`noun|verb|adjective|adverb`), keep non-empty synonym lists (validator/QC enforced),
   - apply verb post-processing for context stability:
     - expand known phrasal heads (for example `bank` -> `bank on`),
     - inflect verb synonym head to node form for `past participle` contexts.
@@ -276,6 +277,15 @@ One-time local model preparation:
   --cefr \
   --cefr-provider rule
 ```
+
+### 5.11 CEFR quality regression
+```bash
+.venv/bin/python -m ela_pipeline.inference.cefr_quality_control \
+  --cefr-provider t5 \
+  --cefr-model-path artifacts/models/t5_cefr/best_model \
+  --cefr-nodes
+```
+If CUDA is unavailable, run the same command with `--cefr-provider rule` for deterministic sanity checks.
 
 ## 6. Testing
 Run in activated `.venv`:

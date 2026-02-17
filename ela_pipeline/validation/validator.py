@@ -271,6 +271,12 @@ def _validate_optional_synonyms(node: Dict[str, Any], path: str, errors: List[Va
     _expect(isinstance(synonyms, list), errors, f"{path}.synonyms", "synonyms must be list")
     if not isinstance(synonyms, list):
         return
+
+    pos = str(node.get("part_of_speech") or "").strip().lower()
+    is_content_word = str(node.get("type") or "").strip() == "Word" and pos in {"noun", "verb", "adjective", "adverb"}
+    if is_content_word:
+        _expect(len(synonyms) > 0, errors, f"{path}.synonyms", "content words must have non-empty synonyms")
+
     seen: set[str] = set()
     for idx, value in enumerate(synonyms):
         item_path = f"{path}.synonyms[{idx}]"

@@ -321,6 +321,34 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
+    def test_accepts_empty_synonyms_for_function_word(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        first_word = sentence["linguistic_elements"][0]["linguistic_elements"][0]
+        first_word["part_of_speech"] = "auxiliary verb"
+        first_word["synonyms"] = []
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertTrue(result.ok, msg=str(result.errors))
+
+    def test_rejects_empty_synonyms_for_content_word(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        first_word = sentence["linguistic_elements"][0]["linguistic_elements"][0]
+        first_word["part_of_speech"] = "verb"
+        first_word["synonyms"] = []
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any(".synonyms" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
     def test_accepts_valid_optional_cefr_level_fields(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)

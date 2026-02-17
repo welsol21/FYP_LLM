@@ -183,6 +183,7 @@ WordNet prerequisite (one-time):
   --synonyms-provider wordnet \
   --synonyms-top-k 5
 ```
+Note: empty `synonyms: []` is valid for function-word nodes; content words are expected to have non-empty synonym lists.
 
 Sentence-only synonyms:
 ```bash
@@ -210,6 +211,15 @@ ML predictor (fail-fast if model file is missing):
   --cefr-model-path artifacts/models/t5_cefr/best_model
 ```
 GPU-only policy: CEFR T5 inference requires CUDA; CPU fallback is disabled.
+
+CEFR quality regression suite:
+```bash
+.venv/bin/python -m ela_pipeline.inference.cefr_quality_control \
+  --cefr-provider t5 \
+  --cefr-model-path artifacts/models/t5_cefr/best_model \
+  --cefr-nodes
+```
+If CUDA is unavailable, use `--cefr-provider rule`.
 
 Sentence-only CEFR:
 ```bash

@@ -36,9 +36,15 @@ def _is_valid_phonetic(value: Any) -> bool:
     )
 
 
-def _is_valid_synonyms(value: Any) -> bool:
-    if not isinstance(value, list) or not value:
+def _is_valid_synonyms(value: Any, node: Dict[str, Any]) -> bool:
+    if not isinstance(value, list):
         return False
+
+    pos = str(node.get("part_of_speech") or "").strip().lower()
+    is_content_word = str(node.get("type") or "").strip() == "Word" and pos in {"noun", "verb", "adjective", "adverb"}
+    if is_content_word and not value:
+        return False
+
     normalized = []
     for item in value:
         if not isinstance(item, str) or item.strip() == "":
@@ -59,7 +65,11 @@ def _field_stats(nodes: list[Dict[str, Any]], field: str, validator) -> Dict[str
         if field not in node:
             missing += 1
             continue
-        if validator(node.get(field)):
+        try:
+            ok = bool(validator(node.get(field), node))
+        except TypeError:
+            ok = bool(validator(node.get(field)))
+        if ok:
             valid += 1
         else:
             invalid += 1
@@ -83,7 +93,7 @@ def _extract_enrichment_probe_stats(result: Dict[str, Any]) -> Dict[str, Any]:
         "sentence": {
             "translation_ok": _is_valid_translation(root.get("translation")),
             "phonetic_ok": _is_valid_phonetic(root.get("phonetic")),
-            "synonyms_ok": _is_valid_synonyms(root.get("synonyms")),
+            "synonyms_ok": _is_valid_synonyms(root.get("synonyms"), root),
             "cefr_ok": _is_valid_cefr(root.get("cefr_level")),
         },
         "node_fields": {

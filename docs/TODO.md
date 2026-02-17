@@ -279,7 +279,10 @@
 - [x] Introduce synonym provider interface and first implementation (`wordnet` via NLTK).
 - [x] Add source-span/ref-node aware deduplication for synonym generation (reuse by `ref_node_id` and normalized source key).
 - [x] Add context-aware synonym post-processing for verbs (phrasal expansion + participle-form alignment) to reduce out-of-context lemmas.
-- [x] Add validator rules for optional `synonyms` fields (list of non-empty unique strings).
+- [x] Add validator rules for optional `synonyms` fields:
+  - [x] unique non-empty strings when present,
+  - [x] allow empty list for function-word nodes,
+  - [x] require non-empty list for content-word nodes (`noun|verb|adjective|adverb`).
 - [x] Add TDD regression tests for synonym enrichment + validator checks.
 - [x] Document WordNet prerequisite (`nltk.downloader wordnet omw-1.4`) in docs.
 
@@ -295,7 +298,8 @@
 - [x] Integrate CEFR prediction stage into inference pipeline with fail-fast model loading for `ml` provider.
 - [x] Extend corpus dataset builder with CEFR mode (`ela_pipeline.dataset.build_dataset --task cefr_level`) to rebuild train/dev/test from CEFR-annotated hierarchical corpus.
 - [x] Rebuild CEFR dataset splits from updated corpus (`data/processed_cefr*`) through the standard dataset pipeline.
-- [ ] Add CEFR quality-control script/report (coverage + class distribution + sanity checks).
+- [x] Add CEFR quality-control script (coverage + class distribution + sanity checks).
+- [ ] Publish CEFR quality-control report artifact in `docs/reports/`.
 - [x] Add TDD regression tests for CEFR stage (sentence/phrase/word, ordering invariants, deterministic behavior).
 - [x] Document CEFR stage in README/CLI/full docs/sample contract.
 
