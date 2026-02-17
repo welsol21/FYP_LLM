@@ -360,7 +360,8 @@
 - [x] Fix and document next-stage product scope in `docs/next_stage_product_spec_2026-02-17.md`.
 - [x] Fix legacy feature source mapping (`feature -> source project -> source files`) in `docs/legacy_feature_source_map_2026-02-17.md`.
 - [ ] Reuse ELA `main_menu` UX as canonical navigation baseline (no full redesign from scratch).
-- [ ] Build frontend migration map screen-by-screen (`Projects -> Files -> Analyze -> Vocabulary`) and bind to current backend contracts.
+- [x] Build frontend migration map screen-by-screen (`Projects -> Files -> Analyze -> Vocabulary`) and bind to current backend contracts.
+  - [x] Documented in `docs/ui_migration_map_2026-02-17.md`.
 - [ ] Implement local client persistence (SQLite) for projects/files/local edits/workspace state.
 - [ ] Define and implement offline/online capability matrix in runtime + UI (feature flags and graceful degradation).
 - [ ] Enforce media routing policy:
