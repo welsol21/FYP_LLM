@@ -12,6 +12,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
+from ela_pipeline.corpus import validate_cefr_corpus
+
 TELEMETRY_PATTERNS = (
     re.compile(r"\bquality_flags\b", re.IGNORECASE),
     re.compile(r"\breason_codes\b", re.IGNORECASE),
@@ -31,6 +33,8 @@ LOW_QUALITY_NOTE_PATTERNS = (
 )
 
 PROMPT_TEMPLATE_VERSION = "v1"
+CEFR_LEVELS = {"A1", "A2", "B1", "B2", "C1", "C2"}
+CANONICAL_CEFR_CORPUS_PATH = "linguistic_hierarchical_3000_v5_cefr_balanced.json"
 
 
 def format_feature_list(features: List[str]) -> str:
@@ -410,6 +414,16 @@ def _extract_tam_bucket(node: Dict[str, Any]) -> str:
     return "none"
 
 
+def _extract_cefr_level(node: Dict[str, Any]) -> str | None:
+    raw = node.get("cefr_level")
+    if not isinstance(raw, str):
+        return None
+    level = raw.strip().upper()
+    if level in CEFR_LEVELS:
+        return level
+    return None
+
+
 def _render_sentence_prompt(sentence: str, pos_text: str, dep_text: str, tam_bucket: str) -> str:
     return (
         f"task: write_linguistic_note "
@@ -458,19 +472,90 @@ def _render_word_prompt(
     )
 
 
+def _render_sentence_cefr_prompt(sentence: str, pos_text: str, dep_text: str, tam_bucket: str) -> str:
+    return (
+        f"task: predict_cefr_level "
+        f"template_version: {PROMPT_TEMPLATE_VERSION} "
+        f"node_type: Sentence "
+        f"tam_bucket: {tam_bucket} "
+        f"sentence: {sentence} "
+        f"pos: {pos_text} "
+        f"dep: {dep_text}"
+    )
+
+
+def _render_phrase_cefr_prompt(sentence: str, phrase_text: str, pos_text: str, dep_text: str, tam_bucket: str) -> str:
+    return (
+        f"task: predict_cefr_level "
+        f"template_version: {PROMPT_TEMPLATE_VERSION} "
+        f"node_type: Phrase "
+        f"tam_bucket: {tam_bucket} "
+        f"sentence: {sentence} "
+        f"phrase: {phrase_text} "
+        f"pos: {pos_text} "
+        f"dep: {dep_text}"
+    )
+
+
+def _render_word_cefr_prompt(
+    sentence: str,
+    word_text: str,
+    pos_text: str,
+    tag_text: str,
+    dep_text: str,
+    morph_text: str,
+    tam_bucket: str,
+) -> str:
+    return (
+        f"task: predict_cefr_level "
+        f"template_version: {PROMPT_TEMPLATE_VERSION} "
+        f"node_type: Word "
+        f"tam_bucket: {tam_bucket} "
+        f"sentence: {sentence} "
+        f"word: {word_text} "
+        f"pos: {pos_text} "
+        f"tag: {tag_text} "
+        f"dep: {dep_text} "
+        f"morph: {morph_text}"
+    )
+
+
 def iter_examples(
     item: Dict[str, Any],
     counters: Dict[str, int] | None = None,
     *,
     use_reference_templates: bool = False,
     use_template_id_targets: bool = False,
+    task: str = "linguistic_note",
 ) -> Iterable[Dict[str, str]]:
+    if task not in {"linguistic_note", "cefr_level"}:
+        raise ValueError(f"Unsupported task: {task}")
+
     sentence = _node_input_text(item)
     sent_features = item.get("features", {})
     sent_targets = item.get("targets", {})
 
     sent_tam = _extract_tam_bucket(item)
-    if use_template_id_targets:
+    if task == "cefr_level":
+        sentence_cefr = _extract_cefr_level(item)
+        if sentence_cefr:
+            prompt = _render_sentence_cefr_prompt(
+                sentence=sentence,
+                pos_text=format_feature_list(sent_features.get("pos", [])),
+                dep_text=format_feature_list(sent_features.get("dep", [])),
+                tam_bucket=sent_tam,
+            )
+            yield {
+                "input": prompt,
+                "target": sentence_cefr,
+                "level": "Sentence",
+                "tam_bucket": sent_tam,
+                "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+                "task": task,
+            }
+            if counters is not None:
+                counters["rows_emitted"] += 1
+    elif use_template_id_targets:
         sentence_note, reason = _build_template_target("Sentence", sentence, sent_features, sent_tam)
         if counters is not None:
             if sentence_note:
@@ -487,7 +572,7 @@ def iter_examples(
     else:
         sentence_note = _extract_note_from_targets(sent_targets, counters=counters)
 
-    if sentence_note:
+    if task == "linguistic_note" and sentence_note:
         prompt = _render_sentence_prompt(
             sentence=sentence,
             pos_text=format_feature_list(sent_features.get("pos", [])),
@@ -500,6 +585,7 @@ def iter_examples(
             "level": "Sentence",
             "tam_bucket": sent_tam,
             "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+            "task": task,
         }
         if counters is not None:
             counters["rows_emitted"] += 1
@@ -510,7 +596,10 @@ def iter_examples(
         phrase_tam = _extract_tam_bucket(phrase)
         phrase_text = _node_input_text(phrase)
         phrase_features = phrase.get("features", {})
-        if use_template_id_targets:
+        if task == "cefr_level":
+            phrase_cefr = _extract_cefr_level(phrase)
+            p_note = phrase_cefr
+        elif use_template_id_targets:
             p_note, reason = _build_template_target("Phrase", phrase_text, phrase_features, phrase_tam)
             if counters is not None:
                 if p_note:
@@ -527,19 +616,29 @@ def iter_examples(
         else:
             p_note = _extract_note_from_targets(phrase.get("targets", {}), counters=counters)
         if p_note:
-            prompt = _render_phrase_prompt(
-                sentence=sentence,
-                phrase_text=phrase_text,
-                pos_text=format_feature_list(phrase_features.get("pos", [])),
-                dep_text=format_feature_list(phrase_features.get("dep", [])),
-                tam_bucket=phrase_tam,
-            )
+            if task == "cefr_level":
+                prompt = _render_phrase_cefr_prompt(
+                    sentence=sentence,
+                    phrase_text=phrase_text,
+                    pos_text=format_feature_list(phrase_features.get("pos", [])),
+                    dep_text=format_feature_list(phrase_features.get("dep", [])),
+                    tam_bucket=phrase_tam,
+                )
+            else:
+                prompt = _render_phrase_prompt(
+                    sentence=sentence,
+                    phrase_text=phrase_text,
+                    pos_text=format_feature_list(phrase_features.get("pos", [])),
+                    dep_text=format_feature_list(phrase_features.get("dep", [])),
+                    tam_bucket=phrase_tam,
+                )
             yield {
                 "input": prompt,
                 "target": p_note,
                 "level": "Phrase",
                 "tam_bucket": phrase_tam,
                 "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+                "task": task,
             }
             if counters is not None:
                 counters["rows_emitted"] += 1
@@ -550,7 +649,9 @@ def iter_examples(
             word_tam = _extract_tam_bucket(word)
             word_text = _node_input_text(word)
             word_features = word.get("features", {})
-            if use_template_id_targets:
+            if task == "cefr_level":
+                w_note = _extract_cefr_level(word)
+            elif use_template_id_targets:
                 w_note, reason = _build_template_target("Word", word_text, word_features, word_tam)
                 if counters is not None:
                     if w_note:
@@ -568,21 +669,33 @@ def iter_examples(
                 w_note = _extract_note_from_targets(word.get("targets", {}), counters=counters)
             if not w_note:
                 continue
-            prompt = _render_word_prompt(
-                sentence=sentence,
-                word_text=word_text,
-                pos_text=(word_features.get("pos", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                tag_text=(word_features.get("tag", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                dep_text=(word_features.get("dep", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                morph_text=format_feature_list(word_features.get("morph", [])),
-                tam_bucket=word_tam,
-            )
+            if task == "cefr_level":
+                prompt = _render_word_cefr_prompt(
+                    sentence=sentence,
+                    word_text=word_text,
+                    pos_text=(word_features.get("pos", ["UNKNOWN"]) or ["UNKNOWN"])[0],
+                    tag_text=(word_features.get("tag", ["UNKNOWN"]) or ["UNKNOWN"])[0],
+                    dep_text=(word_features.get("dep", ["UNKNOWN"]) or ["UNKNOWN"])[0],
+                    morph_text=format_feature_list(word_features.get("morph", [])),
+                    tam_bucket=word_tam,
+                )
+            else:
+                prompt = _render_word_prompt(
+                    sentence=sentence,
+                    word_text=word_text,
+                    pos_text=(word_features.get("pos", ["UNKNOWN"]) or ["UNKNOWN"])[0],
+                    tag_text=(word_features.get("tag", ["UNKNOWN"]) or ["UNKNOWN"])[0],
+                    dep_text=(word_features.get("dep", ["UNKNOWN"]) or ["UNKNOWN"])[0],
+                    morph_text=format_feature_list(word_features.get("morph", [])),
+                    tam_bucket=word_tam,
+                )
             yield {
                 "input": prompt,
                 "target": w_note,
                 "level": "Word",
                 "tam_bucket": word_tam,
                 "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+                "task": task,
             }
             if counters is not None:
                 counters["rows_emitted"] += 1
@@ -770,8 +883,14 @@ def evaluate_quality_gates(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build train/dev/test JSONL from hierarchical dataset")
-    parser.add_argument("--input", default="linguistic_hierarchical_3000_v3.json")
+    parser.add_argument("--input", default=CANONICAL_CEFR_CORPUS_PATH)
     parser.add_argument("--output-dir", default="data/processed")
+    parser.add_argument(
+        "--task",
+        choices=["linguistic_note", "cefr_level"],
+        default="linguistic_note",
+        help="Build dataset task: note generation or CEFR classification.",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--dev-ratio", type=float, default=0.1)
     parser.add_argument("--test-ratio", type=float, default=0.1)
@@ -815,8 +934,23 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    if args.task == "cefr_level":
+        if args.use_reference_templates:
+            raise SystemExit("--use-reference-templates is not supported with --task cefr_level")
+        if args.use_template_id_targets:
+            raise SystemExit("--use-template-id-targets is not supported with --task cefr_level")
+
     with open(args.input, "r", encoding="utf-8") as f:
         raw = json.load(f)
+
+    if args.task == "cefr_level":
+        cefr_issues = validate_cefr_corpus(raw)
+        if cefr_issues:
+            sample = "; ".join(f"{item.path}: {item.message}" for item in cefr_issues[:5])
+            raise SystemExit(
+                f"CEFR corpus validation failed ({len(cefr_issues)} issues). "
+                f"Sample: {sample}"
+            )
 
     schema_report = detect_dataset_schema(raw)
     quality_counters: Dict[str, int] = defaultdict(int)
@@ -828,6 +962,7 @@ def main() -> None:
                 counters=quality_counters,
                 use_reference_templates=bool(args.use_reference_templates),
                 use_template_id_targets=bool(args.use_template_id_targets),
+                task=args.task,
             )
         )
     rows_before_dedup = rows[:]
@@ -871,6 +1006,7 @@ def main() -> None:
         }
 
     stats = {
+        "task": args.task,
         "prompt_template_version": PROMPT_TEMPLATE_VERSION,
         "input_path": str(Path(args.input).resolve()),
         "use_reference_templates": bool(args.use_reference_templates),

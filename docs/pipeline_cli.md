@@ -53,7 +53,18 @@ python -m ela_pipeline.dataset.build_dataset_from_ingested \
 ## 6) Build dataset splits (legacy hierarchical input)
 
 ```bash
-python -m ela_pipeline.dataset.build_dataset --input <hierarchical_input.json> --output-dir data/processed
+.venv/bin/python -m ela_pipeline.dataset.build_dataset --output-dir data/processed
+```
+Default input is canonical `linguistic_hierarchical_3000_v5_cefr_balanced.json`.
+
+CEFR-classification dataset from the same hierarchical corpus:
+```bash
+.venv/bin/python -m ela_pipeline.dataset.build_dataset \
+  --input linguistic_hierarchical_3000_v5_cefr_balanced.json \
+  --task cefr_level \
+  --output-dir data/processed_cefr \
+  --max-per-target 0 \
+  --no-dedup-exact-input-target
 ```
 
 ## 7) Train local generator
@@ -179,6 +190,32 @@ Sentence-only synonyms:
   --text "She should have trusted her instincts before making the decision." \
   --synonyms \
   --no-synonym-nodes
+```
+
+Optional CEFR enrichment:
+Rule baseline:
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --cefr \
+  --cefr-provider rule
+```
+
+ML predictor (fail-fast if model file is missing):
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --cefr \
+  --cefr-provider ml \
+  --cefr-model-path artifacts/models/cefr/best_ml_classifier.pkl
+```
+
+Sentence-only CEFR:
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --cefr \
+  --no-cefr-nodes
 ```
 
 `v2_strict` is now the default mode.

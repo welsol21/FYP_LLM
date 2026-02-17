@@ -1,0 +1,206 @@
+{
+  "task": "cefr_level",
+  "prompt_template_version": "v1",
+  "input_path": "/home/vlad/Dev/FYP_LLM/linguistic_hierarchical_3000_v5_cefr_balanced.json",
+  "use_reference_templates": false,
+  "use_template_id_targets": false,
+  "schema_report": {
+    "nodes_total": 177249,
+    "nodes_with_targets": 0,
+    "nodes_with_notes_array": 0,
+    "nodes_with_legacy_linguistic_notes": 0,
+    "detected_schema": "unknown"
+  },
+  "total_before_dedup": 177249,
+  "total_after_dedup": 177249,
+  "total_after_balance": 177249,
+  "balance_level_tam": true,
+  "max_per_target": 0,
+  "dedup_exact_input_target": false,
+  "dedup_report": {
+    "skipped_exact_input_target_duplicates": 0,
+    "skipped_by_target_cap": 0
+  },
+  "quality_counters": {
+    "rows_emitted": 177249
+  },
+  "train": 141801,
+  "dev": 17724,
+  "test": 17724,
+  "target_stats": {
+    "before_dedup": {
+      "total": 177249,
+      "unique_targets": 6,
+      "duplicate_ratio": 0.999966,
+      "top_repeated_targets": [
+        {
+          "target": "a2",
+          "count": 29586
+        },
+        {
+          "target": "c1",
+          "count": 29586
+        },
+        {
+          "target": "b1",
+          "count": 29577
+        },
+        {
+          "target": "b2",
+          "count": 29500
+        },
+        {
+          "target": "a1",
+          "count": 29500
+        },
+        {
+          "target": "c2",
+          "count": 29500
+        }
+      ]
+    },
+    "after_dedup": {
+      "total": 177249,
+      "unique_targets": 6,
+      "duplicate_ratio": 0.999966,
+      "top_repeated_targets": [
+        {
+          "target": "a2",
+          "count": 29586
+        },
+        {
+          "target": "c1",
+          "count": 29586
+        },
+        {
+          "target": "b1",
+          "count": 29577
+        },
+        {
+          "target": "b2",
+          "count": 29500
+        },
+        {
+          "target": "a1",
+          "count": 29500
+        },
+        {
+          "target": "c2",
+          "count": 29500
+        }
+      ]
+    },
+    "after_balance": {
+      "total": 177249,
+      "unique_targets": 6,
+      "duplicate_ratio": 0.999966,
+      "top_repeated_targets": [
+        {
+          "target": "c1",
+          "count": 29586
+        },
+        {
+          "target": "a2",
+          "count": 29586
+        },
+        {
+          "target": "b1",
+          "count": 29577
+        },
+        {
+          "target": "a1",
+          "count": 29500
+        },
+        {
+          "target": "c2",
+          "count": 29500
+        },
+        {
+          "target": "b2",
+          "count": 29500
+        }
+      ]
+    }
+  },
+  "distributions": {
+    "before_dedup": {
+      "level": {
+        "Phrase": 18000,
+        "Sentence": 3000,
+        "Word": 156249
+      },
+      "tam_bucket": {
+        "none": 177249
+      },
+      "template_id": {
+        "none": 177249
+      },
+      "level_tam": {
+        "Phrase": {
+          "none": 18000
+        },
+        "Sentence": {
+          "none": 3000
+        },
+        "Word": {
+          "none": 156249
+        }
+      }
+    },
+    "after_dedup": {
+      "level": {
+        "Phrase": 18000,
+        "Sentence": 3000,
+        "Word": 156249
+      },
+      "tam_bucket": {
+        "none": 177249
+      },
+      "template_id": {
+        "none": 177249
+      },
+      "level_tam": {
+        "Phrase": {
+          "none": 18000
+        },
+        "Sentence": {
+          "none": 3000
+        },
+        "Word": {
+          "none": 156249
+        }
+      }
+    },
+    "after_balance": {
+      "level": {
+        "Phrase": 18000,
+        "Sentence": 3000,
+        "Word": 156249
+      },
+      "tam_bucket": {
+        "none": 177249
+      },
+      "template_id": {
+        "none": 177249
+      },
+      "level_tam": {
+        "Phrase": {
+          "none": 18000
+        },
+        "Sentence": {
+          "none": 3000
+        },
+        "Word": {
+          "none": 156249
+        }
+      }
+    }
+  },
+  "quality_gates": {
+    "min_unique_targets": 0,
+    "max_top1_share": 1.0,
+    "min_active_template_ids": 0,
+    "failures": [],
+    "passed": true
+  }
+}

@@ -8,9 +8,11 @@ This project converts English text into a validated hierarchical linguistic JSON
 - optional multilingual translation enrichment (current provider: `m2m100`, EN->RU first)
 - optional phonetic enrichment (UK/US transcription via `espeak` backend)
 - optional synonym enrichment (WordNet-backed, EN)
+- optional CEFR enrichment (`cefr_level`, rule baseline or ML model)
 - strict validation and frozen-structure checks
 
 Authoritative contract reference: `docs/sample.json`.
+Canonical CEFR corpus source: `linguistic_hierarchical_3000_v5_cefr_balanced.json`.
 Tool/model/data license inventory: `docs/licenses_inventory.md`.
 
 ## What Has Been Improved
@@ -46,6 +48,7 @@ Each node always keeps required contract fields and may include optional v2 fiel
 - `phonetic` payloads (sentence + optional node level): `{uk, us}`
 - `synonyms` payloads (sentence + optional node level): `[string, ...]`
   - synonym output applies context filters for function words and basic verb-form normalization.
+- `cefr_level` payload (sentence + optional node level): one of `A1|A2|B1|B2|C1|C2`
 
 ## Quick Start
 
@@ -152,13 +155,40 @@ Sentence-only synonyms:
   --no-synonym-nodes
 ```
 
+### 11) Inference with CEFR levels
+Rule-based baseline:
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --cefr \
+  --cefr-provider rule
+```
+
+ML mode (requires model artifact):
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --cefr \
+  --cefr-provider ml \
+  --cefr-model-path artifacts/models/cefr/best_ml_classifier.pkl
+```
+
 ## Main Commands
 
 ### Build dataset splits
 ```bash
 .venv/bin/python -m ela_pipeline.dataset.build_dataset \
-  --input linguistic_hierarchical_3000_v3.json \
   --output-dir data/processed
+```
+
+### Build CEFR dataset splits from hierarchical corpus
+```bash
+.venv/bin/python -m ela_pipeline.dataset.build_dataset \
+  --input linguistic_hierarchical_3000_v5_cefr_balanced.json \
+  --task cefr_level \
+  --output-dir data/processed_cefr \
+  --max-per-target 0 \
+  --no-dedup-exact-input-target
 ```
 
 ### Train local generator

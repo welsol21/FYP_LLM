@@ -10,6 +10,73 @@ from ela_pipeline.dataset.build_dataset import (
 
 
 class BuildDatasetTests(unittest.TestCase):
+    def test_iter_examples_cefr_mode_uses_node_levels(self):
+        item = {
+            "input": "She should have trusted her instincts.",
+            "cefr_level": "B2",
+            "features": {"pos": ["PRON", "AUX", "AUX", "VERB"], "dep": ["nsubj", "aux", "aux", "ROOT"]},
+            "targets": {},
+            "linguistic_elements": [
+                {
+                    "type": "Phrase",
+                    "input": "should have trusted",
+                    "cefr_level": "B1",
+                    "features": {"pos": ["AUX", "AUX", "VERB"], "dep": ["aux", "aux", "ROOT"]},
+                    "targets": {},
+                    "linguistic_elements": [
+                        {
+                            "type": "Word",
+                            "input": "trusted",
+                            "cefr_level": "A2",
+                            "features": {
+                                "pos": ["VERB"],
+                                "tag": ["VBN"],
+                                "dep": ["ROOT"],
+                                "morph": ["VerbForm=Part|Tense=Past"],
+                            },
+                            "targets": {},
+                        }
+                    ],
+                }
+            ],
+        }
+
+        rows = list(iter_examples(item, task="cefr_level"))
+        self.assertEqual(len(rows), 3)
+        self.assertEqual({row["target"] for row in rows}, {"B2", "B1", "A2"})
+        self.assertTrue(all(row["task"] == "cefr_level" for row in rows))
+        self.assertTrue(all("task: predict_cefr_level" in row["input"] for row in rows))
+
+    def test_iter_examples_cefr_mode_skips_missing_or_invalid_levels(self):
+        item = {
+            "input": "The sentence.",
+            "cefr_level": "B3",
+            "features": {"pos": ["DET", "NOUN"], "dep": ["det", "ROOT"]},
+            "targets": {},
+            "linguistic_elements": [
+                {
+                    "type": "Phrase",
+                    "input": "the sentence",
+                    "cefr_level": "A2",
+                    "features": {"pos": ["DET", "NOUN"], "dep": ["det", "dobj"]},
+                    "targets": {},
+                    "linguistic_elements": [
+                        {
+                            "type": "Word",
+                            "input": "sentence",
+                            "features": {"pos": ["NOUN"], "tag": ["NN"], "dep": ["dobj"], "morph": []},
+                            "targets": {},
+                        }
+                    ],
+                }
+            ],
+        }
+
+        rows = list(iter_examples(item, task="cefr_level"))
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["level"], "Phrase")
+        self.assertEqual(rows[0]["target"], "A2")
+
     def test_iter_examples_uses_only_model_notes(self):
         item = {
             "input": "She should have trusted her instincts.",

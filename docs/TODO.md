@@ -283,6 +283,22 @@
 - [x] Add TDD regression tests for synonym enrichment + validator checks.
 - [x] Document WordNet prerequisite (`nltk.downloader wordnet omw-1.4`) in docs.
 
+## CEFR Rollout
+
+- [x] Fix canonical CEFR corpus file in repository root: `linguistic_hierarchical_3000_v5_cefr_balanced.json`.
+- [x] Switch dataset builders to canonical CEFR corpus by default (`build_dataset --input` default -> `linguistic_hierarchical_3000_v5_cefr_balanced.json`).
+- [x] Add fail-fast CEFR corpus validation before CEFR dataset build (`--task cefr_level`).
+- [x] Define contract extension for CEFR on node levels (`Sentence`, `Phrase`, `Word`) with optional `cefr_level`.
+- [x] Add validator rules for `cefr_level` with allowed labels only: `A1|A2|B1|B2|C1|C2`.
+- [x] Add CLI controls for optional CEFR enrichment (`--cefr`, model path, node toggle).
+- [x] Implement CEFR feature extractor based on current contract fields (no legacy schema assumptions).
+- [x] Integrate CEFR prediction stage into inference pipeline with fail-fast model loading for `ml` provider.
+- [x] Extend corpus dataset builder with CEFR mode (`ela_pipeline.dataset.build_dataset --task cefr_level`) to rebuild train/dev/test from CEFR-annotated hierarchical corpus.
+- [x] Rebuild CEFR dataset splits from updated corpus (`data/processed_cefr*`) through the standard dataset pipeline.
+- [ ] Add CEFR quality-control script/report (coverage + class distribution + sanity checks).
+- [x] Add TDD regression tests for CEFR stage (sentence/phrase/word, ordering invariants, deterministic behavior).
+- [x] Document CEFR stage in README/CLI/full docs/sample contract.
+
 ## DB Persistence (Deferred, Postgres-only)
 
 - [ ] Document decision: PostgreSQL is primary storage (no MongoDB in current architecture).

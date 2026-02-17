@@ -50,6 +50,7 @@ Allowed types only:
   - node-level: `{source_lang, target_lang, text}`
 - `phonetic` object: `{uk, us}`
 - `synonyms` list: `[string, ...]`
+- `cefr_level`: one of `A1|A2|B1|B2|C1|C2`
 
 ### 2.5 Nesting Rules
 - `Sentence` can contain only `Phrase`
@@ -174,11 +175,35 @@ If `--model-dir` is omitted:
     - expand known phrasal heads (for example `bank` -> `bank on`),
     - inflect verb synonym head to node form for `past participle` contexts.
 
+### 4.8 CEFR Enrichment (`ela_pipeline/cefr/engine.py`)
+- Optional runtime stage behind CLI flag `--cefr`.
+- Providers:
+  - `rule`: fast deterministic baseline.
+  - `ml`: sklearn/joblib model loaded from `--cefr-model-path`.
+- Output field:
+  - `cefr_level` on sentence and (optionally) node levels.
+- Allowed CEFR labels: `A1|A2|B1|B2|C1|C2`.
+- Node CEFR strategy:
+  - sentence CEFR predicted from sentence content,
+  - node CEFR reuses canonical prediction via `ref_node_id`,
+  - duplicate source spans/text reuse cached CEFR by normalized source key.
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset
 ```bash
-python -m ela_pipeline.dataset.build_dataset --input linguistic_hierarchical_3000_v3.json --output-dir data/processed
+.venv/bin/python -m ela_pipeline.dataset.build_dataset --output-dir data/processed
+```
+Default input is canonical `linguistic_hierarchical_3000_v5_cefr_balanced.json`.
+
+CEFR dataset mode (same pipeline, different task):
+```bash
+.venv/bin/python -m ela_pipeline.dataset.build_dataset \
+  --input linguistic_hierarchical_3000_v5_cefr_balanced.json \
+  --task cefr_level \
+  --output-dir data/processed_cefr \
+  --max-per-target 0 \
+  --no-dedup-exact-input-target
 ```
 
 ### 5.2 Train local generator
@@ -242,6 +267,14 @@ One-time local model preparation:
   --synonyms \
   --synonyms-provider wordnet \
   --synonyms-top-k 5
+```
+
+### 5.10 CEFR inference
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --cefr \
+  --cefr-provider rule
 ```
 
 ## 6. Testing
