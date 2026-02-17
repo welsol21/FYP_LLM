@@ -179,7 +179,7 @@ If `--model-dir` is omitted:
 - Optional runtime stage behind CLI flag `--cefr`.
 - Providers:
   - `rule`: fast deterministic baseline.
-  - `ml`: sklearn/joblib model loaded from `--cefr-model-path`.
+  - `t5`: local T5 model loaded from `--cefr-model-path` (GPU-only, CUDA required).
 - Output field:
   - `cefr_level` on sentence and (optionally) node levels.
 - Allowed CEFR labels: `A1|A2|B1|B2|C1|C2`.

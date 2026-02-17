@@ -206,9 +206,10 @@ ML predictor (fail-fast if model file is missing):
 .venv/bin/python -m ela_pipeline.inference.run \
   --text "She should have trusted her instincts before making the decision." \
   --cefr \
-  --cefr-provider ml \
-  --cefr-model-path artifacts/models/cefr/best_ml_classifier.pkl
+  --cefr-provider t5 \
+  --cefr-model-path artifacts/models/t5_cefr/best_model
 ```
+GPU-only policy: CEFR T5 inference requires CUDA; CPU fallback is disabled.
 
 Sentence-only CEFR:
 ```bash

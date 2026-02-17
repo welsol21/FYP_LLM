@@ -21,6 +21,8 @@ from ela_pipeline.validation.validator import (
 STRICT_NULLABLE_TAM_FIELDS = {"tense", "aspect", "mood", "voice", "finiteness"}
 DEFAULT_TRANSLATION_MODEL = "facebook/m2m100_418M"
 DEFAULT_LOCAL_TRANSLATION_MODEL_DIR = "artifacts/models/m2m100_418M"
+DEFAULT_CEFR_MODEL_PATH = "artifacts/models/t5_cefr/best_model"
+CEFR_ALLOWED_LEVELS = {"A1", "A2", "B1", "B2", "C1", "C2"}
 
 
 def _normalize_strict_null_sentinels(node: dict) -> None:
@@ -335,6 +337,58 @@ def _attach_synonyms(
                 enrich_node(child)
 
 
+def _attach_cefr(
+    doc: dict,
+    predictor: Any,
+    include_node_cefr: bool = True,
+) -> None:
+    for sentence_node in doc.values():
+        if not isinstance(sentence_node, dict):
+            continue
+
+        sentence_text = str(sentence_node.get("content") or "")
+        sentence_level = str(predictor.predict_level(sentence_node, sentence_text, sentence_text)).strip().upper()
+        if sentence_level not in CEFR_ALLOWED_LEVELS:
+            raise ValueError(f"Invalid CEFR level from predictor: {sentence_level!r}")
+        sentence_node["cefr_level"] = sentence_level
+
+        if not include_node_cefr:
+            continue
+
+        cefr_by_node_id: dict[str, str] = {}
+        cefr_by_source_key: dict[str, str] = {}
+
+        def enrich_node(node: dict) -> None:
+            node_id = node.get("node_id")
+            ref_node_id = node.get("ref_node_id")
+
+            if isinstance(ref_node_id, str) and ref_node_id in cefr_by_node_id:
+                level = cefr_by_node_id[ref_node_id]
+            else:
+                source_text = _node_source_text(node, sentence_text)
+                pos = str(node.get("part_of_speech") or "").strip().lower()
+                source_key = f"{source_text.strip().lower()}|{pos}"
+                if source_key in cefr_by_source_key:
+                    level = cefr_by_source_key[source_key]
+                else:
+                    level = str(predictor.predict_level(node, source_text, sentence_text)).strip().upper()
+                    if level not in CEFR_ALLOWED_LEVELS:
+                        raise ValueError(f"Invalid CEFR level from predictor: {level!r}")
+                    cefr_by_source_key[source_key] = level
+
+            node["cefr_level"] = level
+            if isinstance(node_id, str):
+                cefr_by_node_id[node_id] = level
+
+            for child in node.get("linguistic_elements", []) or []:
+                if isinstance(child, dict):
+                    enrich_node(child)
+
+        for child in sentence_node.get("linguistic_elements", []) or []:
+            if isinstance(child, dict):
+                enrich_node(child)
+
+
 def _enforce_linguistic_elements_last(doc: dict) -> None:
     def reorder_node(node: dict) -> None:
         children = node.get("linguistic_elements", [])
@@ -382,6 +436,10 @@ def run_pipeline(
     synonyms_provider: str = "wordnet",
     synonyms_top_k: int = 5,
     synonym_nodes: bool = True,
+    enable_cefr: bool = False,
+    cefr_provider: str = "rule",
+    cefr_model_path: str = DEFAULT_CEFR_MODEL_PATH,
+    cefr_nodes: bool = True,
 ) -> dict:
     nlp = load_nlp(spacy_model)
 
@@ -444,6 +502,24 @@ def run_pipeline(
             provider=provider,
             top_k=synonyms_top_k,
             include_node_synonyms=synonym_nodes,
+        )
+
+    if enable_cefr:
+        if cefr_provider == "rule":
+            from ela_pipeline.cefr import RuleBasedCEFRPredictor
+
+            predictor = RuleBasedCEFRPredictor()
+        elif cefr_provider == "t5":
+            from ela_pipeline.cefr import T5CEFRPredictor
+
+            predictor = T5CEFRPredictor(model_path=cefr_model_path, device="cuda")
+        else:
+            raise ValueError("cefr_provider must be one of: rule | t5")
+
+        _attach_cefr(
+            enriched,
+            predictor=predictor,
+            include_node_cefr=cefr_nodes,
         )
 
     raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
@@ -533,6 +609,23 @@ def main() -> None:
         action="store_true",
         help="Attach synonyms to sentence only (skip phrase/word node synonyms).",
     )
+    parser.add_argument("--cefr", action="store_true", help="Enable CEFR level enrichment.")
+    parser.add_argument(
+        "--cefr-provider",
+        default="rule",
+        choices=["rule", "t5"],
+        help="CEFR backend provider.",
+    )
+    parser.add_argument(
+        "--cefr-model-path",
+        default=DEFAULT_CEFR_MODEL_PATH,
+        help="Path to local T5 CEFR model directory for `--cefr-provider t5`.",
+    )
+    parser.add_argument(
+        "--no-cefr-nodes",
+        action="store_true",
+        help="Attach CEFR level to sentence only (skip phrase/word node CEFR).",
+    )
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
@@ -558,6 +651,10 @@ def main() -> None:
         synonyms_provider=args.synonyms_provider,
         synonyms_top_k=args.synonyms_top_k,
         synonym_nodes=not args.no_synonym_nodes,
+        enable_cefr=args.cefr,
+        cefr_provider=args.cefr_provider,
+        cefr_model_path=args.cefr_model_path,
+        cefr_nodes=not args.no_cefr_nodes,
     )
 
     out_path = args.output

@@ -78,6 +78,12 @@ def main() -> None:
     parser.add_argument("--learning-rate", type=float, default=5e-5)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+    try:
+        import torch
+    except Exception as exc:
+        raise RuntimeError("torch is required for training") from exc
+    if not torch.cuda.is_available():
+        raise RuntimeError("GPU-only policy: CUDA is required for training; CPU training is disabled.")
 
     set_seed(args.seed)
     train_rows = load_jsonl(args.train)
@@ -87,7 +93,7 @@ def main() -> None:
     processed_stats = _validate_processed_freshness(args.train, args.dev)
 
     tokenizer = T5Tokenizer.from_pretrained(args.model_name)
-    model = T5ForConditionalGeneration.from_pretrained(args.model_name)
+    model = T5ForConditionalGeneration.from_pretrained(args.model_name).to("cuda")
 
     train_ds = Dataset.from_list(train_rows)
     dev_ds = Dataset.from_list(dev_rows)

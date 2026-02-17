@@ -169,9 +169,10 @@ ML mode (requires model artifact):
 .venv/bin/python -m ela_pipeline.inference.run \
   --text "She should have trusted her instincts before making the decision." \
   --cefr \
-  --cefr-provider ml \
-  --cefr-model-path artifacts/models/cefr/best_ml_classifier.pkl
+  --cefr-provider t5 \
+  --cefr-model-path artifacts/models/t5_cefr/best_model
 ```
+Note: CEFR T5 inference follows GPU-only policy (CUDA required, no CPU fallback).
 
 ## Main Commands
 
