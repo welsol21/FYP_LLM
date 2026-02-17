@@ -151,6 +151,15 @@ Policy thresholds come from env:
 - `MEDIA_MAX_SIZE_LOCAL_MB`
 - `MEDIA_MAX_SIZE_BACKEND_MB`
 
+Framework-agnostic JSON API for frontend integration:
+```bash
+.venv/bin/python -m ela_pipeline.runtime.client_api --db-path artifacts/client_state.sqlite3 ui-state
+.venv/bin/python -m ela_pipeline.runtime.client_api --db-path artifacts/client_state.sqlite3 submit-media --media-path /tmp/long.mp4 --duration-sec 1800 --size-bytes 314572800
+.venv/bin/python -m ela_pipeline.runtime.client_api --db-path artifacts/client_state.sqlite3 backend-jobs
+.venv/bin/python -m ela_pipeline.runtime.client_api --db-path artifacts/client_state.sqlite3 queue-missing-content --source-text "New sentence not in shared corpus."
+.venv/bin/python -m ela_pipeline.runtime.client_api --db-path artifacts/client_state.sqlite3 sync-queue
+```
+
 Optional multilingual translation enrichment (first pair: EN->RU, provider `m2m100`):
 ```bash
 .venv/bin/python -m ela_pipeline.translate.prepare_m2m100

@@ -383,6 +383,18 @@ Simple usage pattern:
   - reuse legacy visualizer/editor behavior without duplicating model logic,
   - keep edit flow on top of the same unified contract.
 
+### 4.21 Framework-Agnostic Client API (JSON CLI)
+- Module: `ela_pipeline/runtime/client_api.py`
+- Purpose: provide stable JSON interface for any frontend stack (React/Kivy/etc.).
+- Commands:
+  - `ui-state`
+  - `submit-media`
+  - `backend-jobs`
+  - `queue-missing-content`
+  - `sync-queue`
+- Benefit:
+  - frontend can integrate quickly without reimplementing runtime rules in UI code.
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset

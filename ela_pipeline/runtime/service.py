@@ -8,7 +8,7 @@ from typing import Any
 
 from ela_pipeline.client_storage import LocalSQLiteRepository
 
-from .capabilities import build_runtime_capabilities, resolve_runtime_mode
+from .capabilities import build_runtime_capabilities, resolve_deployment_mode, resolve_runtime_mode
 from .media_policy import MediaPolicyLimits, load_media_policy_limits_from_env
 from .media_submission import submit_media_for_processing
 from .ui_state import build_runtime_ui_state, build_submission_ui_feedback
@@ -20,12 +20,14 @@ class RuntimeMediaService:
 
     db_path: str | Path
     runtime_mode: str = "auto"
+    deployment_mode: str = "auto"
     limits: MediaPolicyLimits | None = None
 
     def __post_init__(self) -> None:
         self.repo = LocalSQLiteRepository(self.db_path)
         self.effective_mode = resolve_runtime_mode(self.runtime_mode)
-        self.caps = build_runtime_capabilities(self.effective_mode)
+        self.effective_deployment_mode = resolve_deployment_mode(self.deployment_mode)
+        self.caps = build_runtime_capabilities(self.effective_mode, deployment_mode=self.effective_deployment_mode)
         self.limits = self.limits or load_media_policy_limits_from_env()
 
     def get_ui_state(self) -> dict[str, Any]:

@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from ela_pipeline.runtime import MediaPolicyLimits, RuntimeMediaService
 
@@ -51,6 +52,24 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertEqual(response["result"]["route"], "reject")
             self.assertEqual(response["ui_feedback"]["severity"], "error")
             self.assertEqual(svc.list_backend_jobs(), [])
+
+    def test_service_respects_deployment_mode_for_phonetic_policy(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict("os.environ", {"ELA_PHONETIC_POLICY": "backend_only"}, clear=False):
+                local_svc = RuntimeMediaService(
+                    db_path=Path(tmpdir) / "client.sqlite3",
+                    runtime_mode="online",
+                    deployment_mode="local",
+                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+                )
+                backend_svc = RuntimeMediaService(
+                    db_path=Path(tmpdir) / "client2.sqlite3",
+                    runtime_mode="online",
+                    deployment_mode="backend",
+                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+                )
+            self.assertFalse(local_svc.caps.phonetic_enabled)
+            self.assertTrue(backend_svc.caps.phonetic_enabled)
 
 
 if __name__ == "__main__":

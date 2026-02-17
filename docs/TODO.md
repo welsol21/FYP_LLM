@@ -420,6 +420,7 @@
     - [x] `build_visualizer_payload(...)`
     - [x] `build_visualizer_payload_for_document(...)`
   - [x] Added editor patch helper: `apply_node_edit(...)` by `sentence_text + node_id + field_path`.
+  - [x] Added framework-agnostic JSON bridge CLI: `ela_pipeline/runtime/client_api.py`.
   - [ ] Connect bridge to actual frontend screens/routes.
 - [x] Add explicit license-gated runtime switch for phonetics by deployment mode (offline/distributed/backend).
   - [x] Added deployment mode resolution: `ELA_DEPLOYMENT_MODE` + CLI `--deployment-mode`.
