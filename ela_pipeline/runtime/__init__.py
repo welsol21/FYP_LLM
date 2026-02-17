@@ -13,6 +13,7 @@ from .media_policy import (
     decide_media_route,
     load_media_policy_limits_from_env,
 )
+from .media_orchestrator import MediaExecutionPlan, plan_media_execution
 
 __all__ = [
     "RuntimeCapabilities",
@@ -24,4 +25,6 @@ __all__ = [
     "MediaRoutingDecision",
     "decide_media_route",
     "load_media_policy_limits_from_env",
+    "MediaExecutionPlan",
+    "plan_media_execution",
 ]

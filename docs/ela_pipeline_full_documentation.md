@@ -12,6 +12,10 @@ End-to-end flow:
 6. validation (schema + frozen structure)
 7. optional PostgreSQL persistence of final contract
 
+Runtime policy additions:
+8. runtime capability gate (`offline` / `online`)
+9. media routing policy (`local` / `backend` / `reject`) by duration+size limits
+
 Authoritative compatibility contract: `docs/sample.json`.
 Tool/model/data license registry: `docs/licenses_inventory.md`.
 
@@ -203,6 +207,44 @@ If `--model-dir` is omitted:
   - `ela_pipeline/db/migrations/0001_init.sql`
   - tables: `runs`, `sentences` (contract in `jsonb`).
 
+### 4.10 Runtime Capability Gate (`ela_pipeline/runtime/capabilities.py`)
+- Runtime mode values:
+  - `online` (default)
+  - `offline`
+  - `auto` (resolves from `ELA_RUNTIME_MODE`, defaults to `online`)
+- In `offline` mode:
+  - phonetic enrichment is blocked,
+  - PostgreSQL persistence is blocked,
+  - backend async jobs are blocked.
+- Gate behavior is fail-fast: if a blocked feature is requested, pipeline exits with explicit reason.
+
+### 4.11 Media Routing Policy (`ela_pipeline/runtime/media_policy.py`)
+- Policy inputs:
+  - media duration (seconds),
+  - media size (bytes),
+  - env-configured limits:
+    - `MEDIA_MAX_DURATION_MIN`
+    - `MEDIA_MAX_SIZE_LOCAL_MB`
+    - `MEDIA_MAX_SIZE_BACKEND_MB`
+- Policy output:
+  - `local`: process on client/runtime node,
+  - `backend`: enqueue backend async job,
+  - `reject`: file must not start.
+- Reject reasons include actual values and configured limits for transparent UX/debug.
+
+### 4.12 Media Orchestration + Local Queue
+- Planner: `ela_pipeline/runtime/media_orchestrator.py`
+  - converts routing decision into execution action:
+    - `run_local`
+    - `enqueue_backend`
+    - `reject`
+- Local queue persistence: `ela_pipeline/client_storage/sqlite_repository.py`
+  - table `backend_jobs`
+  - methods:
+    - `enqueue_backend_job(...)`
+    - `update_backend_job_status(...)`
+    - `list_backend_jobs(...)`
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset
@@ -230,6 +272,16 @@ python -m ela_pipeline.training.train_generator --train data/processed/train.jso
 ```bash
 python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --model-dir results_llm_notes_v3_t5-small_phrase/best_model
 ```
+
+### 5.3.1 Runtime mode and media validation (simple)
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --runtime-mode offline \
+  --media-duration-sec 600 \
+  --media-size-bytes 157286400
+```
+If media is not allowed by policy, command fails immediately with a clear reason.
 
 ### 5.4 Run strict v2 inference
 ```bash

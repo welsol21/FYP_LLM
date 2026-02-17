@@ -373,7 +373,10 @@
   - [x] Runtime policy engine added (`ela_pipeline/runtime/media_policy.py`) with decision routes: `local|backend|reject`.
   - [x] local processing for files <= 15 minutes (policy decision path implemented).
   - [x] backend async job path for files > 15 minutes (policy decision path implemented, requires backend_jobs capability).
-  - [ ] UI/backend job orchestration wiring to use policy decision result.
+  - [x] Backend orchestration base added:
+    - [x] `ela_pipeline/runtime/media_orchestrator.py` (execution plan: `run_local|enqueue_backend|reject`)
+    - [x] local SQLite backend job queue in `ela_pipeline/client_storage/sqlite_repository.py` (`backend_jobs` table + CRUD methods)
+  - [ ] UI wiring to consume orchestration plan and show route/status in interface.
 - [ ] Add media file size limits for both paths (configurable env/runtime thresholds):
   - [x] reject local jobs above `MEDIA_MAX_SIZE_LOCAL_MB` (policy routes to backend/reject).
   - [x] reject backend jobs above `MEDIA_MAX_SIZE_BACKEND_MB`.

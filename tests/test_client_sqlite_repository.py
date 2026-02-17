@@ -78,6 +78,29 @@ class LocalSQLiteRepositoryTests(unittest.TestCase):
             self.assertEqual(len(limited), 1)
             self.assertEqual(limited[0]["sentence_key"], "s2")
 
+    def test_backend_job_queue_roundtrip(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "client.sqlite3"
+            repo = LocalSQLiteRepository(db_path)
+
+            job = repo.enqueue_backend_job(
+                job_id="job-1",
+                project_id="proj-1",
+                media_file_id="file-1",
+                request_payload={"media_path": "/tmp/large.mp4", "duration_seconds": 1800},
+            )
+            self.assertEqual(job["id"], "job-1")
+            self.assertEqual(job["status"], "queued")
+
+            queued = repo.list_backend_jobs(status="queued")
+            self.assertEqual(len(queued), 1)
+            self.assertEqual(queued[0]["id"], "job-1")
+
+            repo.update_backend_job_status("job-1", "processing")
+            processing = repo.list_backend_jobs(status="processing")
+            self.assertEqual(len(processing), 1)
+            self.assertEqual(processing[0]["id"], "job-1")
+
 
 if __name__ == "__main__":
     unittest.main()

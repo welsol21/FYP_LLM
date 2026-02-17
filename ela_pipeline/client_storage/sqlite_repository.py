@@ -66,6 +66,17 @@ class LocalSQLiteRepository:
                     created_at TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_local_edits_sentence_key ON local_edits(sentence_key);
+
+                CREATE TABLE IF NOT EXISTS backend_jobs (
+                    id TEXT PRIMARY KEY,
+                    project_id TEXT,
+                    media_file_id TEXT,
+                    status TEXT NOT NULL,
+                    request_payload TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_backend_jobs_status ON backend_jobs(status);
                 """
             )
 
@@ -240,6 +251,85 @@ class LocalSQLiteRepository:
                     "before_value": json.loads(row[4]) if row[4] is not None else None,
                     "after_value": json.loads(row[5]),
                     "created_at": row[6],
+                }
+            )
+        return out
+
+    def enqueue_backend_job(
+        self,
+        *,
+        request_payload: dict[str, Any],
+        project_id: str | None = None,
+        media_file_id: str | None = None,
+        job_id: str | None = None,
+    ) -> dict[str, Any]:
+        now = _utc_now()
+        jid = job_id or str(uuid.uuid4())
+        payload = json.dumps(request_payload, ensure_ascii=False, sort_keys=True)
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO backend_jobs (
+                    id, project_id, media_file_id, status, request_payload, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (jid, project_id, media_file_id, "queued", payload, now, now),
+            )
+            conn.commit()
+        return {
+            "id": jid,
+            "project_id": project_id,
+            "media_file_id": media_file_id,
+            "status": "queued",
+            "request_payload": request_payload,
+            "created_at": now,
+            "updated_at": now,
+        }
+
+    def update_backend_job_status(self, job_id: str, status: str) -> None:
+        now = _utc_now()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE backend_jobs
+                SET status = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (status, now, job_id),
+            )
+            conn.commit()
+
+    def list_backend_jobs(self, *, status: str | None = None, limit: int | None = None) -> list[dict[str, Any]]:
+        params: list[Any] = []
+        where_sql = ""
+        if status:
+            where_sql = "WHERE status = ?"
+            params.append(status)
+        limit_sql = ""
+        if limit is not None and limit > 0:
+            limit_sql = "LIMIT ?"
+            params.append(limit)
+        sql = f"""
+            SELECT id, project_id, media_file_id, status, request_payload, created_at, updated_at
+            FROM backend_jobs
+            {where_sql}
+            ORDER BY created_at DESC
+            {limit_sql}
+        """
+        with self._connect() as conn:
+            rows = conn.execute(sql, tuple(params)).fetchall()
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            out.append(
+                {
+                    "id": row[0],
+                    "project_id": row[1],
+                    "media_file_id": row[2],
+                    "status": row[3],
+                    "request_payload": json.loads(row[4]),
+                    "created_at": row[5],
+                    "updated_at": row[6],
                 }
             )
         return out
