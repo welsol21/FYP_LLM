@@ -337,10 +337,11 @@
 
 ## Long-Term Backlog (Far Future)
 
-- [ ] Introduce dual translation channels in contract:
-  - [ ] `translation_literary` (baseline from `m2m100`)
-  - [ ] `translation_idiomatic` (rule-based rewrite layer with literary fallback)
-  - [ ] Keep both as top-level sibling fields per node (no nested alternatives array).
+- [x] Introduce dual translation channels in contract:
+  - [x] `translation_literary` (baseline from `m2m100`)
+  - [x] `translation_idiomatic` (rule-based rewrite layer with literary fallback)
+  - [x] Keep both as top-level sibling fields per node (no nested alternatives array).
+  - [x] Backward-compatible `translation` field is retained.
 
 ## Human-in-the-Loop Corrections (Planned)
 

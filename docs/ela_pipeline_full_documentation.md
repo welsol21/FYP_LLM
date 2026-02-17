@@ -149,6 +149,10 @@ If `--model-dir` is omitted:
 - Current output fields:
   - sentence-level `translation`: `{source_lang, target_lang, model, text}`
   - node-level `translation`: `{source_lang, target_lang, text}` (when node translation is enabled)
+- Optional dual-channel mode (`--translation-dual-channels`):
+  - `translation_literary`: baseline model output
+  - `translation_idiomatic`: deterministic rule-layer rewrite with fallback to literary
+  - `translation` is still emitted for backward compatibility (same as literary text)
 - Node translation strategy:
   - prefer `source_span` projection from sentence text over free node content translation,
   - reuse canonical translation via `ref_node_id`,

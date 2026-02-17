@@ -129,19 +129,46 @@ def _attach_translation(
     source_lang: str,
     target_lang: str,
     include_node_translations: bool = True,
+    dual_channels: bool = False,
 ) -> None:
+    from ela_pipeline.translate import build_dual_translation_channels
+
     for sentence_node in doc.values():
         if not isinstance(sentence_node, dict):
             continue
 
         sentence_text = str(sentence_node.get("content") or "")
         sentence_translation = translator.translate_text(sentence_text, source_lang=source_lang, target_lang=target_lang)
-        sentence_node["translation"] = {
-            "source_lang": source_lang,
-            "target_lang": target_lang,
-            "model": getattr(translator, "model_name", "unknown"),
-            "text": sentence_translation,
-        }
+        if dual_channels:
+            literary, idiomatic = build_dual_translation_channels(
+                literary_text=sentence_translation,
+                target_lang=target_lang,
+            )
+            sentence_node["translation_literary"] = {
+                "source_lang": source_lang,
+                "target_lang": target_lang,
+                "model": getattr(translator, "model_name", "unknown"),
+                "text": literary,
+            }
+            sentence_node["translation_idiomatic"] = {
+                "source_lang": source_lang,
+                "target_lang": target_lang,
+                "text": idiomatic,
+            }
+            # Backward-compatible field remains available.
+            sentence_node["translation"] = {
+                "source_lang": source_lang,
+                "target_lang": target_lang,
+                "model": getattr(translator, "model_name", "unknown"),
+                "text": literary,
+            }
+        else:
+            sentence_node["translation"] = {
+                "source_lang": source_lang,
+                "target_lang": target_lang,
+                "model": getattr(translator, "model_name", "unknown"),
+                "text": sentence_translation,
+            }
 
         if not include_node_translations:
             continue
@@ -164,11 +191,32 @@ def _attach_translation(
                     translated = translator.translate_text(source_text, source_lang=source_lang, target_lang=target_lang)
                     translated_by_source_key[source_key] = translated
 
-            node["translation"] = {
-                "source_lang": source_lang,
-                "target_lang": target_lang,
-                "text": translated,
-            }
+            if dual_channels:
+                literary, idiomatic = build_dual_translation_channels(
+                    literary_text=translated,
+                    target_lang=target_lang,
+                )
+                node["translation_literary"] = {
+                    "source_lang": source_lang,
+                    "target_lang": target_lang,
+                    "text": literary,
+                }
+                node["translation_idiomatic"] = {
+                    "source_lang": source_lang,
+                    "target_lang": target_lang,
+                    "text": idiomatic,
+                }
+                node["translation"] = {
+                    "source_lang": source_lang,
+                    "target_lang": target_lang,
+                    "text": literary,
+                }
+            else:
+                node["translation"] = {
+                    "source_lang": source_lang,
+                    "target_lang": target_lang,
+                    "text": translated,
+                }
             if isinstance(node_id, str):
                 translated_by_node_id[node_id] = translated
 
@@ -492,6 +540,7 @@ def run_pipeline(
     translation_target_lang: str = "ru",
     translation_device: str = "auto",
     translate_nodes: bool = True,
+    translation_dual_channels: bool = False,
     enable_phonetic: bool = False,
     phonetic_provider: str = "espeak",
     phonetic_binary: str = "auto",
@@ -541,6 +590,7 @@ def run_pipeline(
             source_lang=translation_source_lang,
             target_lang=translation_target_lang,
             include_node_translations=translate_nodes,
+            dual_channels=translation_dual_channels,
         )
 
     if enable_phonetic:
@@ -636,6 +686,11 @@ def main() -> None:
         "--no-translate-nodes",
         action="store_true",
         help="Translate sentence only (skip phrase/word node content translation).",
+    )
+    parser.add_argument(
+        "--translation-dual-channels",
+        action="store_true",
+        help="Emit both translation_literary and translation_idiomatic (keeps translation for compatibility).",
     )
     parser.add_argument("--phonetic", action="store_true", help="Enable phonetic transcription enrichment (UK/US).")
     parser.add_argument(
@@ -754,6 +809,7 @@ def main() -> None:
         translation_target_lang=args.translation_target_lang,
         translation_device=args.translation_device,
         translate_nodes=not args.no_translate_nodes,
+        translation_dual_channels=args.translation_dual_channels,
         enable_phonetic=args.phonetic,
         phonetic_provider=args.phonetic_provider,
         phonetic_binary=args.phonetic_binary,
@@ -787,6 +843,7 @@ def main() -> None:
             "note_mode": args.note_mode,
             "translate": bool(args.translate),
             "translation_provider": args.translation_provider if args.translate else "none",
+            "translation_dual_channels": bool(args.translation_dual_channels) if args.translate else False,
             "phonetic": bool(args.phonetic),
             "phonetic_provider": args.phonetic_provider if args.phonetic else "none",
             "synonyms": bool(args.synonyms),

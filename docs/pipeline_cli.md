@@ -188,6 +188,18 @@ Translation inference:
 ```
 If `artifacts/models/m2m100_418M` exists and `--translation-model` is not overridden, it is used automatically.
 
+Dual translation channels (optional):
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --translate \
+  --translation-dual-channels
+```
+This adds:
+- `translation_literary`
+- `translation_idiomatic`
+and keeps `translation` for backward compatibility.
+
 Sentence-only translation (skip phrase/word node translations):
 ```bash
 .venv/bin/python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --translate --no-translate-nodes
