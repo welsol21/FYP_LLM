@@ -372,6 +372,7 @@
     - [x] capability badges payload (`build_runtime_ui_state`)
     - [x] disabled-state reasons for blocked features
     - [x] fallback messaging payload for local/backend/reject (`build_submission_ui_feedback`)
+  - [x] Frontend integration service added (`ela_pipeline/runtime/service.py`) to expose UI-ready payloads and submission flow.
   - [ ] Visual UI components to render this payload in frontend screens.
 - [ ] Enforce media routing policy:
   - [x] Runtime policy engine added (`ela_pipeline/runtime/media_policy.py`) with decision routes: `local|backend|reject`.
@@ -382,6 +383,7 @@
     - [x] local SQLite backend job queue in `ela_pipeline/client_storage/sqlite_repository.py` (`backend_jobs` table + CRUD methods)
     - [x] submission helper added: `ela_pipeline/runtime/media_submission.py` (single entrypoint for Start action)
   - [x] UI payload adapters added for route/status and user-facing messages (`ela_pipeline/runtime/ui_state.py`).
+  - [x] Service-level wiring for Start action added (`RuntimeMediaService.submit_media`).
   - [ ] Visual UI wiring to consume orchestration payload and show route/status in interface.
 - [ ] Add media file size limits for both paths (configurable env/runtime thresholds):
   - [x] reject local jobs above `MEDIA_MAX_SIZE_LOCAL_MB` (policy routes to backend/reject).

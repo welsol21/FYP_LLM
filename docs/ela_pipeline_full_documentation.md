@@ -273,6 +273,24 @@ If `--model-dir` is omitted:
       - `message`
 - This allows frontend to render disabled states and fallback messages without duplicating runtime rules.
 
+### 4.15 Frontend Integration Service (ready-to-use)
+- Module: `ela_pipeline/runtime/service.py`
+- Class: `RuntimeMediaService`
+- Why it exists:
+  - UI should not manually call 4-5 runtime functions for one action.
+  - Service bundles capabilities, routing policy, submission, and queue access in one place.
+- Main methods:
+  - `get_ui_state()` -> badges + feature availability payload
+  - `submit_media(...)` -> returns:
+    - `result` (`route/status/message/job_id`)
+    - `ui_feedback` (`severity/title/message`)
+  - `list_backend_jobs(...)` -> queue list for status screens
+
+Simple usage pattern:
+1. create service once on app start,
+2. call `get_ui_state()` to render mode and disabled buttons,
+3. call `submit_media(...)` on Start and show `ui_feedback`.
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset
