@@ -70,6 +70,7 @@ docker compose exec app python -m ela_pipeline.inference.run \
 ```
 
 App container runs DB migrations on startup (`python -m ela_pipeline.db.migrate`).
+Docker profile is CPU-only for `torch` by default (faster/lighter image build).
 
 ### 2) Run tests
 ```bash
@@ -226,6 +227,17 @@ If CUDA is unavailable, use `--cefr-provider rule` for a structural sanity pass.
 .venv/bin/python -m ela_pipeline.training.train_generator \
   --train data/processed/train.jsonl \
   --dev data/processed/dev.jsonl \
+  --output-dir artifacts/models/t5_notes
+```
+
+Optional feedback mix-in:
+
+```bash
+.venv/bin/python -m ela_pipeline.training.train_generator \
+  --train data/processed/train.jsonl \
+  --dev data/processed/dev.jsonl \
+  --feedback-train data/feedback/train.jsonl \
+  --feedback-weight 2 \
   --output-dir artifacts/models/t5_notes
 ```
 

@@ -77,6 +77,16 @@ Training writes reproducibility artifacts:
 - `artifacts/models/t5_notes/training_config.json`
 - `artifacts/models/t5_notes/evaluation_report.json`
 
+Feedback-retrain regression gate (train metrics + inference QC, blocks on degradation):
+```bash
+python -m ela_pipeline.training.feedback_regression \
+  --baseline-train-report artifacts/models/t5_baseline/evaluation_report.json \
+  --candidate-train-report artifacts/models/t5_feedback/evaluation_report.json \
+  --baseline-qc-report docs/reports/baseline_inference_qc.json \
+  --candidate-qc-report docs/reports/feedback_inference_qc.json \
+  --output docs/reports/feedback_retrain_regression.json
+```
+
 Optional hard-negative loop from rejected candidates:
 
 ```bash

@@ -58,7 +58,20 @@ class TestHILRepository(unittest.TestCase):
             [
                 (101, "key-1", "reviewer", "fix", 0.9, 202, "n7", "cefr_level", "B1", "B2", "2026-02-17T00:00:00Z")
             ],
-            [("key-1", "reviewer", "fix", 0.9, "n7", "cefr_level", "B1", "B2", "2026-02-17T00:00:00Z")],
+            [
+                (
+                    "key-1",
+                    "reviewer",
+                    "fix",
+                    0.9,
+                    {"provenance": {"source": "manual_review", "license": "internal_review"}},
+                    "n7",
+                    "cefr_level",
+                    "B1",
+                    "B2",
+                    "2026-02-17T00:00:00Z",
+                )
+            ],
         ]
         repo = PostgresContractRepository(db_url="postgresql://local/test", connect_fn=lambda _db_url: conn)
 
@@ -87,6 +100,7 @@ class TestHILRepository(unittest.TestCase):
                 "reviewed_by": "reviewer",
                 "change_reason": "fix",
                 "confidence": 0.9,
+                "review_metadata": {"provenance": {"source": "manual_review", "license": "internal_review"}},
                 "node_id": "n7",
                 "field_path": "cefr_level",
                 "before_value": "B1",
@@ -110,6 +124,7 @@ class TestHILRepository(unittest.TestCase):
                 "reviewed_by": "reviewer",
                 "change_reason": "fix",
                 "confidence": 0.9,
+                "review_metadata": {"provenance": {"source": "manual_review", "license": "internal_review"}},
                 "node_id": "n7",
                 "field_path": "cefr_level",
                 "before_value": "B1",
@@ -122,6 +137,7 @@ class TestHILRepository(unittest.TestCase):
                 "reviewed_by": "reviewer",
                 "change_reason": "fix2",
                 "confidence": 0.8,
+                "review_metadata": {"provenance": {"source": "manual_review", "license": "internal_review"}},
                 "node_id": "n7",
                 "field_path": "cefr_level",
                 "before_value": "A2",
@@ -134,6 +150,7 @@ class TestHILRepository(unittest.TestCase):
                 "reviewed_by": "reviewer",
                 "change_reason": "fix",
                 "confidence": 0.9,
+                "review_metadata": {"provenance": {"source": "manual_review", "license": "internal_review"}},
                 "node_id": "n8",
                 "field_path": "cefr_level",
                 "before_value": "B1",
@@ -146,13 +163,73 @@ class TestHILRepository(unittest.TestCase):
                 "reviewed_by": "reviewer",
                 "change_reason": "fix",
                 "confidence": 0.9,
+                "review_metadata": {"provenance": {"source": "manual_review", "license": "internal_review"}},
                 "node_id": "n9",
                 "field_path": "unknown_field",
                 "before_value": "x",
                 "after_value": "y",
                 "edited_at": "2026-02-17T00:00:00Z",
             },
+            {
+                # invalid provenance license
+                "sentence_key": "key-4",
+                "reviewed_by": "reviewer",
+                "change_reason": "fix",
+                "confidence": 0.9,
+                "review_metadata": {"provenance": {"source": "manual_review", "license": "proprietary_unknown"}},
+                "node_id": "n10",
+                "field_path": "synonyms",
+                "before_value": ["x"],
+                "after_value": ["y"],
+                "edited_at": "2026-02-17T00:00:00Z",
+            },
+            {
+                # source/license mismatch
+                "sentence_key": "key-5",
+                "reviewed_by": "reviewer",
+                "change_reason": "fix",
+                "confidence": 0.9,
+                "review_metadata": {"provenance": {"source": "manual_review", "license": "cc_by"}},
+                "node_id": "n11",
+                "field_path": "synonyms",
+                "before_value": ["x"],
+                "after_value": ["y"],
+                "edited_at": "2026-02-17T00:00:00Z",
+            },
+            {
+                # external license without source URL
+                "sentence_key": "key-6",
+                "reviewed_by": "reviewer",
+                "change_reason": "fix",
+                "confidence": 0.9,
+                "review_metadata": {"provenance": {"source": "trusted_corpus", "license": "cc_by"}},
+                "node_id": "n12",
+                "field_path": "synonyms",
+                "before_value": ["x"],
+                "after_value": ["y"],
+                "edited_at": "2026-02-17T00:00:00Z",
+            },
+            {
+                # valid externally attributed row
+                "sentence_key": "key-7",
+                "reviewed_by": "reviewer",
+                "change_reason": "fix",
+                "confidence": 0.9,
+                "review_metadata": {
+                    "provenance": {
+                        "source": "trusted_corpus",
+                        "license": "cc_by",
+                        "source_url": "https://example.org/source/1",
+                    }
+                },
+                "node_id": "n13",
+                "field_path": "synonyms",
+                "before_value": ["x"],
+                "after_value": ["y"],
+                "edited_at": "2026-02-17T00:00:00Z",
+            },
         ]
         filtered = apply_feedback_quality_gates(rows)
-        self.assertEqual(len(filtered), 1)
+        self.assertEqual(len(filtered), 2)
         self.assertEqual(filtered[0]["sentence_key"], "key-1")
+        self.assertEqual(filtered[1]["sentence_key"], "key-7")

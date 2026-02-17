@@ -11,6 +11,7 @@ Run the project in containers with stable service boundaries:
 - `Dockerfile`
 - `docker-compose.yml`
 - `.env.example`
+- `requirements-docker-cpu.txt` (container-only deps, CPU profile)
 
 ## 1) Prepare environment
 
@@ -23,6 +24,11 @@ Adjust `.env` values for production secrets and host port mapping.
 Compose CLI requirement:
 - use Docker Compose v2 (`docker compose ...`).
 - legacy `docker-compose` v1 is deprecated and is not supported in this setup.
+
+CPU-only container profile:
+- Docker image installs `torch` from CPU index (`download.pytorch.org/whl/cpu`).
+- This prevents pulling NVIDIA CUDA wheel stacks during `docker compose build`.
+- Torch version is configurable via `.env`: `TORCH_VERSION=2.5.1`.
 
 ## 2) Build and start
 

@@ -64,7 +64,7 @@ class TestHILIntegrationPostgres(unittest.TestCase):
                 reviewed_by="hil_tester",
                 change_reason="manual_correction",
                 confidence=0.95,
-                metadata={"tag": tag},
+                metadata={"tag": tag, "provenance": {"source": "manual_review", "license": "internal_review"}},
             )
             repo.add_node_edit(
                 review_event_id=event_id,
@@ -122,6 +122,7 @@ class TestHILIntegrationPostgres(unittest.TestCase):
                     parsed = [json.loads(line) for line in fh if line.strip()]
                 found = [row for row in parsed if row["sentence_key"] == sentence_key]
                 self.assertEqual(len(found), 2)
+                self.assertIn("review_metadata", found[0])
         finally:
             with self._psycopg.connect(self.db_url) as conn:
                 with conn.cursor() as cur:

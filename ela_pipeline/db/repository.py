@@ -265,6 +265,7 @@ class PostgresContractRepository:
             re.reviewed_by,
             re.change_reason,
             re.confidence,
+            re.metadata,
             ne.node_id,
             ne.field_path,
             ne.before_value,
@@ -289,11 +290,12 @@ class PostgresContractRepository:
                     "reviewed_by": row[1],
                     "change_reason": row[2],
                     "confidence": row[3],
-                    "node_id": row[4],
-                    "field_path": row[5],
-                    "before_value": row[6],
-                    "after_value": row[7],
-                    "edited_at": str(row[8]),
+                    "review_metadata": row[4],
+                    "node_id": row[5],
+                    "field_path": row[6],
+                    "before_value": row[7],
+                    "after_value": row[8],
+                    "edited_at": str(row[9]),
                 }
             )
         return exported

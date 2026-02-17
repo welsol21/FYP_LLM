@@ -346,9 +346,11 @@
 - [x] Add reviewer metadata model (`reviewed_by`, `reviewed_at`, `change_reason`, `confidence`) on every manual correction.
 - [x] Implement diff logger that stores `before/after` for every corrected node field.
 - [x] Build correction export pipeline: accepted edits -> normalized feedback dataset (JSONL) for retraining.
-- [ ] Add dataset quality gates for human-feedback export (dedup, invalid-label filter, license/provenance consistency).
+- [x] Add dataset quality gates for human-feedback export (dedup, invalid-label filter, license/provenance consistency).
   - [x] Dedup gate added (`sentence_key + node_id + field_path + after_value`).
   - [x] Invalid-label/field filter added (`cefr_level` allowed set + `field_path` whitelist).
-  - [ ] License/provenance consistency gate (source attribution policy) remains open.
-- [ ] Add training pipeline mode to mix base corpus + human-feedback dataset with configurable weighting.
-- [ ] Add regression checks proving that model quality improves after feedback retraining and does not break contract validity.
+  - [x] License/provenance consistency gate added (`source/license` matrix + required `source_url` for external-attributed licenses).
+- [x] Add training pipeline mode to mix base corpus + human-feedback dataset with configurable weighting.
+  - [x] Initial implementation in trainer CLI: `--feedback-train` + `--feedback-weight`.
+- [x] Add regression checks proving that model quality improves after feedback retraining and does not break contract validity.
+  - [x] Added gate CLI: `ela_pipeline.training.feedback_regression` (compares train metrics + inference QC and fails on degradation).

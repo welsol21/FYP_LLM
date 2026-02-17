@@ -24,6 +24,22 @@ ALLOWED_FIELD_PATHS = {
 }
 
 VALID_CEFR_LEVELS = {"A1", "A2", "B1", "B2", "C1", "C2"}
+ALLOWED_LICENSE_VALUES = {
+    "public_domain",
+    "project_owned",
+    "cc_by",
+    "cc_by_sa",
+    "mit",
+    "apache_2_0",
+    "internal_review",
+}
+EXTERNAL_ATTRIBUTED_LICENSES = {"public_domain", "cc_by", "cc_by_sa", "mit", "apache_2_0"}
+SOURCE_LICENSE_POLICY = {
+    "manual_review": {"internal_review", "project_owned"},
+    "trusted_corpus": {"public_domain", "cc_by", "cc_by_sa", "mit", "apache_2_0"},
+    "public_reference": {"public_domain", "cc_by", "cc_by_sa"},
+    "project_asset": {"project_owned", "mit", "apache_2_0"},
+}
 
 
 def _is_valid_row(row: dict[str, Any]) -> bool:
@@ -33,6 +49,25 @@ def _is_valid_row(row: dict[str, Any]) -> bool:
     reviewed_by = str(row.get("reviewed_by", "")).strip()
     if not reviewed_by:
         return False
+    meta = row.get("review_metadata")
+    if not isinstance(meta, dict):
+        return False
+    provenance = meta.get("provenance")
+    if not isinstance(provenance, dict):
+        return False
+    source = str(provenance.get("source", "")).strip()
+    license_value = str(provenance.get("license", "")).strip().lower()
+    source_url = str(provenance.get("source_url", "")).strip()
+    if not source:
+        return False
+    if license_value not in ALLOWED_LICENSE_VALUES:
+        return False
+    allowed_for_source = SOURCE_LICENSE_POLICY.get(source)
+    if allowed_for_source is None or license_value not in allowed_for_source:
+        return False
+    if license_value in EXTERNAL_ATTRIBUTED_LICENSES:
+        if not (source_url.startswith("http://") or source_url.startswith("https://")):
+            return False
     if field_path == "cefr_level":
         after_value = row.get("after_value")
         if not isinstance(after_value, str) or after_value not in VALID_CEFR_LEVELS:

@@ -11,9 +11,12 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends espeak-ng ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt /app/requirements.txt
+ARG TORCH_VERSION=2.5.1
+
+COPY requirements-docker-cpu.txt /app/requirements-docker-cpu.txt
 RUN pip install --upgrade pip \
-    && pip install -r /app/requirements.txt
+    && pip install --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple "torch==${TORCH_VERSION}" \
+    && pip install -r /app/requirements-docker-cpu.txt
 
 COPY . /app
 

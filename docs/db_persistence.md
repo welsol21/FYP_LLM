@@ -108,3 +108,7 @@ HIL feedback export quality gates (current):
 - allow only whitelisted editable `field_path` values
 - validate `cefr_level` labels (`A1|A2|B1|B2|C1|C2`)
 - deduplicate by (`sentence_key`, `node_id`, `field_path`, `after_value`)
+- enforce provenance metadata consistency:
+  - required: `review_metadata.provenance.source`, `license`
+  - source/license matrix policy (for example `manual_review -> internal_review|project_owned`)
+  - external-attributed licenses (`public_domain|cc_by|cc_by_sa|mit|apache_2_0`) require `provenance.source_url` (`http(s)://...`)

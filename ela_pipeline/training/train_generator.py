@@ -65,6 +65,21 @@ def _validate_processed_freshness(train_path: str, dev_path: str) -> Dict:
     return stats
 
 
+def mix_with_feedback_rows(
+    base_rows: List[Dict[str, str]],
+    feedback_rows: List[Dict[str, str]],
+    feedback_weight: int,
+) -> List[Dict[str, str]]:
+    if feedback_weight < 0:
+        raise ValueError("feedback_weight must be >= 0")
+    if not feedback_rows or feedback_weight == 0:
+        return list(base_rows)
+    mixed = list(base_rows)
+    for _ in range(feedback_weight):
+        mixed.extend(feedback_rows)
+    return mixed
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train local T5 generator for linguistic notes")
     parser.add_argument("--train", default="data/processed/train.jsonl")
@@ -77,6 +92,17 @@ def main() -> None:
     parser.add_argument("--max-target", type=int, default=128)
     parser.add_argument("--learning-rate", type=float, default=5e-5)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--feedback-train",
+        default="",
+        help="Optional JSONL with human-feedback rows (same schema as processed train rows).",
+    )
+    parser.add_argument(
+        "--feedback-weight",
+        type=int,
+        default=0,
+        help="How many times to replicate feedback rows into train mix.",
+    )
     args = parser.parse_args()
     try:
         import torch
@@ -91,6 +117,12 @@ def main() -> None:
     _validate_processed_rows(train_rows, split="train")
     _validate_processed_rows(dev_rows, split="dev")
     processed_stats = _validate_processed_freshness(args.train, args.dev)
+
+    feedback_rows: List[Dict[str, str]] = []
+    if args.feedback_train:
+        feedback_rows = load_jsonl(args.feedback_train)
+        _validate_processed_rows(feedback_rows, split="feedback_train")
+    train_rows = mix_with_feedback_rows(train_rows, feedback_rows, args.feedback_weight)
 
     tokenizer = T5Tokenizer.from_pretrained(args.model_name)
     model = T5ForConditionalGeneration.from_pretrained(args.model_name).to("cuda")
@@ -139,6 +171,9 @@ def main() -> None:
         "seed": args.seed,
         "processed_stats_path": str((Path(args.train).resolve().parent / "stats.json")),
         "processed_total_after_balance": int(processed_stats.get("total_after_balance", 0)),
+        "feedback_train_path": args.feedback_train or None,
+        "feedback_weight": args.feedback_weight,
+        "num_feedback_rows": len(feedback_rows),
     }
     save_json(os.path.join(args.output_dir, "training_config.json"), training_config)
 
