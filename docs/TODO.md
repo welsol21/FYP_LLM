@@ -405,7 +405,15 @@
   - [x] Added repository methods: enqueue/list/update status for sync requests.
   - [x] Added service layer: `ela_pipeline/runtime/sync_service.py`.
   - [x] Added tests: `tests/test_runtime_sync_service.py` (+ repository coverage in `tests/test_client_sqlite_repository.py`).
-- [ ] Keep a single unified output contract and add legacy format adapters at ingestion boundaries.
+- [x] Keep a single unified output contract and add legacy format adapters at ingestion boundaries.
+  - [x] Added adapter module: `ela_pipeline/adapters/legacy_contract.py`.
+  - [x] Added unified conversion entrypoint: `adapt_legacy_contract_doc(...)`.
+  - [x] Adapter coverage:
+    - [x] `linguistic_notes -> notes[]` mapping (`source=legacy`)
+    - [x] CEFR aliases (`sentence_cefr|phrase_cefr|word_cefr -> cefr_level`)
+    - [x] `"null" -> null` TAM normalization
+    - [x] missing `linguistic_elements` normalization
+  - [x] Added tests: `tests/test_legacy_contract_adapter.py`.
 - [ ] Integrate legacy visualizer and editor features into the new app flow (without model duplication).
 - [ ] Add explicit license-gated runtime switch for phonetics by deployment mode (offline/distributed/backend).
 - [ ] Update docs with end-user limitations in offline mode (phonetics unavailability and large-media delegation).

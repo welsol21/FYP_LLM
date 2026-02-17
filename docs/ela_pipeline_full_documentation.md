@@ -340,6 +340,19 @@ Simple usage pattern:
   - queue is local-first and works offline,
   - send/retry worker can process queued requests when network is available.
 
+### 4.19 Legacy Contract Adapter (single unified contract path)
+- Module: `ela_pipeline/adapters/legacy_contract.py`
+- Entry point: `adapt_legacy_contract_doc(doc)`
+- Why:
+  - avoid branching runtime logic for old formats,
+  - normalize old payloads before validation/inference processing.
+- Current adapter conversions:
+  - `linguistic_notes` -> typed `notes[]` (`source="legacy"`),
+  - `sentence_cefr|phrase_cefr|word_cefr` -> `cefr_level`,
+  - `"null"` TAM sentinels -> real `null`,
+  - missing `linguistic_elements` -> empty list,
+  - missing `schema_version` -> `v2`.
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset
