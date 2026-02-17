@@ -258,6 +258,21 @@ If `--model-dir` is omitted:
   - `message`: human-readable reason
   - `job_id`: backend queue id (only for backend route)
 
+### 4.14 UI State Contract (for frontend integration)
+- Module: `ela_pipeline/runtime/ui_state.py`
+- Purpose: keep UI logic simple by sending ready-to-render payloads.
+- Functions:
+  - `build_runtime_ui_state(caps)`:
+    - mode badge (`online|offline`)
+    - feature badges (phonetic/backend jobs)
+    - per-feature `enabled` flag + `reason_if_disabled`
+  - `build_submission_ui_feedback(result)`:
+    - maps route result to UI message payload:
+      - `severity`: `info|warning|error`
+      - `title`
+      - `message`
+- This allows frontend to render disabled states and fallback messages without duplicating runtime rules.
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset

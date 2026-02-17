@@ -368,7 +368,11 @@
 - [ ] Define and implement offline/online capability matrix in runtime + UI (feature flags and graceful degradation).
   - [x] Runtime policy layer added (`ela_pipeline/runtime/capabilities.py`) with fail-fast checks for offline disallowed features.
   - [x] Inference CLI wired with `--runtime-mode auto|offline|online` + `ELA_RUNTIME_MODE`.
-  - [ ] UI layer: capability badges/disabled states and graceful fallback messaging.
+  - [x] UI state contract added (`ela_pipeline/runtime/ui_state.py`):
+    - [x] capability badges payload (`build_runtime_ui_state`)
+    - [x] disabled-state reasons for blocked features
+    - [x] fallback messaging payload for local/backend/reject (`build_submission_ui_feedback`)
+  - [ ] Visual UI components to render this payload in frontend screens.
 - [ ] Enforce media routing policy:
   - [x] Runtime policy engine added (`ela_pipeline/runtime/media_policy.py`) with decision routes: `local|backend|reject`.
   - [x] local processing for files <= 15 minutes (policy decision path implemented).
@@ -377,7 +381,8 @@
     - [x] `ela_pipeline/runtime/media_orchestrator.py` (execution plan: `run_local|enqueue_backend|reject`)
     - [x] local SQLite backend job queue in `ela_pipeline/client_storage/sqlite_repository.py` (`backend_jobs` table + CRUD methods)
     - [x] submission helper added: `ela_pipeline/runtime/media_submission.py` (single entrypoint for Start action)
-  - [ ] UI wiring to consume orchestration plan and show route/status in interface.
+  - [x] UI payload adapters added for route/status and user-facing messages (`ela_pipeline/runtime/ui_state.py`).
+  - [ ] Visual UI wiring to consume orchestration payload and show route/status in interface.
 - [ ] Add media file size limits for both paths (configurable env/runtime thresholds):
   - [x] reject local jobs above `MEDIA_MAX_SIZE_LOCAL_MB` (policy routes to backend/reject).
   - [x] reject backend jobs above `MEDIA_MAX_SIZE_BACKEND_MB`.
