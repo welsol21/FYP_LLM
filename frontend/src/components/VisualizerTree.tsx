@@ -91,18 +91,17 @@ export function VisualizerTree({ node, depth = 0 }: Props) {
       </div>
       {showDetails ? (
         <div className="node-details">
-          <div><strong>Content:</strong> {node.content}</div>
-          {node.tense ? <div><strong>Tense:</strong> {node.tense}</div> : null}
           {node.cefr_level ? <div><strong>CEFR:</strong> {node.cefr_level}</div> : null}
-          {node.phonetic?.uk ? <div><strong>Phonetic:</strong> /{node.phonetic.uk}/</div> : null}
-          {node.translations?.length ? (
-            <div><strong>Translations:</strong> {node.translations.join(', ')}</div>
-          ) : null}
-          {node.linguistic_notes?.length ? (
-            <div><strong>Notes:</strong> {node.linguistic_notes.join(' ')}</div>
-          ) : null}
-          {node.synonyms?.length ? (
-            <div><strong>Synonyms:</strong> {node.synonyms.join(', ')}</div>
+          {node.tense ? <div><strong>Tense:</strong> {node.tense}</div> : null}
+          {node.linguistic_notes?.length ? <div><strong>Linguistic Notes:</strong> {node.linguistic_notes.join(' ')}</div> : null}
+          {node.translation?.text ? <div><strong>Translation:</strong> {node.translation.text}</div> : null}
+          {node.phonetic?.uk || node.phonetic?.us ? (
+            <div>
+              <strong>Phonetic:</strong>{' '}
+              {node.phonetic?.uk ? `UK /${node.phonetic.uk}/` : ''}
+              {node.phonetic?.uk && node.phonetic?.us ? ' | ' : ''}
+              {node.phonetic?.us ? `US /${node.phonetic.us}/` : ''}
+            </div>
           ) : null}
         </div>
       ) : null}

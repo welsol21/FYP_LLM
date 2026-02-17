@@ -58,14 +58,14 @@ Allowed types only:
 - `cefr_level`: one of `A1|A2|B1|B2|C1|C2`
 
 ### 2.5 Nesting Rules
-- `Sentence` can contain only `Phrase`
-- `Phrase` can contain only `Word`
+- `Sentence` can contain `Phrase` and `Word`
+- `Phrase` can contain `Phrase` and `Word`
 - `Word` must have an empty `linguistic_elements`
 - serialization order rule: `linguistic_elements` is emitted as the last field in each node object (`Sentence`, `Phrase`, `Word`) for stable readability.
 
 ### 2.6 Phrase Quality Rules
-- one-word phrases are disallowed
-- simple determiner-led noun chunks are filtered out (for example, `the decision`)
+- phrase shaping is heuristic and may differ by builder mode
+- simple determiner-led noun chunks may be filtered out by builder heuristics (for example, `the decision`)
 
 ### 2.7 Frozen Structure Rules
 After skeleton creation, enrichment cannot change:
@@ -115,7 +115,7 @@ python -m ela_pipeline.inference.run --validation-mode v1
 ## 4. Pipeline Stages
 
 ### 4.1 Skeleton Builder (`ela_pipeline/skeleton/builder.py`)
-Creates deterministic `Sentence -> Phrase -> Word` structure with POS labels, dependency metadata, and morphology features.
+Creates deterministic hierarchical structure with POS labels, dependency metadata, and morphology features (`Sentence|Phrase -> Phrase|Word`, `Word -> []`).
 
 ### 4.2 TAM Rules (`ela_pipeline/tam/rules.py`)
 Detects tense/aspect/voice/mood/finiteness at sentence and phrase levels.

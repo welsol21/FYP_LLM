@@ -40,8 +40,12 @@ export type VisualizerNode = {
   tense?: string
   phonetic?: { uk?: string; us?: string }
   linguistic_notes?: string[]
-  translations?: string[]
-  synonyms?: string[]
+  translation?: {
+    source_lang?: string
+    target_lang?: string
+    text: string
+    model?: string
+  }
   children: VisualizerNode[]
 }
 

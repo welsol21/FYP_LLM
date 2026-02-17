@@ -757,17 +757,20 @@ def _validate_node(
             expected_parent_id=node.get("node_id"),
         )
 
-    if node_type == "Sentence":
+    if node_type in {"Sentence", "Phrase"}:
         for idx, child in enumerate(children):
-            _expect(child.get("type") == "Phrase", errors, f"{path}.linguistic_elements[{idx}].type", "Sentence can only contain Phrase")
-    if node_type == "Phrase":
-        for idx, child in enumerate(children):
-            _expect(child.get("type") == "Word", errors, f"{path}.linguistic_elements[{idx}].type", "Phrase can only contain Word")
+            _expect(
+                child.get("type") in {"Phrase", "Word"},
+                errors,
+                f"{path}.linguistic_elements[{idx}].type",
+                f"{node_type} can only contain Phrase or Word",
+            )
+    if node_type == "Word":
         _expect(
-            len(children) >= 2,
+            len(children) == 0,
             errors,
             f"{path}.linguistic_elements",
-            "Phrase must contain at least 2 Word nodes",
+            "Word must have empty linguistic_elements",
         )
 
 

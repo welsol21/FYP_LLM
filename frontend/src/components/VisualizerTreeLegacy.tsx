@@ -66,15 +66,8 @@ function stableTopLevelTone(nodeId: string): string {
 }
 
 function nodeTokens(node: VisualizerNode, level: number): Token[] {
-  const children = orderedChildren(node)
-  if (children.length === 0) {
-    const tone = level === 1 ? stableTopLevelTone(node.node_id) : colorOf(labelOf(node))
-    return [{ text: node.content, tone }]
-  }
-  if (level === 0) {
-    return children.map((child) => ({ text: child.content, tone: stableTopLevelTone(child.node_id) }))
-  }
-  return children.map((child) => ({ text: child.content, tone: colorOf(labelOf(child)) }))
+  const tone = level === 1 && node.children.length === 0 ? stableTopLevelTone(node.node_id) : colorOf(labelOf(node))
+  return [{ text: node.content, tone }]
 }
 
 type Props = {
@@ -93,6 +86,12 @@ export function VisualizerTreeLegacy({ node, isRoot = false, level = 0 }: Props)
   const children = useMemo(() => orderedChildren(node), [node])
   const tokens = useMemo(() => nodeTokens(node, level), [node, level])
   const hasChildren = children.length > 0
+  const hasDetails =
+    Boolean(node.cefr_level) ||
+    Boolean(node.tense) ||
+    Boolean(node.linguistic_notes?.length) ||
+    Boolean(node.translation?.text) ||
+    Boolean(node.phonetic?.uk || node.phonetic?.us)
 
   return (
     <div className="lv-node-wrap">
@@ -121,19 +120,22 @@ export function VisualizerTreeLegacy({ node, isRoot = false, level = 0 }: Props)
         ))}
       </div>
 
-      <div className="lv-details-card">
-        {node.content ? <div><strong>Content:</strong> {node.content}</div> : null}
-        {node.cefr_level ? <div><strong>CEFR:</strong> {node.cefr_level}</div> : null}
-        {node.tense ? <div><strong>Tense:</strong> {node.tense}</div> : null}
-        {node.phonetic?.uk ? <div><strong>Phonetic:</strong> /{node.phonetic.uk}/</div> : null}
-        {node.translations?.length ? (
-          <div><strong>Translations:</strong> {node.translations.join(', ')}</div>
-        ) : null}
-        {node.linguistic_notes?.length ? (
-          <div><strong>Notes:</strong> {node.linguistic_notes.join(' ')}</div>
-        ) : null}
-        {node.synonyms?.length ? <div><strong>Synonyms:</strong> {node.synonyms.join(', ')}</div> : null}
-      </div>
+      {hasDetails ? (
+        <div className="lv-details-card">
+          {node.cefr_level ? <div><strong>CEFR:</strong> {node.cefr_level}</div> : null}
+          {node.tense ? <div><strong>Tense:</strong> {node.tense}</div> : null}
+          {node.linguistic_notes?.length ? <div><strong>Linguistic Notes:</strong> {node.linguistic_notes.join(' ')}</div> : null}
+          {node.translation?.text ? <div><strong>Translation:</strong> {node.translation.text}</div> : null}
+          {node.phonetic?.uk || node.phonetic?.us ? (
+            <div>
+              <strong>Phonetic:</strong>{' '}
+              {node.phonetic?.uk ? `UK /${node.phonetic.uk}/` : ''}
+              {node.phonetic?.uk && node.phonetic?.us ? ' | ' : ''}
+              {node.phonetic?.us ? `US /${node.phonetic.us}/` : ''}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {hasChildren && childrenOpen ? (
         <div className="lv-children-col">

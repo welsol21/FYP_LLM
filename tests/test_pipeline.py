@@ -18,6 +18,20 @@ from ela_pipeline.tam.rules import apply_tam
 
 
 class PipelineTests(unittest.TestCase):
+    @staticmethod
+    def _iter_descendants(node):
+        for child in node.get("linguistic_elements", []):
+            if not isinstance(child, dict):
+                continue
+            yield child
+            yield from PipelineTests._iter_descendants(child)
+
+    @staticmethod
+    def _iter_by_type(node, expected_type: str):
+        for item in PipelineTests._iter_descendants(node):
+            if item.get("type") == expected_type:
+                yield item
+
     def test_translation_model_prefers_local_project_copy_for_default_hf_id(self):
         with patch("ela_pipeline.inference.run.os.path.isdir", return_value=True):
             resolved = _resolve_translation_model_name("facebook/m2m100_418M")
@@ -474,14 +488,10 @@ class PipelineTests(unittest.TestCase):
         self.assertIsInstance(summary.get("unique_spans"), list)
         self.assertIsInstance(summary.get("reasons"), list)
 
-        leaf_backoff_node = None
-        for phrase in sentence.get("linguistic_elements", []):
-            for word in phrase.get("linguistic_elements", []):
-                if word.get("node_id") == "n9":
-                    leaf_backoff_node = word
-                    break
-            if leaf_backoff_node:
-                break
+        leaf_backoff_node = next(
+            (word for word in self._iter_by_type(sentence, "Word") if word.get("node_id") == "n9"),
+            None,
+        )
         self.assertIsNotNone(leaf_backoff_node)
         self.assertIn("backoff_used", leaf_backoff_node.get("quality_flags", []))
         self.assertIs(leaf_backoff_node.get("backoff_in_subtree"), False)
@@ -492,12 +502,13 @@ class PipelineTests(unittest.TestCase):
         key = next(iter(out))
         self.assertEqual(out[key]["type"], "Sentence")
 
-    def test_pipeline_disallows_one_word_phrases(self):
+    def test_pipeline_allows_one_word_phrases(self):
         out = run_pipeline("I run.", model_dir=None)
         key = next(iter(out))
         sentence = out[key]
-        for phrase in sentence.get("linguistic_elements", []):
-            self.assertGreaterEqual(len(phrase.get("linguistic_elements", [])), 2)
+        phrases = list(self._iter_by_type(sentence, "Phrase"))
+        self.assertGreaterEqual(len(phrases), 1)
+        self.assertTrue(any(len(p.get("linguistic_elements", [])) == 1 for p in phrases))
 
     def test_pipeline_adds_node_metadata(self):
         text = "She should have trusted her instincts before making the decision."
@@ -517,7 +528,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(sentence["source_span"]["start"], 0)
         self.assertEqual(sentence["source_span"]["end"], len(text))
 
-        for phrase in sentence.get("linguistic_elements", []):
+        for phrase in self._iter_by_type(sentence, "Phrase"):
             self.assertEqual(phrase.get("parent_id"), sentence.get("node_id"))
             self.assertIn("source_span", phrase)
             self.assertIn("grammatical_role", phrase)
@@ -527,7 +538,7 @@ class PipelineTests(unittest.TestCase):
                 self.assertIsInstance(phrase[field], str)
             self.assertIn("tam_construction", phrase)
             self.assertIsInstance(phrase["tam_construction"], str)
-            for word in phrase.get("linguistic_elements", []):
+            for word in self._iter_by_type(phrase, "Word"):
                 self.assertEqual(word.get("parent_id"), phrase.get("node_id"))
                 self.assertIn("source_span", word)
                 self.assertIn("grammatical_role", word)
@@ -546,7 +557,7 @@ class PipelineTests(unittest.TestCase):
     def test_pipeline_excludes_simple_determiner_noun_phrases(self):
         out = run_pipeline("She should have trusted her instincts before making the decision.", model_dir=None)
         key = next(iter(out))
-        phrase_texts = [p.get("content") for p in out[key].get("linguistic_elements", [])]
+        phrase_texts = [p.get("content") for p in self._iter_by_type(out[key], "Phrase")]
         self.assertNotIn("the decision", phrase_texts)
 
     def test_pipeline_strict_mode_uses_real_null_for_tam_fields(self):
@@ -619,10 +630,7 @@ class PipelineTests(unittest.TestCase):
         )
         sentence = out[next(iter(out))]
 
-        words_by_id = {}
-        for phrase in sentence.get("linguistic_elements", []):
-            for word in phrase.get("linguistic_elements", []):
-                words_by_id[word.get("node_id")] = word
+        words_by_id = {word.get("node_id"): word for word in self._iter_by_type(sentence, "Word")}
 
         ref_words = [w for w in words_by_id.values() if isinstance(w.get("ref_node_id"), str)]
         self.assertTrue(ref_words)
@@ -645,15 +653,9 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(modal_sentence.get("aspect"), "perfect")
         self.assertEqual(modal_sentence.get("mood"), "modal")
 
-        modal_phrase = next(
-            (p for p in modal_sentence.get("linguistic_elements", []) if p.get("tam_construction") == "modal_perfect"),
-            None,
-        )
+        modal_phrase = next((p for p in self._iter_by_type(modal_sentence, "Phrase") if p.get("tam_construction") == "modal_perfect"), None)
         self.assertIsNotNone(modal_phrase)
-        should_word = next(
-            (w for w in modal_phrase.get("linguistic_elements", []) if w.get("content", "").lower() == "should"),
-            None,
-        )
+        should_word = next((w for w in self._iter_by_type(modal_phrase, "Word") if w.get("content", "").lower() == "should"), None)
         self.assertIsNotNone(should_word)
         self.assertEqual(should_word.get("mood"), "modal")
 

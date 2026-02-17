@@ -51,7 +51,7 @@ class ValidatorTests(unittest.TestCase):
         result = validate_frozen_structure(skeleton, enriched)
         self.assertFalse(result.ok)
 
-    def test_rejects_one_word_phrase(self):
+    def test_accepts_one_word_phrase(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)
 
@@ -62,11 +62,47 @@ class ValidatorTests(unittest.TestCase):
         ]
 
         result = validate_contract(data, validation_mode="v1")
-        self.assertFalse(result.ok)
-        self.assertTrue(
-            any("at least 2 Word nodes" in err.message for err in result.errors),
-            msg=str(result.errors),
-        )
+        self.assertTrue(result.ok, msg=str(result.errors))
+
+    def test_accepts_mixed_children_for_sentence_and_phrase(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+
+        top_word = sentence["linguistic_elements"][0]["linguistic_elements"][0]
+        sentence["linguistic_elements"].append(top_word)
+
+        nested_phrase = {
+            "type": "Phrase",
+            "content": "nested phrase",
+            "tense": "null",
+            "linguistic_notes": [],
+            "part_of_speech": "noun phrase",
+            "linguistic_elements": [
+                {
+                    "type": "Word",
+                    "content": "nested",
+                    "tense": "null",
+                    "linguistic_notes": [],
+                    "part_of_speech": "adjective",
+                    "linguistic_elements": [],
+                },
+                {
+                    "type": "Word",
+                    "content": "phrase",
+                    "tense": "null",
+                    "linguistic_notes": [],
+                    "part_of_speech": "noun",
+                    "linguistic_elements": [],
+                },
+            ],
+        }
+        sentence["linguistic_elements"][0]["linguistic_elements"].append(nested_phrase)
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertTrue(result.ok, msg=str(result.errors))
 
     def test_rejects_invalid_optional_source_span(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:

@@ -16,7 +16,11 @@ export class MockRuntimeApi implements RuntimeApi {
         type: 'Sentence',
         content: 'Although she had been warned several times, she still chose to ignore the evidence, which eventually led to a costly mistake that could have been avoided.',
         cefr_level: 'B2',
-        translations: ['Хотя ее несколько раз предупреждали, она все же решила игнорировать доказательства, что в итоге привело к дорогостоящей ошибке, которой можно было избежать.'],
+        translation: {
+          source_lang: 'en',
+          target_lang: 'ru',
+          text: 'Хотя ее несколько раз предупреждали, она все же решила игнорировать доказательства, что в итоге привело к дорогостоящей ошибке, которой можно было избежать.',
+        },
         linguistic_notes: ['Complex sentence with subordinate and relative clauses.'],
         children: [
           {

@@ -590,126 +590,128 @@ def iter_examples(
         if counters is not None:
             counters["rows_emitted"] += 1
 
-    for phrase in item.get("linguistic_elements", []):
-        if phrase.get("type") != "Phrase":
-            continue
-        phrase_tam = _extract_tam_bucket(phrase)
-        phrase_text = _node_input_text(phrase)
-        phrase_features = phrase.get("features", {})
-        if task == "cefr_level":
-            phrase_cefr = _extract_cefr_level(phrase)
-            p_note = phrase_cefr
-        elif use_template_id_targets:
-            p_note, reason = _build_template_target("Phrase", phrase_text, phrase_features, phrase_tam)
-            if counters is not None:
-                if p_note:
-                    counters["template_targets_used"] += 1
-                elif reason:
-                    counters[f"template_filtered_{reason.lower()}"] += 1
-        elif use_reference_templates:
-            p_note = _build_reference_note(
-                level="Phrase",
-                node_text=phrase_text,
-                features=phrase_features,
-                tam_bucket=phrase_tam,
-            )
-        else:
-            p_note = _extract_note_from_targets(phrase.get("targets", {}), counters=counters)
-        if p_note:
+    for node in _iter_descendants(item):
+        node_type = node.get("type")
+        if node_type == "Phrase":
+            phrase_tam = _extract_tam_bucket(node)
+            phrase_text = _node_input_text(node)
+            phrase_features = node.get("features", {})
             if task == "cefr_level":
-                prompt = _render_phrase_cefr_prompt(
-                    sentence=sentence,
-                    phrase_text=phrase_text,
-                    pos_text=format_feature_list(phrase_features.get("pos", [])),
-                    dep_text=format_feature_list(phrase_features.get("dep", [])),
-                    tam_bucket=phrase_tam,
-                )
-            else:
-                prompt = _render_phrase_prompt(
-                    sentence=sentence,
-                    phrase_text=phrase_text,
-                    pos_text=format_feature_list(phrase_features.get("pos", [])),
-                    dep_text=format_feature_list(phrase_features.get("dep", [])),
-                    tam_bucket=phrase_tam,
-                )
-            yield {
-                "input": prompt,
-                "target": p_note,
-                "level": "Phrase",
-                "tam_bucket": phrase_tam,
-                "prompt_template_version": PROMPT_TEMPLATE_VERSION,
-                "task": task,
-            }
-            if counters is not None:
-                counters["rows_emitted"] += 1
-
-        for word in phrase.get("linguistic_elements", []):
-            if word.get("type") != "Word":
-                continue
-            word_tam = _extract_tam_bucket(word)
-            word_text = _node_input_text(word)
-            word_features = word.get("features", {})
-            if task == "cefr_level":
-                w_note = _extract_cefr_level(word)
+                phrase_cefr = _extract_cefr_level(node)
+                p_note = phrase_cefr
             elif use_template_id_targets:
-                w_note, reason = _build_template_target("Word", word_text, word_features, word_tam)
+                p_note, reason = _build_template_target("Phrase", phrase_text, phrase_features, phrase_tam)
                 if counters is not None:
-                    if w_note:
+                    if p_note:
                         counters["template_targets_used"] += 1
                     elif reason:
                         counters[f"template_filtered_{reason.lower()}"] += 1
             elif use_reference_templates:
-                w_note = _build_reference_note(
-                    level="Word",
-                    node_text=word_text,
-                    features=word_features,
-                    tam_bucket=word_tam,
+                p_note = _build_reference_note(
+                    level="Phrase",
+                    node_text=phrase_text,
+                    features=phrase_features,
+                    tam_bucket=phrase_tam,
                 )
             else:
-                w_note = _extract_note_from_targets(word.get("targets", {}), counters=counters)
-            if not w_note:
-                continue
-            if task == "cefr_level":
-                prompt = _render_word_cefr_prompt(
-                    sentence=sentence,
-                    word_text=word_text,
-                    pos_text=(word_features.get("pos", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                    tag_text=(word_features.get("tag", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                    dep_text=(word_features.get("dep", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                    morph_text=format_feature_list(word_features.get("morph", [])),
-                    tam_bucket=word_tam,
-                )
-            else:
-                prompt = _render_word_prompt(
-                    sentence=sentence,
-                    word_text=word_text,
-                    pos_text=(word_features.get("pos", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                    tag_text=(word_features.get("tag", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                    dep_text=(word_features.get("dep", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                    morph_text=format_feature_list(word_features.get("morph", [])),
-                    tam_bucket=word_tam,
-                )
-            yield {
-                "input": prompt,
-                "target": w_note,
-                "level": "Word",
-                "tam_bucket": word_tam,
-                "prompt_template_version": PROMPT_TEMPLATE_VERSION,
-                "task": task,
-            }
+                p_note = _extract_note_from_targets(node.get("targets", {}), counters=counters)
+            if p_note:
+                if task == "cefr_level":
+                    prompt = _render_phrase_cefr_prompt(
+                        sentence=sentence,
+                        phrase_text=phrase_text,
+                        pos_text=format_feature_list(phrase_features.get("pos", [])),
+                        dep_text=format_feature_list(phrase_features.get("dep", [])),
+                        tam_bucket=phrase_tam,
+                    )
+                else:
+                    prompt = _render_phrase_prompt(
+                        sentence=sentence,
+                        phrase_text=phrase_text,
+                        pos_text=format_feature_list(phrase_features.get("pos", [])),
+                        dep_text=format_feature_list(phrase_features.get("dep", [])),
+                        tam_bucket=phrase_tam,
+                    )
+                yield {
+                    "input": prompt,
+                    "target": p_note,
+                    "level": "Phrase",
+                    "tam_bucket": phrase_tam,
+                    "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+                    "task": task,
+                }
+                if counters is not None:
+                    counters["rows_emitted"] += 1
+            continue
+
+        if node_type != "Word":
+            continue
+        word_tam = _extract_tam_bucket(node)
+        word_text = _node_input_text(node)
+        word_features = node.get("features", {})
+        if task == "cefr_level":
+            w_note = _extract_cefr_level(node)
+        elif use_template_id_targets:
+            w_note, reason = _build_template_target("Word", word_text, word_features, word_tam)
             if counters is not None:
-                counters["rows_emitted"] += 1
+                if w_note:
+                    counters["template_targets_used"] += 1
+                elif reason:
+                    counters[f"template_filtered_{reason.lower()}"] += 1
+        elif use_reference_templates:
+            w_note = _build_reference_note(
+                level="Word",
+                node_text=word_text,
+                features=word_features,
+                tam_bucket=word_tam,
+            )
+        else:
+            w_note = _extract_note_from_targets(node.get("targets", {}), counters=counters)
+        if not w_note:
+            continue
+        if task == "cefr_level":
+            prompt = _render_word_cefr_prompt(
+                sentence=sentence,
+                word_text=word_text,
+                pos_text=(word_features.get("pos", ["UNKNOWN"]) or ["UNKNOWN"])[0],
+                tag_text=(word_features.get("tag", ["UNKNOWN"]) or ["UNKNOWN"])[0],
+                dep_text=(word_features.get("dep", ["UNKNOWN"]) or ["UNKNOWN"])[0],
+                morph_text=format_feature_list(word_features.get("morph", [])),
+                tam_bucket=word_tam,
+            )
+        else:
+            prompt = _render_word_prompt(
+                sentence=sentence,
+                word_text=word_text,
+                pos_text=(word_features.get("pos", ["UNKNOWN"]) or ["UNKNOWN"])[0],
+                tag_text=(word_features.get("tag", ["UNKNOWN"]) or ["UNKNOWN"])[0],
+                dep_text=(word_features.get("dep", ["UNKNOWN"]) or ["UNKNOWN"])[0],
+                morph_text=format_feature_list(word_features.get("morph", [])),
+                tam_bucket=word_tam,
+            )
+        yield {
+            "input": prompt,
+            "target": w_note,
+            "level": "Word",
+            "tam_bucket": word_tam,
+            "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+            "task": task,
+        }
+        if counters is not None:
+            counters["rows_emitted"] += 1
+
+
+def _iter_descendants(node: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
+    for child in node.get("linguistic_elements", []):
+        if not isinstance(child, dict):
+            continue
+        yield child
+        yield from _iter_descendants(child)
 
 
 def _iter_nodes(item: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
     yield item
-    for phrase in item.get("linguistic_elements", []):
-        if not isinstance(phrase, dict):
-            continue
-        yield phrase
-        for word in phrase.get("linguistic_elements", []):
-            if isinstance(word, dict):
-                yield word
+    yield from _iter_descendants(item)
 
 
 def detect_dataset_schema(raw: List[Dict[str, Any]]) -> Dict[str, int | str]:

@@ -271,37 +271,30 @@ def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
 def _mark_ref_duplicates(sentence_node: Dict) -> None:
     """Mark duplicate span/content nodes with ref_node_id without changing tree shape."""
     seen: Dict[Tuple[str, int, int, str, str], str] = {}
-    for phrase in sentence_node.get("linguistic_elements", []):
-        p_span = phrase.get("source_span") or {}
-        p_key = (
-            "Phrase",
-            int(p_span.get("start", -1)),
-            int(p_span.get("end", -1)),
-            str(phrase.get("content") or ""),
-            str(phrase.get("part_of_speech") or ""),
-        )
-        first_phrase_id = seen.get(p_key)
-        if first_phrase_id is None:
-            seen[p_key] = phrase.get("node_id")
-            phrase.pop("ref_node_id", None)
-        else:
-            phrase["ref_node_id"] = first_phrase_id
 
-        for word in phrase.get("linguistic_elements", []):
-            w_span = word.get("source_span") or {}
-            w_key = (
-                "Word",
-                int(w_span.get("start", -1)),
-                int(w_span.get("end", -1)),
-                str(word.get("content") or ""),
-                str(word.get("part_of_speech") or ""),
-            )
-            first_word_id = seen.get(w_key)
-            if first_word_id is None:
-                seen[w_key] = word.get("node_id")
-                word.pop("ref_node_id", None)
-            else:
-                word["ref_node_id"] = first_word_id
+    def walk(node: Dict) -> None:
+        for child in node.get("linguistic_elements", []):
+            if not isinstance(child, dict):
+                continue
+            node_type = str(child.get("type") or "")
+            if node_type in {"Phrase", "Word"}:
+                span = child.get("source_span") or {}
+                key = (
+                    node_type,
+                    int(span.get("start", -1)),
+                    int(span.get("end", -1)),
+                    str(child.get("content") or ""),
+                    str(child.get("part_of_speech") or ""),
+                )
+                first_id = seen.get(key)
+                if first_id is None:
+                    seen[key] = child.get("node_id")
+                    child.pop("ref_node_id", None)
+                else:
+                    child["ref_node_id"] = first_id
+            walk(child)
+
+    walk(sentence_node)
 
 
 def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
@@ -354,14 +347,10 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
                 next_id=next_id,
             )
 
-            # Contract rule: do not emit one-word phrases.
-            if len(phrase_node["linguistic_elements"]) < 2:
-                continue
-
             sentence_node["linguistic_elements"].append(phrase_node)
 
         if not sentence_node["linguistic_elements"]:
-            # Fallback: single phrase with all non-space tokens when sentence has at least 2 tokens.
+            # Fallback: single phrase with all non-space tokens.
             phrase_node = blank_node("Phrase", sent_text, "clause", tense="null")
             phrase_id = next_id()
             _with_metadata(
@@ -377,8 +366,7 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
                 parent_id=phrase_id,
                 next_id=next_id,
             )
-            if len(phrase_node["linguistic_elements"]) >= 2:
-                sentence_node["linguistic_elements"].append(phrase_node)
+            sentence_node["linguistic_elements"].append(phrase_node)
 
         _mark_ref_duplicates(sentence_node)
         output[sent_text] = sentence_node

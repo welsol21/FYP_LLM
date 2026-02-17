@@ -13,10 +13,9 @@
 
 ## Contract v2 Improvements
 
-- [x] Enforce phrase length constraints:
-  - [x] one-word phrases must be disallowed
-  - [x] each `Phrase` node should contain at least 2 word tokens in `linguistic_elements`
-  - [x] exclude simple determiner-led noun chunks (e.g., `the decision`)
+- [x] Enforce phrase shaping constraints:
+  - [x] simple determiner-led noun chunks may be filtered by builder heuristics (e.g., `the decision`)
+  - [x] contract allows mixed children for `Sentence` and `Phrase` nodes (`Phrase|Word`)
 - [x] Add stable graph identity fields:
   - [x] `node_id`
   - [x] `parent_id`

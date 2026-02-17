@@ -10,7 +10,7 @@ describe('VisualizerPage', () => {
       expect(screen.getAllByText('Although she had been warned several times, she still chose to ignore the evidence, which eventually led to a costly mistake that could have been avoided.').length).toBeGreaterThan(0)
     })
     expect(screen.getAllByText('B2').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('ignore').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('still chose to ignore the evidence').length).toBeGreaterThan(0)
     expect(screen.getByText(/CEFR:/)).toBeInTheDocument()
   })
 
@@ -19,8 +19,7 @@ describe('VisualizerPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Verb Phrase')).toBeInTheDocument()
-      expect(screen.getAllByText('chose').length).toBeGreaterThan(0)
-      expect(screen.getAllByText('evidence').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('still chose to ignore the evidence').length).toBeGreaterThan(0)
     })
 
     fireEvent.change(screen.getByLabelText(/Node ID/), { target: { value: 'p1' } })

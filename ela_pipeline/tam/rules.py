@@ -111,7 +111,25 @@ def detect_tam(tokens: Iterable) -> TamResult:
 
 
 def apply_tam(contract_doc: dict, nlp) -> dict:
-    """Apply TAM to sentence and phrase nodes in-place."""
+    """Apply TAM to sentence and all phrase nodes in-place."""
+
+    def _apply_phrase_tam_recursive(node: dict) -> None:
+        for child in node.get("linguistic_elements", []):
+            if not isinstance(child, dict):
+                continue
+            if child.get("type") == "Phrase":
+                phrase_text = child.get("content", "")
+                phrase_doc = nlp(phrase_text)
+                phrase_sent = next(phrase_doc.sents, phrase_doc[:])
+                phrase_tam = detect_tam(phrase_sent)
+                child["tense"] = phrase_tam.short_tense
+                child["aspect"] = phrase_tam.aspect
+                child["voice"] = phrase_tam.voice
+                child["mood"] = phrase_tam.mood
+                child["finiteness"] = phrase_tam.finiteness
+                child["tam_construction"] = phrase_tam.construction
+            _apply_phrase_tam_recursive(child)
+
     for sent_text, sentence_node in contract_doc.items():
         doc = nlp(sent_text)
         sent = next(doc.sents, doc[:])
@@ -124,16 +142,6 @@ def apply_tam(contract_doc: dict, nlp) -> dict:
         sentence_node["finiteness"] = sentence_tam.finiteness
         sentence_node["tam_construction"] = sentence_tam.construction
 
-        for phrase in sentence_node.get("linguistic_elements", []):
-            phrase_text = phrase.get("content", "")
-            phrase_doc = nlp(phrase_text)
-            phrase_sent = next(phrase_doc.sents, phrase_doc[:])
-            phrase_tam = detect_tam(phrase_sent)
-            phrase["tense"] = phrase_tam.short_tense
-            phrase["aspect"] = phrase_tam.aspect
-            phrase["voice"] = phrase_tam.voice
-            phrase["mood"] = phrase_tam.mood
-            phrase["finiteness"] = phrase_tam.finiteness
-            phrase["tam_construction"] = phrase_tam.construction
+        _apply_phrase_tam_recursive(sentence_node)
 
     return contract_doc

@@ -98,6 +98,14 @@ def _write_jsonl(path: Path, rows: List[Dict[str, Any]]) -> None:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 
+def _iter_descendants(node: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
+    for child in node.get("linguistic_elements", []):
+        if not isinstance(child, dict):
+            continue
+        yield child
+        yield from _iter_descendants(child)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Extract sentence/phrase/word datasets from ingested corpus")
     parser.add_argument("--input-jsonl", required=True, help="Ingested sentence corpus JSONL")
@@ -135,13 +143,12 @@ def main() -> None:
             if len(sentence_rows) < int(args.sentence_quota):
                 sentence_rows.append(_sentence_record(sent_node, base, sent_text))
 
-            for phrase_node in sent_node.get("linguistic_elements", []):
-                if len(phrase_rows) < int(args.phrase_quota):
-                    phrase_rows.append(_phrase_record(phrase_node, base, sent_text))
-
-                for word_node in phrase_node.get("linguistic_elements", []):
-                    if len(word_rows) < int(args.word_quota):
-                        word_rows.append(_word_record(word_node, base, sent_text))
+            for node in _iter_descendants(sent_node):
+                node_type = node.get("type")
+                if node_type == "Phrase" and len(phrase_rows) < int(args.phrase_quota):
+                    phrase_rows.append(_phrase_record(node, base, sent_text))
+                if node_type == "Word" and len(word_rows) < int(args.word_quota):
+                    word_rows.append(_word_record(node, base, sent_text))
 
             if (
                 len(sentence_rows) >= int(args.sentence_quota)

@@ -16,17 +16,16 @@ class CEFRCorpusValidationIssue:
 
 def iter_contract_nodes(sentence: Dict[str, Any], *, sentence_index: int) -> Iterable[tuple[Dict[str, Any], str]]:
     sentence_path = f"[{sentence_index}]"
-    yield sentence, sentence_path
-    for phrase_index, phrase in enumerate(sentence.get("linguistic_elements", []) or []):
-        if not isinstance(phrase, dict):
-            continue
-        phrase_path = f"{sentence_path}.linguistic_elements[{phrase_index}]"
-        yield phrase, phrase_path
-        for word_index, word in enumerate(phrase.get("linguistic_elements", []) or []):
-            if not isinstance(word, dict):
+
+    def walk(node: Dict[str, Any], path: str) -> Iterable[tuple[Dict[str, Any], str]]:
+        yield node, path
+        for child_index, child in enumerate(node.get("linguistic_elements", []) or []):
+            if not isinstance(child, dict):
                 continue
-            word_path = f"{phrase_path}.linguistic_elements[{word_index}]"
-            yield word, word_path
+            child_path = f"{path}.linguistic_elements[{child_index}]"
+            yield from walk(child, child_path)
+
+    yield from walk(sentence, sentence_path)
 
 
 def validate_cefr_corpus(payload: Any) -> List[CEFRCorpusValidationIssue]:
@@ -56,4 +55,3 @@ def validate_cefr_corpus(payload: Any) -> List[CEFRCorpusValidationIssue]:
                     )
                 )
     return issues
-
