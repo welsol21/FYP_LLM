@@ -353,6 +353,17 @@ Simple usage pattern:
   - missing `linguistic_elements` -> empty list,
   - missing `schema_version` -> `v2`.
 
+### 4.20 Legacy Visualizer/Editor Bridge
+- Module: `ela_pipeline/legacy_bridge/visualizer_editor.py`
+- Visualizer helpers:
+  - `build_visualizer_payload(sentence_node)`
+  - `build_visualizer_payload_for_document(doc)`
+- Editor helper:
+  - `apply_node_edit(doc, sentence_text, node_id, field_path, new_value)`
+- Why this matters:
+  - reuse legacy visualizer/editor behavior without duplicating model logic,
+  - keep edit flow on top of the same unified contract.
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset

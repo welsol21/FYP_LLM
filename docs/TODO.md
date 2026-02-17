@@ -415,5 +415,11 @@
     - [x] missing `linguistic_elements` normalization
   - [x] Added tests: `tests/test_legacy_contract_adapter.py`.
 - [ ] Integrate legacy visualizer and editor features into the new app flow (without model duplication).
+  - [x] Added bridge module: `ela_pipeline/legacy_bridge/visualizer_editor.py`.
+  - [x] Added visualizer payload builders:
+    - [x] `build_visualizer_payload(...)`
+    - [x] `build_visualizer_payload_for_document(...)`
+  - [x] Added editor patch helper: `apply_node_edit(...)` by `sentence_text + node_id + field_path`.
+  - [ ] Connect bridge to actual frontend screens/routes.
 - [ ] Add explicit license-gated runtime switch for phonetics by deployment mode (offline/distributed/backend).
 - [ ] Update docs with end-user limitations in offline mode (phonetics unavailability and large-media delegation).
