@@ -47,6 +47,11 @@ Temporary media retention policy:
   - `.venv/bin/python -m ela_pipeline.runtime.cleanup_media_tmp --dry-run`
   - `.venv/bin/python -m ela_pipeline.runtime.cleanup_media_tmp`
 
+Minimal identity policy:
+- `ELA_PHONE_HASH_SALT` must be set (strong secret value).
+- backend stores only `phone_hash` in DB (table `backend_accounts`).
+- raw phone number must not be persisted.
+
 ## 2) Build and start
 
 ```bash

@@ -309,6 +309,20 @@ Simple usage pattern:
 - Recommended production usage:
   - run periodically via cron/systemd timer in app container/host.
 
+### 4.17 Minimal Backend Identity Policy (phone-hash only)
+- Goal: avoid storing personal data beyond minimum required account link.
+- Module: `ela_pipeline/identity/policy.py`
+- Rules:
+  - normalize phone to strict E.164-like format (`normalize_phone_e164`),
+  - compute salted hash (`hash_phone_e164`),
+  - do not persist raw phone values.
+- DB support:
+  - migration `ela_pipeline/db/migrations/0004_backend_accounts.sql`
+  - table `backend_accounts` stores only `phone_hash`.
+- Repository methods:
+  - `upsert_backend_account(phone_hash=...)`
+  - `get_backend_account_by_phone_hash(phone_hash=...)`
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset

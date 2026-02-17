@@ -299,3 +299,40 @@ class PostgresContractRepository:
                 }
             )
         return exported
+
+    def upsert_backend_account(self, *, phone_hash: str) -> int:
+        sql = """
+        INSERT INTO backend_accounts (phone_hash)
+        VALUES (%s)
+        ON CONFLICT (phone_hash)
+        DO UPDATE SET updated_at = NOW()
+        RETURNING id
+        """
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, (phone_hash,))
+                row = cur.fetchone()
+            conn.commit()
+        if not row:
+            raise RuntimeError("Failed to upsert backend account.")
+        return int(row[0])
+
+    def get_backend_account_by_phone_hash(self, *, phone_hash: str) -> dict[str, Any] | None:
+        sql = """
+        SELECT id, phone_hash, created_at, updated_at
+        FROM backend_accounts
+        WHERE phone_hash = %s
+        LIMIT 1
+        """
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, (phone_hash,))
+                row = cur.fetchone()
+        if row is None:
+            return None
+        return {
+            "id": int(row[0]),
+            "phone_hash": row[1],
+            "created_at": str(row[2]),
+            "updated_at": str(row[3]),
+        }
