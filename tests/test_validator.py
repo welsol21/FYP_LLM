@@ -321,6 +321,32 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
+    def test_accepts_valid_optional_cefr_level_fields(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["cefr_level"] = "B2"
+        first_word = sentence["linguistic_elements"][0]["linguistic_elements"][0]
+        first_word["cefr_level"] = "B1"
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertTrue(result.ok, msg=str(result.errors))
+
+    def test_rejects_invalid_optional_cefr_level_fields(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["cefr_level"] = "B3"
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any(".cefr_level" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
     def test_rejects_missing_sentence_translation_model_in_v2_strict(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)

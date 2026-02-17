@@ -1,0 +1,13 @@
+{
+  "prompt_template_version": "v1",
+  "total_after_balance": 2520,
+  "train": 1800,
+  "dev": 360,
+  "test": 360,
+  "source": "data/processed_cefr",
+  "sampling": {
+    "train": 100,
+    "dev": 20,
+    "test": 20
+  }
+}

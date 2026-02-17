@@ -12,6 +12,7 @@ NOTE_SOURCES = {"model", "rule", "fallback"}
 VALIDATION_MODES = {"v1", "v2_strict"}
 STRICT_V2_REQUIRED_FIELDS = {"node_id", "source_span", "grammatical_role", "schema_version"}
 TAM_FIELDS = ("tense", "aspect", "mood", "voice", "finiteness")
+CEFR_LEVELS = {"A1", "A2", "B1", "B2", "C1", "C2"}
 
 
 @dataclass
@@ -282,6 +283,16 @@ def _validate_optional_synonyms(node: Dict[str, Any], path: str, errors: List[Va
             continue
         _expect(normalized not in seen, errors, item_path, "synonym items must be unique")
         seen.add(normalized)
+
+
+def _validate_optional_cefr_level(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "cefr_level" not in node:
+        return
+    level = node.get("cefr_level")
+    _expect(isinstance(level, str), errors, f"{path}.cefr_level", "cefr_level must be string")
+    if isinstance(level, str):
+        normalized = level.strip().upper()
+        _expect(normalized in CEFR_LEVELS, errors, f"{path}.cefr_level", "cefr_level must be one of A1|A2|B1|B2|C1|C2")
 
 
 def _validate_optional_trace_fields(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
@@ -707,6 +718,7 @@ def _validate_node(
     _validate_optional_translation(node, path, errors, validation_mode)
     _validate_optional_phonetic(node, path, errors)
     _validate_optional_synonyms(node, path, errors)
+    _validate_optional_cefr_level(node, path, errors)
     _validate_optional_trace_fields(node, path, errors)
     _validate_optional_template_selection(node, path, errors)
     _validate_optional_backoff_in_subtree(node, path, errors)

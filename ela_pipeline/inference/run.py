@@ -23,6 +23,18 @@ DEFAULT_TRANSLATION_MODEL = "facebook/m2m100_418M"
 DEFAULT_LOCAL_TRANSLATION_MODEL_DIR = "artifacts/models/m2m100_418M"
 DEFAULT_CEFR_MODEL_PATH = "artifacts/models/t5_cefr/best_model"
 CEFR_ALLOWED_LEVELS = {"A1", "A2", "B1", "B2", "C1", "C2"}
+CEFR_LEVEL_ORDER = ("A1", "A2", "B1", "B2", "C1", "C2")
+CEFR_LEVEL_TO_INDEX = {level: idx for idx, level in enumerate(CEFR_LEVEL_ORDER)}
+
+WORD_POS_CEILING = {
+    "article": "A1",
+    "auxiliary verb": "A2",
+    "determiner": "A2",
+    "pronoun": "A2",
+    "preposition": "B1",
+    "conjunction": "B1",
+    "particle": "B1",
+}
 
 
 def _normalize_strict_null_sentinels(node: dict) -> None:
@@ -63,6 +75,44 @@ def _node_source_text(node: dict, sentence_text: str) -> str:
             if 0 <= start <= end <= len(sentence_text):
                 return sentence_text[start:end]
     return str(node.get("content") or "")
+
+
+def _cefr_clamp(level: str, *, low: str | None = None, high: str | None = None) -> str:
+    idx = CEFR_LEVEL_TO_INDEX[level]
+    if low is not None:
+        idx = max(idx, CEFR_LEVEL_TO_INDEX[low])
+    if high is not None:
+        idx = min(idx, CEFR_LEVEL_TO_INDEX[high])
+    return CEFR_LEVEL_ORDER[idx]
+
+
+def _cefr_shift(level: str, delta: int) -> str:
+    idx = CEFR_LEVEL_TO_INDEX[level] + delta
+    idx = max(0, min(idx, len(CEFR_LEVEL_ORDER) - 1))
+    return CEFR_LEVEL_ORDER[idx]
+
+
+def _calibrate_cefr_level(
+    node: dict,
+    level: str,
+    *,
+    sentence_level: str,
+    parent_level: str | None,
+) -> str:
+    node_type = str(node.get("type") or "").strip()
+    pos = str(node.get("part_of_speech") or "").strip().lower()
+    calibrated = level
+
+    if node_type == "Phrase":
+        calibrated = _cefr_clamp(calibrated, low=_cefr_shift(sentence_level, -1), high=_cefr_shift(sentence_level, 1))
+    elif node_type == "Word":
+        if pos in WORD_POS_CEILING:
+            calibrated = _cefr_clamp(calibrated, high=WORD_POS_CEILING[pos])
+        calibrated = _cefr_clamp(calibrated, high=_cefr_shift(sentence_level, 2))
+        if parent_level is not None:
+            calibrated = _cefr_clamp(calibrated, high=_cefr_shift(parent_level, 1))
+
+    return calibrated
 
 
 def _attach_translation(
@@ -358,7 +408,7 @@ def _attach_cefr(
         cefr_by_node_id: dict[str, str] = {}
         cefr_by_source_key: dict[str, str] = {}
 
-        def enrich_node(node: dict) -> None:
+        def enrich_node(node: dict, parent_level: str | None = sentence_level) -> None:
             node_id = node.get("node_id")
             ref_node_id = node.get("ref_node_id")
 
@@ -371,9 +421,15 @@ def _attach_cefr(
                 if source_key in cefr_by_source_key:
                     level = cefr_by_source_key[source_key]
                 else:
-                    level = str(predictor.predict_level(node, source_text, sentence_text)).strip().upper()
-                    if level not in CEFR_ALLOWED_LEVELS:
-                        raise ValueError(f"Invalid CEFR level from predictor: {level!r}")
+                    predicted_level = str(predictor.predict_level(node, source_text, sentence_text)).strip().upper()
+                    if predicted_level not in CEFR_ALLOWED_LEVELS:
+                        raise ValueError(f"Invalid CEFR level from predictor: {predicted_level!r}")
+                    level = _calibrate_cefr_level(
+                        node=node,
+                        level=predicted_level,
+                        sentence_level=sentence_level,
+                        parent_level=parent_level,
+                    )
                     cefr_by_source_key[source_key] = level
 
             node["cefr_level"] = level
@@ -382,7 +438,7 @@ def _attach_cefr(
 
             for child in node.get("linguistic_elements", []) or []:
                 if isinstance(child, dict):
-                    enrich_node(child)
+                    enrich_node(child, parent_level=level)
 
         for child in sentence_node.get("linguistic_elements", []) or []:
             if isinstance(child, dict):

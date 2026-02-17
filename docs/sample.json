@@ -12,6 +12,7 @@
       "us": "ʃi ʃʊd hæv ˈtrʌstɪd hɝ ˈɪnstɪŋkts bɪˈfɔɹ ˈmeɪkɪŋ ðə dɪˈsɪʒən"
     },
     "synonyms": ["trust", "rely"],
+    "cefr_level": "B2",
     "linguistic_elements": [
       {
         "type": "Phrase",
@@ -26,6 +27,7 @@
           "us": "ʃi ʃʊd hæv ˈtrʌstɪd hɝ ˈɪnstɪŋkts"
         },
         "synonyms": [],
+        "cefr_level": "B2",
         "linguistic_elements": [
           {
             "type": "Word",
@@ -37,6 +39,7 @@
             "part_of_speech": "pronoun",
             "phonetic": {"uk": "ʃi", "us": "ʃi"},
             "synonyms": [],
+            "cefr_level": "A1",
             "linguistic_elements": []
           },
           {
@@ -49,6 +52,7 @@
             "part_of_speech": "modal verb",
             "phonetic": {"uk": "ʃʊd", "us": "ʃʊd"},
             "synonyms": ["ought to"],
+            "cefr_level": "A2",
             "linguistic_elements": []
           },
           {
@@ -62,6 +66,7 @@
             "translations": ["иметь"],
             "phonetic": {"uk": "hæv", "us": "hæv"},
             "synonyms": [],
+            "cefr_level": "A2",
             "linguistic_elements": []
           },
           {
@@ -74,6 +79,7 @@
             "part_of_speech": "verb",
             "phonetic": {"uk": "ˈtrʌstɪd", "us": "ˈtrʌstɪd"},
             "synonyms": ["relied", "believed"],
+            "cefr_level": "B1",
             "linguistic_elements": []
           },
           {
@@ -86,6 +92,7 @@
             "part_of_speech": "pronoun",
             "phonetic": {"uk": "hɜː", "us": "hɝ"},
             "synonyms": [],
+            "cefr_level": "A1",
             "linguistic_elements": []
           },
           {
@@ -98,6 +105,7 @@
             "part_of_speech": "noun",
             "phonetic": {"uk": "ˈɪnstɪŋkts", "us": "ˈɪnstɪŋkts"},
             "synonyms": ["intuition"],
+            "cefr_level": "B2",
             "linguistic_elements": []
           }
         ]
@@ -115,6 +123,7 @@
           "us": "bɪˈfɔɹ ˈmeɪkɪŋ ðə dɪˈsɪʒən"
         },
         "synonyms": [],
+        "cefr_level": "B1",
         "linguistic_elements": [
           {
             "type": "Word",
@@ -126,6 +135,7 @@
             "part_of_speech": "preposition",
             "phonetic": {"uk": "bɪˈfɔː", "us": "bɪˈfɔɹ"},
             "synonyms": ["prior to"],
+            "cefr_level": "A2",
             "linguistic_elements": []
           },
           {
@@ -138,6 +148,7 @@
             "part_of_speech": "verb",
             "phonetic": {"uk": "ˈmeɪkɪŋ", "us": "ˈmeɪkɪŋ"},
             "synonyms": ["creating"],
+            "cefr_level": "B1",
             "linguistic_elements": []
           },
           {
@@ -150,6 +161,7 @@
             "part_of_speech": "article",
             "phonetic": {"uk": "ðə", "us": "ðə"},
             "synonyms": [],
+            "cefr_level": "A1",
             "linguistic_elements": []
           },
           {
@@ -162,6 +174,7 @@
             "part_of_speech": "noun",
             "phonetic": {"uk": "dɪˈsɪʒən", "us": "dɪˈsɪʒən"},
             "synonyms": ["choice", "resolution"],
+            "cefr_level": "B2",
             "linguistic_elements": []
           }
         ]

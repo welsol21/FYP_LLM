@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 from ela_pipeline.annotate.local_generator import LocalT5Annotator
 from ela_pipeline.inference.run import (
+    _attach_cefr,
     _attach_phonetic,
     _attach_synonyms,
     _attach_translation,
@@ -249,6 +250,125 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(dup_word["synonyms"], ["sworn", "relied on"])
         trusted_calls = [c for c in FakeSynonyms.calls if c[0] == "trusted"]
         self.assertEqual(len(trusted_calls), 1)
+
+    def test_attach_cefr_enriches_sentence_and_nodes_with_dedup(self):
+        doc = {
+            "She trusted him.": {
+                "type": "Sentence",
+                "content": "She trusted him.",
+                "part_of_speech": "sentence",
+                "source_span": {"start": 0, "end": 15},
+                "linguistic_elements": [
+                    {
+                        "type": "Phrase",
+                        "content": "trusted him",
+                        "part_of_speech": "verb phrase",
+                        "source_span": {"start": 4, "end": 15},
+                        "linguistic_elements": [
+                            {
+                                "type": "Word",
+                                "content": "trusted",
+                                "part_of_speech": "verb",
+                                "source_span": {"start": 4, "end": 11},
+                                "linguistic_elements": [],
+                            },
+                            {
+                                "type": "Word",
+                                "content": "trusted",
+                                "part_of_speech": "verb",
+                                "source_span": {"start": 4, "end": 11},
+                                "ref_node_id": "n_word_1",
+                                "linguistic_elements": [],
+                            },
+                        ],
+                    }
+                ],
+            }
+        }
+        doc["She trusted him."]["node_id"] = "n_sentence"
+        phrase = doc["She trusted him."]["linguistic_elements"][0]
+        phrase["node_id"] = "n_phrase_1"
+        phrase["linguistic_elements"][0]["node_id"] = "n_word_1"
+        phrase["linguistic_elements"][1]["node_id"] = "n_word_2"
+
+        class FakeCEFR:
+            calls = []
+
+            @classmethod
+            def predict_level(cls, node: dict, source_text: str, sentence_text: str) -> str:
+                cls.calls.append(source_text)
+                if source_text == sentence_text:
+                    return "B1"
+                if source_text.strip().lower() == "trusted":
+                    return "B2"
+                return "A2"
+
+        _attach_cefr(doc, predictor=FakeCEFR(), include_node_cefr=True)
+        sentence = doc["She trusted him."]
+        self.assertEqual(sentence["cefr_level"], "B1")
+        phrase = sentence["linguistic_elements"][0]
+        word = phrase["linguistic_elements"][0]
+        dup_word = phrase["linguistic_elements"][1]
+        self.assertEqual(phrase["cefr_level"], "A2")
+        self.assertEqual(word["cefr_level"], "B1")
+        self.assertEqual(dup_word["cefr_level"], "B1")
+        self.assertEqual(FakeCEFR.calls.count("trusted"), 1)
+
+    def test_attach_cefr_calibrates_service_and_content_words(self):
+        doc = {
+            "She should have trusted her instincts before making the decision.": {
+                "type": "Sentence",
+                "content": "She should have trusted her instincts before making the decision.",
+                "part_of_speech": "sentence",
+                "source_span": {"start": 0, "end": 65},
+                "linguistic_elements": [
+                    {
+                        "type": "Phrase",
+                        "content": "before making the decision",
+                        "part_of_speech": "prepositional phrase",
+                        "source_span": {"start": 38, "end": 64},
+                        "linguistic_elements": [
+                            {
+                                "type": "Word",
+                                "content": "the",
+                                "part_of_speech": "article",
+                                "source_span": {"start": 52, "end": 55},
+                                "linguistic_elements": [],
+                            },
+                            {
+                                "type": "Word",
+                                "content": "decision",
+                                "part_of_speech": "noun",
+                                "source_span": {"start": 56, "end": 64},
+                                "linguistic_elements": [],
+                            },
+                        ],
+                    }
+                ],
+            }
+        }
+
+        class FakeCEFR:
+            @staticmethod
+            def predict_level(node: dict, source_text: str, sentence_text: str) -> str:
+                if node.get("type") == "Sentence":
+                    return "A2"
+                if node.get("type") == "Phrase":
+                    return "A2"
+                if source_text.strip().lower() == "the":
+                    return "C1"
+                if source_text.strip().lower() == "decision":
+                    return "C2"
+                return "A2"
+
+        _attach_cefr(doc, predictor=FakeCEFR(), include_node_cefr=True)
+        sentence = doc["She should have trusted her instincts before making the decision."]
+        phrase = sentence["linguistic_elements"][0]
+        article = phrase["linguistic_elements"][0]
+        noun = phrase["linguistic_elements"][1]
+
+        self.assertEqual(article["cefr_level"], "A1")
+        self.assertEqual(noun["cefr_level"], "B1")
 
     def test_backoff_flag_added_for_non_l1_levels(self):
         flags = LocalT5Annotator._with_backoff_flag(
