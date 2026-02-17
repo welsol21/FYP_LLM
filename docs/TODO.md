@@ -362,7 +362,9 @@
 - [ ] Reuse ELA `main_menu` UX as canonical navigation baseline (no full redesign from scratch).
 - [x] Build frontend migration map screen-by-screen (`Projects -> Files -> Analyze -> Vocabulary`) and bind to current backend contracts.
   - [x] Documented in `docs/ui_migration_map_2026-02-17.md`.
-- [ ] Implement local client persistence (SQLite) for projects/files/local edits/workspace state.
+- [x] Implement local client persistence (SQLite) for projects/files/local edits/workspace state.
+  - [x] Added `ela_pipeline/client_storage/sqlite_repository.py`.
+  - [x] Added unit tests `tests/test_client_sqlite_repository.py`.
 - [ ] Define and implement offline/online capability matrix in runtime + UI (feature flags and graceful degradation).
 - [ ] Enforce media routing policy:
   - [ ] local processing for files <= 15 minutes,
