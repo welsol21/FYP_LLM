@@ -344,7 +344,11 @@
 
 ## Human-in-the-Loop Corrections (Planned)
 
-- [ ] Add editable-review schema for key fields in contract (`notes`, `translation`, `phonetic`, `synonyms`, `cefr_level`, critical grammar tags).
+- [x] Add editable-review schema for key fields in contract (`notes`, `translation`, `phonetic`, `synonyms`, `cefr_level`, critical grammar tags).
+  - [x] Added schema module: `ela_pipeline/hil/review_schema.py`.
+  - [x] Added dynamic field-path validation by root (`notes[0].text`, `translation.text`, `phonetic.uk`, etc.).
+  - [x] Integrated schema checks in feedback quality gates (`ela_pipeline/hil/export_feedback.py`).
+  - [x] Added tests: `tests/test_hil_review_schema.py` + updated `tests/test_hil_repository.py`.
   - [x] Persistence base added: `review_events` + `node_edits` tables for sentence/node-level corrections.
 - [x] Add reviewer metadata model (`reviewed_by`, `reviewed_at`, `change_reason`, `confidence`) on every manual correction.
 - [x] Implement diff logger that stores `before/after` for every corrected node field.

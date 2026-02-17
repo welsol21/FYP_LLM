@@ -408,6 +408,20 @@ Simple usage pattern:
   - `0` on pass,
   - `2` on fail (CI/release pipeline friendly).
 
+### 4.23 HIL Editable-Review Schema
+- Module: `ela_pipeline/hil/review_schema.py`
+- Purpose: constrain manual edits to approved contract areas.
+- Allowed roots include:
+  - `notes`, `translation`, `phonetic`, `synonyms`, `cefr_level`
+  - critical grammar tags (`tense`, `aspect`, `mood`, `voice`, `finiteness`, `grammatical_role`, `tam_construction`, `part_of_speech`, `dep_label`, `features`)
+- Path examples accepted:
+  - `notes[0].text`
+  - `translation.text`
+  - `phonetic.uk`
+  - `features.number`
+- Integrated in feedback export quality gates:
+  - invalid field paths are dropped before JSONL export.
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset

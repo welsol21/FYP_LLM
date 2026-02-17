@@ -7,21 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from ela_pipeline.db.repository import PostgresContractRepository
-
-ALLOWED_FIELD_PATHS = {
-    "notes",
-    "translation",
-    "phonetic",
-    "synonyms",
-    "cefr_level",
-    "tense",
-    "aspect",
-    "mood",
-    "voice",
-    "finiteness",
-    "grammatical_role",
-    "tam_construction",
-}
+from ela_pipeline.hil.review_schema import is_allowed_review_field_path, review_field_root
 
 VALID_CEFR_LEVELS = {"A1", "A2", "B1", "B2", "C1", "C2"}
 ALLOWED_LICENSE_VALUES = {
@@ -44,7 +30,7 @@ SOURCE_LICENSE_POLICY = {
 
 def _is_valid_row(row: dict[str, Any]) -> bool:
     field_path = str(row.get("field_path", "")).strip()
-    if field_path not in ALLOWED_FIELD_PATHS:
+    if not is_allowed_review_field_path(field_path):
         return False
     reviewed_by = str(row.get("reviewed_by", "")).strip()
     if not reviewed_by:
@@ -68,7 +54,7 @@ def _is_valid_row(row: dict[str, Any]) -> bool:
     if license_value in EXTERNAL_ATTRIBUTED_LICENSES:
         if not (source_url.startswith("http://") or source_url.startswith("https://")):
             return False
-    if field_path == "cefr_level":
+    if review_field_root(field_path) == "cefr_level":
         after_value = row.get("after_value")
         if not isinstance(after_value, str) or after_value not in VALID_CEFR_LEVELS:
             return False

@@ -228,8 +228,22 @@ class TestHILRepository(unittest.TestCase):
                 "after_value": ["y"],
                 "edited_at": "2026-02-17T00:00:00Z",
             },
+            {
+                # valid nested notes path
+                "sentence_key": "key-8",
+                "reviewed_by": "reviewer",
+                "change_reason": "fix",
+                "confidence": 0.9,
+                "review_metadata": {"provenance": {"source": "manual_review", "license": "internal_review"}},
+                "node_id": "n14",
+                "field_path": "notes[0].text",
+                "before_value": "old",
+                "after_value": "new",
+                "edited_at": "2026-02-17T00:00:00Z",
+            },
         ]
         filtered = apply_feedback_quality_gates(rows)
-        self.assertEqual(len(filtered), 2)
+        self.assertEqual(len(filtered), 3)
         self.assertEqual(filtered[0]["sentence_key"], "key-1")
         self.assertEqual(filtered[1]["sentence_key"], "key-7")
+        self.assertEqual(filtered[2]["sentence_key"], "key-8")
