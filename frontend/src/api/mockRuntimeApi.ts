@@ -10,23 +10,98 @@ export class MockRuntimeApi implements RuntimeApi {
   private jobs: BackendJob[] = []
   private rows: VisualizerPayloadRow[] = [
     {
-      sentence_text: 'She trusted him.',
+      sentence_text: 'Although she had been warned several times, she still chose to ignore the evidence, which eventually led to a costly mistake that could have been avoided.',
       tree: {
         node_id: 's1',
         type: 'Sentence',
-        content: 'She trusted him.',
-        cefr_level: 'B1',
+        content: 'Although she had been warned several times, she still chose to ignore the evidence, which eventually led to a costly mistake that could have been avoided.',
+        cefr_level: 'B2',
+        translations: ['Хотя ее несколько раз предупреждали, она все же решила игнорировать доказательства, что в итоге привело к дорогостоящей ошибке, которой можно было избежать.'],
+        linguistic_notes: ['Complex sentence with subordinate and relative clauses.'],
         children: [
           {
             node_id: 'p1',
             type: 'Phrase',
-            content: 'trusted him',
+            phraseType: 'Verb Phrase',
+            content: 'still chose to ignore the evidence',
+            tense: 'Past Simple',
             children: [
               {
                 node_id: 'w1',
                 type: 'Word',
-                content: 'trusted',
+                content: 'chose',
                 part_of_speech: 'verb',
+                children: [],
+              },
+              {
+                node_id: 'w2',
+                type: 'Word',
+                content: 'to',
+                part_of_speech: 'preposition',
+                children: [],
+              },
+              {
+                node_id: 'w3',
+                type: 'Word',
+                content: 'ignore',
+                part_of_speech: 'verb',
+                children: [],
+              },
+              {
+                node_id: 'w4',
+                type: 'Word',
+                content: 'the',
+                part_of_speech: 'article',
+                children: [],
+              },
+              {
+                node_id: 'w5',
+                type: 'Word',
+                content: 'evidence',
+                part_of_speech: 'noun',
+                children: [],
+              },
+            ],
+          },
+          {
+            node_id: 'w6',
+            type: 'Word',
+            content: 'she',
+            part_of_speech: 'pronoun',
+            children: [],
+          },
+          {
+            node_id: 'p2',
+            type: 'Phrase',
+            phraseType: 'Prepositional Phrase',
+            content: 'which eventually led to a costly mistake',
+            children: [
+              {
+                node_id: 'w7',
+                type: 'Word',
+                content: 'led',
+                part_of_speech: 'verb',
+                children: [],
+              },
+              {
+                node_id: 'w8',
+                type: 'Word',
+                content: 'to',
+                part_of_speech: 'preposition',
+                children: [],
+              },
+              {
+                node_id: 'w9',
+                type: 'Word',
+                content: 'a',
+                part_of_speech: 'article',
+                children: [],
+              },
+              {
+                node_id: 'w10',
+                type: 'Word',
+                content: 'costly mistake',
+                part_of_speech: 'noun',
                 children: [],
               },
             ],
@@ -123,6 +198,13 @@ export class MockRuntimeApi implements RuntimeApi {
       const node = stack.pop()!
       if (node.node_id === input.nodeId) {
         node.content = input.newValue
+        const words = input.newValue.trim().split(/\s+/).filter(Boolean)
+        const directLeafChildren = node.children.filter((c) => c.children.length === 0)
+        if (directLeafChildren.length === words.length && words.length > 0) {
+          directLeafChildren.forEach((child, idx) => {
+            child.content = words[idx]
+          })
+        }
         return { status: 'ok', message: 'Edit applied.' }
       }
       for (const child of node.children) stack.push(child)

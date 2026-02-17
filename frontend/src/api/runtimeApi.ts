@@ -35,7 +35,13 @@ export type VisualizerNode = {
   type: string
   content: string
   part_of_speech?: string
+  phraseType?: string
   cefr_level?: string
+  tense?: string
+  phonetic?: { uk?: string; us?: string }
+  linguistic_notes?: string[]
+  translations?: string[]
+  synonyms?: string[]
   children: VisualizerNode[]
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useApi } from '../api/apiContext'
 import type { VisualizerPayloadRow } from '../api/runtimeApi'
-import { VisualizerTree } from '../components/VisualizerTree'
+import { VisualizerTreeLegacy } from '../components/VisualizerTreeLegacy'
 
 export function VisualizerPage() {
   const api = useApi()
@@ -34,29 +34,36 @@ export function VisualizerPage() {
   }
 
   return (
-    <section className="card">
-      <h1>Linguistic Visualizer</h1>
-      <form onSubmit={onApplyEdit} className="card" aria-label="edit-form">
-        <h2>Quick Node Edit</h2>
-        <label>
-          Node ID
-          <input value={nodeId} onChange={(e) => setNodeId(e.target.value)} />
-        </label>
-        <label>
-          New Content
-          <input value={newValue} onChange={(e) => setNewValue(e.target.value)} />
-        </label>
-        <button type="submit">Apply Edit</button>
-        {editStatus ? <p>{editStatus}</p> : null}
-      </form>
-      {rows.map((row) => (
-        <article key={row.sentence_text}>
-          <h2>{row.sentence_text}</h2>
-          <ul>
-            <VisualizerTree node={row.tree} />
-          </ul>
-        </article>
-      ))}
+    <section className="visualizer-root">
+      <section className="card">
+        <h1>Linguistic Visualizer</h1>
+        <p>Touch-first tree view aligned with the original ELA main menu flow.</p>
+      </section>
+      <section className="visualizer-row">
+        <form onSubmit={onApplyEdit} className="card quick-edit-grid" aria-label="edit-form">
+          <h2>Quick Node Edit</h2>
+          <label>
+            Node ID
+            <input value={nodeId} onChange={(e) => setNodeId(e.target.value)} />
+          </label>
+          <label>
+            New Content
+            <input value={newValue} onChange={(e) => setNewValue(e.target.value)} />
+          </label>
+          <div className="quick-edit-actions">
+            <button type="submit">Apply Edit</button>
+            {editStatus ? <p className="quick-edit-status">{editStatus}</p> : null}
+          </div>
+        </form>
+        <section className="card">
+          {rows.map((row) => (
+            <article key={row.sentence_text} className="visualizer-article">
+              <h2>{row.sentence_text}</h2>
+              <VisualizerTreeLegacy node={row.tree} isRoot />
+            </article>
+          ))}
+        </section>
+      </section>
     </section>
   )
 }
