@@ -132,6 +132,23 @@ Optional DB identity controls:
 - `--db-source-lang`
 - `--db-target-lang`
 
+Runtime policy mode:
+- `--runtime-mode auto|offline|online` (default `auto`, resolves via `ELA_RUNTIME_MODE`, defaulting to online).
+- In offline mode runtime blocks backend-dependent features (`--persist-db`) and phonetic enrichment.
+
+Optional media routing validation (duration+size fail-fast checks):
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --runtime-mode offline \
+  --media-duration-sec 600 \
+  --media-size-bytes 157286400
+```
+Policy thresholds come from env:
+- `MEDIA_MAX_DURATION_MIN`
+- `MEDIA_MAX_SIZE_LOCAL_MB`
+- `MEDIA_MAX_SIZE_BACKEND_MB`
+
 Optional multilingual translation enrichment (first pair: EN->RU, provider `m2m100`):
 ```bash
 .venv/bin/python -m ela_pipeline.translate.prepare_m2m100

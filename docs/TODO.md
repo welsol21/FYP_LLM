@@ -370,12 +370,15 @@
   - [x] Inference CLI wired with `--runtime-mode auto|offline|online` + `ELA_RUNTIME_MODE`.
   - [ ] UI layer: capability badges/disabled states and graceful fallback messaging.
 - [ ] Enforce media routing policy:
-  - [ ] local processing for files <= 15 minutes,
-  - [ ] backend async job path for files > 15 minutes.
+  - [x] Runtime policy engine added (`ela_pipeline/runtime/media_policy.py`) with decision routes: `local|backend|reject`.
+  - [x] local processing for files <= 15 minutes (policy decision path implemented).
+  - [x] backend async job path for files > 15 minutes (policy decision path implemented, requires backend_jobs capability).
+  - [ ] UI/backend job orchestration wiring to use policy decision result.
 - [ ] Add media file size limits for both paths (configurable env/runtime thresholds):
-  - [ ] reject local jobs above `MEDIA_MAX_SIZE_LOCAL_MB`,
-  - [ ] reject backend jobs above `MEDIA_MAX_SIZE_BACKEND_MB`,
-  - [ ] fail-fast validation message must include actual file duration/size and active limits.
+  - [x] reject local jobs above `MEDIA_MAX_SIZE_LOCAL_MB` (policy routes to backend/reject).
+  - [x] reject backend jobs above `MEDIA_MAX_SIZE_BACKEND_MB`.
+  - [x] fail-fast validation message includes actual duration/size and active limits.
+  - [x] CLI validation hook added in inference runner (`--media-duration-sec` + `--media-size-bytes`).
 - [ ] Implement backend temporary media retention policy (TTL cleanup, no permanent storage of user final media).
 - [ ] Enforce minimal backend identity policy (phone-linked account only, no extra PII by default).
 - [ ] Add sync flow for user-submitted new content that is missing from shared corpus.

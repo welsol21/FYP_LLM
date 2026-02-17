@@ -11,6 +11,8 @@ from typing import Any
 from ela_pipeline.contract import deep_copy_contract
 from ela_pipeline.parse.spacy_parser import load_nlp
 from ela_pipeline.runtime import (
+    decide_media_route,
+    load_media_policy_limits_from_env,
     RuntimeFeatureRequest,
     build_runtime_capabilities,
     resolve_runtime_mode,
@@ -689,6 +691,8 @@ def main() -> None:
         help="Attach CEFR level to sentence only (skip phrase/word node CEFR).",
     )
     parser.add_argument("--output", default=None)
+    parser.add_argument("--media-duration-sec", type=int, default=None, help="Optional media duration for routing validation.")
+    parser.add_argument("--media-size-bytes", type=int, default=None, help="Optional media size in bytes for routing validation.")
     parser.add_argument(
         "--runtime-mode",
         default="auto",
@@ -715,6 +719,20 @@ def main() -> None:
             enable_db_persistence=bool(args.persist_db),
         ),
     )
+
+    if (args.media_duration_sec is None) != (args.media_size_bytes is None):
+        raise ValueError("Both --media-duration-sec and --media-size-bytes must be provided together.")
+    if args.media_duration_sec is not None and args.media_size_bytes is not None:
+        limits = load_media_policy_limits_from_env()
+        media_decision = decide_media_route(
+            duration_seconds=args.media_duration_sec,
+            size_bytes=args.media_size_bytes,
+            limits=limits,
+            runtime_caps=runtime_caps,
+        )
+        if media_decision.route == "reject":
+            raise RuntimeError(media_decision.reason)
+        print(f"Media routing: {media_decision.route} ({media_decision.reason})")
 
     result = run_pipeline(
         text=args.text,
