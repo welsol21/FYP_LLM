@@ -699,6 +699,12 @@ def main() -> None:
         choices=["auto", "offline", "online"],
         help="Runtime policy mode. `auto` resolves from ELA_RUNTIME_MODE (defaults to online).",
     )
+    parser.add_argument(
+        "--deployment-mode",
+        default="auto",
+        choices=["auto", "local", "backend", "distributed"],
+        help="Deployment context for license-gated features. `auto` resolves from ELA_DEPLOYMENT_MODE.",
+    )
     parser.add_argument("--persist-db", action="store_true", help="Persist inference result to PostgreSQL.")
     parser.add_argument(
         "--db-url",
@@ -711,7 +717,7 @@ def main() -> None:
     args = parser.parse_args()
 
     runtime_mode = resolve_runtime_mode(args.runtime_mode)
-    runtime_caps = build_runtime_capabilities(runtime_mode)
+    runtime_caps = build_runtime_capabilities(runtime_mode, deployment_mode=args.deployment_mode)
     validate_runtime_feature_request(
         runtime_caps,
         RuntimeFeatureRequest(

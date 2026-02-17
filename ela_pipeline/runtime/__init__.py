@@ -1,9 +1,14 @@
 """Runtime capability policy helpers."""
 
 from .capabilities import (
+    DEPLOYMENT_MODE_BACKEND,
+    DEPLOYMENT_MODE_DISTRIBUTED,
+    DEPLOYMENT_MODE_LOCAL,
     RuntimeCapabilities,
     RuntimeFeatureRequest,
     build_runtime_capabilities,
+    resolve_deployment_mode,
+    resolve_phonetic_policy,
     resolve_runtime_mode,
     validate_runtime_feature_request,
 )
@@ -29,8 +34,13 @@ __all__ = [
     "RuntimeCapabilities",
     "RuntimeFeatureRequest",
     "build_runtime_capabilities",
+    "resolve_deployment_mode",
+    "resolve_phonetic_policy",
     "resolve_runtime_mode",
     "validate_runtime_feature_request",
+    "DEPLOYMENT_MODE_LOCAL",
+    "DEPLOYMENT_MODE_BACKEND",
+    "DEPLOYMENT_MODE_DISTRIBUTED",
     "MediaPolicyLimits",
     "MediaRoutingDecision",
     "decide_media_route",

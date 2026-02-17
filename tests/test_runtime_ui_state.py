@@ -11,6 +11,7 @@ class RuntimeUIStateTests(unittest.TestCase):
     def test_offline_ui_state_contains_disabled_reasons(self):
         state = build_runtime_ui_state(build_runtime_capabilities("offline"))
         self.assertEqual(state["runtime_mode"], "offline")
+        self.assertIn("deployment_mode", state)
         self.assertFalse(state["features"]["phonetic"]["enabled"])
         self.assertIn("offline", state["features"]["phonetic"]["reason_if_disabled"].lower())
         self.assertIn("Mode: offline", state["badges"]["mode"])

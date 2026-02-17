@@ -421,5 +421,9 @@
     - [x] `build_visualizer_payload_for_document(...)`
   - [x] Added editor patch helper: `apply_node_edit(...)` by `sentence_text + node_id + field_path`.
   - [ ] Connect bridge to actual frontend screens/routes.
-- [ ] Add explicit license-gated runtime switch for phonetics by deployment mode (offline/distributed/backend).
+- [x] Add explicit license-gated runtime switch for phonetics by deployment mode (offline/distributed/backend).
+  - [x] Added deployment mode resolution: `ELA_DEPLOYMENT_MODE` + CLI `--deployment-mode`.
+  - [x] Added phonetic policy switch: `ELA_PHONETIC_POLICY=enabled|disabled|backend_only`.
+  - [x] Integrated with runtime capability gate (`ela_pipeline/runtime/capabilities.py`) and inference CLI checks.
+  - [x] Added/updated tests in `tests/test_runtime_capabilities.py`.
 - [ ] Update docs with end-user limitations in offline mode (phonetics unavailability and large-media delegation).

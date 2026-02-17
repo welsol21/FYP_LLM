@@ -212,6 +212,14 @@ If `--model-dir` is omitted:
   - `online` (default)
   - `offline`
   - `auto` (resolves from `ELA_RUNTIME_MODE`, defaults to `online`)
+- Deployment mode values:
+  - `local`
+  - `backend`
+  - `distributed`
+  - `auto` (resolves from `ELA_DEPLOYMENT_MODE`, defaults to `local`)
+- Phonetic policy switch (license/deployment gate):
+  - `ELA_PHONETIC_POLICY=enabled|disabled|backend_only`
+  - `backend_only` means phonetic works only when deployment mode is `backend`.
 - In `offline` mode:
   - phonetic enrichment is blocked,
   - PostgreSQL persistence is blocked,

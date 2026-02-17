@@ -135,6 +135,8 @@ Optional DB identity controls:
 Runtime policy mode:
 - `--runtime-mode auto|offline|online` (default `auto`, resolves via `ELA_RUNTIME_MODE`, defaulting to online).
 - In offline mode runtime blocks backend-dependent features (`--persist-db`) and phonetic enrichment.
+- `--deployment-mode auto|local|backend|distributed` controls deployment-aware license gates.
+- Phonetic gate policy is controlled by env `ELA_PHONETIC_POLICY=enabled|disabled|backend_only`.
 
 Optional media routing validation (duration+size fail-fast checks):
 ```bash

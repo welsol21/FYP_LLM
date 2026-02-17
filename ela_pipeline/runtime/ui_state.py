@@ -33,8 +33,10 @@ def build_runtime_ui_state(caps: RuntimeCapabilities) -> dict[str, Any]:
     }
     return {
         "runtime_mode": caps.mode,
+        "deployment_mode": caps.deployment_mode,
         "badges": {
             "mode": f"Mode: {caps.mode}",
+            "deployment": f"Deployment: {caps.deployment_mode}",
             "backend_jobs": "Backend jobs: on" if caps.backend_jobs_enabled else "Backend jobs: off",
             "phonetic": "Phonetic: on" if caps.phonetic_enabled else "Phonetic: off",
         },

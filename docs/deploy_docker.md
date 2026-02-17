@@ -40,6 +40,13 @@ Runtime policy mode:
 - available values: `online` | `offline`
 - in `offline` mode runtime blocks backend-dependent features and phonetic enrichment.
 
+Deployment + phonetic license gate:
+- `ELA_DEPLOYMENT_MODE=local|backend|distributed`
+- `ELA_PHONETIC_POLICY=enabled|disabled|backend_only`
+- Example safe setup for distributed delivery:
+  - `ELA_DEPLOYMENT_MODE=distributed`
+  - `ELA_PHONETIC_POLICY=disabled` (or keep `backend_only` and run phonetic only on backend deployment)
+
 Temporary media retention policy:
 - `MEDIA_TEMP_DIR=artifacts/media_tmp`
 - `MEDIA_RETENTION_TTL_HOURS=24`
