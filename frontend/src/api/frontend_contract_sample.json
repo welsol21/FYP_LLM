@@ -1,0 +1,668 @@
+{
+  "She should have trusted her instincts before making the decision.": {
+    "type": "Sentence",
+    "content": "She should have trusted her instincts before making the decision.",
+    "tense": null,
+    "aspect": "perfect",
+    "mood": "modal",
+    "voice": "active",
+    "finiteness": "finite",
+    "linguistic_notes": [],
+    "notes": [],
+    "quality_flags": [],
+    "rejected_candidates": [],
+    "rejected_candidate_stats": [],
+    "reason_codes": [],
+    "schema_version": "v2",
+    "part_of_speech": "sentence",
+    "node_id": "n1",
+    "parent_id": null,
+    "source_span": {
+      "start": 0,
+      "end": 65
+    },
+    "grammatical_role": "clause",
+    "tam_construction": "modal_perfect",
+    "phonetic": {
+      "uk": "ʃiː ʃˌʊdəv tɹˈʌstɪd hɜːɹ ˈɪnstɪŋkts bɪfˌɔː mˌe‍ɪkɪŋ ðə dɪsˈɪʒən",
+      "us": "ʃiː ʃˌʊdəv tɹˈʌstᵻd hɜːɹ ˈɪnstɪŋkts bᵻfˌɔː‍ɹ mˌe‍ɪkɪŋ ðə dᵻsˈɪʒən"
+    },
+    "cefr_level": "B2",
+    "linguistic_elements": [
+      {
+        "type": "Phrase",
+        "content": "She",
+        "tense": null,
+        "aspect": "simple",
+        "mood": "indicative",
+        "voice": "active",
+        "finiteness": "non-finite",
+        "linguistic_notes": [],
+        "notes": [],
+        "quality_flags": [],
+        "rejected_candidates": [],
+        "rejected_candidate_stats": [],
+        "reason_codes": [],
+        "schema_version": "v2",
+        "part_of_speech": "noun phrase",
+        "node_id": "n2",
+        "parent_id": "n1",
+        "source_span": {
+          "start": 0,
+          "end": 3
+        },
+        "grammatical_role": "subject",
+        "tam_construction": "none",
+        "phonetic": {
+          "uk": "ʃˈiː",
+          "us": "ʃˈiː"
+        },
+        "cefr_level": "B1",
+        "linguistic_elements": [
+          {
+            "type": "Word",
+            "content": "She",
+            "tense": null,
+            "aspect": null,
+            "mood": null,
+            "voice": null,
+            "finiteness": null,
+            "linguistic_notes": [],
+            "notes": [],
+            "quality_flags": [],
+            "rejected_candidates": [],
+            "rejected_candidate_stats": [],
+            "reason_codes": [],
+            "schema_version": "v2",
+            "part_of_speech": "pronoun",
+            "features": {
+              "number": "sing",
+              "person": "3",
+              "case": "nom",
+              "degree": null,
+              "definiteness": null,
+              "verb_form": null,
+              "gender": "fem",
+              "tense_feature": null
+            },
+            "node_id": "n3",
+            "parent_id": "n2",
+            "source_span": {
+              "start": 0,
+              "end": 3
+            },
+            "grammatical_role": "subject",
+            "dep_label": "nsubj",
+            "head_id": null,
+            "phonetic": {
+              "uk": "ʃˈiː",
+              "us": "ʃˈiː"
+            },
+            "cefr_level": "A1",
+            "linguistic_elements": []
+          }
+        ]
+      },
+      {
+        "type": "Phrase",
+        "content": "should have trusted her instincts",
+        "tense": null,
+        "aspect": "perfect",
+        "mood": "modal",
+        "voice": "active",
+        "finiteness": "finite",
+        "linguistic_notes": [],
+        "notes": [],
+        "quality_flags": [],
+        "rejected_candidates": [],
+        "rejected_candidate_stats": [],
+        "reason_codes": [],
+        "schema_version": "v2",
+        "part_of_speech": "verb phrase",
+        "node_id": "n4",
+        "parent_id": "n1",
+        "source_span": {
+          "start": 4,
+          "end": 37
+        },
+        "grammatical_role": "predicate",
+        "tam_construction": "modal_perfect",
+        "phonetic": {
+          "uk": "ʃˌʊdəv tɹˈʌstɪd hɜːɹ ˈɪnstɪŋkts",
+          "us": "ʃˌʊdəv tɹˈʌstᵻd hɜːɹ ˈɪnstɪŋkts"
+        },
+        "cefr_level": "B1",
+        "linguistic_elements": [
+          {
+            "type": "Word",
+            "content": "should",
+            "tense": null,
+            "aspect": "simple",
+            "mood": "modal",
+            "voice": "active",
+            "finiteness": "finite",
+            "linguistic_notes": [],
+            "notes": [],
+            "quality_flags": [],
+            "rejected_candidates": [],
+            "rejected_candidate_stats": [],
+            "reason_codes": [],
+            "schema_version": "v2",
+            "part_of_speech": "auxiliary verb",
+            "features": {
+              "number": null,
+              "person": null,
+              "case": null,
+              "degree": null,
+              "definiteness": null,
+              "verb_form": "fin",
+              "gender": null,
+              "tense_feature": null
+            },
+            "node_id": "n5",
+            "parent_id": "n4",
+            "source_span": {
+              "start": 4,
+              "end": 10
+            },
+            "grammatical_role": "auxiliary",
+            "dep_label": "aux",
+            "head_id": "n7",
+            "phonetic": {
+              "uk": "ʃˈʊd",
+              "us": "ʃˈʊd"
+            },
+            "cefr_level": "A1",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "have",
+            "tense": null,
+            "aspect": "simple",
+            "mood": null,
+            "voice": "active",
+            "finiteness": "non-finite",
+            "linguistic_notes": [],
+            "notes": [],
+            "quality_flags": [],
+            "rejected_candidates": [],
+            "rejected_candidate_stats": [],
+            "reason_codes": [],
+            "schema_version": "v2",
+            "part_of_speech": "auxiliary verb",
+            "features": {
+              "number": null,
+              "person": null,
+              "case": null,
+              "degree": null,
+              "definiteness": null,
+              "verb_form": "inf",
+              "gender": null,
+              "tense_feature": null
+            },
+            "node_id": "n6",
+            "parent_id": "n4",
+            "source_span": {
+              "start": 11,
+              "end": 15
+            },
+            "grammatical_role": "auxiliary",
+            "dep_label": "aux",
+            "head_id": "n7",
+            "phonetic": {
+              "uk": "hˈav",
+              "us": "hˈæv"
+            },
+            "cefr_level": "A1",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "trusted",
+            "tense": "past participle",
+            "aspect": "perfect",
+            "mood": null,
+            "voice": "active",
+            "finiteness": "non-finite",
+            "linguistic_notes": [],
+            "notes": [],
+            "quality_flags": [],
+            "rejected_candidates": [],
+            "rejected_candidate_stats": [],
+            "reason_codes": [],
+            "schema_version": "v2",
+            "part_of_speech": "verb",
+            "features": {
+              "number": null,
+              "person": null,
+              "case": null,
+              "degree": null,
+              "definiteness": null,
+              "verb_form": "part",
+              "gender": null,
+              "tense_feature": "past"
+            },
+            "node_id": "n7",
+            "parent_id": "n4",
+            "source_span": {
+              "start": 16,
+              "end": 23
+            },
+            "grammatical_role": "predicate",
+            "dep_label": "ROOT",
+            "head_id": null,
+            "phonetic": {
+              "uk": "tɹˈʌstɪd",
+              "us": "tɹˈʌstᵻd"
+            },
+            "cefr_level": "A1",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "her",
+            "tense": null,
+            "aspect": null,
+            "mood": null,
+            "voice": null,
+            "finiteness": null,
+            "linguistic_notes": [],
+            "notes": [],
+            "quality_flags": [],
+            "rejected_candidates": [],
+            "rejected_candidate_stats": [],
+            "reason_codes": [],
+            "schema_version": "v2",
+            "part_of_speech": "pronoun",
+            "features": {
+              "number": "sing",
+              "person": "3",
+              "case": null,
+              "degree": null,
+              "definiteness": null,
+              "verb_form": null,
+              "gender": "fem",
+              "tense_feature": null
+            },
+            "node_id": "n8",
+            "parent_id": "n4",
+            "source_span": {
+              "start": 24,
+              "end": 27
+            },
+            "grammatical_role": "other",
+            "dep_label": "poss",
+            "head_id": "n9",
+            "phonetic": {
+              "uk": "hˈɜː",
+              "us": "hˈɜː"
+            },
+            "cefr_level": "A1",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "instincts",
+            "tense": null,
+            "aspect": null,
+            "mood": null,
+            "voice": null,
+            "finiteness": null,
+            "linguistic_notes": [],
+            "notes": [],
+            "quality_flags": [],
+            "rejected_candidates": [],
+            "rejected_candidate_stats": [],
+            "reason_codes": [],
+            "schema_version": "v2",
+            "part_of_speech": "noun",
+            "features": {
+              "number": "plur",
+              "person": null,
+              "case": null,
+              "degree": null,
+              "definiteness": null,
+              "verb_form": null,
+              "gender": null,
+              "tense_feature": null
+            },
+            "node_id": "n9",
+            "parent_id": "n4",
+            "source_span": {
+              "start": 28,
+              "end": 37
+            },
+            "grammatical_role": "object",
+            "dep_label": "dobj",
+            "head_id": "n7",
+            "phonetic": {
+              "uk": "ˈɪnstɪŋkts",
+              "us": "ˈɪnstɪŋkts"
+            },
+            "cefr_level": "A2",
+            "linguistic_elements": []
+          }
+        ]
+      },
+      {
+        "type": "Phrase",
+        "content": "her instincts",
+        "tense": null,
+        "aspect": "simple",
+        "mood": "indicative",
+        "voice": "active",
+        "finiteness": "non-finite",
+        "linguistic_notes": [],
+        "notes": [],
+        "quality_flags": [],
+        "rejected_candidates": [],
+        "rejected_candidate_stats": [],
+        "reason_codes": [],
+        "schema_version": "v2",
+        "part_of_speech": "noun phrase",
+        "node_id": "n10",
+        "parent_id": "n1",
+        "source_span": {
+          "start": 24,
+          "end": 37
+        },
+        "grammatical_role": "object",
+        "tam_construction": "none",
+        "phonetic": {
+          "uk": "hɜːɹ ˈɪnstɪŋkts",
+          "us": "hɜːɹ ˈɪnstɪŋkts"
+        },
+        "cefr_level": "B1",
+        "linguistic_elements": [
+          {
+            "type": "Word",
+            "content": "her",
+            "tense": null,
+            "aspect": null,
+            "mood": null,
+            "voice": null,
+            "finiteness": null,
+            "linguistic_notes": [],
+            "notes": [],
+            "quality_flags": [],
+            "rejected_candidates": [],
+            "rejected_candidate_stats": [],
+            "reason_codes": [],
+            "schema_version": "v2",
+            "part_of_speech": "pronoun",
+            "features": {
+              "number": "sing",
+              "person": "3",
+              "case": null,
+              "degree": null,
+              "definiteness": null,
+              "verb_form": null,
+              "gender": "fem",
+              "tense_feature": null
+            },
+            "node_id": "n11",
+            "parent_id": "n10",
+            "source_span": {
+              "start": 24,
+              "end": 27
+            },
+            "grammatical_role": "other",
+            "dep_label": "poss",
+            "head_id": "n12",
+            "ref_node_id": "n8",
+            "phonetic": {
+              "uk": "hˈɜː",
+              "us": "hˈɜː"
+            },
+            "cefr_level": "A1",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "instincts",
+            "tense": null,
+            "aspect": null,
+            "mood": null,
+            "voice": null,
+            "finiteness": null,
+            "linguistic_notes": [],
+            "notes": [],
+            "quality_flags": [],
+            "rejected_candidates": [],
+            "rejected_candidate_stats": [],
+            "reason_codes": [],
+            "schema_version": "v2",
+            "part_of_speech": "noun",
+            "features": {
+              "number": "plur",
+              "person": null,
+              "case": null,
+              "degree": null,
+              "definiteness": null,
+              "verb_form": null,
+              "gender": null,
+              "tense_feature": null
+            },
+            "node_id": "n12",
+            "parent_id": "n10",
+            "source_span": {
+              "start": 28,
+              "end": 37
+            },
+            "grammatical_role": "object",
+            "dep_label": "dobj",
+            "head_id": null,
+            "ref_node_id": "n9",
+            "phonetic": {
+              "uk": "ˈɪnstɪŋkts",
+              "us": "ˈɪnstɪŋkts"
+            },
+            "cefr_level": "A2",
+            "linguistic_elements": []
+          }
+        ]
+      },
+      {
+        "type": "Phrase",
+        "content": "before making the decision",
+        "tense": null,
+        "aspect": "simple",
+        "mood": "indicative",
+        "voice": "active",
+        "finiteness": "non-finite",
+        "linguistic_notes": [],
+        "notes": [],
+        "quality_flags": [],
+        "rejected_candidates": [],
+        "rejected_candidate_stats": [],
+        "reason_codes": [],
+        "schema_version": "v2",
+        "part_of_speech": "prepositional phrase",
+        "node_id": "n13",
+        "parent_id": "n1",
+        "source_span": {
+          "start": 38,
+          "end": 64
+        },
+        "grammatical_role": "modifier",
+        "tam_construction": "none",
+        "phonetic": {
+          "uk": "bɪfˌɔː mˌe‍ɪkɪŋ ðə dɪsˈɪʒən",
+          "us": "bᵻfˌɔː‍ɹ mˌe‍ɪkɪŋ ðə dᵻsˈɪʒən"
+        },
+        "cefr_level": "B1",
+        "linguistic_elements": [
+          {
+            "type": "Word",
+            "content": "before",
+            "tense": null,
+            "aspect": null,
+            "mood": null,
+            "voice": null,
+            "finiteness": null,
+            "linguistic_notes": [],
+            "notes": [],
+            "quality_flags": [],
+            "rejected_candidates": [],
+            "rejected_candidate_stats": [],
+            "reason_codes": [],
+            "schema_version": "v2",
+            "part_of_speech": "preposition",
+            "features": {
+              "number": null,
+              "person": null,
+              "case": null,
+              "degree": null,
+              "definiteness": null,
+              "verb_form": null,
+              "gender": null,
+              "tense_feature": null
+            },
+            "node_id": "n14",
+            "parent_id": "n13",
+            "source_span": {
+              "start": 38,
+              "end": 44
+            },
+            "grammatical_role": "linker",
+            "dep_label": "prep",
+            "head_id": null,
+            "phonetic": {
+              "uk": "bɪfˈɔː",
+              "us": "bᵻfˈɔː‍ɹ"
+            },
+            "cefr_level": "A1",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "making",
+            "tense": "present participle",
+            "aspect": "progressive",
+            "mood": null,
+            "voice": "active",
+            "finiteness": "non-finite",
+            "linguistic_notes": [],
+            "notes": [],
+            "quality_flags": [],
+            "rejected_candidates": [],
+            "rejected_candidate_stats": [],
+            "reason_codes": [],
+            "schema_version": "v2",
+            "part_of_speech": "verb",
+            "features": {
+              "number": null,
+              "person": null,
+              "case": null,
+              "degree": null,
+              "definiteness": null,
+              "verb_form": "part",
+              "gender": null,
+              "tense_feature": "pres"
+            },
+            "node_id": "n15",
+            "parent_id": "n13",
+            "source_span": {
+              "start": 45,
+              "end": 51
+            },
+            "grammatical_role": "other",
+            "dep_label": "pcomp",
+            "head_id": "n14",
+            "phonetic": {
+              "uk": "mˈe‍ɪkɪŋ",
+              "us": "mˈe‍ɪkɪŋ"
+            },
+            "cefr_level": "A1",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "the",
+            "tense": null,
+            "aspect": null,
+            "mood": null,
+            "voice": null,
+            "finiteness": null,
+            "linguistic_notes": [],
+            "notes": [],
+            "quality_flags": [],
+            "rejected_candidates": [],
+            "rejected_candidate_stats": [],
+            "reason_codes": [],
+            "schema_version": "v2",
+            "part_of_speech": "article",
+            "features": {
+              "number": null,
+              "person": null,
+              "case": null,
+              "degree": null,
+              "definiteness": "def",
+              "verb_form": null,
+              "gender": null,
+              "tense_feature": null
+            },
+            "node_id": "n16",
+            "parent_id": "n13",
+            "source_span": {
+              "start": 52,
+              "end": 55
+            },
+            "grammatical_role": "determiner",
+            "dep_label": "det",
+            "head_id": "n17",
+            "phonetic": {
+              "uk": "ðˈə",
+              "us": "ðˈə"
+            },
+            "cefr_level": "A1",
+            "linguistic_elements": []
+          },
+          {
+            "type": "Word",
+            "content": "decision",
+            "tense": null,
+            "aspect": null,
+            "mood": null,
+            "voice": null,
+            "finiteness": null,
+            "linguistic_notes": [],
+            "notes": [],
+            "quality_flags": [],
+            "rejected_candidates": [],
+            "rejected_candidate_stats": [],
+            "reason_codes": [],
+            "schema_version": "v2",
+            "part_of_speech": "noun",
+            "features": {
+              "number": "sing",
+              "person": null,
+              "case": null,
+              "degree": null,
+              "definiteness": null,
+              "verb_form": null,
+              "gender": null,
+              "tense_feature": null
+            },
+            "node_id": "n17",
+            "parent_id": "n13",
+            "source_span": {
+              "start": 56,
+              "end": 64
+            },
+            "grammatical_role": "object",
+            "dep_label": "dobj",
+            "head_id": "n15",
+            "phonetic": {
+              "uk": "dɪsˈɪʒən",
+              "us": "dᵻsˈɪʒən"
+            },
+            "cefr_level": "B1",
+            "linguistic_elements": []
+          }
+        ]
+      }
+    ]
+  }
+}

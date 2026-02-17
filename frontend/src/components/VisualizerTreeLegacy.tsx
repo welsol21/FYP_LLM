@@ -25,7 +25,7 @@ const colorMap: Record<string, string> = {
 const topLevelPalette = ['#f6c90e', '#3ec1d3', '#ff6f59', '#7bd389', '#a78bfa', '#f59e0b']
 
 function labelOf(node: VisualizerNode): string {
-  return node.part_of_speech ?? node.phraseType ?? node.type ?? 'unknown'
+  return node.part_of_speech
 }
 
 function colorOf(label: string): string {
@@ -35,7 +35,7 @@ function colorOf(label: string): string {
 type Token = { text: string; tone: string }
 
 function orderedChildren(node: VisualizerNode): VisualizerNode[] {
-  const src = node.children.map((child, idx) => ({ child, idx }))
+  const src = node.linguistic_elements.map((child, idx) => ({ child, idx }))
   const parent = node.content.toLowerCase()
   const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const firstBoundaryIndex = (text: string): number => {
@@ -66,7 +66,7 @@ function stableTopLevelTone(nodeId: string): string {
 }
 
 function nodeTokens(node: VisualizerNode, level: number): Token[] {
-  const tone = level === 1 && node.children.length === 0 ? stableTopLevelTone(node.node_id) : colorOf(labelOf(node))
+  const tone = level === 1 && node.linguistic_elements.length === 0 ? stableTopLevelTone(node.node_id) : colorOf(labelOf(node))
   return [{ text: node.content, tone }]
 }
 
@@ -80,9 +80,9 @@ export function VisualizerTreeLegacy({ node, isRoot = false, level = 0 }: Props)
   const [childrenOpen, setChildrenOpen] = useState(isRoot)
   const label = labelOf(node)
   const tone = useMemo(() => {
-    if (level === 1 && node.children.length === 0) return stableTopLevelTone(node.node_id)
+    if (level === 1 && node.linguistic_elements.length === 0) return stableTopLevelTone(node.node_id)
     return colorOf(label)
-  }, [label, level, node.children.length, node.node_id])
+  }, [label, level, node.linguistic_elements.length, node.node_id])
   const children = useMemo(() => orderedChildren(node), [node])
   const tokens = useMemo(() => nodeTokens(node, level), [node, level])
   const hasChildren = children.length > 0
@@ -124,7 +124,7 @@ export function VisualizerTreeLegacy({ node, isRoot = false, level = 0 }: Props)
         <div className="lv-details-card">
           {node.cefr_level ? <div><strong>CEFR:</strong> {node.cefr_level}</div> : null}
           {node.tense ? <div><strong>Tense:</strong> {node.tense}</div> : null}
-          {node.linguistic_notes?.length ? <div><strong>Linguistic Notes:</strong> {node.linguistic_notes.join(' ')}</div> : null}
+          {node.linguistic_notes.length ? <div><strong>Linguistic Notes:</strong> {node.linguistic_notes.join(' ')}</div> : null}
           {node.translation?.text ? <div><strong>Translation:</strong> {node.translation.text}</div> : null}
           {node.phonetic?.uk || node.phonetic?.us ? (
             <div>

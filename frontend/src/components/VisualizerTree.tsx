@@ -28,7 +28,7 @@ const COLOR_MAP: Record<string, string> = {
 }
 
 function resolveLabel(node: VisualizerNode): string {
-  return node.part_of_speech ?? node.phraseType ?? node.type
+  return node.part_of_speech
 }
 
 function toneForLabel(label: string): string {
@@ -40,7 +40,7 @@ export function VisualizerTree({ node, depth = 0 }: Props) {
   const [showDetails, setShowDetails] = useState(depth === 0)
   const label = resolveLabel(node)
   const borderColor = useMemo(() => toneForLabel(label), [label])
-  const hasChildren = node.children.length > 0
+  const hasChildren = node.linguistic_elements.length > 0
 
   return (
     <div className="visualizer-node parse-node" style={{ borderLeftColor: borderColor }}>
@@ -71,7 +71,7 @@ export function VisualizerTree({ node, depth = 0 }: Props) {
       </div>
       <div className="node-content-strip">
         {hasChildren ? (
-          node.children.map((child) => {
+          node.linguistic_elements.map((child) => {
             const childLabel = resolveLabel(child)
             return (
               <span
@@ -93,7 +93,7 @@ export function VisualizerTree({ node, depth = 0 }: Props) {
         <div className="node-details">
           {node.cefr_level ? <div><strong>CEFR:</strong> {node.cefr_level}</div> : null}
           {node.tense ? <div><strong>Tense:</strong> {node.tense}</div> : null}
-          {node.linguistic_notes?.length ? <div><strong>Linguistic Notes:</strong> {node.linguistic_notes.join(' ')}</div> : null}
+          {node.linguistic_notes.length ? <div><strong>Linguistic Notes:</strong> {node.linguistic_notes.join(' ')}</div> : null}
           {node.translation?.text ? <div><strong>Translation:</strong> {node.translation.text}</div> : null}
           {node.phonetic?.uk || node.phonetic?.us ? (
             <div>
@@ -107,7 +107,7 @@ export function VisualizerTree({ node, depth = 0 }: Props) {
       ) : null}
       {hasChildren && expanded ? (
         <div className="tree-children">
-          {node.children.map((child) => (
+          {node.linguistic_elements.map((child) => (
             <VisualizerTree key={child.node_id} node={child} depth={depth + 1} />
           ))}
         </div>

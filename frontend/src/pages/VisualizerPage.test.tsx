@@ -7,22 +7,22 @@ describe('VisualizerPage', () => {
     renderWithProviders(<VisualizerPage />)
 
     await waitFor(() => {
-      expect(screen.getAllByText('Although she had been warned several times, she still chose to ignore the evidence, which eventually led to a costly mistake that could have been avoided.').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('She should have trusted her instincts before making the decision.').length).toBeGreaterThan(0)
     })
     expect(screen.getAllByText('B2').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('still chose to ignore the evidence').length).toBeGreaterThan(0)
-    expect(screen.getByText(/CEFR:/)).toBeInTheDocument()
+    expect(screen.getAllByText('should have trusted her instincts').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/CEFR:/).length).toBeGreaterThan(0)
   })
 
   it('applies node edit and updates rendered content', async () => {
     renderWithProviders(<VisualizerPage />)
 
     await waitFor(() => {
-      expect(screen.getByText('Verb Phrase')).toBeInTheDocument()
-      expect(screen.getAllByText('still chose to ignore the evidence').length).toBeGreaterThan(0)
+      expect(screen.getByText('verb phrase')).toBeInTheDocument()
+      expect(screen.getAllByText('should have trusted her instincts').length).toBeGreaterThan(0)
     })
 
-    fireEvent.change(screen.getByLabelText(/Node ID/), { target: { value: 'p1' } })
+    fireEvent.change(screen.getByLabelText(/Node ID/), { target: { value: 'n4' } })
     fireEvent.change(screen.getByLabelText(/New Content/), { target: { value: 'trusted them' } })
     fireEvent.click(screen.getByRole('button', { name: 'Apply Edit' }))
 

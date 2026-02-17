@@ -34,25 +34,21 @@ export type VisualizerNode = {
   node_id: string
   type: string
   content: string
-  part_of_speech?: string
-  phraseType?: string
+  tense: string
+  linguistic_notes: string[]
+  part_of_speech: string
+  linguistic_elements: VisualizerNode[]
   cefr_level?: string
-  tense?: string
   phonetic?: { uk?: string; us?: string }
-  linguistic_notes?: string[]
   translation?: {
     source_lang?: string
     target_lang?: string
     text: string
     model?: string
   }
-  children: VisualizerNode[]
 }
 
-export type VisualizerPayloadRow = {
-  sentence_text: string
-  tree: VisualizerNode
-}
+export type VisualizerPayload = Record<string, VisualizerNode>
 
 export interface RuntimeApi {
   getUiState(): Promise<RuntimeUiState>
@@ -64,7 +60,7 @@ export interface RuntimeApi {
     mediaFileId?: string
   }): Promise<MediaSubmissionPayload>
   listBackendJobs(): Promise<BackendJob[]>
-  getVisualizerPayload(): Promise<VisualizerPayloadRow[]>
+  getVisualizerPayload(): Promise<VisualizerPayload>
   applyEdit(input: {
     sentenceText: string
     nodeId: string

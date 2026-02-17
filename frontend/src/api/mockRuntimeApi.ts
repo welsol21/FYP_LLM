@@ -1,119 +1,16 @@
+import samplePayload from './frontend_contract_sample.json'
 import type {
   BackendJob,
   MediaSubmissionPayload,
   RuntimeApi,
   RuntimeUiState,
-  VisualizerPayloadRow,
+  VisualizerNode,
+  VisualizerPayload,
 } from './runtimeApi'
 
 export class MockRuntimeApi implements RuntimeApi {
   private jobs: BackendJob[] = []
-  private rows: VisualizerPayloadRow[] = [
-    {
-      sentence_text: 'Although she had been warned several times, she still chose to ignore the evidence, which eventually led to a costly mistake that could have been avoided.',
-      tree: {
-        node_id: 's1',
-        type: 'Sentence',
-        content: 'Although she had been warned several times, she still chose to ignore the evidence, which eventually led to a costly mistake that could have been avoided.',
-        cefr_level: 'B2',
-        translation: {
-          source_lang: 'en',
-          target_lang: 'ru',
-          text: 'Хотя ее несколько раз предупреждали, она все же решила игнорировать доказательства, что в итоге привело к дорогостоящей ошибке, которой можно было избежать.',
-        },
-        linguistic_notes: ['Complex sentence with subordinate and relative clauses.'],
-        children: [
-          {
-            node_id: 'p1',
-            type: 'Phrase',
-            phraseType: 'Verb Phrase',
-            content: 'still chose to ignore the evidence',
-            tense: 'Past Simple',
-            children: [
-              {
-                node_id: 'w1',
-                type: 'Word',
-                content: 'chose',
-                part_of_speech: 'verb',
-                children: [],
-              },
-              {
-                node_id: 'w2',
-                type: 'Word',
-                content: 'to',
-                part_of_speech: 'preposition',
-                children: [],
-              },
-              {
-                node_id: 'w3',
-                type: 'Word',
-                content: 'ignore',
-                part_of_speech: 'verb',
-                children: [],
-              },
-              {
-                node_id: 'w4',
-                type: 'Word',
-                content: 'the',
-                part_of_speech: 'article',
-                children: [],
-              },
-              {
-                node_id: 'w5',
-                type: 'Word',
-                content: 'evidence',
-                part_of_speech: 'noun',
-                children: [],
-              },
-            ],
-          },
-          {
-            node_id: 'w6',
-            type: 'Word',
-            content: 'she',
-            part_of_speech: 'pronoun',
-            children: [],
-          },
-          {
-            node_id: 'p2',
-            type: 'Phrase',
-            phraseType: 'Prepositional Phrase',
-            content: 'which eventually led to a costly mistake',
-            children: [
-              {
-                node_id: 'w7',
-                type: 'Word',
-                content: 'led',
-                part_of_speech: 'verb',
-                children: [],
-              },
-              {
-                node_id: 'w8',
-                type: 'Word',
-                content: 'to',
-                part_of_speech: 'preposition',
-                children: [],
-              },
-              {
-                node_id: 'w9',
-                type: 'Word',
-                content: 'a',
-                part_of_speech: 'article',
-                children: [],
-              },
-              {
-                node_id: 'w10',
-                type: 'Word',
-                content: 'costly mistake',
-                part_of_speech: 'noun',
-                children: [],
-              },
-            ],
-          },
-        ],
-      },
-    },
-  ]
+  private payload: VisualizerPayload = JSON.parse(JSON.stringify(samplePayload)) as VisualizerPayload
 
   async getUiState(): Promise<RuntimeUiState> {
     return {
@@ -180,8 +77,8 @@ export class MockRuntimeApi implements RuntimeApi {
     return this.jobs
   }
 
-  async getVisualizerPayload(): Promise<VisualizerPayloadRow[]> {
-    return this.rows
+  async getVisualizerPayload(): Promise<VisualizerPayload> {
+    return this.payload
   }
 
   async applyEdit(input: {
@@ -190,20 +87,20 @@ export class MockRuntimeApi implements RuntimeApi {
     fieldPath: string
     newValue: string
   }): Promise<{ status: 'ok' | 'error'; message: string }> {
-    const targetRow = this.rows.find((r) => r.sentence_text === input.sentenceText)
-    if (!targetRow) {
+    const root = this.payload[input.sentenceText]
+    if (!root) {
       return { status: 'error', message: 'Sentence not found.' }
     }
     if (input.fieldPath !== 'content') {
       return { status: 'error', message: 'Mock supports only `content` field path.' }
     }
-    const stack = [targetRow.tree]
+    const stack: VisualizerNode[] = [root]
     while (stack.length > 0) {
-      const node = stack.pop()!
+      const node = stack.pop() as VisualizerNode
       if (node.node_id === input.nodeId) {
         node.content = input.newValue
         const words = input.newValue.trim().split(/\s+/).filter(Boolean)
-        const directLeafChildren = node.children.filter((c) => c.children.length === 0)
+        const directLeafChildren = node.linguistic_elements.filter((c) => c.linguistic_elements.length === 0)
         if (directLeafChildren.length === words.length && words.length > 0) {
           directLeafChildren.forEach((child, idx) => {
             child.content = words[idx]
@@ -211,7 +108,7 @@ export class MockRuntimeApi implements RuntimeApi {
         }
         return { status: 'ok', message: 'Edit applied.' }
       }
-      for (const child of node.children) stack.push(child)
+      for (const child of node.linguistic_elements) stack.push(child)
     }
     return { status: 'error', message: 'node_id not found.' }
   }

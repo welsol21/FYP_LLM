@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useApi } from '../api/apiContext'
-import type { VisualizerPayloadRow } from '../api/runtimeApi'
+import type { VisualizerPayload, VisualizerNode } from '../api/runtimeApi'
 import { VisualizerTreeLegacy } from '../components/VisualizerTreeLegacy'
 
 export function VisualizerPage() {
   const api = useApi()
-  const [rows, setRows] = useState<VisualizerPayloadRow[]>([])
-  const [nodeId, setNodeId] = useState('p1')
+  const [rows, setRows] = useState<Array<{ sentence_text: string; tree: VisualizerNode }>>([])
+  const [nodeId, setNodeId] = useState('n4')
   const [newValue, setNewValue] = useState('trusted them')
   const [editStatus, setEditStatus] = useState('')
 
   async function refresh() {
     const payload = await api.getVisualizerPayload()
-    setRows(payload)
+    const normalized = Object.entries(payload as VisualizerPayload).map(([sentence_text, tree]) => ({
+      sentence_text,
+      tree,
+    }))
+    setRows(normalized)
   }
 
   useEffect(() => {
