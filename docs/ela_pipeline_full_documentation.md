@@ -245,6 +245,19 @@ If `--model-dir` is omitted:
     - `update_backend_job_status(...)`
     - `list_backend_jobs(...)`
 
+### 4.13 Submission Entry Point (for UI Start button)
+- Helper: `ela_pipeline/runtime/media_submission.py`
+- Function: `submit_media_for_processing(...)`
+- What it does in one call:
+  1. applies media routing policy,
+  2. builds execution plan (`run_local|enqueue_backend|reject`),
+  3. enqueues backend job in local SQLite if backend route is required.
+- Return shape (simple):
+  - `route`: `local|backend|reject`
+  - `status`: `accepted_local|queued_backend|rejected`
+  - `message`: human-readable reason
+  - `job_id`: backend queue id (only for backend route)
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset

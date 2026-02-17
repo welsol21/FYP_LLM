@@ -14,6 +14,7 @@ from .media_policy import (
     load_media_policy_limits_from_env,
 )
 from .media_orchestrator import MediaExecutionPlan, plan_media_execution
+from .media_submission import submit_media_for_processing
 
 __all__ = [
     "RuntimeCapabilities",
@@ -27,4 +28,5 @@ __all__ = [
     "load_media_policy_limits_from_env",
     "MediaExecutionPlan",
     "plan_media_execution",
+    "submit_media_for_processing",
 ]

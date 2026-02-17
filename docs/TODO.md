@@ -376,6 +376,7 @@
   - [x] Backend orchestration base added:
     - [x] `ela_pipeline/runtime/media_orchestrator.py` (execution plan: `run_local|enqueue_backend|reject`)
     - [x] local SQLite backend job queue in `ela_pipeline/client_storage/sqlite_repository.py` (`backend_jobs` table + CRUD methods)
+    - [x] submission helper added: `ela_pipeline/runtime/media_submission.py` (single entrypoint for Start action)
   - [ ] UI wiring to consume orchestration plan and show route/status in interface.
 - [ ] Add media file size limits for both paths (configurable env/runtime thresholds):
   - [x] reject local jobs above `MEDIA_MAX_SIZE_LOCAL_MB` (policy routes to backend/reject).
