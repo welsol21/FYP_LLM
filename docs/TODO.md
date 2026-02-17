@@ -391,6 +391,11 @@
   - [x] fail-fast validation message includes actual duration/size and active limits.
   - [x] CLI validation hook added in inference runner (`--media-duration-sec` + `--media-size-bytes`).
 - [ ] Implement backend temporary media retention policy (TTL cleanup, no permanent storage of user final media).
+- [x] Implement backend temporary media retention policy (TTL cleanup, no permanent storage of user final media).
+  - [x] Added runtime cleanup module: `ela_pipeline/runtime/media_retention.py`.
+  - [x] Added CLI: `python -m ela_pipeline.runtime.cleanup_media_tmp` (`--dry-run` supported).
+  - [x] Added env config: `MEDIA_TEMP_DIR`, `MEDIA_RETENTION_TTL_HOURS`.
+  - [x] Added tests: `tests/test_runtime_media_retention.py`.
 - [ ] Enforce minimal backend identity policy (phone-linked account only, no extra PII by default).
 - [ ] Add sync flow for user-submitted new content that is missing from shared corpus.
 - [ ] Keep a single unified output contract and add legacy format adapters at ingestion boundaries.

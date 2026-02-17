@@ -40,6 +40,13 @@ Runtime policy mode:
 - available values: `online` | `offline`
 - in `offline` mode runtime blocks backend-dependent features and phonetic enrichment.
 
+Temporary media retention policy:
+- `MEDIA_TEMP_DIR=artifacts/media_tmp`
+- `MEDIA_RETENTION_TTL_HOURS=24`
+- run cleanup periodically:
+  - `.venv/bin/python -m ela_pipeline.runtime.cleanup_media_tmp --dry-run`
+  - `.venv/bin/python -m ela_pipeline.runtime.cleanup_media_tmp`
+
 ## 2) Build and start
 
 ```bash

@@ -291,6 +291,24 @@ Simple usage pattern:
 2. call `get_ui_state()` to render mode and disabled buttons,
 3. call `submit_media(...)` on Start and show `ui_feedback`.
 
+### 4.16 Temporary Media Retention (TTL cleanup)
+- Purpose: backend must not store user media permanently.
+- Module: `ela_pipeline/runtime/media_retention.py`
+- Config via env:
+  - `MEDIA_TEMP_DIR` (default `artifacts/media_tmp`)
+  - `MEDIA_RETENTION_TTL_HOURS` (default `24`)
+- Behavior:
+  - scans temp directory,
+  - deletes files older than TTL,
+  - returns cleanup report (`scanned/deleted/kept/bytes_deleted`).
+- CLI command:
+```bash
+.venv/bin/python -m ela_pipeline.runtime.cleanup_media_tmp --dry-run
+.venv/bin/python -m ela_pipeline.runtime.cleanup_media_tmp
+```
+- Recommended production usage:
+  - run periodically via cron/systemd timer in app container/host.
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset
