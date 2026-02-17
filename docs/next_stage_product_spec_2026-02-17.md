@@ -78,6 +78,7 @@ Backend should not become a heavy monolith for all media operations.
 - Known limitations:
   - no phonetic feature if backend-only/GPL-gated provider is required;
   - media processing limited to short files (<=15 min, local capability constraints).
+  - files exceeding local duration/size limits are rejected in offline mode (backend delegation is unavailable).
 
 ### Online mode
 

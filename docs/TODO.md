@@ -426,4 +426,7 @@
   - [x] Added phonetic policy switch: `ELA_PHONETIC_POLICY=enabled|disabled|backend_only`.
   - [x] Integrated with runtime capability gate (`ela_pipeline/runtime/capabilities.py`) and inference CLI checks.
   - [x] Added/updated tests in `tests/test_runtime_capabilities.py`.
-- [ ] Update docs with end-user limitations in offline mode (phonetics unavailability and large-media delegation).
+- [x] Update docs with end-user limitations in offline mode (phonetics unavailability and large-media delegation).
+  - [x] `docs/ela_pipeline_full_documentation.md`
+  - [x] `docs/next_stage_product_spec_2026-02-17.md`
+  - [x] `docs/deploy_docker.md`

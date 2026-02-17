@@ -226,6 +226,17 @@ If `--model-dir` is omitted:
   - backend async jobs are blocked.
 - Gate behavior is fail-fast: if a blocked feature is requested, pipeline exits with explicit reason.
 
+### 4.10.1 End-User Offline Limitations (simple)
+- In offline mode, user can still run core local processing.
+- Not available offline:
+  - phonetic enrichment (policy/license gate),
+  - backend persistence (`--persist-db`),
+  - backend async jobs for large media.
+- If media exceeds local limits (duration/size), run is rejected with explicit message including:
+  - actual duration/size,
+  - active local/backend limits,
+  - reason why backend route is unavailable offline.
+
 ### 4.11 Media Routing Policy (`ela_pipeline/runtime/media_policy.py`)
 - Policy inputs:
   - media duration (seconds),

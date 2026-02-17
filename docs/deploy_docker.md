@@ -47,6 +47,11 @@ Deployment + phonetic license gate:
   - `ELA_DEPLOYMENT_MODE=distributed`
   - `ELA_PHONETIC_POLICY=disabled` (or keep `backend_only` and run phonetic only on backend deployment)
 
+Offline user-facing limitations:
+- phonetic enrichment is unavailable,
+- DB persistence and backend async jobs are unavailable,
+- large media above local limits is rejected (no backend fallback in offline mode).
+
 Temporary media retention policy:
 - `MEDIA_TEMP_DIR=artifacts/media_tmp`
 - `MEDIA_RETENTION_TTL_HOURS=24`
