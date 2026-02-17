@@ -60,6 +60,17 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+### Docker (PostgreSQL + app)
+```bash
+cp .env.example .env
+docker compose up -d --build
+docker compose exec app python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --persist-db
+```
+
+App container runs DB migrations on startup (`python -m ela_pipeline.db.migrate`).
+
 ### 2) Run tests
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
@@ -238,6 +249,7 @@ If CUDA is unavailable, use `--cefr-provider rule` for a structural sanity pass.
 - CLI usage: `docs/pipeline_cli.md`
 - License inventory: `docs/licenses_inventory.md`
 - DB persistence: `docs/db_persistence.md`
+- Docker deployment: `docs/deploy_docker.md`
 - Implementation proposal: `docs/implementation_proposal.md`
 - Progress TODO: `docs/TODO.md`
 - Curator summary report: `docs/curator_progress_report.md`

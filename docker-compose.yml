@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ela-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ela}
+      POSTGRES_USER: ${POSTGRES_USER:-ela_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ela_pass}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ela_user} -d ${POSTGRES_DB:-ela}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ela-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ELA_DATABASE_URL: ${ELA_DATABASE_URL:-postgresql://ela_user:ela_pass@postgres:5432/ela}
+      HF_HOME: /opt/hf-cache
+    volumes:
+      - inference_results:/app/inference_results
+      - artifacts_data:/app/artifacts
+      - hf_cache:/opt/hf-cache
+    command: >
+      bash -lc "python -m ela_pipeline.db.migrate &&
+      tail -f /dev/null"
+
+volumes:
+  pgdata:
+  inference_results:
+  artifacts_data:
+  hf_cache:

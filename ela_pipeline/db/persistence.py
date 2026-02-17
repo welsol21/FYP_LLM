@@ -53,7 +53,13 @@ def persist_inference_result(
             run_id=rid,
             pipeline_context=pipeline_context,
             contract_payload=sentence_node,
+            analytics={
+                "tam_construction": sentence_node.get("tam_construction"),
+                "backoff_nodes_count": sentence_node.get("backoff_nodes_count"),
+                "backoff_leaf_nodes_count": sentence_node.get("backoff_leaf_nodes_count"),
+                "backoff_aggregate_nodes_count": sentence_node.get("backoff_aggregate_nodes_count"),
+                "backoff_unique_spans_count": sentence_node.get("backoff_unique_spans_count"),
+            },
         )
 
     return mapping
-

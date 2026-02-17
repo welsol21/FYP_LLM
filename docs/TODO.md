@@ -315,12 +315,22 @@
 - [x] Add `UNIQUE` index on `sentence_key`.
 - [x] Design minimal PostgreSQL schema: `runs`, `sentences` (contract in `jsonb`).
 - [x] Store full pipeline contract payload in `jsonb`.
-- [ ] Promote analytics-critical fields to columns (`tam_construction`, `backoff_*`, `language_pair`, etc.).
+- [x] Promote analytics-critical fields to columns (`tam_construction`, `backoff_*`, `language_pair`, etc.).
 - [x] Add DB migrations for schema creation and upgrades.
 - [x] Add repository/DAO layer for write path.
 - [x] Implement idempotent upsert by `sentence_key` (`ON CONFLICT` flow).
-- [ ] Add DB integration tests (TDD): insert, dedup, query by metrics.
+- [x] Add DB integration tests (TDD): insert, dedup, query by metrics.
+  - [x] Real PostgreSQL integration test added: `tests/test_db_integration_postgres.py`.
 - [ ] Optional later: add Redis cache for translation hot-path.
+
+## Deployment (Docker)
+
+- [x] Add container image definition for app runtime (`Dockerfile`).
+- [x] Add `docker-compose.yml` for `app + postgres` with persistent volumes and healthcheck.
+- [x] Add env template for deployment (`.env.example`).
+- [x] Add startup DB migration command for container flow (`ela_pipeline.db.migrate`).
+- [x] Document docker deployment runbook (`docs/deploy_docker.md`).
+- [x] Migrate runtime commands to Docker Compose v2 (`docker compose`), remove legacy v1 binary.
 
 ## Long-Term Backlog (Far Future)
 
@@ -332,9 +342,13 @@
 ## Human-in-the-Loop Corrections (Planned)
 
 - [ ] Add editable-review schema for key fields in contract (`notes`, `translation`, `phonetic`, `synonyms`, `cefr_level`, critical grammar tags).
-- [ ] Add reviewer metadata model (`reviewed_by`, `reviewed_at`, `change_reason`, `confidence`) on every manual correction.
-- [ ] Implement diff logger that stores `before/after` for every corrected node field.
-- [ ] Build correction export pipeline: accepted edits -> normalized feedback dataset (JSONL) for retraining.
+  - [x] Persistence base added: `review_events` + `node_edits` tables for sentence/node-level corrections.
+- [x] Add reviewer metadata model (`reviewed_by`, `reviewed_at`, `change_reason`, `confidence`) on every manual correction.
+- [x] Implement diff logger that stores `before/after` for every corrected node field.
+- [x] Build correction export pipeline: accepted edits -> normalized feedback dataset (JSONL) for retraining.
 - [ ] Add dataset quality gates for human-feedback export (dedup, invalid-label filter, license/provenance consistency).
+  - [x] Dedup gate added (`sentence_key + node_id + field_path + after_value`).
+  - [x] Invalid-label/field filter added (`cefr_level` allowed set + `field_path` whitelist).
+  - [ ] License/provenance consistency gate (source attribution policy) remains open.
 - [ ] Add training pipeline mode to mix base corpus + human-feedback dataset with configurable weighting.
 - [ ] Add regression checks proving that model quality improves after feedback retraining and does not break contract validity.
