@@ -96,6 +96,7 @@ inference_results/
 
 # Local project translation model cache
 artifacts/models/m2m100_418M/
+artifacts/
 
 
 temp/
