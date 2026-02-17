@@ -271,7 +271,10 @@
   - [x] serialization order invariant (`linguistic_elements` last).
 - [x] Add phonetic quality-control script/report (smoke set + structural checks).
 - [x] Document phonetic stage in sample contract (`docs/sample.json`).
-- [ ] Add final license gate before production enablement of chosen phonetic backend (per `docs/licenses_inventory.md`).
+- [x] Add final license gate before production enablement of chosen phonetic backend (per `docs/licenses_inventory.md`).
+  - [x] Added gate module/CLI: `ela_pipeline/runtime/license_gate.py`.
+  - [x] Added checklist command in `docs/license_compliance_checklists.md`.
+  - [x] Added tests: `tests/test_runtime_license_gate.py`.
 
 ## Synonyms Rollout (EN, WordNet)
 

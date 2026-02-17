@@ -397,6 +397,17 @@ Simple usage pattern:
 - Benefit:
   - frontend can integrate quickly without reimplementing runtime rules in UI code.
 
+### 4.22 Production License Gate (phonetic)
+- Module: `ela_pipeline/runtime/license_gate.py`
+- Command checks:
+  - deployment mode,
+  - phonetic policy,
+  - legal approval flag for distributed mode,
+  - inventory presence for phonetic GPL entries.
+- Exit code:
+  - `0` on pass,
+  - `2` on fail (CI/release pipeline friendly).
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset

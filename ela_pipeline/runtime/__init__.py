@@ -26,6 +26,7 @@ from .media_retention import (
     load_media_retention_config_from_env,
 )
 from .media_submission import submit_media_for_processing
+from .license_gate import LicenseGateResult, check_phonetic_license_gate
 from .service import RuntimeMediaService
 from .sync_service import SyncService
 from .ui_state import build_runtime_ui_state, build_submission_ui_feedback
@@ -52,6 +53,8 @@ __all__ = [
     "cleanup_temp_media",
     "load_media_retention_config_from_env",
     "submit_media_for_processing",
+    "LicenseGateResult",
+    "check_phonetic_license_gate",
     "RuntimeMediaService",
     "SyncService",
     "build_runtime_ui_state",

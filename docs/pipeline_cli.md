@@ -162,6 +162,15 @@ Framework-agnostic JSON API for frontend integration:
 .venv/bin/python -m ela_pipeline.runtime.client_api --db-path artifacts/client_state.sqlite3 apply-edit --input-json inference_results/pipeline_result_latest.json --output-json inference_results/pipeline_result_edited.json --sentence-text "She trusted him." --node-id p1 --field-path notes[0].text --new-value-json "\"Updated note\""
 ```
 
+Production license gate check (phonetic, GPL-sensitive):
+```bash
+.venv/bin/python -m ela_pipeline.runtime.license_gate \
+  --feature phonetic \
+  --deployment-mode distributed \
+  --phonetic-policy enabled \
+  --legal-approval
+```
+
 Optional multilingual translation enrichment (first pair: EN->RU, provider `m2m100`):
 ```bash
 .venv/bin/python -m ela_pipeline.translate.prepare_m2m100

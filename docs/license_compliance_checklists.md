@@ -33,3 +33,11 @@ When phonetics is enabled in production with GPL-backed tools (`espeak-ng`, etc.
 - [ ] deployment mode explicitly declared in release notes
 - [ ] legal gate passed for any distributed/on-prem delivery
 
+Recommended command (must pass before production enablement):
+```bash
+.venv/bin/python -m ela_pipeline.runtime.license_gate \
+  --feature phonetic \
+  --deployment-mode distributed \
+  --phonetic-policy enabled \
+  --legal-approval
+```
