@@ -384,7 +384,9 @@
     - [x] disabled-state reasons for blocked features
     - [x] fallback messaging payload for local/backend/reject (`build_submission_ui_feedback`)
   - [x] Frontend integration service added (`ela_pipeline/runtime/service.py`) to expose UI-ready payloads and submission flow.
-  - [ ] Visual UI components to render this payload in frontend screens.
+  - [x] Visual UI components to render this payload in frontend screens.
+    - [x] React component `RuntimeStatusCard` added (badges + disabled reasons).
+    - [x] React page `AnalyzePage` renders runtime payload + feedback block.
 - [ ] Enforce media routing policy:
   - [x] Runtime policy engine added (`ela_pipeline/runtime/media_policy.py`) with decision routes: `local|backend|reject`.
   - [x] local processing for files <= 15 minutes (policy decision path implemented).
@@ -395,7 +397,10 @@
     - [x] submission helper added: `ela_pipeline/runtime/media_submission.py` (single entrypoint for Start action)
   - [x] UI payload adapters added for route/status and user-facing messages (`ela_pipeline/runtime/ui_state.py`).
   - [x] Service-level wiring for Start action added (`RuntimeMediaService.submit_media`).
-  - [ ] Visual UI wiring to consume orchestration payload and show route/status in interface.
+  - [x] Visual UI wiring to consume orchestration payload and show route/status in interface.
+    - [x] React `MediaSubmitForm` wired to API submit.
+    - [x] UI feedback severity/title/message rendered from `ui_feedback`.
+    - [x] Backend job list rendered in `BackendJobsTable`.
 - [ ] Add media file size limits for both paths (configurable env/runtime thresholds):
   - [x] reject local jobs above `MEDIA_MAX_SIZE_LOCAL_MB` (policy routes to backend/reject).
   - [x] reject backend jobs above `MEDIA_MAX_SIZE_BACKEND_MB`.
@@ -435,7 +440,12 @@
   - [x] Added route-ready CLI commands for screen wiring:
     - [x] `visualizer-payload`
     - [x] `apply-edit`
-  - [ ] Render and bind these commands in concrete frontend screens/routes.
+  - [x] Render and bind these commands in concrete frontend screens/routes.
+    - [x] Route shell created: `Projects -> Files -> Analyze -> Vocabulary -> Visualizer`.
+    - [x] Visualizer screen renders tree payload structure (React recursive tree).
+    - [x] Frontend API contract layer added for `ui-state`, `submit-media`, `backend-jobs`, `visualizer-payload`.
+    - [x] Minimal editor interaction wired via `apply-edit`-compatible API method (`applyEdit`), with in-UI re-render after patch.
+  - [ ] Replace current mock API transport with production transport wired to runtime/backend endpoints.
 - [x] Add explicit license-gated runtime switch for phonetics by deployment mode (offline/distributed/backend).
   - [x] Added deployment mode resolution: `ELA_DEPLOYMENT_MODE` + CLI `--deployment-mode`.
   - [x] Added phonetic policy switch: `ELA_PHONETIC_POLICY=enabled|disabled|backend_only`.

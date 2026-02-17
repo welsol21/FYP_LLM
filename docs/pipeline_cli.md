@@ -162,6 +162,13 @@ Framework-agnostic JSON API for frontend integration:
 .venv/bin/python -m ela_pipeline.runtime.client_api --db-path artifacts/client_state.sqlite3 apply-edit --input-json inference_results/pipeline_result_latest.json --output-json inference_results/pipeline_result_edited.json --sentence-text "She trusted him." --node-id p1 --field-path notes[0].text --new-value-json "\"Updated note\""
 ```
 
+React frontend (UI migration slice):
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
 Production license gate check (phonetic, GPL-sensitive):
 ```bash
 .venv/bin/python -m ela_pipeline.runtime.license_gate \

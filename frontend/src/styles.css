@@ -1,0 +1,89 @@
+:root {
+  --bg: #101114;
+  --panel: #1a1c21;
+  --line: #424650;
+  --text: #f5f7fa;
+  --accent: #f4d03f;
+  --muted: #a5abb8;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(180deg, #0f1116 0%, #141821 100%);
+  color: var(--text);
+}
+
+.layout { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+.sidebar {
+  border-right: 1px solid var(--line);
+  background: #0d0f13;
+  padding: 18px;
+}
+.sidebar h1 { color: var(--accent); font-size: 24px; margin: 0 0 14px; }
+.sidebar nav { display: grid; gap: 8px; }
+.menu-link {
+  color: var(--text);
+  text-decoration: none;
+  border: 1px solid var(--line);
+  padding: 10px;
+  border-radius: 8px;
+}
+.menu-link.active { border-color: var(--accent); color: var(--accent); }
+
+.content { padding: 20px; }
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.badge {
+  border: 1px solid var(--line);
+  color: var(--accent);
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+table { width: 100%; border-collapse: collapse; }
+th, td { border: 1px solid var(--line); padding: 8px; text-align: left; }
+th { color: var(--accent); }
+
+input {
+  width: 100%;
+  margin-top: 4px;
+  margin-bottom: 10px;
+  padding: 8px;
+  background: #10131a;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+button {
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+.feedback.info h2 { color: #7bd88f; }
+.feedback.warning h2 { color: #ffd166; }
+.feedback.error h2 { color: #ff6b6b; }
+
+.node-box {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  margin: 6px 0;
+  display: inline-block;
+  background: #11141b;
+}
+
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
+}
