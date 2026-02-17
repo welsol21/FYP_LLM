@@ -22,6 +22,7 @@ from .media_retention import (
 )
 from .media_submission import submit_media_for_processing
 from .service import RuntimeMediaService
+from .sync_service import SyncService
 from .ui_state import build_runtime_ui_state, build_submission_ui_feedback
 
 __all__ = [
@@ -42,6 +43,7 @@ __all__ = [
     "load_media_retention_config_from_env",
     "submit_media_for_processing",
     "RuntimeMediaService",
+    "SyncService",
     "build_runtime_ui_state",
     "build_submission_ui_feedback",
 ]

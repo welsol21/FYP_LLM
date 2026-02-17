@@ -77,6 +77,16 @@ class LocalSQLiteRepository:
                     updated_at TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_backend_jobs_status ON backend_jobs(status);
+
+                CREATE TABLE IF NOT EXISTS sync_requests (
+                    id TEXT PRIMARY KEY,
+                    request_type TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_sync_requests_status ON sync_requests(status);
                 """
             )
 
@@ -330,6 +340,80 @@ class LocalSQLiteRepository:
                     "request_payload": json.loads(row[4]),
                     "created_at": row[5],
                     "updated_at": row[6],
+                }
+            )
+        return out
+
+    def enqueue_sync_request(
+        self,
+        *,
+        request_type: str,
+        payload: dict[str, Any],
+        request_id: str | None = None,
+    ) -> dict[str, Any]:
+        now = _utc_now()
+        rid = request_id or str(uuid.uuid4())
+        encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO sync_requests (id, request_type, status, payload, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (rid, request_type, "queued", encoded, now, now),
+            )
+            conn.commit()
+        return {
+            "id": rid,
+            "request_type": request_type,
+            "status": "queued",
+            "payload": payload,
+            "created_at": now,
+            "updated_at": now,
+        }
+
+    def update_sync_request_status(self, request_id: str, status: str) -> None:
+        now = _utc_now()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE sync_requests
+                SET status = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (status, now, request_id),
+            )
+            conn.commit()
+
+    def list_sync_requests(self, *, status: str | None = None, limit: int | None = None) -> list[dict[str, Any]]:
+        params: list[Any] = []
+        where_sql = ""
+        if status:
+            where_sql = "WHERE status = ?"
+            params.append(status)
+        limit_sql = ""
+        if limit is not None and limit > 0:
+            limit_sql = "LIMIT ?"
+            params.append(limit)
+        sql = f"""
+            SELECT id, request_type, status, payload, created_at, updated_at
+            FROM sync_requests
+            {where_sql}
+            ORDER BY created_at DESC
+            {limit_sql}
+        """
+        with self._connect() as conn:
+            rows = conn.execute(sql, tuple(params)).fetchall()
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            out.append(
+                {
+                    "id": row[0],
+                    "request_type": row[1],
+                    "status": row[2],
+                    "payload": json.loads(row[3]),
+                    "created_at": row[4],
+                    "updated_at": row[5],
                 }
             )
         return out

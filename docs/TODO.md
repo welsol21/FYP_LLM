@@ -400,7 +400,11 @@
   - [x] Added DB migration/table for hash-only accounts: `ela_pipeline/db/migrations/0004_backend_accounts.sql` (`backend_accounts.phone_hash`).
   - [x] Added repository methods: `upsert_backend_account` / `get_backend_account_by_phone_hash`.
   - [x] Added tests: `tests/test_identity_policy.py`, `tests/test_db_backend_accounts.py`.
-- [ ] Add sync flow for user-submitted new content that is missing from shared corpus.
+- [x] Add sync flow for user-submitted new content that is missing from shared corpus.
+  - [x] Added local sync queue in SQLite: `sync_requests` table.
+  - [x] Added repository methods: enqueue/list/update status for sync requests.
+  - [x] Added service layer: `ela_pipeline/runtime/sync_service.py`.
+  - [x] Added tests: `tests/test_runtime_sync_service.py` (+ repository coverage in `tests/test_client_sqlite_repository.py`).
 - [ ] Keep a single unified output contract and add legacy format adapters at ingestion boundaries.
 - [ ] Integrate legacy visualizer and editor features into the new app flow (without model duplication).
 - [ ] Add explicit license-gated runtime switch for phonetics by deployment mode (offline/distributed/backend).

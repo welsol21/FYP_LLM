@@ -323,6 +323,23 @@ Simple usage pattern:
   - `upsert_backend_account(phone_hash=...)`
   - `get_backend_account_by_phone_hash(phone_hash=...)`
 
+### 4.18 Sync Flow for Missing Content
+- Goal: if user content is missing in shared corpus, queue it for backend sync safely.
+- Local queue persistence:
+  - SQLite table `sync_requests` in `ela_pipeline/client_storage/sqlite_repository.py`
+  - status lifecycle: `queued -> sent|failed`
+- Service layer:
+  - `ela_pipeline/runtime/sync_service.py` (`SyncService`)
+  - methods:
+    - `queue_missing_content(...)`
+    - `queue_large_media_reference(...)`
+    - `list_queued()`
+    - `mark_sent(...)`
+    - `mark_failed(...)`
+- Design note:
+  - queue is local-first and works offline,
+  - send/retry worker can process queued requests when network is available.
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset

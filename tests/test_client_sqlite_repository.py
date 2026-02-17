@@ -101,6 +101,28 @@ class LocalSQLiteRepositoryTests(unittest.TestCase):
             self.assertEqual(len(processing), 1)
             self.assertEqual(processing[0]["id"], "job-1")
 
+    def test_sync_requests_queue_roundtrip(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "client.sqlite3"
+            repo = LocalSQLiteRepository(db_path)
+
+            queued = repo.enqueue_sync_request(
+                request_id="sync-1",
+                request_type="missing_content",
+                payload={"source_text": "Hello world."},
+            )
+            self.assertEqual(queued["id"], "sync-1")
+            self.assertEqual(queued["status"], "queued")
+
+            rows = repo.list_sync_requests(status="queued")
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["id"], "sync-1")
+
+            repo.update_sync_request_status("sync-1", "sent")
+            sent = repo.list_sync_requests(status="sent")
+            self.assertEqual(len(sent), 1)
+            self.assertEqual(sent[0]["id"], "sync-1")
+
 
 if __name__ == "__main__":
     unittest.main()
