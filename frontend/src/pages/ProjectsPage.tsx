@@ -2,7 +2,7 @@ export function ProjectsPage() {
   return (
     <section className="card">
       <h1>Projects</h1>
-      <p>Main menu baseline preserved: Projects -> Files -> Analyze -> Vocabulary.</p>
+      <p>Main menu baseline preserved: Projects → Files → Analyze → Vocabulary.</p>
       <table>
         <thead>
           <tr>

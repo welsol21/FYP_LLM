@@ -69,6 +69,9 @@ docker compose exec app python -m ela_pipeline.inference.run \
   --persist-db
 ```
 
+Frontend is served in a separate container:
+- `http://localhost:8080` (or custom `${FRONTEND_PORT}` from `.env`).
+
 App container runs DB migrations on startup (`python -m ela_pipeline.db.migrate`).
 Docker profile is CPU-only for `torch` by default (faster/lighter image build).
 

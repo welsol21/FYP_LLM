@@ -17,3 +17,9 @@ results_*
 .idea
 *.log
 *.tmp
+
+# Frontend local artifacts
+frontend/node_modules
+frontend/dist
+frontend/.vite
+frontend/coverage

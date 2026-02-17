@@ -5,11 +5,14 @@
 Run the project in containers with stable service boundaries:
 - `postgres` for persistence
 - `app` for inference/training utilities
+- `frontend` for production React UI (served by Nginx)
 
 ## Files
 
 - `Dockerfile`
 - `docker-compose.yml`
+- `frontend/Dockerfile`
+- `frontend/nginx.conf`
 - `.env.example`
 - `requirements-docker-cpu.txt` (container-only deps, CPU profile)
 
@@ -20,6 +23,7 @@ cp .env.example .env
 ```
 
 Adjust `.env` values for production secrets, host port mapping, and media thresholds if needed.
+Frontend host port is configurable via `FRONTEND_PORT` (default `8080`).
 
 Compose CLI requirement:
 - use Docker Compose v2 (`docker compose ...`).
@@ -82,9 +86,15 @@ python -m ela_pipeline.db.migrate
 docker compose ps
 docker compose logs postgres --tail=100
 docker compose logs app --tail=100
+docker compose logs frontend --tail=100
 ```
 
-## 4) Run inference inside container
+## 4) Open frontend
+
+Open:
+- `http://localhost:${FRONTEND_PORT}` (default `http://localhost:8080`)
+
+## 5) Run inference inside container
 
 ```bash
 docker compose exec app python -m ela_pipeline.inference.run \
@@ -92,7 +102,7 @@ docker compose exec app python -m ela_pipeline.inference.run \
   --persist-db
 ```
 
-## 5) Inspect database
+## 6) Inspect database
 
 ```bash
 docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt"
