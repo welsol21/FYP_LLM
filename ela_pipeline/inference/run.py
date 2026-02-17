@@ -683,6 +683,15 @@ def main() -> None:
         help="Attach CEFR level to sentence only (skip phrase/word node CEFR).",
     )
     parser.add_argument("--output", default=None)
+    parser.add_argument("--persist-db", action="store_true", help="Persist inference result to PostgreSQL.")
+    parser.add_argument(
+        "--db-url",
+        default=None,
+        help="PostgreSQL DSN. If omitted, ELA_DATABASE_URL or DATABASE_URL env var is used.",
+    )
+    parser.add_argument("--db-run-id", default=None, help="Optional external run id for DB persistence.")
+    parser.add_argument("--db-source-lang", default="en", help="Source language for sentence keying in DB.")
+    parser.add_argument("--db-target-lang", default="none", help="Target language for sentence keying in DB.")
     args = parser.parse_args()
 
     result = run_pipeline(
@@ -721,6 +730,33 @@ def main() -> None:
 
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
+
+    if args.persist_db:
+        from ela_pipeline.db import persist_inference_result
+
+        db_target_lang = args.translation_target_lang if args.translate else args.db_target_lang
+        pipeline_context = {
+            "validation_mode": args.validation_mode,
+            "note_mode": args.note_mode,
+            "translate": bool(args.translate),
+            "translation_provider": args.translation_provider if args.translate else "none",
+            "phonetic": bool(args.phonetic),
+            "phonetic_provider": args.phonetic_provider if args.phonetic else "none",
+            "synonyms": bool(args.synonyms),
+            "synonyms_provider": args.synonyms_provider if args.synonyms else "none",
+            "cefr": bool(args.cefr),
+            "cefr_provider": args.cefr_provider if args.cefr else "none",
+            "schema_version": "v2",
+        }
+        mapping = persist_inference_result(
+            result=result,
+            db_url=args.db_url or "",
+            source_lang=args.db_source_lang,
+            target_lang=db_target_lang,
+            pipeline_context=pipeline_context,
+            run_id=args.db_run_id,
+        )
+        print(f"Persisted to DB: {len(mapping)} sentence(s)")
 
     print(f"Saved: {out_path}")
 

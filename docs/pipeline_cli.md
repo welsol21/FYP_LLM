@@ -109,6 +109,19 @@ in addition to always-on counters:
 `backoff_nodes_count`, `backoff_leaf_nodes_count`, `backoff_aggregate_nodes_count`, and `backoff_unique_spans_count`.
 Each node also carries `backoff_in_subtree` to indicate descendant-level backoff independently of local `backoff_used`.
 
+Optional PostgreSQL persistence for inference artifact:
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --persist-db \
+  --db-url "postgresql://user:pass@localhost:5432/ela"
+```
+
+Optional DB identity controls:
+- `--db-run-id`
+- `--db-source-lang`
+- `--db-target-lang`
+
 Optional multilingual translation enrichment (first pair: EN->RU, provider `m2m100`):
 ```bash
 .venv/bin/python -m ela_pipeline.translate.prepare_m2m100

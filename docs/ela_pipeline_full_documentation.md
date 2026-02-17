@@ -10,6 +10,7 @@ End-to-end flow:
 4. optional local T5 note generation
 5. optional multilingual translation enrichment
 6. validation (schema + frozen structure)
+7. optional PostgreSQL persistence of final contract
 
 Authoritative compatibility contract: `docs/sample.json`.
 Tool/model/data license registry: `docs/licenses_inventory.md`.
@@ -189,6 +190,19 @@ If `--model-dir` is omitted:
   - node CEFR reuses canonical prediction via `ref_node_id`,
   - duplicate source spans/text reuse cached CEFR by normalized source key.
 
+### 4.9 PostgreSQL Persistence (`ela_pipeline/db/*`)
+- Optional runtime stage behind CLI flag `--persist-db`.
+- Driver: `psycopg` (PostgreSQL).
+- Stores sentence-level contract snapshots in DB with deterministic `sentence_key`.
+- Keying uses:
+  - `canonical_text` normalization (NFC + trim + whitespace collapse),
+  - `hash_version`,
+  - source/target language,
+  - pipeline context fingerprint.
+- Current schema migration:
+  - `ela_pipeline/db/migrations/0001_init.sql`
+  - tables: `runs`, `sentences` (contract in `jsonb`).
+
 ## 5. CLI Usage
 
 ### 5.1 Build dataset
@@ -286,6 +300,15 @@ One-time local model preparation:
   --cefr-nodes
 ```
 If CUDA is unavailable, run the same command with `--cefr-provider rule` for deterministic sanity checks.
+
+### 5.12 Inference with PostgreSQL persistence
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --persist-db \
+  --db-url "postgresql://user:pass@localhost:5432/ela"
+```
+Optional flags: `--db-run-id`, `--db-source-lang`, `--db-target-lang`.
 
 ## 6. Testing
 Run in activated `.venv`:

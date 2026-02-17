@@ -184,6 +184,14 @@ Note: CEFR T5 inference follows GPU-only policy (CUDA required, no CPU fallback)
 ```
 If CUDA is unavailable, use `--cefr-provider rule` for a structural sanity pass.
 
+### 13) Persist inference result to PostgreSQL
+```bash
+.venv/bin/python -m ela_pipeline.inference.run \
+  --text "She should have trusted her instincts before making the decision." \
+  --persist-db \
+  --db-url "postgresql://user:pass@localhost:5432/ela"
+```
+
 ## Main Commands
 
 ### Build dataset splits
@@ -229,6 +237,7 @@ If CUDA is unavailable, use `--cefr-provider rule` for a structural sanity pass.
 - Full documentation: `docs/ela_pipeline_full_documentation.md`
 - CLI usage: `docs/pipeline_cli.md`
 - License inventory: `docs/licenses_inventory.md`
+- DB persistence: `docs/db_persistence.md`
 - Implementation proposal: `docs/implementation_proposal.md`
 - Progress TODO: `docs/TODO.md`
 - Curator summary report: `docs/curator_progress_report.md`

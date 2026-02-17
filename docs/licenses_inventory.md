@@ -32,6 +32,7 @@ Primary dependencies from `requirements.txt` and runtime code:
 | `rouge-score` | text-quality metric tooling | Apache-2.0 |
 | `sentencepiece` | tokenizer backend (used by M2M100/T5 tokenizers) | Apache-2.0 |
 | `nltk` | lexical resources / WordNet synonym enrichment | Apache-2.0 |
+| `psycopg` | PostgreSQL driver for DB persistence | LGPL-3.0-only |
 
 Notes:
 - `sentencepiece` and `rouge-score` metadata in local wheels can have empty `License` field; license type above is taken from upstream project/license declarations.

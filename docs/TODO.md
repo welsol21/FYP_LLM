@@ -305,20 +305,20 @@
 - [x] Add TDD regression tests for CEFR stage (sentence/phrase/word, ordering invariants, deterministic behavior).
 - [x] Document CEFR stage in README/CLI/full docs/sample contract.
 
-## DB Persistence (Deferred, Postgres-only)
+## DB Persistence (In Progress, Postgres-only)
 
-- [ ] Document decision: PostgreSQL is primary storage (no MongoDB in current architecture).
-- [ ] Add deterministic `sentence_key` for sentence-level identity.
-- [ ] Define and document `canonical_text` normalization (trim, whitespace collapse, Unicode NFC).
-- [ ] Add `hash_version` (for example `v1`) for key schema evolution.
-- [ ] Implement key formula: `sha256(canonical_text + source_lang + target_lang + pipeline/model context)`.
-- [ ] Add `UNIQUE` index on `sentence_key`.
-- [ ] Design minimal PostgreSQL schema: `runs`, `sentences`, `artifacts(jsonb)`.
-- [ ] Store full pipeline contract payload in `jsonb`.
+- [x] Document decision: PostgreSQL is primary storage (no MongoDB in current architecture).
+- [x] Add deterministic `sentence_key` for sentence-level identity.
+- [x] Define and document `canonical_text` normalization (trim, whitespace collapse, Unicode NFC).
+- [x] Add `hash_version` (for example `v1`) for key schema evolution.
+- [x] Implement key formula: `sha256(canonical_text + source_lang + target_lang + pipeline/model context)`.
+- [x] Add `UNIQUE` index on `sentence_key`.
+- [x] Design minimal PostgreSQL schema: `runs`, `sentences` (contract in `jsonb`).
+- [x] Store full pipeline contract payload in `jsonb`.
 - [ ] Promote analytics-critical fields to columns (`tam_construction`, `backoff_*`, `language_pair`, etc.).
-- [ ] Add DB migrations for schema creation and upgrades.
-- [ ] Add repository/DAO layer for write/read.
-- [ ] Implement idempotent upsert by `sentence_key` (`ON CONFLICT` flow).
+- [x] Add DB migrations for schema creation and upgrades.
+- [x] Add repository/DAO layer for write path.
+- [x] Implement idempotent upsert by `sentence_key` (`ON CONFLICT` flow).
 - [ ] Add DB integration tests (TDD): insert, dedup, query by metrics.
 - [ ] Optional later: add Redis cache for translation hot-path.
 
