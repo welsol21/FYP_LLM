@@ -35,6 +35,11 @@ Media limits (default profile):
 - `MEDIA_MAX_SIZE_LOCAL_MB=250` (targeting ~15 min medium-quality source files)
 - `MEDIA_MAX_SIZE_BACKEND_MB=2048` (hard cap for backend async path)
 
+Runtime policy mode:
+- `ELA_RUNTIME_MODE=online` (default)
+- available values: `online` | `offline`
+- in `offline` mode runtime blocks backend-dependent features and phonetic enrichment.
+
 ## 2) Build and start
 
 ```bash

@@ -366,6 +366,9 @@
   - [x] Added `ela_pipeline/client_storage/sqlite_repository.py`.
   - [x] Added unit tests `tests/test_client_sqlite_repository.py`.
 - [ ] Define and implement offline/online capability matrix in runtime + UI (feature flags and graceful degradation).
+  - [x] Runtime policy layer added (`ela_pipeline/runtime/capabilities.py`) with fail-fast checks for offline disallowed features.
+  - [x] Inference CLI wired with `--runtime-mode auto|offline|online` + `ELA_RUNTIME_MODE`.
+  - [ ] UI layer: capability badges/disabled states and graceful fallback messaging.
 - [ ] Enforce media routing policy:
   - [ ] local processing for files <= 15 minutes,
   - [ ] backend async job path for files > 15 minutes.

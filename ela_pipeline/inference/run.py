@@ -10,6 +10,12 @@ from typing import Any
 
 from ela_pipeline.contract import deep_copy_contract
 from ela_pipeline.parse.spacy_parser import load_nlp
+from ela_pipeline.runtime import (
+    RuntimeFeatureRequest,
+    build_runtime_capabilities,
+    resolve_runtime_mode,
+    validate_runtime_feature_request,
+)
 from ela_pipeline.skeleton.builder import build_skeleton
 from ela_pipeline.tam.rules import apply_tam
 from ela_pipeline.validation.validator import (
@@ -683,6 +689,12 @@ def main() -> None:
         help="Attach CEFR level to sentence only (skip phrase/word node CEFR).",
     )
     parser.add_argument("--output", default=None)
+    parser.add_argument(
+        "--runtime-mode",
+        default="auto",
+        choices=["auto", "offline", "online"],
+        help="Runtime policy mode. `auto` resolves from ELA_RUNTIME_MODE (defaults to online).",
+    )
     parser.add_argument("--persist-db", action="store_true", help="Persist inference result to PostgreSQL.")
     parser.add_argument(
         "--db-url",
@@ -693,6 +705,16 @@ def main() -> None:
     parser.add_argument("--db-source-lang", default="en", help="Source language for sentence keying in DB.")
     parser.add_argument("--db-target-lang", default="none", help="Target language for sentence keying in DB.")
     args = parser.parse_args()
+
+    runtime_mode = resolve_runtime_mode(args.runtime_mode)
+    runtime_caps = build_runtime_capabilities(runtime_mode)
+    validate_runtime_feature_request(
+        runtime_caps,
+        RuntimeFeatureRequest(
+            enable_phonetic=bool(args.phonetic),
+            enable_db_persistence=bool(args.persist_db),
+        ),
+    )
 
     result = run_pipeline(
         text=args.text,
@@ -736,6 +758,7 @@ def main() -> None:
 
         db_target_lang = args.translation_target_lang if args.translate else args.db_target_lang
         pipeline_context = {
+            "runtime_mode": runtime_mode,
             "validation_mode": args.validation_mode,
             "note_mode": args.note_mode,
             "translate": bool(args.translate),
