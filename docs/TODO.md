@@ -324,7 +324,10 @@
 - [x] Implement idempotent upsert by `sentence_key` (`ON CONFLICT` flow).
 - [x] Add DB integration tests (TDD): insert, dedup, query by metrics.
   - [x] Real PostgreSQL integration test added: `tests/test_db_integration_postgres.py`.
-- [ ] Optional later: add Redis cache for translation hot-path.
+- [x] Optional later: add Redis cache for translation hot-path.
+  - [x] Added optional translation cache backends (`memory|redis`) with env-driven bootstrap in `ela_pipeline/translate/cache.py`.
+  - [x] Wired translation stage to cache reads/writes in inference (`_attach_translation`, `run_pipeline`).
+  - [x] Added tests for cache key/env bootstrap + translation cache reuse.
 
 ## Deployment (Docker)
 

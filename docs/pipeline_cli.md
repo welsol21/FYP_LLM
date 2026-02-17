@@ -205,6 +205,11 @@ Sentence-only translation (skip phrase/word node translations):
 .venv/bin/python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --translate --no-translate-nodes
 ```
 
+Optional translation hot-path cache:
+- `ELA_TRANSLATION_CACHE_BACKEND=memory|redis` (empty disables cache)
+- `ELA_TRANSLATION_CACHE_URL=redis://...` (required for `redis`)
+- `ELA_TRANSLATION_CACHE_TTL_SECONDS=86400` (must be `> 0`)
+
 Translation quality regression suite (EN->RU default):
 ```bash
 .venv/bin/python -m ela_pipeline.inference.translation_quality_control \

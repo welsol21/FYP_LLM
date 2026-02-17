@@ -130,15 +130,36 @@ def _attach_translation(
     target_lang: str,
     include_node_translations: bool = True,
     dual_channels: bool = False,
+    translation_cache: Any | None = None,
+    translation_cache_ttl_seconds: int = 86400,
 ) -> None:
-    from ela_pipeline.translate import build_dual_translation_channels
+    from ela_pipeline.translate import build_dual_translation_channels, build_translation_cache_key
+
+    model_name = str(getattr(translator, "model_name", "unknown"))
+
+    def translate_with_cache(source_text: str) -> str:
+        if translation_cache is None:
+            return translator.translate_text(source_text, source_lang=source_lang, target_lang=target_lang)
+
+        cache_key = build_translation_cache_key(
+            source_text=source_text,
+            source_lang=source_lang,
+            target_lang=target_lang,
+            model_name=model_name,
+        )
+        cached = translation_cache.get(cache_key)
+        if isinstance(cached, str) and cached:
+            return cached
+        translated = translator.translate_text(source_text, source_lang=source_lang, target_lang=target_lang)
+        translation_cache.set(cache_key, translated, ttl_seconds=translation_cache_ttl_seconds)
+        return translated
 
     for sentence_node in doc.values():
         if not isinstance(sentence_node, dict):
             continue
 
         sentence_text = str(sentence_node.get("content") or "")
-        sentence_translation = translator.translate_text(sentence_text, source_lang=source_lang, target_lang=target_lang)
+        sentence_translation = translate_with_cache(sentence_text)
         if dual_channels:
             literary, idiomatic = build_dual_translation_channels(
                 literary_text=sentence_translation,
@@ -188,7 +209,7 @@ def _attach_translation(
                 if source_key in translated_by_source_key:
                     translated = translated_by_source_key[source_key]
                 else:
-                    translated = translator.translate_text(source_text, source_lang=source_lang, target_lang=target_lang)
+                    translated = translate_with_cache(source_text)
                     translated_by_source_key[source_key] = translated
 
             if dual_channels:
@@ -526,6 +547,16 @@ def _resolve_translation_model_name(
     return model_name
 
 
+def _resolve_translation_cache_ttl_seconds(default_seconds: int = 86400) -> int:
+    raw = os.getenv("ELA_TRANSLATION_CACHE_TTL_SECONDS", "").strip()
+    if not raw:
+        return default_seconds
+    ttl = int(raw)
+    if ttl <= 0:
+        raise ValueError("ELA_TRANSLATION_CACHE_TTL_SECONDS must be > 0")
+    return ttl
+
+
 def run_pipeline(
     text: str,
     model_dir: str | None = None,
@@ -577,13 +608,15 @@ def run_pipeline(
     if enable_translation:
         if translation_provider != "m2m100":
             raise ValueError("translation_provider must be 'm2m100'")
-        from ela_pipeline.translate import M2M100Translator
+        from ela_pipeline.translate import M2M100Translator, build_translation_cache_from_env
 
         resolved_translation_model = _resolve_translation_model_name(translation_model)
         translator = M2M100Translator(
             model_name=resolved_translation_model,
             device=translation_device,
         )
+        translation_cache = build_translation_cache_from_env()
+        translation_cache_ttl_seconds = _resolve_translation_cache_ttl_seconds()
         _attach_translation(
             enriched,
             translator=translator,
@@ -591,6 +624,8 @@ def run_pipeline(
             target_lang=translation_target_lang,
             include_node_translations=translate_nodes,
             dual_channels=translation_dual_channels,
+            translation_cache=translation_cache,
+            translation_cache_ttl_seconds=translation_cache_ttl_seconds,
         )
 
     if enable_phonetic:

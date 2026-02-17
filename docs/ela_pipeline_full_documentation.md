@@ -157,6 +157,10 @@ If `--model-dir` is omitted:
   - prefer `source_span` projection from sentence text over free node content translation,
   - reuse canonical translation via `ref_node_id`,
   - deduplicate calls for identical source spans/text within sentence.
+- Optional hot-path translation cache:
+  - `ELA_TRANSLATION_CACHE_BACKEND=memory|redis` (empty disables),
+  - `ELA_TRANSLATION_CACHE_URL` required for redis backend,
+  - `ELA_TRANSLATION_CACHE_TTL_SECONDS` controls TTL for cached items.
 
 ### 4.6 Phonetic Enrichment (`ela_pipeline/phonetic/engine.py`)
 - Optional runtime stage behind CLI flag `--phonetic`.

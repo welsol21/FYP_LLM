@@ -5,11 +5,13 @@ from ela_pipeline.annotate.local_generator import LocalT5Annotator
 from ela_pipeline.inference.run import (
     _attach_cefr,
     _attach_phonetic,
+    _resolve_translation_cache_ttl_seconds,
     _attach_synonyms,
     _attach_translation,
     _resolve_translation_model_name,
     run_pipeline,
 )
+from ela_pipeline.translate import InMemoryTranslationCache
 from ela_pipeline.parse.spacy_parser import load_nlp
 from ela_pipeline.skeleton.builder import build_skeleton
 from ela_pipeline.tam.rules import apply_tam
@@ -126,6 +128,64 @@ class PipelineTests(unittest.TestCase):
         # sentence + phrase span
         self.assertIn("He, however, left.", CaptureTranslator.calls)
         self.assertIn("however", CaptureTranslator.calls)
+
+    def test_attach_translation_uses_cache_across_runs(self):
+        doc = {
+            "She trusted him.": {
+                "type": "Sentence",
+                "content": "She trusted him.",
+                "linguistic_elements": [
+                    {
+                        "type": "Phrase",
+                        "content": "trusted him",
+                        "linguistic_elements": [],
+                    }
+                ],
+            }
+        }
+
+        class CaptureTranslator:
+            model_name = "fake-model"
+            calls = []
+
+            @classmethod
+            def translate_text(cls, text: str, source_lang: str, target_lang: str) -> str:
+                cls.calls.append(text)
+                return f"{target_lang}:{text}"
+
+        cache = InMemoryTranslationCache()
+        _attach_translation(
+            doc,
+            translator=CaptureTranslator(),
+            source_lang="en",
+            target_lang="ru",
+            include_node_translations=True,
+            translation_cache=cache,
+            translation_cache_ttl_seconds=60,
+        )
+        first_calls = len(CaptureTranslator.calls)
+        _attach_translation(
+            doc,
+            translator=CaptureTranslator(),
+            source_lang="en",
+            target_lang="ru",
+            include_node_translations=True,
+            translation_cache=cache,
+            translation_cache_ttl_seconds=60,
+        )
+        second_calls = len(CaptureTranslator.calls)
+        self.assertEqual(first_calls, second_calls)
+
+    def test_resolve_translation_cache_ttl_seconds_default_and_env(self):
+        with patch("ela_pipeline.inference.run.os.getenv", return_value=""):
+            self.assertEqual(_resolve_translation_cache_ttl_seconds(), 86400)
+        with patch("ela_pipeline.inference.run.os.getenv", return_value="120"):
+            self.assertEqual(_resolve_translation_cache_ttl_seconds(), 120)
+
+    def test_resolve_translation_cache_ttl_seconds_rejects_non_positive(self):
+        with patch("ela_pipeline.inference.run.os.getenv", return_value="0"):
+            with self.assertRaises(ValueError):
+                _resolve_translation_cache_ttl_seconds()
 
     def test_attach_phonetic_enriches_sentence_and_nodes_with_dedup(self):
         doc = {
