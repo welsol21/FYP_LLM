@@ -15,6 +15,15 @@ The project now produces contract-compliant linguistic JSON with improved struct
 ## Practical Result
 Compared to the initial state, outputs are now cleaner, easier to consume downstream, and easier to debug when quality issues appear.
 
+## Frontend Curation Update (2026-02-18)
+Quick Node Edit in the React visualizer was aligned with the touch-first curator workflow:
+- default collapsed panel with explicit expand/collapse
+- node selection only via node label tap/click
+- Basic mode constrained to contract-facing correction fields
+- Advanced mode constrained to linguist-facing curated fields (no internal/system maintenance fields)
+- large advanced value sets now use preview behavior (first 4 rows) with conditional `Expand/Collapse Values`
+- current selected advanced value is rendered in a dedicated value box for immediate visibility
+
 ## Appendix A: Contract Schema v2 Strict (Verbatim)
 
 Source: `schemas/linguistic_contract_v2_strict.schema.json`

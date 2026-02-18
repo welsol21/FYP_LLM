@@ -444,6 +444,14 @@
     - [x] Visualizer screen renders tree payload structure (React recursive tree).
     - [x] Frontend API contract layer added for `ui-state`, `submit-media`, `backend-jobs`, `visualizer-payload`.
     - [x] Minimal editor interaction wired via `apply-edit`-compatible API method (`applyEdit`), with in-UI re-render after patch.
+    - [x] Quick Node Edit touch-first UX refined:
+      - [x] collapsed by default; explicit expand/collapse control
+      - [x] node selection bound to node label tap/click (no manual node id input)
+      - [x] Basic mode edits only contract-facing fields (`content`, `cefr_level`, `tense`, `linguistic_notes`, `translation`, `phonetic`)
+      - [x] Advanced mode edits only linguist-facing curated fields (internal/system-only fields hidden)
+      - [x] advanced value picker shows first 4 rows by default with conditional `Expand/Collapse Values` for overflow
+      - [x] selected advanced value shown as dedicated value box near overflow toggle
+    - [x] Visualizer sentence navigation bound to `Prev/Next` controls per loaded payload.
   - [ ] Replace current mock API transport with production transport wired to runtime/backend endpoints.
 - [x] Add explicit license-gated runtime switch for phonetics by deployment mode (offline/distributed/backend).
   - [x] Added deployment mode resolution: `ELA_DEPLOYMENT_MODE` + CLI `--deployment-mode`.
