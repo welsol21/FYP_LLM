@@ -401,7 +401,10 @@ export function VisualizerPage() {
                   <div className="touch-value-picker">
                     <div className="touch-value-picker-top">
                       <span className="touch-value-current">
-                        Selected: {(advancedOptions.find((opt) => opt.value === (newValue || NULL_SENTINEL))?.label) || '-'}
+                        <span className="touch-value-current-label">Selected</span>
+                        <span className="touch-value-current-value">
+                          {(advancedOptions.find((opt) => opt.value === (newValue || NULL_SENTINEL))?.label) || '-'}
+                        </span>
                       </span>
                       {hasOverflowValues ? (
                         <button
