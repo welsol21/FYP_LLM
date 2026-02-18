@@ -5,6 +5,9 @@ import { renderWithProviders } from '../test/testUtils'
 describe('AnalyzePage', () => {
   it('shows backend queue feedback and syncs completed result to visualizer-ready state', async () => {
     renderWithProviders(<AnalyzePage />)
+    await waitFor(() => {
+      expect(screen.getByText(/Project:\s*proj-1/i)).toBeInTheDocument()
+    })
 
     fireEvent.change(screen.getByLabelText(/Duration/), { target: { value: '1800' } })
     fireEvent.change(screen.getByLabelText(/Size \(bytes\)/), { target: { value: '314572800' } })

@@ -73,6 +73,15 @@ describe('VisualizerPage', () => {
           backend_jobs: { enabled: true, reason_if_disabled: '' },
         },
       }),
+      listProjects: async () => [{ id: 'proj-1', name: 'Demo', created_at: '2026-02-18T00:00:00Z', updated_at: '2026-02-18T00:00:00Z' }],
+      createProject: async (name: string) => ({
+        id: 'proj-2',
+        name,
+        created_at: '2026-02-18T00:00:00Z',
+        updated_at: '2026-02-18T00:00:00Z',
+      }),
+      getSelectedProject: async () => ({ project_id: 'proj-1', project_name: 'Demo' }),
+      setSelectedProject: async () => ({ project_id: 'proj-1', project_name: 'Demo' }),
       submitMedia: async () => ({
         result: { route: 'local', message: '' },
         ui_feedback: { severity: 'info', title: '', message: '' },

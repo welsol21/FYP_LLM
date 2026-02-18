@@ -5,8 +5,10 @@ import type {
   BackendSyncPayload,
   MediaFileRow,
   MediaSubmissionPayload,
+  ProjectRow,
   RuntimeApi,
   RuntimeUiState,
+  SelectedProject,
   VisualizerPayload,
 } from './runtimeApi'
 
@@ -22,6 +24,30 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
 export class HttpRuntimeApi implements RuntimeApi {
   async getUiState(): Promise<RuntimeUiState> {
     return requestJson<RuntimeUiState>('/api/ui-state')
+  }
+
+  async listProjects(): Promise<ProjectRow[]> {
+    return requestJson<ProjectRow[]>('/api/projects')
+  }
+
+  async createProject(name: string): Promise<ProjectRow> {
+    return requestJson<ProjectRow>('/api/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+  }
+
+  async getSelectedProject(): Promise<SelectedProject> {
+    return requestJson<SelectedProject>('/api/selected-project')
+  }
+
+  async setSelectedProject(projectId: string): Promise<SelectedProject> {
+    return requestJson<SelectedProject>('/api/selected-project', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId }),
+    })
   }
 
   async uploadMedia(file: File): Promise<{ fileName: string; mediaPath: string; sizeBytes: number }> {

@@ -8,6 +8,23 @@ from ela_pipeline.client_storage import build_sentence_hash
 
 
 class RuntimeMediaServiceTests(unittest.TestCase):
+    def test_projects_create_select_and_list(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            created = svc.create_project(name="Project A")
+            self.assertEqual(created["name"], "Project A")
+            listed = svc.list_projects()
+            self.assertEqual(len(listed), 1)
+            self.assertEqual(listed[0]["id"], created["id"])
+            selected = svc.get_selected_project()
+            self.assertEqual(selected["project_id"], created["id"])
+            switched = svc.set_selected_project(project_id=created["id"])
+            self.assertEqual(switched["project_name"], "Project A")
+
     def test_ui_state_exposes_mode_and_feature_flags(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             svc = RuntimeMediaService(
@@ -26,6 +43,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                 runtime_mode="online",
                 limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
             )
+            svc.repo.create_project("Project A", project_id="proj-1")
             response = svc.submit_media(
                 media_path="/tmp/long.mp4",
                 duration_seconds=1800,
@@ -55,6 +73,21 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertEqual(response["result"]["route"], "reject")
             self.assertEqual(response["ui_feedback"]["severity"], "error")
             self.assertEqual(svc.list_backend_jobs(), [])
+
+    def test_submit_media_rejects_without_selected_project(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            response = svc.submit_media(
+                media_path="/tmp/short.mp3",
+                duration_seconds=300,
+                size_bytes=80 * 1024 * 1024,
+            )
+            self.assertEqual(response["result"]["route"], "reject")
+            self.assertIn("project", response["result"]["message"].lower())
 
     def test_service_respects_deployment_mode_for_phonetic_policy(self):
         with tempfile.TemporaryDirectory() as tmpdir:

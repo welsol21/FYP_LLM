@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
-import type { BackendJob, MediaSubmissionPayload, RuntimeUiState } from '../api/runtimeApi'
+import type { BackendJob, MediaSubmissionPayload, RuntimeUiState, SelectedProject } from '../api/runtimeApi'
 import { BackendJobsTable } from '../components/BackendJobsTable'
 import { MediaSubmitForm } from '../components/MediaSubmitForm'
 import { RuntimeStatusCard } from '../components/RuntimeStatusCard'
@@ -10,6 +10,7 @@ export function AnalyzePage() {
   const navigate = useNavigate()
   const api = useApi()
   const [uiState, setUiState] = useState<RuntimeUiState | null>(null)
+  const [selectedProject, setSelectedProject] = useState<SelectedProject>({ project_id: null })
   const [submission, setSubmission] = useState<MediaSubmissionPayload | null>(null)
   const [jobs, setJobs] = useState<BackendJob[]>([])
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
@@ -20,6 +21,7 @@ export function AnalyzePage() {
   useEffect(() => {
     api.getUiState().then(setUiState)
     api.listBackendJobs().then(setJobs)
+    api.getSelectedProject().then(setSelectedProject)
   }, [api])
 
   async function onSubmitted(payload: MediaSubmissionPayload) {
@@ -80,7 +82,13 @@ export function AnalyzePage() {
   return (
     <section>
       <RuntimeStatusCard uiState={uiState} />
-      <MediaSubmitForm onSubmitted={onSubmitted} />
+      <MediaSubmitForm onSubmitted={onSubmitted} projectId={selectedProject.project_id ?? null} />
+      {!selectedProject.project_id ? (
+        <section className="card warning" aria-label="project-required-warning">
+          <h2>Project Required</h2>
+          <p>Select a project in Media tab before running pipeline.</p>
+        </section>
+      ) : null}
       {submission ? (
         <section className={`card feedback ${submission.ui_feedback.severity}`} aria-label="submission-feedback">
           <h2>{submission.ui_feedback.title}</h2>

@@ -63,6 +63,12 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
         if path == "/api/ui-state":
             self._send_json(SERVICE.get_ui_state())
             return
+        if path == "/api/projects":
+            self._send_json(SERVICE.list_projects())
+            return
+        if path == "/api/selected-project":
+            self._send_json(SERVICE.get_selected_project())
+            return
         if path == "/api/backend-jobs":
             self._send_json(SERVICE.list_backend_jobs())
             return
@@ -146,6 +152,25 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(exc)}, status=400)
                 return
             self._send_json(payload)
+            return
+        if path == "/api/projects":
+            name = str(body.get("name") or "").strip()
+            if not name:
+                self._send_json({"error": "name is required"}, status=400)
+                return
+            self._send_json(SERVICE.create_project(name=name))
+            return
+
+        if path == "/api/selected-project":
+            project_id = str(body.get("projectId") or body.get("project_id") or "").strip()
+            if not project_id:
+                self._send_json({"error": "projectId is required"}, status=400)
+                return
+            selected = SERVICE.set_selected_project(project_id=project_id)
+            if not selected.get("project_id"):
+                self._send_json({"error": "project not found"}, status=404)
+                return
+            self._send_json(selected)
             return
 
         if path == "/api/retry-backend-job":

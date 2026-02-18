@@ -96,6 +96,10 @@ Open:
 
 Runtime API is exposed behind frontend Nginx proxy:
 - `GET /api/ui-state`
+- `GET /api/projects`
+- `POST /api/projects`
+- `GET /api/selected-project`
+- `POST /api/selected-project`
 - `POST /api/upload` (multipart file upload)
 - `POST /api/submit-media`
 - `GET /api/backend-jobs`

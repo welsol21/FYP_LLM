@@ -9,6 +9,18 @@ export type RuntimeUiState = {
   }
 }
 
+export type ProjectRow = {
+  id: string
+  name: string
+  created_at: string
+  updated_at: string
+}
+
+export type SelectedProject = {
+  project_id: string | null
+  project_name?: string
+}
+
 export type MediaSubmissionPayload = {
   result: {
     route: 'local' | 'backend' | 'reject'
@@ -82,6 +94,10 @@ export type VisualizerPayload = Record<string, VisualizerNode>
 
 export interface RuntimeApi {
   getUiState(): Promise<RuntimeUiState>
+  listProjects(): Promise<ProjectRow[]>
+  createProject(name: string): Promise<ProjectRow>
+  getSelectedProject(): Promise<SelectedProject>
+  setSelectedProject(projectId: string): Promise<SelectedProject>
   uploadMedia(file: File): Promise<{ fileName: string; mediaPath: string; sizeBytes: number }>
   submitMedia(input: {
     mediaPath: string

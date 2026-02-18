@@ -6,8 +6,10 @@ import type {
   BackendSyncPayload,
   MediaFileRow,
   MediaSubmissionPayload,
+  ProjectRow,
   RuntimeApi,
   RuntimeUiState,
+  SelectedProject,
   VisualizerNode,
   VisualizerPayload,
 } from './runtimeApi'
@@ -107,10 +109,23 @@ function coerceInputValue(raw: string, existing: unknown): unknown {
 }
 
 export class MockRuntimeApi implements RuntimeApi {
+  private projects: ProjectRow[] = [
+    {
+      id: 'proj-1',
+      name: 'Demo Project',
+      created_at: '2026-02-17T00:00:00Z',
+      updated_at: '2026-02-18T00:00:00Z',
+    },
+  ]
+  private selectedProjectId: string | null = 'proj-1'
   private jobs: BackendJob[] = []
   private jobPollCount: Record<string, number> = {}
   private jobFileId: Record<string, string> = {}
   private jobDocumentId: Record<string, string> = {}
+  private fileProjectId: Record<string, string> = {
+    'file-1': 'proj-1',
+    'file-2': 'proj-1',
+  }
   private payloadByDocument: Record<string, VisualizerPayload> = {
     'doc-1': JSON.parse(JSON.stringify(samplePayload)) as VisualizerPayload,
   }
@@ -150,6 +165,35 @@ export class MockRuntimeApi implements RuntimeApi {
     }
   }
 
+  async listProjects(): Promise<ProjectRow[]> {
+    return this.projects
+  }
+
+  async createProject(name: string): Promise<ProjectRow> {
+    const now = new Date().toISOString()
+    const row: ProjectRow = {
+      id: `proj-${this.projects.length + 1}`,
+      name: name.trim() || `Project ${this.projects.length + 1}`,
+      created_at: now,
+      updated_at: now,
+    }
+    this.projects.unshift(row)
+    return row
+  }
+
+  async getSelectedProject(): Promise<SelectedProject> {
+    if (!this.selectedProjectId) return { project_id: null }
+    const row = this.projects.find((p) => p.id === this.selectedProjectId)
+    return { project_id: this.selectedProjectId, project_name: row?.name }
+  }
+
+  async setSelectedProject(projectId: string): Promise<SelectedProject> {
+    const row = this.projects.find((p) => p.id === projectId)
+    if (!row) return { project_id: null }
+    this.selectedProjectId = projectId
+    return { project_id: projectId, project_name: row.name }
+  }
+
   async uploadMedia(file: File): Promise<{ fileName: string; mediaPath: string; sizeBytes: number }> {
     return {
       fileName: file.name,
@@ -162,11 +206,23 @@ export class MockRuntimeApi implements RuntimeApi {
     mediaPath: string
     durationSec: number
     sizeBytes: number
+    projectId?: string
   }): Promise<MediaSubmissionPayload> {
+    if (!input.projectId) {
+      return {
+        result: { route: 'reject', message: 'Select project first.' },
+        ui_feedback: {
+          severity: 'error',
+          title: 'Project is required',
+          message: 'Create/select a project before starting pipeline.',
+        },
+      }
+    }
     const mediaName = input.mediaPath.split('/').pop() || input.mediaPath
     if (input.durationSec <= 900 && input.sizeBytes <= 250 * 1024 * 1024) {
       const fileId = `file-${this.files.length + 1}`
       const docId = `doc-${Object.keys(this.payloadByDocument).length + 1}`
+      this.fileProjectId[fileId] = input.projectId
       this.payloadByDocument[docId] = JSON.parse(JSON.stringify(samplePayload)) as VisualizerPayload
       this.files.unshift({
         id: fileId,
@@ -187,6 +243,7 @@ export class MockRuntimeApi implements RuntimeApi {
     }
     if (input.sizeBytes <= 2048 * 1024 * 1024) {
       const fileId = `file-${this.files.length + 1}`
+      this.fileProjectId[fileId] = input.projectId
       const job: BackendJob = {
         id: `job-${this.jobs.length + 1}`,
         status: 'queued',
@@ -281,8 +338,9 @@ export class MockRuntimeApi implements RuntimeApi {
     }
   }
 
-  async listFiles(): Promise<MediaFileRow[]> {
-    return this.files
+  async listFiles(projectId?: string): Promise<MediaFileRow[]> {
+    if (!projectId) return this.files
+    return this.files.filter((row) => this.fileProjectId[row.id] === projectId)
   }
 
   async getVisualizerPayload(_documentId?: string): Promise<VisualizerPayload> {

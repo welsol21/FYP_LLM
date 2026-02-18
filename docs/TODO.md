@@ -453,6 +453,12 @@
       - [x] selected advanced value shown as dedicated value box near overflow toggle
     - [x] Visualizer sentence navigation bound to `Prev/Next` controls per loaded payload.
   - [ ] Replace current mock API transport with production transport wired to runtime/backend endpoints.
+  - [x] Restore legacy project-first UX flow parity (`Projects -> Files -> Analyze`):
+    - [x] Runtime API/project service for list/create/select project.
+    - [x] Frontend Projects screen wired to real API (create + double-click select/open files).
+    - [x] Files screen scoped to selected project (no global file list by default).
+    - [x] Analyze submit requires selected project and sends `projectId`.
+    - [x] Tests added/updated for project create/select flow.
   - [ ] Media processing feature rollout (spec: `docs/media_processing_feature_spec_2026-02-18.md`).
   - [x] Create consolidated implementation spec for media processing + backend/frontend integration.
   - [x] Implement document persistence layer for analyzed media outputs:

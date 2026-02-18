@@ -11,6 +11,51 @@ from ela_pipeline.runtime import client_api
 
 
 class RuntimeClientAPITests(unittest.TestCase):
+    def test_project_commands(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "client.sqlite3"
+
+            create_argv = [
+                "client_api",
+                "--db-path",
+                str(db_path),
+                "create-project",
+                "--name",
+                "Project A",
+            ]
+            with patch("sys.argv", create_argv):
+                buf = io.StringIO()
+                with redirect_stdout(buf):
+                    client_api.main()
+            created = json.loads(buf.getvalue())
+            self.assertEqual(created["name"], "Project A")
+
+            list_argv = [
+                "client_api",
+                "--db-path",
+                str(db_path),
+                "projects",
+            ]
+            with patch("sys.argv", list_argv):
+                buf2 = io.StringIO()
+                with redirect_stdout(buf2):
+                    client_api.main()
+            listed = json.loads(buf2.getvalue())
+            self.assertEqual(len(listed), 1)
+
+            selected_argv = [
+                "client_api",
+                "--db-path",
+                str(db_path),
+                "selected-project",
+            ]
+            with patch("sys.argv", selected_argv):
+                buf3 = io.StringIO()
+                with redirect_stdout(buf3):
+                    client_api.main()
+            selected = json.loads(buf3.getvalue())
+            self.assertEqual(selected["project_id"], created["id"])
+
     def test_ui_state_command_outputs_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "client.sqlite3"
@@ -45,7 +90,11 @@ class RuntimeClientAPITests(unittest.TestCase):
                 "1800",
                 "--size-bytes",
                 str(300 * 1024 * 1024),
+                "--project-id",
+                "proj-1",
             ]
+            repo = LocalSQLiteRepository(db_path)
+            repo.create_project("Project A", project_id="proj-1")
             with patch("sys.argv", submit_argv):
                 buf = io.StringIO()
                 with redirect_stdout(buf):

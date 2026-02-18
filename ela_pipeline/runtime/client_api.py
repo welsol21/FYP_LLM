@@ -27,6 +27,14 @@ def main() -> None:
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("ui-state", help="Return runtime UI payload.")
+    sub.add_parser("projects", help="List projects.")
+
+    create_project = sub.add_parser("create-project", help="Create project and select it.")
+    create_project.add_argument("--name", required=True)
+
+    sub.add_parser("selected-project", help="Get selected project from workspace state.")
+    set_selected_project = sub.add_parser("set-selected-project", help="Set selected project.")
+    set_selected_project.add_argument("--project-id", required=True)
 
     submit_media = sub.add_parser("submit-media", help="Submit media for local/backend routing.")
     submit_media.add_argument("--media-path", required=True)
@@ -105,6 +113,22 @@ def main() -> None:
 
     if args.cmd == "ui-state":
         _print_json(media_service.get_ui_state())
+        return
+
+    if args.cmd == "projects":
+        _print_json(media_service.list_projects())
+        return
+
+    if args.cmd == "create-project":
+        _print_json(media_service.create_project(name=args.name))
+        return
+
+    if args.cmd == "selected-project":
+        _print_json(media_service.get_selected_project())
+        return
+
+    if args.cmd == "set-selected-project":
+        _print_json(media_service.set_selected_project(project_id=args.project_id))
         return
 
     if args.cmd == "submit-media":

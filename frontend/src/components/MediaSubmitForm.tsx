@@ -4,9 +4,10 @@ import type { MediaSubmissionPayload } from '../api/runtimeApi'
 
 type Props = {
   onSubmitted: (payload: MediaSubmissionPayload) => void
+  projectId: string | null
 }
 
-export function MediaSubmitForm({ onSubmitted }: Props) {
+export function MediaSubmitForm({ onSubmitted, projectId }: Props) {
   const api = useApi()
   const [mediaPath, setMediaPath] = useState('/tmp/demo.mp4')
   const [durationSec, setDurationSec] = useState(600)
@@ -20,7 +21,7 @@ export function MediaSubmitForm({ onSubmitted }: Props) {
     e.preventDefault()
     setSubmitting(true)
     try {
-      const payload = await api.submitMedia({ mediaPath, durationSec, sizeBytes })
+      const payload = await api.submitMedia({ mediaPath, durationSec, sizeBytes, projectId: projectId ?? undefined })
       onSubmitted(payload)
     } finally {
       setSubmitting(false)
@@ -30,6 +31,7 @@ export function MediaSubmitForm({ onSubmitted }: Props) {
   return (
     <form onSubmit={handleSubmit} className="card" aria-label="media-submit-form">
       <h2>Analyze Media</h2>
+      <p>Project: {projectId ?? 'not selected'}</p>
       <label>
         Media File
         <input
@@ -79,7 +81,7 @@ export function MediaSubmitForm({ onSubmitted }: Props) {
           min={1}
         />
       </label>
-      <button type="submit" disabled={submitting || uploading || !mediaPath}>
+      <button type="submit" disabled={submitting || uploading || !mediaPath || !projectId}>
         {submitting ? 'Submitting...' : 'Start'}
       </button>
     </form>

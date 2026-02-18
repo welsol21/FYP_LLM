@@ -37,6 +37,33 @@ class RuntimeMediaService:
     def get_ui_state(self) -> dict[str, Any]:
         return build_runtime_ui_state(self.caps)
 
+    def list_projects(self) -> list[dict[str, Any]]:
+        return self.repo.list_projects()
+
+    def create_project(self, *, name: str) -> dict[str, Any]:
+        created = self.repo.create_project(name=name)
+        self.set_selected_project(project_id=created["id"])
+        return created
+
+    def get_selected_project(self) -> dict[str, Any]:
+        state = self.repo.get_workspace_state("selected_project")
+        if not state:
+            return {"project_id": None}
+        project_id = state.get("project_id")
+        if not project_id:
+            return {"project_id": None}
+        row = next((p for p in self.repo.list_projects() if p["id"] == project_id), None)
+        if row is None:
+            return {"project_id": None}
+        return {"project_id": row["id"], "project_name": row["name"]}
+
+    def set_selected_project(self, *, project_id: str) -> dict[str, Any]:
+        row = next((p for p in self.repo.list_projects() if p["id"] == project_id), None)
+        if row is None:
+            return {"project_id": None}
+        self.repo.set_workspace_state("selected_project", {"project_id": project_id})
+        return {"project_id": row["id"], "project_name": row["name"]}
+
     def submit_media(
         self,
         *,
@@ -46,9 +73,30 @@ class RuntimeMediaService:
         project_id: str | None = None,
         media_file_id: str | None = None,
     ) -> dict[str, Any]:
-        effective_project_id = project_id or "proj-default"
+        selected = self.get_selected_project()
+        effective_project_id = project_id or selected.get("project_id")
+        if not effective_project_id:
+            raw = {
+                "route": "reject",
+                "status": "rejected",
+                "message": "Create/select project first.",
+                "job_id": None,
+            }
+            return {
+                "result": raw,
+                "ui_feedback": build_submission_ui_feedback(raw),
+            }
         if not any(p["id"] == effective_project_id for p in self.repo.list_projects()):
-            self.repo.create_project("Default Project", project_id=effective_project_id)
+            raw = {
+                "route": "reject",
+                "status": "rejected",
+                "message": f"Project '{effective_project_id}' not found.",
+                "job_id": None,
+            }
+            return {
+                "result": raw,
+                "ui_feedback": build_submission_ui_feedback(raw),
+            }
 
         if media_file_id is None:
             media_file_id = f"file-{uuid.uuid4().hex[:12]}"
