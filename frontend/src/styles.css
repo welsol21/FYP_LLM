@@ -156,6 +156,13 @@ button {
 .feedback.warning h2 { color: var(--warn); }
 .feedback.error h2 { color: var(--err); }
 
+.job-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 0;
+}
+
 .visualizer-root {
   display: grid;
   gap: 14px;

@@ -1,6 +1,10 @@
 import samplePayload from './frontend_contract_sample.json'
 import type {
   BackendJob,
+  BackendJobStatus,
+  BackendResumePayload,
+  BackendSyncPayload,
+  MediaFileRow,
   MediaSubmissionPayload,
   RuntimeApi,
   RuntimeUiState,
@@ -104,7 +108,29 @@ function coerceInputValue(raw: string, existing: unknown): unknown {
 
 export class MockRuntimeApi implements RuntimeApi {
   private jobs: BackendJob[] = []
-  private payload: VisualizerPayload = JSON.parse(JSON.stringify(samplePayload)) as VisualizerPayload
+  private jobPollCount: Record<string, number> = {}
+  private jobFileId: Record<string, string> = {}
+  private jobDocumentId: Record<string, string> = {}
+  private payloadByDocument: Record<string, VisualizerPayload> = {
+    'doc-1': JSON.parse(JSON.stringify(samplePayload)) as VisualizerPayload,
+  }
+  private files: MediaFileRow[] = [
+    {
+      id: 'file-1',
+      name: 'sample.mp4',
+      settings: 'GPT / Bilingual',
+      updated: 'Feb 17, 2026',
+      analyzed: true,
+      document_id: 'doc-1',
+    },
+    {
+      id: 'file-2',
+      name: 'draft.mp3',
+      settings: 'HF / EN only',
+      updated: 'Feb 18, 2026',
+      analyzed: false,
+    },
+  ]
 
   async getUiState(): Promise<RuntimeUiState> {
     return {
@@ -124,12 +150,32 @@ export class MockRuntimeApi implements RuntimeApi {
     }
   }
 
+  async uploadMedia(file: File): Promise<{ fileName: string; mediaPath: string; sizeBytes: number }> {
+    return {
+      fileName: file.name,
+      mediaPath: `/uploads/${file.name}`,
+      sizeBytes: file.size,
+    }
+  }
+
   async submitMedia(input: {
     mediaPath: string
     durationSec: number
     sizeBytes: number
   }): Promise<MediaSubmissionPayload> {
+    const mediaName = input.mediaPath.split('/').pop() || input.mediaPath
     if (input.durationSec <= 900 && input.sizeBytes <= 250 * 1024 * 1024) {
+      const fileId = `file-${this.files.length + 1}`
+      const docId = `doc-${Object.keys(this.payloadByDocument).length + 1}`
+      this.payloadByDocument[docId] = JSON.parse(JSON.stringify(samplePayload)) as VisualizerPayload
+      this.files.unshift({
+        id: fileId,
+        name: mediaName,
+        settings: 'HF / Local',
+        updated: 'Feb 18, 2026',
+        analyzed: true,
+        document_id: docId,
+      })
       return {
         result: { route: 'local', message: 'File accepted for local processing.' },
         ui_feedback: {
@@ -140,6 +186,7 @@ export class MockRuntimeApi implements RuntimeApi {
       }
     }
     if (input.sizeBytes <= 2048 * 1024 * 1024) {
+      const fileId = `file-${this.files.length + 1}`
       const job: BackendJob = {
         id: `job-${this.jobs.length + 1}`,
         status: 'queued',
@@ -147,7 +194,16 @@ export class MockRuntimeApi implements RuntimeApi {
         duration_seconds: input.durationSec,
         size_bytes: input.sizeBytes,
       }
+      this.jobPollCount[job.id] = 0
+      this.jobFileId[job.id] = fileId
       this.jobs.unshift(job)
+      this.files.unshift({
+        id: fileId,
+        name: mediaName,
+        settings: 'HF / Backend',
+        updated: 'Feb 18, 2026',
+        analyzed: false,
+      })
       return {
         result: { route: 'backend', message: 'Queued for backend processing.', job_id: job.id },
         ui_feedback: {
@@ -171,8 +227,67 @@ export class MockRuntimeApi implements RuntimeApi {
     return this.jobs
   }
 
-  async getVisualizerPayload(): Promise<VisualizerPayload> {
-    return this.payload
+  async getBackendJobStatus(jobId: string): Promise<BackendJobStatus> {
+    const job = this.jobs.find((j) => j.id === jobId)
+    if (!job) return { job_id: jobId, status: 'not_found' }
+    const polls = (this.jobPollCount[jobId] || 0) + 1
+    this.jobPollCount[jobId] = polls
+    if (job.status === 'queued' && polls >= 1) job.status = 'processing'
+    if (job.status === 'processing' && polls >= 2) job.status = 'completed'
+    return { job_id: job.id, status: job.status }
+  }
+
+  async retryBackendJob(jobId: string): Promise<BackendSyncPayload> {
+    const job = this.jobs.find((j) => j.id === jobId)
+    if (!job) return { job_id: jobId, status: 'not_found', message: 'Job not found.' }
+    if (!['failed', 'error', 'canceled'].includes(job.status)) {
+      return { job_id: job.id, status: job.status, message: `Job is not retryable from status '${job.status}'.` }
+    }
+    job.status = 'queued'
+    this.jobPollCount[job.id] = 0
+    return { job_id: job.id, status: 'queued', message: 'Job moved to queued.' }
+  }
+
+  async resumeBackendJobs(): Promise<BackendResumePayload> {
+    const jobs = this.jobs
+      .filter((j) => ['queued', 'processing'].includes(j.status))
+      .map((j) => ({ job_id: j.id, status: j.status }))
+    return { resumed_count: jobs.length, jobs }
+  }
+
+  async syncBackendResult(jobId: string): Promise<BackendSyncPayload> {
+    const job = this.jobs.find((j) => j.id === jobId)
+    if (!job) return { job_id: jobId, status: 'not_found', message: 'Job not found.' }
+    if (job.status !== 'completed') {
+      return { job_id: jobId, status: job.status, message: 'Job is not completed yet.' }
+    }
+    const docId = this.jobDocumentId[jobId] || `doc-${Object.keys(this.payloadByDocument).length + 1}`
+    this.jobDocumentId[jobId] = docId
+    if (!this.payloadByDocument[docId]) {
+      this.payloadByDocument[docId] = JSON.parse(JSON.stringify(samplePayload)) as VisualizerPayload
+    }
+    const fileId = this.jobFileId[jobId]
+    const file = this.files.find((f) => f.id === fileId)
+    if (file) {
+      file.analyzed = true
+      file.document_id = docId
+      file.updated = 'Feb 18, 2026'
+    }
+    return {
+      job_id: jobId,
+      status: 'completed',
+      document_id: docId,
+      message: 'Backend result synced to local document tables.',
+    }
+  }
+
+  async listFiles(): Promise<MediaFileRow[]> {
+    return this.files
+  }
+
+  async getVisualizerPayload(_documentId?: string): Promise<VisualizerPayload> {
+    if (_documentId) return this.payloadByDocument[_documentId] || {}
+    return this.payloadByDocument['doc-1'] || {}
   }
 
   async applyEdit(input: {
@@ -180,8 +295,11 @@ export class MockRuntimeApi implements RuntimeApi {
     nodeId: string
     fieldPath: string
     newValue: string
+    documentId?: string
   }): Promise<{ status: 'ok' | 'error'; message: string }> {
-    const root = this.payload[input.sentenceText]
+    const docId = input.documentId || 'doc-1'
+    const defaultDoc = this.payloadByDocument[docId] || {}
+    const root = defaultDoc[input.sentenceText]
     if (!root) {
       return { status: 'error', message: 'Sentence not found.' }
     }

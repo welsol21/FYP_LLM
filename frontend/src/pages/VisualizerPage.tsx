@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
 import type { VisualizerPayload, VisualizerNode } from '../api/runtimeApi'
 import { VisualizerTreeLegacy } from '../components/VisualizerTreeLegacy'
@@ -205,6 +206,8 @@ function decodeEditorValue(raw: string): string {
 
 export function VisualizerPage() {
   const api = useApi()
+  const location = useLocation()
+  const documentId = (location.state as { documentId?: string } | null)?.documentId
   const [rows, setRows] = useState<Array<{ sentence_text: string; tree: VisualizerNode }>>([])
   const [activeSentenceIndex, setActiveSentenceIndex] = useState(0)
   const [isNarrowScreen, setIsNarrowScreen] = useState(
@@ -222,7 +225,7 @@ export function VisualizerPage() {
   const [editStatus, setEditStatus] = useState('')
 
   async function refresh() {
-    const payload = await api.getVisualizerPayload()
+    const payload = await api.getVisualizerPayload(documentId)
     const normalized = Object.entries(payload as VisualizerPayload).map(([sentence_text, tree]) => ({
       sentence_text,
       tree,
@@ -236,7 +239,7 @@ export function VisualizerPage() {
 
   useEffect(() => {
     refresh()
-  }, [api])
+  }, [api, documentId])
 
   useEffect(() => {
     const onResize = () => setIsNarrowScreen(window.innerWidth <= 860)
@@ -274,6 +277,7 @@ export function VisualizerPage() {
       nodeId,
       fieldPath,
       newValue: valueForSubmit,
+      documentId,
     })
     setEditStatus(result.message)
     await refresh()

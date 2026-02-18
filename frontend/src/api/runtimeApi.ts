@@ -30,6 +30,35 @@ export type BackendJob = {
   size_bytes: number
 }
 
+export type BackendJobStatus = {
+  job_id: string
+  status: string
+  updated_at?: string
+  project_id?: string
+  media_file_id?: string
+}
+
+export type BackendResumePayload = {
+  resumed_count: number
+  jobs: BackendJobStatus[]
+}
+
+export type BackendSyncPayload = {
+  job_id: string
+  status: string
+  document_id?: string
+  message?: string
+}
+
+export type MediaFileRow = {
+  id: string
+  name: string
+  settings: string
+  updated: string
+  analyzed: boolean
+  document_id?: string
+}
+
 export type VisualizerNode = {
   node_id: string
   type: string
@@ -53,6 +82,7 @@ export type VisualizerPayload = Record<string, VisualizerNode>
 
 export interface RuntimeApi {
   getUiState(): Promise<RuntimeUiState>
+  uploadMedia(file: File): Promise<{ fileName: string; mediaPath: string; sizeBytes: number }>
   submitMedia(input: {
     mediaPath: string
     durationSec: number
@@ -61,11 +91,17 @@ export interface RuntimeApi {
     mediaFileId?: string
   }): Promise<MediaSubmissionPayload>
   listBackendJobs(): Promise<BackendJob[]>
-  getVisualizerPayload(): Promise<VisualizerPayload>
+  getBackendJobStatus(jobId: string): Promise<BackendJobStatus>
+  retryBackendJob(jobId: string): Promise<BackendSyncPayload>
+  resumeBackendJobs(): Promise<BackendResumePayload>
+  syncBackendResult(jobId: string): Promise<BackendSyncPayload>
+  listFiles(projectId?: string): Promise<MediaFileRow[]>
+  getVisualizerPayload(documentId?: string): Promise<VisualizerPayload>
   applyEdit(input: {
     sentenceText: string
     nodeId: string
     fieldPath: string
     newValue: string
+    documentId?: string
   }): Promise<{ status: 'ok' | 'error'; message: string }>
 }

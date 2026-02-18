@@ -16,11 +16,15 @@ Location: `frontend/`
 Implemented:
 - route shell preserving legacy UX sequence,
 - runtime capability badges + disabled reasons,
+- real media upload (`multipart/form-data`) from Analyze screen to runtime backend,
 - media submit form + route/status feedback (`local|backend|reject`),
+- backend lifecycle controls in Analyze (`Check status`, `Retry`, `Resume`, auto-sync on completed),
 - backend jobs table,
 - visualizer tree rendering,
 - minimal node edit action (apply edit + re-render),
-- frontend API abstraction (`RuntimeApi`) with mock implementation for local development,
+- frontend API abstraction (`RuntimeApi`) with:
+  - production HTTP transport (`/api/*`),
+  - mock implementation for local development/tests,
 - TDD tests (Vitest + Testing Library).
 
 ## Run locally
@@ -48,9 +52,8 @@ Covered tests:
 
 ## Next step
 
-Replace `MockRuntimeApi` with production transport adapter (HTTP/CLI bridge) mapped to runtime commands:
-- `ui-state`
-- `submit-media`
-- `backend-jobs`
-- `visualizer-payload`
-- `apply-edit`
+Integrate ASR for direct audio/video transcription in media pipeline.
+Current implementation supports:
+- `text` extraction (native text read),
+- `pdf` extraction (`pypdf`),
+- `audio/video` via sidecar transcript file (`<media>.<ext>.txt`).

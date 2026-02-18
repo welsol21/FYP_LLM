@@ -1,0 +1,35 @@
+import tempfile
+import unittest
+from pathlib import Path
+
+from ela_pipeline.runtime.media_pipeline import run_media_pipeline
+
+
+class RuntimeMediaPipelineTests(unittest.TestCase):
+    def test_text_pipeline_builds_sentences_and_contract_nodes(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "sample.txt"
+            source.write_text("She trusted him. Before making the decision.", encoding="utf-8")
+
+            result = run_media_pipeline(source_path=str(source))
+            self.assertEqual(result.source_type, "text")
+            self.assertIn("She trusted him.", result.full_text)
+            self.assertEqual(len(result.media_sentences), 2)
+            self.assertEqual(len(result.contract_sentences), 2)
+            self.assertEqual(result.contract_sentences[0]["sentence_node"]["type"], "Sentence")
+
+    def test_audio_pipeline_uses_sidecar_transcript(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media = Path(tmpdir) / "sample.mp3"
+            media.write_bytes(b"fake-audio")
+            sidecar = Path(tmpdir) / "sample.mp3.txt"
+            sidecar.write_text("This is transcript text. It has two sentences.", encoding="utf-8")
+
+            result = run_media_pipeline(source_path=str(media))
+            self.assertEqual(result.source_type, "audio")
+            self.assertEqual(len(result.media_sentences), 2)
+
+
+if __name__ == "__main__":
+    unittest.main()
+

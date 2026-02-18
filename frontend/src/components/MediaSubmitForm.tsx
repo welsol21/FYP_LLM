@@ -11,7 +11,10 @@ export function MediaSubmitForm({ onSubmitted }: Props) {
   const [mediaPath, setMediaPath] = useState('/tmp/demo.mp4')
   const [durationSec, setDurationSec] = useState(600)
   const [sizeBytes, setSizeBytes] = useState(100 * 1024 * 1024)
+  const [selectedFileName, setSelectedFileName] = useState('')
+  const [uploadError, setUploadError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [uploading, setUploading] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -27,6 +30,33 @@ export function MediaSubmitForm({ onSubmitted }: Props) {
   return (
     <form onSubmit={handleSubmit} className="card" aria-label="media-submit-form">
       <h2>Analyze Media</h2>
+      <label>
+        Media File
+        <input
+          type="file"
+          accept=".mp3,.wav,.m4a,.flac,.ogg,.mp4,.mkv,.mov,.avi,.webm,.pdf,.txt"
+          onChange={async (e) => {
+            const file = e.target.files?.[0]
+            if (!file) return
+            setUploading(true)
+            setUploadError('')
+            try {
+              const uploaded = await api.uploadMedia(file)
+              setSelectedFileName(uploaded.fileName)
+              setMediaPath(uploaded.mediaPath)
+              setSizeBytes(uploaded.sizeBytes)
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err)
+              setUploadError(msg)
+            } finally {
+              setUploading(false)
+            }
+          }}
+        />
+      </label>
+      {selectedFileName ? <p>Selected: {selectedFileName}</p> : null}
+      {uploading ? <p>Uploading...</p> : null}
+      {uploadError ? <p style={{ color: '#ff6b6b' }}>{uploadError}</p> : null}
       <label>
         Media Path
         <input value={mediaPath} onChange={(e) => setMediaPath(e.target.value)} />
@@ -49,7 +79,7 @@ export function MediaSubmitForm({ onSubmitted }: Props) {
           min={1}
         />
       </label>
-      <button type="submit" disabled={submitting}>
+      <button type="submit" disabled={submitting || uploading || !mediaPath}>
         {submitting ? 'Submitting...' : 'Start'}
       </button>
     </form>

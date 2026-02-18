@@ -94,6 +94,19 @@ docker compose logs frontend --tail=100
 Open:
 - `http://localhost:${FRONTEND_PORT}` (default `http://localhost:8080`)
 
+Runtime API is exposed behind frontend Nginx proxy:
+- `GET /api/ui-state`
+- `POST /api/upload` (multipart file upload)
+- `POST /api/submit-media`
+- `GET /api/backend-jobs`
+- `GET /api/backend-job-status?job_id=...`
+- `POST /api/retry-backend-job`
+- `POST /api/resume-backend-jobs`
+- `POST /api/sync-backend-result`
+- `GET /api/files`
+- `GET /api/visualizer-payload?document_id=...`
+- `POST /api/apply-edit`
+
 ## 5) Run inference inside container
 
 ```bash
@@ -114,3 +127,7 @@ docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELE
 - Replace default credentials in `.env` before deployment.
 - Keep volumes persistent (`pgdata`, `artifacts_data`, `inference_results`, `hf_cache`).
 - Add reverse-proxy/API service later if you expose inference to external clients.
+- Media extraction pipeline in current runtime API:
+  - `text`: native extraction
+  - `pdf`: `pypdf`
+  - `audio/video`: transcript sidecar fallback (`<media>.<ext>.txt`) until ASR is integrated

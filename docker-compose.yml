@@ -31,13 +31,17 @@ services:
     environment:
       ELA_DATABASE_URL: ${ELA_DATABASE_URL:-postgresql://ela_user:ela_pass@postgres:5432/ela}
       HF_HOME: /opt/hf-cache
+      ELA_CLIENT_DB_PATH: /app/artifacts/client_state.sqlite3
+      ELA_RUNTIME_MODE: ${ELA_RUNTIME_MODE:-online}
+      ELA_DEPLOYMENT_MODE: ${ELA_DEPLOYMENT_MODE:-local}
+      ELA_RUNTIME_HTTP_PORT: 8000
     volumes:
       - inference_results:/app/inference_results
       - artifacts_data:/app/artifacts
       - hf_cache:/opt/hf-cache
     command: >
       bash -lc "python -m ela_pipeline.db.migrate &&
-      tail -f /dev/null"
+      python -m ela_pipeline.runtime.api_server"
 
   frontend:
     build:

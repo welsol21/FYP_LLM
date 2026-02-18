@@ -453,41 +453,52 @@
       - [x] selected advanced value shown as dedicated value box near overflow toggle
     - [x] Visualizer sentence navigation bound to `Prev/Next` controls per loaded payload.
   - [ ] Replace current mock API transport with production transport wired to runtime/backend endpoints.
-- [ ] Media processing feature rollout (spec: `docs/media_processing_feature_spec_2026-02-18.md`).
+  - [ ] Media processing feature rollout (spec: `docs/media_processing_feature_spec_2026-02-18.md`).
   - [x] Create consolidated implementation spec for media processing + backend/frontend integration.
-  - [ ] Implement document persistence layer for analyzed media outputs:
-    - [ ] `documents`
-    - [ ] `document_text`
-    - [ ] `media_sentences`
-    - [ ] `contract_sentences`
-    - [ ] `sentence_link`
-  - [ ] Implement hash-first sentence linking (`sentence_hash`) between media sentence stream and main contract nodes.
-  - [ ] Build deterministic sentence hash policy for repeated text (include stable disambiguator such as sentence index).
-  - [ ] Persist full extracted text locally (SQLite) and keep backend text/media temporary-only (TTL).
+  - [x] Implement document persistence layer for analyzed media outputs:
+    - [x] `documents`
+    - [x] `document_text`
+    - [x] `media_sentences`
+    - [x] `contract_sentences`
+    - [x] `sentence_link`
+  - [x] Implement hash-first sentence linking (`sentence_hash`) between media sentence stream and main contract nodes.
+  - [x] Build deterministic sentence hash policy for repeated text (include stable disambiguator such as sentence index).
+  - [x] Persist full extracted text locally (SQLite) and keep backend text/media temporary-only (TTL).
   - [ ] Implement backend large-media processing path end-to-end:
-    - [ ] enqueue job for oversized media
-    - [ ] poll job state
-    - [ ] retry failed job
-    - [ ] resume active job after app restart
-    - [ ] sync completed backend result into local document tables
+    - [x] enqueue job for oversized media
+    - [x] poll job state
+    - [x] retry failed job
+    - [x] resume active job after app restart
+    - [x] sync completed backend result into local document tables
+  - [x] Real upload + extraction pipeline wiring:
+    - [x] Analyze screen uploads media via runtime API (`multipart/form-data`)
+    - [x] Runtime API persists upload to temp media dir (`MEDIA_TEMP_DIR/uploads`)
+    - [x] Extraction pipeline implemented for `text/pdf/audio/video` source types
+    - [x] Local route performs immediate extraction->analyze->sync into document tables
+    - [x] Backend route performs poll->completed->sync into document tables
+    - [x] Files screen reflects analyzed state after sync and provides visualizer entry
+  - [ ] Audio/video direct ASR extraction (remove sidecar transcript fallback)
   - [ ] Add runtime API endpoints/services for document-scoped visualizer flow:
-    - [ ] `get_visualizer_payload(document_id)`
-    - [ ] `list_document_sentences(document_id)`
-    - [ ] `get_document_processing_status(document_id)`
+    - [x] `get_visualizer_payload(document_id)`
+    - [x] `list_document_sentences(document_id)`
+    - [x] `get_document_processing_status(document_id)`
   - [ ] Frontend Files flow:
-    - [ ] show analyzed-state per file
-    - [ ] open visualizer by double-clicking analyzed file
-    - [ ] pass selected `document_id` into visualizer route/state
+    - [x] show analyzed-state per file
+    - [x] open visualizer by double-clicking analyzed file
+    - [x] pass selected `document_id` into visualizer route/state
   - [ ] Frontend Visualizer flow:
-    - [ ] load payload by `document_id` (not global sample)
-    - [ ] keep `Prev/Next` traversal within selected document only
-    - [ ] keep visualizer/render/edit layer strictly contract-native
-  - [ ] Add TDD coverage for:
-    - [ ] local schema + CRUD for document tables
-    - [ ] sentence hash/link builder
-    - [ ] backend job retry/resume
-    - [ ] double-click analyzed file -> visualizer open
-    - [ ] document-scoped `Prev/Next` navigation
+    - [x] load payload by `document_id` (not global sample)
+    - [x] keep `Prev/Next` traversal within selected document only
+    - [x] keep visualizer/render/edit layer strictly contract-native
+  - [ ] Frontend translation provider UX (deferred):
+    - [ ] Reintroduce user-facing translator selection from legacy projects (as in early Kivy versions).
+    - [ ] Keep current default provider (`m2m100`) as active path until this feature is restored.
+  - [x] Add TDD coverage for:
+    - [x] local schema + CRUD for document tables
+    - [x] sentence hash/link builder
+    - [x] backend job retry/resume
+    - [x] double-click analyzed file -> visualizer open
+    - [x] document-scoped `Prev/Next` navigation
 - [x] Add explicit license-gated runtime switch for phonetics by deployment mode (offline/distributed/backend).
   - [x] Added deployment mode resolution: `ELA_DEPLOYMENT_MODE` + CLI `--deployment-mode`.
   - [x] Added phonetic policy switch: `ELA_PHONETIC_POLICY=enabled|disabled|backend_only`.

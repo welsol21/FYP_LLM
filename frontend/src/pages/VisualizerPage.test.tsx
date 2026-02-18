@@ -1,4 +1,8 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { render } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { ApiContext } from '../api/apiContext'
+import type { RuntimeApi, VisualizerPayload } from '../api/runtimeApi'
 import { VisualizerPage } from './VisualizerPage'
 import { renderWithProviders } from '../test/testUtils'
 
@@ -31,5 +35,83 @@ describe('VisualizerPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Edit applied.')).toBeInTheDocument()
     })
+  })
+
+  it('loads document-scoped payload and navigates within selected document', async () => {
+    const docPayload: VisualizerPayload = {
+      'Sentence one.': {
+        node_id: 's1',
+        type: 'Sentence',
+        content: 'Sentence one.',
+        tense: 'null',
+        linguistic_notes: [],
+        part_of_speech: 'sentence',
+        linguistic_elements: [],
+      },
+      'Sentence two.': {
+        node_id: 's2',
+        type: 'Sentence',
+        content: 'Sentence two.',
+        tense: 'null',
+        linguistic_notes: [],
+        part_of_speech: 'sentence',
+        linguistic_elements: [],
+      },
+    }
+    const getVisualizerPayload = vi.fn(async (documentId?: string) => {
+      if (documentId === 'doc-42') return docPayload
+      return {}
+    })
+    const api: RuntimeApi = {
+      getUiState: async () => ({
+        runtime_mode: 'online',
+        deployment_mode: 'local',
+        badges: {},
+        features: {
+          phonetic: { enabled: true, reason_if_disabled: '' },
+          db_persistence: { enabled: true, reason_if_disabled: '' },
+          backend_jobs: { enabled: true, reason_if_disabled: '' },
+        },
+      }),
+      submitMedia: async () => ({
+        result: { route: 'local', message: '' },
+        ui_feedback: { severity: 'info', title: '', message: '' },
+      }),
+      listBackendJobs: async () => [],
+      getBackendJobStatus: async () => ({ job_id: 'job-1', status: 'queued' }),
+      retryBackendJob: async () => ({ job_id: 'job-1', status: 'queued', message: '' }),
+      resumeBackendJobs: async () => ({ resumed_count: 0, jobs: [] }),
+      syncBackendResult: async () => ({ job_id: 'job-1', status: 'completed', document_id: 'doc-42' }),
+      listFiles: async () => [],
+      uploadMedia: async () => ({ fileName: 'uploaded.txt', mediaPath: '/tmp/uploaded.txt', sizeBytes: 12 }),
+      getVisualizerPayload,
+      applyEdit: async () => ({ status: 'ok', message: 'Edit applied.' }),
+    }
+
+    render(
+      <ApiContext.Provider value={api}>
+        <MemoryRouter initialEntries={[{ pathname: '/visualizer', state: { documentId: 'doc-42' } }]}>
+          <VisualizerPage />
+        </MemoryRouter>
+      </ApiContext.Provider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Sentence one.')).toBeInTheDocument()
+    })
+    expect(getVisualizerPayload).toHaveBeenCalledWith('doc-42')
+    expect(screen.getByText('1 / 2')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => {
+      expect(screen.getByText('Sentence two.')).toBeInTheDocument()
+    })
+    expect(screen.getByText('2 / 2')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Prev' }))
+    await waitFor(() => {
+      expect(screen.getByText('Sentence one.')).toBeInTheDocument()
+    })
+    expect(screen.getByText('1 / 2')).toBeInTheDocument()
   })
 })

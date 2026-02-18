@@ -3,7 +3,7 @@ import { AnalyzePage } from './AnalyzePage'
 import { renderWithProviders } from '../test/testUtils'
 
 describe('AnalyzePage', () => {
-  it('shows backend queue feedback and adds job row for large media', async () => {
+  it('shows backend queue feedback and syncs completed result to visualizer-ready state', async () => {
     renderWithProviders(<AnalyzePage />)
 
     fireEvent.change(screen.getByLabelText(/Duration/), { target: { value: '1800' } })
@@ -15,5 +15,16 @@ describe('AnalyzePage', () => {
     })
     expect(screen.getByText(/Job ID:/)).toBeInTheDocument()
     expect(screen.getByRole('cell', { name: /job-1/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check status' }))
+    await waitFor(() => {
+      expect(screen.getByLabelText('backend-job-controls')).toHaveTextContent(/Status:\s*processing/i)
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check status' }))
+    await waitFor(() => {
+      expect(screen.getByText(/Backend result synced to local document tables/i)).toBeInTheDocument()
+    })
+    expect(screen.getByRole('button', { name: 'Open Visualizer' })).toBeInTheDocument()
   })
 })
