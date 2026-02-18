@@ -453,6 +453,41 @@
       - [x] selected advanced value shown as dedicated value box near overflow toggle
     - [x] Visualizer sentence navigation bound to `Prev/Next` controls per loaded payload.
   - [ ] Replace current mock API transport with production transport wired to runtime/backend endpoints.
+- [ ] Media processing feature rollout (spec: `docs/media_processing_feature_spec_2026-02-18.md`).
+  - [x] Create consolidated implementation spec for media processing + backend/frontend integration.
+  - [ ] Implement document persistence layer for analyzed media outputs:
+    - [ ] `documents`
+    - [ ] `document_text`
+    - [ ] `media_sentences`
+    - [ ] `contract_sentences`
+    - [ ] `sentence_link`
+  - [ ] Implement hash-first sentence linking (`sentence_hash`) between media sentence stream and main contract nodes.
+  - [ ] Build deterministic sentence hash policy for repeated text (include stable disambiguator such as sentence index).
+  - [ ] Persist full extracted text locally (SQLite) and keep backend text/media temporary-only (TTL).
+  - [ ] Implement backend large-media processing path end-to-end:
+    - [ ] enqueue job for oversized media
+    - [ ] poll job state
+    - [ ] retry failed job
+    - [ ] resume active job after app restart
+    - [ ] sync completed backend result into local document tables
+  - [ ] Add runtime API endpoints/services for document-scoped visualizer flow:
+    - [ ] `get_visualizer_payload(document_id)`
+    - [ ] `list_document_sentences(document_id)`
+    - [ ] `get_document_processing_status(document_id)`
+  - [ ] Frontend Files flow:
+    - [ ] show analyzed-state per file
+    - [ ] open visualizer by double-clicking analyzed file
+    - [ ] pass selected `document_id` into visualizer route/state
+  - [ ] Frontend Visualizer flow:
+    - [ ] load payload by `document_id` (not global sample)
+    - [ ] keep `Prev/Next` traversal within selected document only
+    - [ ] keep visualizer/render/edit layer strictly contract-native
+  - [ ] Add TDD coverage for:
+    - [ ] local schema + CRUD for document tables
+    - [ ] sentence hash/link builder
+    - [ ] backend job retry/resume
+    - [ ] double-click analyzed file -> visualizer open
+    - [ ] document-scoped `Prev/Next` navigation
 - [x] Add explicit license-gated runtime switch for phonetics by deployment mode (offline/distributed/backend).
   - [x] Added deployment mode resolution: `ELA_DEPLOYMENT_MODE` + CLI `--deployment-mode`.
   - [x] Added phonetic policy switch: `ELA_PHONETIC_POLICY=enabled|disabled|backend_only`.
