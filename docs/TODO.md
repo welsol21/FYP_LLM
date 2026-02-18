@@ -458,6 +458,7 @@
     - [x] Frontend Projects screen wired to real API (create + double-click select/open files).
     - [x] Files screen scoped to selected project (no global file list by default).
     - [x] Analyze submit requires selected project and sends `projectId`.
+    - [x] New file upload/registration moved to `Files` screen (project-scoped).
     - [x] Tests added/updated for project create/select flow.
   - [ ] Media processing feature rollout (spec: `docs/media_processing_feature_spec_2026-02-18.md`).
   - [x] Create consolidated implementation spec for media processing + backend/frontend integration.

@@ -61,6 +61,23 @@ export class HttpRuntimeApi implements RuntimeApi {
     return (await res.json()) as { fileName: string; mediaPath: string; sizeBytes: number }
   }
 
+  async registerMediaFile(input: {
+    projectId: string
+    name: string
+    mediaPath: string
+    sizeBytes: number
+    durationSec?: number
+  }): Promise<{ id: string; project_id: string; name: string; path: string; size_bytes?: number; duration_seconds?: number }> {
+    return requestJson<{ id: string; project_id: string; name: string; path: string; size_bytes?: number; duration_seconds?: number }>(
+      '/api/register-media',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      },
+    )
+  }
+
   async submitMedia(input: {
     mediaPath: string
     durationSec: number

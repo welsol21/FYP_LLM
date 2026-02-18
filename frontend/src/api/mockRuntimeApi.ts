@@ -202,6 +202,32 @@ export class MockRuntimeApi implements RuntimeApi {
     }
   }
 
+  async registerMediaFile(input: {
+    projectId: string
+    name: string
+    mediaPath: string
+    sizeBytes: number
+    durationSec?: number
+  }): Promise<{ id: string; project_id: string; name: string; path: string; size_bytes?: number; duration_seconds?: number }> {
+    const fileId = `file-${this.files.length + 1}`
+    this.fileProjectId[fileId] = input.projectId
+    this.files.unshift({
+      id: fileId,
+      name: input.name,
+      settings: 'HF / Runtime',
+      updated: new Date().toISOString().slice(0, 10),
+      analyzed: false,
+    })
+    return {
+      id: fileId,
+      project_id: input.projectId,
+      name: input.name,
+      path: input.mediaPath,
+      size_bytes: input.sizeBytes,
+      duration_seconds: input.durationSec,
+    }
+  }
+
   async submitMedia(input: {
     mediaPath: string
     durationSec: number

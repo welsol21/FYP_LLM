@@ -82,6 +82,12 @@ describe('VisualizerPage', () => {
       }),
       getSelectedProject: async () => ({ project_id: 'proj-1', project_name: 'Demo' }),
       setSelectedProject: async () => ({ project_id: 'proj-1', project_name: 'Demo' }),
+      registerMediaFile: async () => ({
+        id: 'file-1',
+        project_id: 'proj-1',
+        name: 'demo.mp3',
+        path: '/tmp/demo.mp3',
+      }),
       submitMedia: async () => ({
         result: { route: 'local', message: '' },
         ui_feedback: { severity: 'info', title: '', message: '' },

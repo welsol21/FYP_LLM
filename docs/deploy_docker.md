@@ -101,6 +101,7 @@ Runtime API is exposed behind frontend Nginx proxy:
 - `GET /api/selected-project`
 - `POST /api/selected-project`
 - `POST /api/upload` (multipart file upload)
+- `POST /api/register-media` (attach uploaded file to selected project)
 - `POST /api/submit-media`
 - `GET /api/backend-jobs`
 - `GET /api/backend-job-status?job_id=...`

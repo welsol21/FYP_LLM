@@ -64,6 +64,26 @@ class RuntimeMediaService:
         self.repo.set_workspace_state("selected_project", {"project_id": project_id})
         return {"project_id": row["id"], "project_name": row["name"]}
 
+    def register_media_file(
+        self,
+        *,
+        project_id: str,
+        name: str,
+        media_path: str,
+        size_bytes: int,
+        duration_seconds: int | None = None,
+    ) -> dict[str, Any]:
+        row = next((p for p in self.repo.list_projects() if p["id"] == project_id), None)
+        if row is None:
+            return {"error": "project_not_found"}
+        return self.repo.create_media_file(
+            project_id=project_id,
+            name=name,
+            path=media_path,
+            duration_seconds=duration_seconds,
+            size_bytes=size_bytes,
+        )
+
     def submit_media(
         self,
         *,

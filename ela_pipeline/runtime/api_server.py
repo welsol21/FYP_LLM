@@ -172,6 +172,33 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(selected)
             return
+        if path == "/api/register-media":
+            project_id = str(body.get("projectId") or body.get("project_id") or "").strip()
+            media_path = str(body.get("mediaPath") or body.get("media_path") or "").strip()
+            name = str(body.get("name") or "").strip()
+            size = int(body.get("sizeBytes") or body.get("size_bytes") or 0)
+            duration = body.get("durationSec")
+            if not project_id:
+                self._send_json({"error": "projectId is required"}, status=400)
+                return
+            if not name:
+                self._send_json({"error": "name is required"}, status=400)
+                return
+            if not media_path:
+                self._send_json({"error": "mediaPath is required"}, status=400)
+                return
+            created = SERVICE.register_media_file(
+                project_id=project_id,
+                name=name,
+                media_path=media_path,
+                size_bytes=size,
+                duration_seconds=int(duration) if duration is not None else None,
+            )
+            if created.get("error") == "project_not_found":
+                self._send_json({"error": "project not found"}, status=404)
+                return
+            self._send_json(created)
+            return
 
         if path == "/api/retry-backend-job":
             job_id = str(body.get("jobId") or body.get("job_id") or "")

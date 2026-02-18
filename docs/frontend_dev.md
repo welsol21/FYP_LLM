@@ -16,6 +16,7 @@ Location: `frontend/`
 Implemented:
 - route shell preserving legacy UX sequence,
 - project-first flow (`Projects -> Files -> Analyze`) with persisted selected project,
+- file upload/registration in `Files` screen (project-scoped),
 - runtime capability badges + disabled reasons,
 - real media upload (`multipart/form-data`) from Analyze screen to runtime backend,
 - media submit form + route/status feedback (`local|backend|reject`),

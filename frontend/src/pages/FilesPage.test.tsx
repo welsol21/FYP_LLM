@@ -28,5 +28,12 @@ describe('FilesPage', () => {
     fireEvent.doubleClick(draftRow)
     expect(mockNavigate).not.toHaveBeenCalled()
   })
-})
 
+  it('adds file in Files window by upload', async () => {
+    renderWithProviders(<FilesPage />)
+    const fileInput = (await screen.findByLabelText('Media File')) as HTMLInputElement
+    const file = new File(['hello'], 'lesson.mp3', { type: 'audio/mpeg' })
+    fireEvent.change(fileInput, { target: { files: [file] } })
+    expect(await screen.findByText('lesson.mp3')).toBeInTheDocument()
+  })
+})

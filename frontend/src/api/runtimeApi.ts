@@ -99,6 +99,13 @@ export interface RuntimeApi {
   getSelectedProject(): Promise<SelectedProject>
   setSelectedProject(projectId: string): Promise<SelectedProject>
   uploadMedia(file: File): Promise<{ fileName: string; mediaPath: string; sizeBytes: number }>
+  registerMediaFile(input: {
+    projectId: string
+    name: string
+    mediaPath: string
+    sizeBytes: number
+    durationSec?: number
+  }): Promise<{ id: string; project_id: string; name: string; path: string; size_bytes?: number; duration_seconds?: number }>
   submitMedia(input: {
     mediaPath: string
     durationSec: number
