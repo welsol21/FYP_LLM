@@ -2,17 +2,33 @@
   "She should have trusted her instincts before making the decision.": {
     "type": "Sentence",
     "content": "She should have trusted her instincts before making the decision.",
-    "tense": null,
+    "tense": "null",
     "aspect": "perfect",
     "mood": "modal",
     "voice": "active",
     "finiteness": "finite",
-    "linguistic_notes": [],
-    "notes": [],
-    "quality_flags": [],
+    "linguistic_notes": [
+      "The sentence shows modal perfect meaning, often evaluating what should have happened in the past."
+    ],
+    "notes": [
+      {
+        "text": "The sentence shows modal perfect meaning, often evaluating what should have happened in the past.",
+        "kind": "syntactic",
+        "confidence": 0.65,
+        "source": "rule"
+      }
+    ],
+    "quality_flags": [
+      "note_generated",
+      "rule_used",
+      "template_selected",
+      "backoff_used"
+    ],
     "rejected_candidates": [],
     "rejected_candidate_stats": [],
-    "reason_codes": [],
+    "reason_codes": [
+      "RULE_TEMPLATE_NOTE_ACCEPTED"
+    ],
     "schema_version": "v2",
     "part_of_speech": "sentence",
     "node_id": "n1",
@@ -23,26 +39,65 @@
     },
     "grammatical_role": "clause",
     "tam_construction": "modal_perfect",
+    "template_selection": {
+      "level": "L2_DROP_TAM",
+      "template_id": "SENTENCE_FINITE_CLAUSE",
+      "matched_key": "sentence|sentence|clause|generic",
+      "registry_version": "v1",
+      "context_key_l1": "sentence|sentence|clause|modal_perfect|generic",
+      "context_key_l2": "sentence|sentence|clause|generic",
+      "context_key_l3": "sentence|sentence",
+      "context_key_matched": "sentence|sentence|clause|generic",
+      "selection_mode": "rule_l2_drop_tam",
+      "matched_level_reason": "tam_dropped"
+    },
+    "backoff_in_subtree": true,
+    "backoff_nodes_count": 6,
+    "backoff_leaf_nodes_count": 5,
+    "backoff_aggregate_nodes_count": 1,
+    "backoff_unique_spans_count": 4,
+    "translation": {
+      "source_lang": "en",
+      "target_lang": "ru",
+      "model": "facebook/m2m100_418M",
+      "text": "Она должна была доверять своим инстинктам до принятия решения."
+    },
     "phonetic": {
       "uk": "ʃiː ʃˌʊdəv tɹˈʌstɪd hɜːɹ ˈɪnstɪŋkts bɪfˌɔː mˌe‍ɪkɪŋ ðə dɪsˈɪʒən",
       "us": "ʃiː ʃˌʊdəv tɹˈʌstᵻd hɜːɹ ˈɪnstɪŋkts bᵻfˌɔː‍ɹ mˌe‍ɪkɪŋ ðə dᵻsˈɪʒən"
     },
+    "synonyms": [],
     "cefr_level": "B2",
     "linguistic_elements": [
       {
         "type": "Phrase",
         "content": "She",
-        "tense": null,
-        "aspect": "simple",
-        "mood": "indicative",
-        "voice": "active",
-        "finiteness": "non-finite",
-        "linguistic_notes": [],
-        "notes": [],
-        "quality_flags": [],
+        "tense": "null",
+        "aspect": "null",
+        "mood": "null",
+        "voice": "null",
+        "finiteness": "null",
+        "linguistic_notes": [
+          "The phrase 'She' is a noun phrase built from determiner and noun."
+        ],
+        "notes": [
+          {
+            "text": "The phrase 'She' is a noun phrase built from determiner and noun.",
+            "kind": "syntactic",
+            "confidence": 0.65,
+            "source": "rule"
+          }
+        ],
+        "quality_flags": [
+          "note_generated",
+          "rule_used",
+          "template_selected"
+        ],
         "rejected_candidates": [],
         "rejected_candidate_stats": [],
-        "reason_codes": [],
+        "reason_codes": [
+          "RULE_TEMPLATE_NOTE_ACCEPTED"
+        ],
         "schema_version": "v2",
         "part_of_speech": "noun phrase",
         "node_id": "n2",
@@ -53,37 +108,72 @@
         },
         "grammatical_role": "subject",
         "tam_construction": "none",
+        "template_selection": {
+          "level": "L1_EXACT",
+          "template_id": "NP_DETERMINER_NOUN",
+          "matched_key": "phrase|noun phrase|dep|none|generic",
+          "registry_version": "v1",
+          "context_key_l1": "phrase|noun phrase|dep|none|generic",
+          "context_key_l2": "phrase|noun phrase|dep|generic",
+          "context_key_l3": "phrase|noun phrase",
+          "context_key_matched": "phrase|noun phrase|dep|none|generic",
+          "selection_mode": "rule_l1_exact"
+        },
+        "backoff_in_subtree": true,
+        "translation": {
+          "source_lang": "en",
+          "target_lang": "ru",
+          "text": "Она"
+        },
         "phonetic": {
           "uk": "ʃˈiː",
           "us": "ʃˈiː"
         },
+        "synonyms": [],
         "cefr_level": "B1",
         "linguistic_elements": [
           {
             "type": "Word",
             "content": "She",
-            "tense": null,
-            "aspect": null,
-            "mood": null,
-            "voice": null,
-            "finiteness": null,
-            "linguistic_notes": [],
-            "notes": [],
-            "quality_flags": [],
+            "tense": "null",
+            "aspect": "null",
+            "mood": "null",
+            "voice": "null",
+            "finiteness": "null",
+            "linguistic_notes": [
+              "'She' is a pronoun used to refer to an entity without repeating a full noun phrase."
+            ],
+            "notes": [
+              {
+                "text": "'She' is a pronoun used to refer to an entity without repeating a full noun phrase.",
+                "kind": "syntactic",
+                "confidence": 0.65,
+                "source": "rule"
+              }
+            ],
+            "quality_flags": [
+              "note_generated",
+              "rule_used",
+              "template_fallback",
+              "backoff_used"
+            ],
             "rejected_candidates": [],
             "rejected_candidate_stats": [],
-            "reason_codes": [],
+            "reason_codes": [
+              "RULE_TEMPLATE_MISS",
+              "RULE_TEMPLATE_FALLBACK_ACCEPTED"
+            ],
             "schema_version": "v2",
             "part_of_speech": "pronoun",
             "features": {
               "number": "sing",
               "person": "3",
               "case": "nom",
-              "degree": null,
-              "definiteness": null,
-              "verb_form": null,
+              "degree": "null",
+              "definiteness": "null",
+              "verb_form": "null",
               "gender": "fem",
-              "tense_feature": null
+              "tense_feature": "null"
             },
             "node_id": "n3",
             "parent_id": "n2",
@@ -94,10 +184,38 @@
             "grammatical_role": "subject",
             "dep_label": "nsubj",
             "head_id": null,
+            "template_selection": {
+              "level": "L4_FALLBACK",
+              "template_id": null,
+              "matched_key": "word",
+              "registry_version": "v1",
+              "context_key_l1": "word|pronoun|dep|none|generic",
+              "context_key_l2": "word|pronoun|dep|generic",
+              "context_key_l3": "word|pronoun",
+              "context_key_matched": "word",
+              "selection_mode": "rule_fallback",
+              "semantic_rejects": [
+                {
+                  "template_id": "WORD_PRONOUN_POSSESSIVE",
+                  "level": "L3_LEVEL_POS"
+                },
+                {
+                  "template_id": "WORD_NOUN_COMMON",
+                  "level": "L4_FALLBACK"
+                }
+              ]
+            },
+            "backoff_in_subtree": false,
+            "translation": {
+              "source_lang": "en",
+              "target_lang": "ru",
+              "text": "Она"
+            },
             "phonetic": {
               "uk": "ʃˈiː",
               "us": "ʃˈiː"
             },
+            "synonyms": [],
             "cefr_level": "A1",
             "linguistic_elements": []
           }
@@ -106,17 +224,32 @@
       {
         "type": "Phrase",
         "content": "should have trusted her instincts",
-        "tense": null,
+        "tense": "null",
         "aspect": "perfect",
         "mood": "modal",
         "voice": "active",
         "finiteness": "finite",
-        "linguistic_notes": [],
-        "notes": [],
-        "quality_flags": [],
+        "linguistic_notes": [
+          "The phrase 'should have trusted her instincts' is a verb phrase with modal meaning and perfect aspect."
+        ],
+        "notes": [
+          {
+            "text": "The phrase 'should have trusted her instincts' is a verb phrase with modal meaning and perfect aspect.",
+            "kind": "syntactic",
+            "confidence": 0.65,
+            "source": "rule"
+          }
+        ],
+        "quality_flags": [
+          "note_generated",
+          "rule_used",
+          "template_selected"
+        ],
         "rejected_candidates": [],
         "rejected_candidate_stats": [],
-        "reason_codes": [],
+        "reason_codes": [
+          "RULE_TEMPLATE_NOTE_ACCEPTED"
+        ],
         "schema_version": "v2",
         "part_of_speech": "verb phrase",
         "node_id": "n4",
@@ -127,37 +260,70 @@
         },
         "grammatical_role": "predicate",
         "tam_construction": "modal_perfect",
+        "template_selection": {
+          "level": "L1_EXACT",
+          "template_id": "VP_MODAL_PERFECT",
+          "matched_key": "phrase|verb phrase|predicate|modal_perfect|generic",
+          "registry_version": "v1",
+          "context_key_l1": "phrase|verb phrase|predicate|modal_perfect|generic",
+          "context_key_l2": "phrase|verb phrase|predicate|generic",
+          "context_key_l3": "phrase|verb phrase",
+          "context_key_matched": "phrase|verb phrase|predicate|modal_perfect|generic",
+          "selection_mode": "rule_l1_exact"
+        },
+        "backoff_in_subtree": true,
+        "translation": {
+          "source_lang": "en",
+          "target_lang": "ru",
+          "text": "Она должна доверять своим инстинктам."
+        },
         "phonetic": {
           "uk": "ʃˌʊdəv tɹˈʌstɪd hɜːɹ ˈɪnstɪŋkts",
           "us": "ʃˌʊdəv tɹˈʌstᵻd hɜːɹ ˈɪnstɪŋkts"
         },
+        "synonyms": [],
         "cefr_level": "B1",
         "linguistic_elements": [
           {
             "type": "Word",
             "content": "should",
-            "tense": null,
+            "tense": "null",
             "aspect": "simple",
             "mood": "modal",
             "voice": "active",
             "finiteness": "finite",
-            "linguistic_notes": [],
-            "notes": [],
-            "quality_flags": [],
+            "linguistic_notes": [
+              "As a word, 'should' is a modal auxiliary supporting verb meaning."
+            ],
+            "notes": [
+              {
+                "text": "As a word, 'should' is a modal auxiliary supporting verb meaning.",
+                "kind": "morphological",
+                "confidence": 0.65,
+                "source": "rule"
+              }
+            ],
+            "quality_flags": [
+              "note_generated",
+              "rule_used",
+              "template_selected"
+            ],
             "rejected_candidates": [],
             "rejected_candidate_stats": [],
-            "reason_codes": [],
+            "reason_codes": [
+              "RULE_TEMPLATE_NOTE_ACCEPTED"
+            ],
             "schema_version": "v2",
             "part_of_speech": "auxiliary verb",
             "features": {
-              "number": null,
-              "person": null,
-              "case": null,
-              "degree": null,
-              "definiteness": null,
+              "number": "null",
+              "person": "null",
+              "case": "null",
+              "degree": "null",
+              "definiteness": "null",
               "verb_form": "fin",
-              "gender": null,
-              "tense_feature": null
+              "gender": "null",
+              "tense_feature": "null"
             },
             "node_id": "n5",
             "parent_id": "n4",
@@ -168,38 +334,71 @@
             "grammatical_role": "auxiliary",
             "dep_label": "aux",
             "head_id": "n7",
+            "template_selection": {
+              "level": "L1_EXACT",
+              "template_id": "WORD_AUX_MODAL",
+              "matched_key": "word|auxiliary verb|aux|none|modal_aux",
+              "registry_version": "v1",
+              "context_key_l1": "word|auxiliary verb|aux|none|modal_aux",
+              "context_key_l2": "word|auxiliary verb|aux|modal_aux",
+              "context_key_l3": "word|auxiliary verb",
+              "context_key_matched": "word|auxiliary verb|aux|none|modal_aux",
+              "selection_mode": "rule_l1_exact"
+            },
+            "backoff_in_subtree": false,
+            "translation": {
+              "source_lang": "en",
+              "target_lang": "ru",
+              "text": "должно быть"
+            },
             "phonetic": {
               "uk": "ʃˈʊd",
               "us": "ʃˈʊd"
             },
+            "synonyms": [],
             "cefr_level": "A1",
             "linguistic_elements": []
           },
           {
             "type": "Word",
             "content": "have",
-            "tense": null,
+            "tense": "null",
             "aspect": "simple",
-            "mood": null,
+            "mood": "null",
             "voice": "active",
             "finiteness": "non-finite",
-            "linguistic_notes": [],
-            "notes": [],
-            "quality_flags": [],
+            "linguistic_notes": [
+              "As a word, 'have' marks perfect construction through auxiliary use."
+            ],
+            "notes": [
+              {
+                "text": "As a word, 'have' marks perfect construction through auxiliary use.",
+                "kind": "morphological",
+                "confidence": 0.65,
+                "source": "rule"
+              }
+            ],
+            "quality_flags": [
+              "note_generated",
+              "rule_used",
+              "template_selected"
+            ],
             "rejected_candidates": [],
             "rejected_candidate_stats": [],
-            "reason_codes": [],
+            "reason_codes": [
+              "RULE_TEMPLATE_NOTE_ACCEPTED"
+            ],
             "schema_version": "v2",
             "part_of_speech": "auxiliary verb",
             "features": {
-              "number": null,
-              "person": null,
-              "case": null,
-              "degree": null,
-              "definiteness": null,
+              "number": "null",
+              "person": "null",
+              "case": "null",
+              "degree": "null",
+              "definiteness": "null",
               "verb_form": "inf",
-              "gender": null,
-              "tense_feature": null
+              "gender": "null",
+              "tense_feature": "null"
             },
             "node_id": "n6",
             "parent_id": "n4",
@@ -210,10 +409,28 @@
             "grammatical_role": "auxiliary",
             "dep_label": "aux",
             "head_id": "n7",
+            "template_selection": {
+              "level": "L1_EXACT",
+              "template_id": "WORD_AUX_HAVE",
+              "matched_key": "word|auxiliary verb|aux|none|have_aux",
+              "registry_version": "v1",
+              "context_key_l1": "word|auxiliary verb|aux|none|have_aux",
+              "context_key_l2": "word|auxiliary verb|aux|have_aux",
+              "context_key_l3": "word|auxiliary verb",
+              "context_key_matched": "word|auxiliary verb|aux|none|have_aux",
+              "selection_mode": "rule_l1_exact"
+            },
+            "backoff_in_subtree": false,
+            "translation": {
+              "source_lang": "en",
+              "target_lang": "ru",
+              "text": "Иметь"
+            },
             "phonetic": {
               "uk": "hˈav",
               "us": "hˈæv"
             },
+            "synonyms": [],
             "cefr_level": "A1",
             "linguistic_elements": []
           },
@@ -222,25 +439,40 @@
             "content": "trusted",
             "tense": "past participle",
             "aspect": "perfect",
-            "mood": null,
+            "mood": "null",
             "voice": "active",
             "finiteness": "non-finite",
-            "linguistic_notes": [],
-            "notes": [],
-            "quality_flags": [],
+            "linguistic_notes": [
+              "'trusted' contributes participle morphology to the verb group."
+            ],
+            "notes": [
+              {
+                "text": "'trusted' contributes participle morphology to the verb group.",
+                "kind": "morphological",
+                "confidence": 0.65,
+                "source": "rule"
+              }
+            ],
+            "quality_flags": [
+              "note_generated",
+              "rule_used",
+              "template_selected"
+            ],
             "rejected_candidates": [],
             "rejected_candidate_stats": [],
-            "reason_codes": [],
+            "reason_codes": [
+              "RULE_TEMPLATE_NOTE_ACCEPTED"
+            ],
             "schema_version": "v2",
             "part_of_speech": "verb",
             "features": {
-              "number": null,
-              "person": null,
-              "case": null,
-              "degree": null,
-              "definiteness": null,
+              "number": "null",
+              "person": "null",
+              "case": "null",
+              "degree": "null",
+              "definiteness": "null",
               "verb_form": "part",
-              "gender": null,
+              "gender": "null",
               "tense_feature": "past"
             },
             "node_id": "n7",
@@ -252,38 +484,76 @@
             "grammatical_role": "predicate",
             "dep_label": "ROOT",
             "head_id": null,
+            "template_selection": {
+              "level": "L1_EXACT",
+              "template_id": "WORD_VERB_PARTICIPLE",
+              "matched_key": "word|verb|root|none|participle_form",
+              "registry_version": "v1",
+              "context_key_l1": "word|verb|root|none|participle_form",
+              "context_key_l2": "word|verb|root|participle_form",
+              "context_key_l3": "word|verb",
+              "context_key_matched": "word|verb|root|none|participle_form",
+              "selection_mode": "rule_l1_exact"
+            },
+            "backoff_in_subtree": false,
+            "translation": {
+              "source_lang": "en",
+              "target_lang": "ru",
+              "text": "Доверяем"
+            },
             "phonetic": {
               "uk": "tɹˈʌstɪd",
               "us": "tɹˈʌstᵻd"
             },
+            "synonyms": [
+              "sworn",
+              "relied on",
+              "banked on",
+              "believed"
+            ],
             "cefr_level": "A1",
             "linguistic_elements": []
           },
           {
             "type": "Word",
             "content": "her",
-            "tense": null,
-            "aspect": null,
-            "mood": null,
-            "voice": null,
-            "finiteness": null,
-            "linguistic_notes": [],
-            "notes": [],
-            "quality_flags": [],
+            "tense": "null",
+            "aspect": "null",
+            "mood": "null",
+            "voice": "null",
+            "finiteness": "null",
+            "linguistic_notes": [
+              "As a word, 'her' contributes possessive reference in the phrase."
+            ],
+            "notes": [
+              {
+                "text": "As a word, 'her' contributes possessive reference in the phrase.",
+                "kind": "morphological",
+                "confidence": 0.65,
+                "source": "rule"
+              }
+            ],
+            "quality_flags": [
+              "note_generated",
+              "rule_used",
+              "template_selected"
+            ],
             "rejected_candidates": [],
             "rejected_candidate_stats": [],
-            "reason_codes": [],
+            "reason_codes": [
+              "RULE_TEMPLATE_NOTE_ACCEPTED"
+            ],
             "schema_version": "v2",
             "part_of_speech": "pronoun",
             "features": {
               "number": "sing",
               "person": "3",
-              "case": null,
-              "degree": null,
-              "definiteness": null,
-              "verb_form": null,
+              "case": "null",
+              "degree": "null",
+              "definiteness": "null",
+              "verb_form": "null",
               "gender": "fem",
-              "tense_feature": null
+              "tense_feature": "null"
             },
             "node_id": "n8",
             "parent_id": "n4",
@@ -294,38 +564,72 @@
             "grammatical_role": "other",
             "dep_label": "poss",
             "head_id": "n9",
+            "template_selection": {
+              "level": "L1_EXACT",
+              "template_id": "WORD_PRONOUN_POSSESSIVE",
+              "matched_key": "word|pronoun|poss|none|possessive",
+              "registry_version": "v1",
+              "context_key_l1": "word|pronoun|poss|none|possessive",
+              "context_key_l2": "word|pronoun|poss|possessive",
+              "context_key_l3": "word|pronoun",
+              "context_key_matched": "word|pronoun|poss|none|possessive",
+              "selection_mode": "rule_l1_exact"
+            },
+            "backoff_in_subtree": false,
+            "translation": {
+              "source_lang": "en",
+              "target_lang": "ru",
+              "text": "Ее"
+            },
             "phonetic": {
               "uk": "hˈɜː",
               "us": "hˈɜː"
             },
+            "synonyms": [],
             "cefr_level": "A1",
             "linguistic_elements": []
           },
           {
             "type": "Word",
             "content": "instincts",
-            "tense": null,
-            "aspect": null,
-            "mood": null,
-            "voice": null,
-            "finiteness": null,
-            "linguistic_notes": [],
-            "notes": [],
-            "quality_flags": [],
+            "tense": "null",
+            "aspect": "null",
+            "mood": "null",
+            "voice": "null",
+            "finiteness": "null",
+            "linguistic_notes": [
+              "'instincts' is a common noun naming an entity in context."
+            ],
+            "notes": [
+              {
+                "text": "'instincts' is a common noun naming an entity in context.",
+                "kind": "morphological",
+                "confidence": 0.65,
+                "source": "rule"
+              }
+            ],
+            "quality_flags": [
+              "note_generated",
+              "rule_used",
+              "template_selected",
+              "backoff_used"
+            ],
             "rejected_candidates": [],
             "rejected_candidate_stats": [],
-            "reason_codes": [],
+            "reason_codes": [
+              "RULE_TEMPLATE_NOTE_ACCEPTED"
+            ],
             "schema_version": "v2",
             "part_of_speech": "noun",
             "features": {
               "number": "plur",
-              "person": null,
-              "case": null,
-              "degree": null,
-              "definiteness": null,
-              "verb_form": null,
-              "gender": null,
-              "tense_feature": null
+              "person": "null",
+              "case": "null",
+              "degree": "null",
+              "definiteness": "null",
+              "verb_form": "null",
+              "gender": "null",
+              "tense_feature": "null"
             },
             "node_id": "n9",
             "parent_id": "n4",
@@ -336,10 +640,31 @@
             "grammatical_role": "object",
             "dep_label": "dobj",
             "head_id": "n7",
+            "template_selection": {
+              "level": "L2_DROP_TAM",
+              "template_id": "WORD_NOUN_COMMON",
+              "matched_key": "word|noun|dobj|generic",
+              "registry_version": "v1",
+              "context_key_l1": "word|noun|dobj|none|generic",
+              "context_key_l2": "word|noun|dobj|generic",
+              "context_key_l3": "word|noun",
+              "context_key_matched": "word|noun|dobj|generic",
+              "selection_mode": "rule_l2_drop_tam"
+            },
+            "backoff_in_subtree": false,
+            "translation": {
+              "source_lang": "en",
+              "target_lang": "ru",
+              "text": "Инстинкт"
+            },
             "phonetic": {
               "uk": "ˈɪnstɪŋkts",
               "us": "ˈɪnstɪŋkts"
             },
+            "synonyms": [
+              "instinct",
+              "inherent aptitude"
+            ],
             "cefr_level": "A2",
             "linguistic_elements": []
           }
@@ -348,17 +673,32 @@
       {
         "type": "Phrase",
         "content": "her instincts",
-        "tense": null,
-        "aspect": "simple",
-        "mood": "indicative",
-        "voice": "active",
-        "finiteness": "non-finite",
-        "linguistic_notes": [],
-        "notes": [],
-        "quality_flags": [],
+        "tense": "null",
+        "aspect": "null",
+        "mood": "null",
+        "voice": "null",
+        "finiteness": "null",
+        "linguistic_notes": [
+          "The phrase 'her instincts' is a noun phrase with a possessive relation."
+        ],
+        "notes": [
+          {
+            "text": "The phrase 'her instincts' is a noun phrase with a possessive relation.",
+            "kind": "syntactic",
+            "confidence": 0.65,
+            "source": "rule"
+          }
+        ],
+        "quality_flags": [
+          "note_generated",
+          "rule_used",
+          "template_selected"
+        ],
         "rejected_candidates": [],
         "rejected_candidate_stats": [],
-        "reason_codes": [],
+        "reason_codes": [
+          "RULE_TEMPLATE_NOTE_ACCEPTED"
+        ],
         "schema_version": "v2",
         "part_of_speech": "noun phrase",
         "node_id": "n10",
@@ -369,37 +709,70 @@
         },
         "grammatical_role": "object",
         "tam_construction": "none",
+        "template_selection": {
+          "level": "L1_EXACT",
+          "template_id": "NP_POSSESSIVE",
+          "matched_key": "phrase|noun phrase|object|none|possessive",
+          "registry_version": "v1",
+          "context_key_l1": "phrase|noun phrase|object|none|possessive",
+          "context_key_l2": "phrase|noun phrase|object|possessive",
+          "context_key_l3": "phrase|noun phrase",
+          "context_key_matched": "phrase|noun phrase|object|none|possessive",
+          "selection_mode": "rule_l1_exact"
+        },
+        "backoff_in_subtree": true,
+        "translation": {
+          "source_lang": "en",
+          "target_lang": "ru",
+          "text": "Ее инстинкты"
+        },
         "phonetic": {
           "uk": "hɜːɹ ˈɪnstɪŋkts",
           "us": "hɜːɹ ˈɪnstɪŋkts"
         },
+        "synonyms": [],
         "cefr_level": "B1",
         "linguistic_elements": [
           {
             "type": "Word",
             "content": "her",
-            "tense": null,
-            "aspect": null,
-            "mood": null,
-            "voice": null,
-            "finiteness": null,
-            "linguistic_notes": [],
-            "notes": [],
-            "quality_flags": [],
+            "tense": "null",
+            "aspect": "null",
+            "mood": "null",
+            "voice": "null",
+            "finiteness": "null",
+            "linguistic_notes": [
+              "As a word, 'her' contributes possessive reference in the phrase."
+            ],
+            "notes": [
+              {
+                "text": "As a word, 'her' contributes possessive reference in the phrase.",
+                "kind": "morphological",
+                "confidence": 0.65,
+                "source": "rule"
+              }
+            ],
+            "quality_flags": [
+              "note_generated",
+              "rule_used",
+              "template_selected"
+            ],
             "rejected_candidates": [],
             "rejected_candidate_stats": [],
-            "reason_codes": [],
+            "reason_codes": [
+              "RULE_TEMPLATE_NOTE_ACCEPTED"
+            ],
             "schema_version": "v2",
             "part_of_speech": "pronoun",
             "features": {
               "number": "sing",
               "person": "3",
-              "case": null,
-              "degree": null,
-              "definiteness": null,
-              "verb_form": null,
+              "case": "null",
+              "degree": "null",
+              "definiteness": "null",
+              "verb_form": "null",
               "gender": "fem",
-              "tense_feature": null
+              "tense_feature": "null"
             },
             "node_id": "n11",
             "parent_id": "n10",
@@ -411,38 +784,72 @@
             "dep_label": "poss",
             "head_id": "n12",
             "ref_node_id": "n8",
+            "template_selection": {
+              "level": "L1_EXACT",
+              "template_id": "WORD_PRONOUN_POSSESSIVE",
+              "matched_key": "word|pronoun|poss|none|possessive",
+              "registry_version": "v1",
+              "context_key_l1": "word|pronoun|poss|none|possessive",
+              "context_key_l2": "word|pronoun|poss|possessive",
+              "context_key_l3": "word|pronoun",
+              "context_key_matched": "word|pronoun|poss|none|possessive",
+              "selection_mode": "rule_l1_exact"
+            },
+            "backoff_in_subtree": false,
+            "translation": {
+              "source_lang": "en",
+              "target_lang": "ru",
+              "text": "Ее"
+            },
             "phonetic": {
               "uk": "hˈɜː",
               "us": "hˈɜː"
             },
+            "synonyms": [],
             "cefr_level": "A1",
             "linguistic_elements": []
           },
           {
             "type": "Word",
             "content": "instincts",
-            "tense": null,
-            "aspect": null,
-            "mood": null,
-            "voice": null,
-            "finiteness": null,
-            "linguistic_notes": [],
-            "notes": [],
-            "quality_flags": [],
+            "tense": "null",
+            "aspect": "null",
+            "mood": "null",
+            "voice": "null",
+            "finiteness": "null",
+            "linguistic_notes": [
+              "'instincts' is a common noun naming an entity in context."
+            ],
+            "notes": [
+              {
+                "text": "'instincts' is a common noun naming an entity in context.",
+                "kind": "morphological",
+                "confidence": 0.65,
+                "source": "rule"
+              }
+            ],
+            "quality_flags": [
+              "note_generated",
+              "rule_used",
+              "template_selected",
+              "backoff_used"
+            ],
             "rejected_candidates": [],
             "rejected_candidate_stats": [],
-            "reason_codes": [],
+            "reason_codes": [
+              "RULE_TEMPLATE_NOTE_ACCEPTED"
+            ],
             "schema_version": "v2",
             "part_of_speech": "noun",
             "features": {
               "number": "plur",
-              "person": null,
-              "case": null,
-              "degree": null,
-              "definiteness": null,
-              "verb_form": null,
-              "gender": null,
-              "tense_feature": null
+              "person": "null",
+              "case": "null",
+              "degree": "null",
+              "definiteness": "null",
+              "verb_form": "null",
+              "gender": "null",
+              "tense_feature": "null"
             },
             "node_id": "n12",
             "parent_id": "n10",
@@ -454,10 +861,31 @@
             "dep_label": "dobj",
             "head_id": null,
             "ref_node_id": "n9",
+            "template_selection": {
+              "level": "L2_DROP_TAM",
+              "template_id": "WORD_NOUN_COMMON",
+              "matched_key": "word|noun|dobj|generic",
+              "registry_version": "v1",
+              "context_key_l1": "word|noun|dobj|none|generic",
+              "context_key_l2": "word|noun|dobj|generic",
+              "context_key_l3": "word|noun",
+              "context_key_matched": "word|noun|dobj|generic",
+              "selection_mode": "rule_l2_drop_tam"
+            },
+            "backoff_in_subtree": false,
+            "translation": {
+              "source_lang": "en",
+              "target_lang": "ru",
+              "text": "Инстинкт"
+            },
             "phonetic": {
               "uk": "ˈɪnstɪŋkts",
               "us": "ˈɪnstɪŋkts"
             },
+            "synonyms": [
+              "instinct",
+              "inherent aptitude"
+            ],
             "cefr_level": "A2",
             "linguistic_elements": []
           }
@@ -466,17 +894,32 @@
       {
         "type": "Phrase",
         "content": "before making the decision",
-        "tense": null,
-        "aspect": "simple",
-        "mood": "indicative",
-        "voice": "active",
-        "finiteness": "non-finite",
-        "linguistic_notes": [],
-        "notes": [],
-        "quality_flags": [],
+        "tense": "null",
+        "aspect": "null",
+        "mood": "null",
+        "voice": "null",
+        "finiteness": "null",
+        "linguistic_notes": [
+          "The phrase 'before making the decision' introduces temporal sequencing via 'before' + V-ing."
+        ],
+        "notes": [
+          {
+            "text": "The phrase 'before making the decision' introduces temporal sequencing via 'before' + V-ing.",
+            "kind": "syntactic",
+            "confidence": 0.65,
+            "source": "rule"
+          }
+        ],
+        "quality_flags": [
+          "note_generated",
+          "rule_used",
+          "template_selected"
+        ],
         "rejected_candidates": [],
         "rejected_candidate_stats": [],
-        "reason_codes": [],
+        "reason_codes": [
+          "RULE_TEMPLATE_NOTE_ACCEPTED"
+        ],
         "schema_version": "v2",
         "part_of_speech": "prepositional phrase",
         "node_id": "n13",
@@ -487,37 +930,70 @@
         },
         "grammatical_role": "modifier",
         "tam_construction": "none",
+        "template_selection": {
+          "level": "L1_EXACT",
+          "template_id": "PP_TIME_BEFORE_ING",
+          "matched_key": "phrase|prepositional phrase|modifier|none|before_ing",
+          "registry_version": "v1",
+          "context_key_l1": "phrase|prepositional phrase|modifier|none|before_ing",
+          "context_key_l2": "phrase|prepositional phrase|modifier|before_ing",
+          "context_key_l3": "phrase|prepositional phrase",
+          "context_key_matched": "phrase|prepositional phrase|modifier|none|before_ing",
+          "selection_mode": "rule_l1_exact"
+        },
+        "backoff_in_subtree": true,
+        "translation": {
+          "source_lang": "en",
+          "target_lang": "ru",
+          "text": "Перед принятием решения"
+        },
         "phonetic": {
           "uk": "bɪfˌɔː mˌe‍ɪkɪŋ ðə dɪsˈɪʒən",
           "us": "bᵻfˌɔː‍ɹ mˌe‍ɪkɪŋ ðə dᵻsˈɪʒən"
         },
+        "synonyms": [],
         "cefr_level": "B1",
         "linguistic_elements": [
           {
             "type": "Word",
             "content": "before",
-            "tense": null,
-            "aspect": null,
-            "mood": null,
-            "voice": null,
-            "finiteness": null,
-            "linguistic_notes": [],
-            "notes": [],
-            "quality_flags": [],
+            "tense": "null",
+            "aspect": "null",
+            "mood": "null",
+            "voice": "null",
+            "finiteness": "null",
+            "linguistic_notes": [
+              "'before' serves as a preposition in clause-level structure."
+            ],
+            "notes": [
+              {
+                "text": "'before' serves as a preposition in clause-level structure.",
+                "kind": "morphological",
+                "confidence": 0.65,
+                "source": "rule"
+              }
+            ],
+            "quality_flags": [
+              "note_generated",
+              "rule_used",
+              "template_selected"
+            ],
             "rejected_candidates": [],
             "rejected_candidate_stats": [],
-            "reason_codes": [],
+            "reason_codes": [
+              "RULE_TEMPLATE_NOTE_ACCEPTED"
+            ],
             "schema_version": "v2",
             "part_of_speech": "preposition",
             "features": {
-              "number": null,
-              "person": null,
-              "case": null,
-              "degree": null,
-              "definiteness": null,
-              "verb_form": null,
-              "gender": null,
-              "tense_feature": null
+              "number": "null",
+              "person": "null",
+              "case": "null",
+              "degree": "null",
+              "definiteness": "null",
+              "verb_form": "null",
+              "gender": "null",
+              "tense_feature": "null"
             },
             "node_id": "n14",
             "parent_id": "n13",
@@ -528,10 +1004,28 @@
             "grammatical_role": "linker",
             "dep_label": "prep",
             "head_id": null,
+            "template_selection": {
+              "level": "L1_EXACT",
+              "template_id": "WORD_PREPOSITION",
+              "matched_key": "word|preposition|prep|none|generic",
+              "registry_version": "v1",
+              "context_key_l1": "word|preposition|prep|none|generic",
+              "context_key_l2": "word|preposition|prep|generic",
+              "context_key_l3": "word|preposition",
+              "context_key_matched": "word|preposition|prep|none|generic",
+              "selection_mode": "rule_l1_exact"
+            },
+            "backoff_in_subtree": false,
+            "translation": {
+              "source_lang": "en",
+              "target_lang": "ru",
+              "text": "Прежде"
+            },
             "phonetic": {
               "uk": "bɪfˈɔː",
               "us": "bᵻfˈɔː‍ɹ"
             },
+            "synonyms": [],
             "cefr_level": "A1",
             "linguistic_elements": []
           },
@@ -540,25 +1034,40 @@
             "content": "making",
             "tense": "present participle",
             "aspect": "progressive",
-            "mood": null,
+            "mood": "null",
             "voice": "active",
             "finiteness": "non-finite",
-            "linguistic_notes": [],
-            "notes": [],
-            "quality_flags": [],
+            "linguistic_notes": [
+              "As a word, 'making' is an -ing form in non-finite verb use."
+            ],
+            "notes": [
+              {
+                "text": "As a word, 'making' is an -ing form in non-finite verb use.",
+                "kind": "morphological",
+                "confidence": 0.65,
+                "source": "rule"
+              }
+            ],
+            "quality_flags": [
+              "note_generated",
+              "rule_used",
+              "template_selected"
+            ],
             "rejected_candidates": [],
             "rejected_candidate_stats": [],
-            "reason_codes": [],
+            "reason_codes": [
+              "RULE_TEMPLATE_NOTE_ACCEPTED"
+            ],
             "schema_version": "v2",
             "part_of_speech": "verb",
             "features": {
-              "number": null,
-              "person": null,
-              "case": null,
-              "degree": null,
-              "definiteness": null,
+              "number": "null",
+              "person": "null",
+              "case": "null",
+              "degree": "null",
+              "definiteness": "null",
               "verb_form": "part",
-              "gender": null,
+              "gender": "null",
               "tense_feature": "pres"
             },
             "node_id": "n15",
@@ -570,38 +1079,78 @@
             "grammatical_role": "other",
             "dep_label": "pcomp",
             "head_id": "n14",
+            "template_selection": {
+              "level": "L1_EXACT",
+              "template_id": "WORD_VERB_ING",
+              "matched_key": "word|verb|dep|none|ing_form",
+              "registry_version": "v1",
+              "context_key_l1": "word|verb|dep|none|ing_form",
+              "context_key_l2": "word|verb|dep|ing_form",
+              "context_key_l3": "word|verb",
+              "context_key_matched": "word|verb|dep|none|ing_form",
+              "selection_mode": "rule_l1_exact"
+            },
+            "backoff_in_subtree": false,
+            "translation": {
+              "source_lang": "en",
+              "target_lang": "ru",
+              "text": "Сделать"
+            },
             "phonetic": {
               "uk": "mˈe‍ɪkɪŋ",
               "us": "mˈe‍ɪkɪŋ"
             },
+            "synonyms": [
+              "make",
+              "do",
+              "get",
+              "create",
+              "induce"
+            ],
             "cefr_level": "A1",
             "linguistic_elements": []
           },
           {
             "type": "Word",
             "content": "the",
-            "tense": null,
-            "aspect": null,
-            "mood": null,
-            "voice": null,
-            "finiteness": null,
-            "linguistic_notes": [],
-            "notes": [],
-            "quality_flags": [],
+            "tense": "null",
+            "aspect": "null",
+            "mood": "null",
+            "voice": "null",
+            "finiteness": "null",
+            "linguistic_notes": [
+              "This word, 'the', functions as a definite determiner."
+            ],
+            "notes": [
+              {
+                "text": "This word, 'the', functions as a definite determiner.",
+                "kind": "morphological",
+                "confidence": 0.65,
+                "source": "rule"
+              }
+            ],
+            "quality_flags": [
+              "note_generated",
+              "rule_used",
+              "template_selected",
+              "backoff_used"
+            ],
             "rejected_candidates": [],
             "rejected_candidate_stats": [],
-            "reason_codes": [],
+            "reason_codes": [
+              "RULE_TEMPLATE_NOTE_ACCEPTED"
+            ],
             "schema_version": "v2",
             "part_of_speech": "article",
             "features": {
-              "number": null,
-              "person": null,
-              "case": null,
-              "degree": null,
+              "number": "null",
+              "person": "null",
+              "case": "null",
+              "degree": "null",
               "definiteness": "def",
-              "verb_form": null,
-              "gender": null,
-              "tense_feature": null
+              "verb_form": "null",
+              "gender": "null",
+              "tense_feature": "null"
             },
             "node_id": "n16",
             "parent_id": "n13",
@@ -612,38 +1161,72 @@
             "grammatical_role": "determiner",
             "dep_label": "det",
             "head_id": "n17",
+            "template_selection": {
+              "level": "L2_DROP_TAM",
+              "template_id": "WORD_ARTICLE_DEFINITE",
+              "matched_key": "word|article|det|def_article",
+              "registry_version": "v1",
+              "context_key_l1": "word|article|det|none|def_article",
+              "context_key_l2": "word|article|det|def_article",
+              "context_key_l3": "word|article",
+              "context_key_matched": "word|article|det|def_article",
+              "selection_mode": "rule_l2_drop_tam"
+            },
+            "backoff_in_subtree": false,
+            "translation": {
+              "source_lang": "en",
+              "target_lang": "ru",
+              "text": "В"
+            },
             "phonetic": {
               "uk": "ðˈə",
               "us": "ðˈə"
             },
+            "synonyms": [],
             "cefr_level": "A1",
             "linguistic_elements": []
           },
           {
             "type": "Word",
             "content": "decision",
-            "tense": null,
-            "aspect": null,
-            "mood": null,
-            "voice": null,
-            "finiteness": null,
-            "linguistic_notes": [],
-            "notes": [],
-            "quality_flags": [],
+            "tense": "null",
+            "aspect": "null",
+            "mood": "null",
+            "voice": "null",
+            "finiteness": "null",
+            "linguistic_notes": [
+              "This word, 'decision', functions as a common noun in the clause."
+            ],
+            "notes": [
+              {
+                "text": "This word, 'decision', functions as a common noun in the clause.",
+                "kind": "morphological",
+                "confidence": 0.65,
+                "source": "rule"
+              }
+            ],
+            "quality_flags": [
+              "note_generated",
+              "rule_used",
+              "template_selected",
+              "backoff_used"
+            ],
             "rejected_candidates": [],
             "rejected_candidate_stats": [],
-            "reason_codes": [],
+            "reason_codes": [
+              "RULE_TEMPLATE_NOTE_ACCEPTED"
+            ],
             "schema_version": "v2",
             "part_of_speech": "noun",
             "features": {
               "number": "sing",
-              "person": null,
-              "case": null,
-              "degree": null,
-              "definiteness": null,
-              "verb_form": null,
-              "gender": null,
-              "tense_feature": null
+              "person": "null",
+              "case": "null",
+              "degree": "null",
+              "definiteness": "null",
+              "verb_form": "null",
+              "gender": "null",
+              "tense_feature": "null"
             },
             "node_id": "n17",
             "parent_id": "n13",
@@ -654,10 +1237,32 @@
             "grammatical_role": "object",
             "dep_label": "dobj",
             "head_id": "n15",
+            "template_selection": {
+              "level": "L2_DROP_TAM",
+              "template_id": "WORD_NOUN_COMMON",
+              "matched_key": "word|noun|dobj|generic",
+              "registry_version": "v1",
+              "context_key_l1": "word|noun|dobj|none|generic",
+              "context_key_l2": "word|noun|dobj|generic",
+              "context_key_l3": "word|noun",
+              "context_key_matched": "word|noun|dobj|generic",
+              "selection_mode": "rule_l2_drop_tam"
+            },
+            "backoff_in_subtree": false,
+            "translation": {
+              "source_lang": "en",
+              "target_lang": "ru",
+              "text": "Решение"
+            },
             "phonetic": {
               "uk": "dɪsˈɪʒən",
               "us": "dᵻsˈɪʒən"
             },
+            "synonyms": [
+              "determination",
+              "conclusion",
+              "decisiveness"
+            ],
             "cefr_level": "B1",
             "linguistic_elements": []
           }

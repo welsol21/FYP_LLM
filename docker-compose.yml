@@ -22,7 +22,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        TORCH_VERSION: ${TORCH_VERSION:-2.5.1}
+        TORCH_VERSION: ${TORCH_VERSION:-2.6.0}
     container_name: ela-app
     restart: unless-stopped
     depends_on:

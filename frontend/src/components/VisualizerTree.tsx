@@ -41,6 +41,16 @@ export function VisualizerTree({ node, depth = 0 }: Props) {
   const label = resolveLabel(node)
   const borderColor = useMemo(() => toneForLabel(label), [label])
   const hasChildren = node.linguistic_elements.length > 0
+  const cefrText = node.cefr_level ?? '-'
+  const tenseText = node.tense == null || node.tense === '' ? '-' : node.tense
+  const notesText = node.linguistic_notes.length
+    ? node.linguistic_notes.join(' ')
+    : (node.notes?.map((note) => note?.text?.trim()).filter(Boolean).join(' ') || '-')
+  const translationText = node.translation?.text?.trim() ? node.translation.text : '-'
+  const phoneticText =
+    node.phonetic?.uk || node.phonetic?.us
+      ? `${node.phonetic?.uk ? `UK /${node.phonetic.uk}/` : ''}${node.phonetic?.uk && node.phonetic?.us ? ' | ' : ''}${node.phonetic?.us ? `US /${node.phonetic.us}/` : ''}`
+      : '-'
 
   return (
     <div className="visualizer-node parse-node" style={{ borderLeftColor: borderColor }}>
@@ -91,18 +101,11 @@ export function VisualizerTree({ node, depth = 0 }: Props) {
       </div>
       {showDetails ? (
         <div className="node-details">
-          {node.cefr_level ? <div><strong>CEFR:</strong> {node.cefr_level}</div> : null}
-          {node.tense ? <div><strong>Tense:</strong> {node.tense}</div> : null}
-          {node.linguistic_notes.length ? <div><strong>Linguistic Notes:</strong> {node.linguistic_notes.join(' ')}</div> : null}
-          {node.translation?.text ? <div><strong>Translation:</strong> {node.translation.text}</div> : null}
-          {node.phonetic?.uk || node.phonetic?.us ? (
-            <div>
-              <strong>Phonetic:</strong>{' '}
-              {node.phonetic?.uk ? `UK /${node.phonetic.uk}/` : ''}
-              {node.phonetic?.uk && node.phonetic?.us ? ' | ' : ''}
-              {node.phonetic?.us ? `US /${node.phonetic.us}/` : ''}
-            </div>
-          ) : null}
+          <div><strong>CEFR:</strong> {cefrText}</div>
+          <div><strong>Tense:</strong> {tenseText}</div>
+          <div><strong>Linguistic Notes:</strong> {notesText}</div>
+          <div><strong>Translation:</strong> {translationText}</div>
+          <div><strong>Phonetic:</strong> {phoneticText}</div>
         </div>
       ) : null}
       {hasChildren && expanded ? (

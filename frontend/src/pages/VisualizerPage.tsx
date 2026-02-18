@@ -62,7 +62,6 @@ export function VisualizerPage() {
         <section className="card">
           {rows.map((row) => (
             <article key={row.sentence_text} className="visualizer-article">
-              <h2>{row.sentence_text}</h2>
               <VisualizerTreeLegacy node={row.tree} isRoot />
             </article>
           ))}

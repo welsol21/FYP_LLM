@@ -36,6 +36,7 @@ export type VisualizerNode = {
   content: string
   tense: string
   linguistic_notes: string[]
+  notes?: Array<{ text?: string }>
   part_of_speech: string
   linguistic_elements: VisualizerNode[]
   cefr_level?: string

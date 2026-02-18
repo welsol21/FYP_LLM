@@ -11,7 +11,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends espeak-ng ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-ARG TORCH_VERSION=2.5.1
+ARG TORCH_VERSION=2.6.0
 
 COPY requirements-docker-cpu.txt /app/requirements-docker-cpu.txt
 RUN pip install --upgrade pip \

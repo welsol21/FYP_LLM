@@ -328,19 +328,19 @@ class LocalT5Annotator:
         if node_type == "word":
             if pos not in {"verb", "auxiliary verb"}:
                 for field in ("tense", "aspect", "mood", "voice", "finiteness"):
-                    node[field] = None
+                    node[field] = "null"
             return
 
         if node_type == "phrase":
             if pos in {"noun phrase", "prepositional phrase"}:
                 for field in ("tense", "aspect", "mood", "voice", "finiteness"):
-                    node[field] = None
+                    node[field] = "null"
                 return
 
             # For non-verbal phrases, mood/voice/finiteness are usually not meaningful.
             if pos not in {"verb phrase"}:
                 for field in ("mood", "voice", "finiteness"):
-                    node[field] = None
+                    node[field] = "null"
 
     @staticmethod
     def _kind_from_template_id(template_id: str) -> str | None:
@@ -388,6 +388,7 @@ class LocalT5Annotator:
         for sentence_text, sentence_node in contract_doc.items():
             seen_notes: Set[str] = set()
             self._annotate_node(sentence_text, sentence_node, seen_notes)
+            self._ensure_backoff_flags_consistency(sentence_node)
             self._mark_backoff_in_subtree(sentence_node)
             backoff_node_ids, backoff_leaf_node_ids, backoff_reasons, unique_spans = self._collect_backoff_summary(
                 sentence_node
@@ -410,6 +411,21 @@ class LocalT5Annotator:
             else:
                 sentence_node.pop("backoff_summary", None)
         return contract_doc
+
+    @staticmethod
+    def _ensure_backoff_flags_consistency(node: Dict) -> None:
+        level = str(((node.get("template_selection") or {}).get("level")) or "").strip().upper()
+        if level and level != "L1_EXACT":
+            flags = node.get("quality_flags")
+            if not isinstance(flags, list):
+                flags = []
+            if "backoff_used" not in flags:
+                flags.append("backoff_used")
+            node["quality_flags"] = flags
+
+        for child in node.get("linguistic_elements", []) or []:
+            if isinstance(child, dict):
+                LocalT5Annotator._ensure_backoff_flags_consistency(child)
 
     @staticmethod
     def _mark_backoff_in_subtree(node: Dict) -> bool:
