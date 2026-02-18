@@ -28,6 +28,9 @@ body {
 }
 
 .top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -41,6 +44,14 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.top-title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.1;
+  color: var(--text);
+  font-weight: 700;
 }
 
 .back-btn,
@@ -100,6 +111,11 @@ button {
   margin-bottom: 12px;
 }
 
+.compact-card {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
 .badge-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .badge {
   border: 1px solid var(--line);
@@ -113,7 +129,9 @@ table { width: 100%; border-collapse: collapse; }
 th, td { border: 1px solid var(--line); padding: 10px; text-align: left; }
 th { color: var(--accent); }
 
-input {
+input,
+select,
+textarea {
   width: 100%;
   margin-top: 4px;
   margin-bottom: 10px;
@@ -123,6 +141,11 @@ input {
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 92px;
 }
 
 button {
@@ -250,12 +273,19 @@ button {
 }
 
 .lv-label-chip {
-  border: 0;
+  border: 1px solid rgba(255, 255, 255, 0.75);
   border-radius: 8px;
   padding: 6px 10px;
-  color: #0f1115;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 4px 10px rgba(0, 0, 0, 0.35), 0 0 14px rgba(255, 255, 255, 0.15);
+  text-shadow: none;
+}
+
+.lv-label-chip.is-selected {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px #ffffff, 0 0 18px rgba(255, 255, 255, 0.45);
 }
 
 .lv-cefr-pill {
@@ -334,10 +364,106 @@ button {
   gap: 10px;
 }
 
+.quick-edit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.quick-edit-header h2 {
+  margin: 0;
+}
+
+.quick-edit-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.quick-edit-toggle {
+  min-height: var(--touch-min);
+  border: 1px solid var(--line);
+  background: #101723;
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.quick-edit-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.quick-edit-meta {
+  margin: 0;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.quick-edit-advanced-toggle {
+  min-height: var(--touch-min);
+  border: 1px solid var(--line);
+  background: #101723;
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
 .quick-edit-actions {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+.touch-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.touch-choice-grid-values {
+  padding-right: 0;
+}
+
+.touch-value-picker {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.touch-value-picker-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.touch-value-current {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.touch-choice-btn {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #151b28 0%, #101521 100%);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.touch-choice-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(243, 209, 59, 0.35);
 }
 
 .quick-edit-status {
@@ -345,7 +471,26 @@ button {
   margin: 0;
 }
 
+.sentence-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.sentence-nav-status {
+  min-width: 84px;
+  text-align: center;
+  color: var(--accent);
+  font-weight: 700;
+}
+
 @media (max-width: 860px) {
+  .touch-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
   .top-actions {
     width: 100%;
     justify-content: flex-end;

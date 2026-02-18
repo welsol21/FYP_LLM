@@ -39,14 +39,18 @@ class LegacyVisualizerEditorBridgeTests(unittest.TestCase):
     def test_build_visualizer_payload(self):
         tree = build_visualizer_payload(self.doc["She trusted him."])
         self.assertEqual(tree["node_id"], "s1")
-        self.assertEqual(tree["children"][0]["node_id"], "p1")
-        self.assertEqual(tree["children"][0]["children"][0]["node_id"], "w1")
+        self.assertEqual(tree["linguistic_elements"][0]["node_id"], "p1")
+        self.assertEqual(tree["linguistic_elements"][0]["linguistic_elements"][0]["node_id"], "w1")
+        self.assertEqual(
+            tree["linguistic_elements"][0]["notes"][0]["text"],
+            "old",
+        )
 
     def test_build_visualizer_payload_for_document(self):
-        rows = build_visualizer_payload_for_document(self.doc)
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["sentence_text"], "She trusted him.")
-        self.assertIn("tree", rows[0])
+        payload = build_visualizer_payload_for_document(self.doc)
+        self.assertEqual(len(payload), 1)
+        self.assertIn("She trusted him.", payload)
+        self.assertEqual(payload["She trusted him."]["node_id"], "s1")
 
     def test_apply_node_edit_updates_target_path(self):
         updated = apply_node_edit(

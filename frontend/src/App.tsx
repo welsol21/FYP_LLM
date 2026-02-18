@@ -17,6 +17,14 @@ export default function App() {
   const navigate = useNavigate()
   const location = useLocation()
   const canGoBack = location.pathname !== '/'
+  const pageTitleByPath: Record<string, string> = {
+    '/': 'Media',
+    '/files': 'Files',
+    '/analyze': 'Analyze',
+    '/vocabulary': 'Vocabulary',
+    '/visualizer': 'Linguistic Visualizer',
+  }
+  const pageTitle = pageTitleByPath[location.pathname] ?? 'ELA'
 
   return (
     <div className="app-shell">
@@ -30,6 +38,7 @@ export default function App() {
         >
           Back
         </button>
+        <h1 className="top-title">{pageTitle}</h1>
         <div className="top-actions">
           <NavLink to="/files" className={({ isActive }) => (isActive ? 'top-link active' : 'top-link')}>
             Files

@@ -65,6 +65,16 @@ function stableTopLevelTone(nodeId: string): string {
   return topLevelPalette[hash % topLevelPalette.length]
 }
 
+function textColorForBg(hexColor: string): string {
+  const hex = hexColor.replace('#', '')
+  if (hex.length !== 6) return '#f8fbff'
+  const r = parseInt(hex.slice(0, 2), 16)
+  const g = parseInt(hex.slice(2, 4), 16)
+  const b = parseInt(hex.slice(4, 6), 16)
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000
+  return yiq >= 150 ? '#0b1220' : '#f8fbff'
+}
+
 function nodeTokens(node: VisualizerNode, level: number): Token[] {
   if (level === 0 && node.linguistic_elements.length > 0) {
     return orderedChildren(node).map((child) => ({
@@ -80,10 +90,12 @@ type Props = {
   node: VisualizerNode
   isRoot?: boolean
   level?: number
+  selectedNodeId?: string
+  onNodeSelect?: (node: VisualizerNode) => void
 }
 
-export function VisualizerTreeLegacy({ node, isRoot = false, level = 0 }: Props) {
-  const [childrenOpen, setChildrenOpen] = useState(isRoot)
+export function VisualizerTreeLegacy({ node, isRoot = false, level = 0, selectedNodeId, onNodeSelect }: Props) {
+  const [childrenOpen, setChildrenOpen] = useState(false)
   const label = labelOf(node)
   const tone = useMemo(() => {
     if (level === 1 && node.linguistic_elements.length === 0) return stableTopLevelTone(node.node_id)
@@ -106,9 +118,19 @@ export function VisualizerTreeLegacy({ node, isRoot = false, level = 0 }: Props)
   return (
     <div className="lv-node-wrap">
       <div className="lv-node-top">
-        <span className="lv-label-chip" style={{ backgroundColor: tone }}>
+        <button
+          type="button"
+          className={`lv-label-chip ${selectedNodeId === node.node_id ? 'is-selected' : ''}`}
+          style={{
+            background: tone,
+            backgroundImage: 'none',
+            color: textColorForBg(tone),
+          }}
+          onClick={() => onNodeSelect?.(node)}
+          aria-label={`select-node-${node.node_id}`}
+        >
           {label}
-        </span>
+        </button>
         {node.cefr_level ? <span className="lv-cefr-pill">{node.cefr_level}</span> : null}
         {hasChildren ? (
           <button
@@ -142,7 +164,12 @@ export function VisualizerTreeLegacy({ node, isRoot = false, level = 0 }: Props)
         <div className="lv-children-col">
           {children.map((child) => (
             <div key={child.node_id} className="lv-child-item">
-              <VisualizerTreeLegacy node={child} level={level + 1} />
+              <VisualizerTreeLegacy
+                node={child}
+                level={level + 1}
+                selectedNodeId={selectedNodeId}
+                onNodeSelect={onNodeSelect}
+              />
             </div>
           ))}
         </div>

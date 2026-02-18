@@ -1,4 +1,4 @@
-"""Helpers to bridge contract nodes to visualizer payloads and editor-style field edits."""
+"""Helpers for contract-safe visualizer payloads and editor-style field edits."""
 
 from __future__ import annotations
 
@@ -10,38 +10,18 @@ from typing import Any
 _SEGMENT_RE = re.compile(r"^([A-Za-z_]\w*)(?:\[(\d+)\])?$")
 
 
-def _node_to_visualizer(node: dict[str, Any]) -> dict[str, Any]:
-    payload = {
-        "node_id": node.get("node_id", ""),
-        "type": node.get("type", ""),
-        "content": node.get("content", ""),
-        "part_of_speech": node.get("part_of_speech"),
-        "cefr_level": node.get("cefr_level"),
-        "children": [],
-    }
-    for child in node.get("linguistic_elements", []) or []:
-        if isinstance(child, dict):
-            payload["children"].append(_node_to_visualizer(child))
-    return payload
-
-
 def build_visualizer_payload(sentence_node: dict[str, Any]) -> dict[str, Any]:
-    """Convert one sentence node into stable visualizer-friendly payload."""
-    return _node_to_visualizer(sentence_node)
+    """Return one sentence node payload without contract field loss."""
+    return copy.deepcopy(sentence_node)
 
 
-def build_visualizer_payload_for_document(doc: dict[str, Any]) -> list[dict[str, Any]]:
-    """Convert full contract document into visualizer payload list."""
-    out: list[dict[str, Any]] = []
+def build_visualizer_payload_for_document(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Return full document payload without contract field loss."""
+    out: dict[str, dict[str, Any]] = {}
     for sentence_text, sentence_node in (doc or {}).items():
         if not isinstance(sentence_node, dict):
             continue
-        out.append(
-            {
-                "sentence_text": sentence_text,
-                "tree": build_visualizer_payload(sentence_node),
-            }
-        )
+        out[str(sentence_text)] = build_visualizer_payload(sentence_node)
     return out
 
 
