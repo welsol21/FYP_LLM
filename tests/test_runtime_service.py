@@ -361,6 +361,24 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertIn("She trusted him.", payload)
             self.assertIn("Before making the decision.", payload)
 
+    def test_build_sentence_contract_payload(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            payload = svc.build_sentence_contract(
+                sentence_text="She should have trusted her instincts before making the decision.",
+                sentence_idx=3,
+            )
+            self.assertEqual(payload["sentence_text"], "She should have trusted her instincts before making the decision.")
+            self.assertTrue(payload["sentence_hash"])
+            node = payload["sentence_node"]
+            self.assertEqual(node["type"], "Sentence")
+            self.assertIsInstance(node.get("linguistic_notes"), list)
+            self.assertIn("translation", node)
+
 
 if __name__ == "__main__":
     unittest.main()

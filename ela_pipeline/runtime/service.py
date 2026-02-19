@@ -13,7 +13,7 @@ from ela_pipeline.client_storage import LocalSQLiteRepository, build_sentence_ha
 
 from .capabilities import build_runtime_capabilities, resolve_deployment_mode, resolve_runtime_mode
 from .media_policy import MediaPolicyLimits, load_media_policy_limits_from_env
-from .media_pipeline import run_media_pipeline
+from .media_pipeline import build_sentence_contract, run_media_pipeline
 from .media_submission import submit_media_for_processing
 from .ui_state import build_runtime_ui_state, build_submission_ui_feedback
 
@@ -277,6 +277,17 @@ class RuntimeMediaService:
                 }
             )
         return out
+
+    def build_sentence_contract(
+        self,
+        *,
+        sentence_text: str,
+        sentence_idx: int = 0,
+    ) -> dict[str, Any]:
+        return build_sentence_contract(
+            sentence_text=sentence_text,
+            sentence_idx=sentence_idx,
+        )
 
     def sync_backend_result(self, *, job_id: str, result: dict[str, Any]) -> dict[str, Any]:
         job = self.repo.get_backend_job(job_id)

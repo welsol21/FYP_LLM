@@ -406,6 +406,28 @@ class RuntimeClientAPITests(unittest.TestCase):
             status = json.loads(buf2.getvalue())
             self.assertEqual(status["status"], "completed")
 
+    def test_sentence_contract_command(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "client.sqlite3"
+            argv = [
+                "client_api",
+                "--db-path",
+                str(db_path),
+                "sentence-contract",
+                "--sentence-text",
+                "Although she had been warned several times, she still chose to ignore the evidence.",
+                "--sentence-idx",
+                "2",
+            ]
+            with patch("sys.argv", argv):
+                buf = io.StringIO()
+                with redirect_stdout(buf):
+                    client_api.main()
+            payload = json.loads(buf.getvalue())
+            self.assertIn("sentence_hash", payload)
+            self.assertEqual(payload["sentence_node"]["type"], "Sentence")
+            self.assertIsInstance(payload["sentence_node"].get("linguistic_notes"), list)
+
 
 if __name__ == "__main__":
     unittest.main()

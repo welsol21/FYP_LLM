@@ -14,6 +14,8 @@
   - [x] `translation` with backend provider + safe fallback.
   - [x] `phonetic` on backend path with graceful fallback if binary unavailable.
 - [ ] Replace legacy ChatGPT sentence call in `temp/ela.zip` flow with current backend sentence-contract API (per-sentence contract request/response adapter).
+- [x] Add backend sentence-contract API surface (`runtime service` + `client_api` + HTTP endpoint) for per-sentence contract generation.
+- [x] Add legacy bridge adapter (`media sentence` -> `backend sentence contract`) with unit tests.
 - [ ] Add text/pdf ingestion adapter parity with legacy pipeline outputs (`media contract` artifacts + sentence stream persistence).
 
 ## License Compliance Workflow

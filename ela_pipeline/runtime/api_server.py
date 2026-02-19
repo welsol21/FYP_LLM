@@ -238,6 +238,28 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
             self._send_json(result, status=200 if result.get("status") == "ok" else 400)
             return
 
+        if path == "/api/sentence-contract":
+            sentence_text = str(body.get("sentenceText") or body.get("sentence_text") or "").strip()
+            if not sentence_text:
+                self._send_json({"error": "sentenceText is required"}, status=400)
+                return
+            sentence_idx_raw = body.get("sentenceIdx", body.get("sentence_idx", 0))
+            try:
+                sentence_idx = int(sentence_idx_raw)
+            except (TypeError, ValueError):
+                self._send_json({"error": "sentenceIdx must be an integer"}, status=400)
+                return
+            try:
+                payload = SERVICE.build_sentence_contract(
+                    sentence_text=sentence_text,
+                    sentence_idx=sentence_idx,
+                )
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=400)
+                return
+            self._send_json(payload)
+            return
+
         self._send_json({"error": "Not found"}, status=404)
 
 

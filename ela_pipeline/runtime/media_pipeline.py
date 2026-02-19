@@ -240,3 +240,34 @@ def run_media_pipeline(*, source_path: str, spacy_model: str = "en_core_web_sm")
         media_sentences=media_sentences,
         contract_sentences=contract_sentences,
     )
+
+
+def build_sentence_contract(
+    *,
+    sentence_text: str,
+    sentence_idx: int = 0,
+    spacy_model: str = "en_core_web_sm",
+) -> dict[str, Any]:
+    text = (sentence_text or "").strip()
+    if not text:
+        raise ValueError("sentence_text must be non-empty")
+
+    nlp = load_nlp(spacy_model)
+    skeleton = build_skeleton(text, nlp)
+    if not skeleton:
+        raise RuntimeError("Unable to build sentence skeleton.")
+    analyzed = apply_tam(skeleton, nlp)
+    _enrich_analyzed_contract(analyzed)
+
+    if text in analyzed:
+        node = analyzed[text]
+    else:
+        node = next(iter(analyzed.values()))
+        text = str(node.get("content") or text)
+
+    _ensure_visualizer_fields(node)
+    return {
+        "sentence_text": text,
+        "sentence_hash": build_sentence_hash(text, int(sentence_idx)),
+        "sentence_node": node,
+    }

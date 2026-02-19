@@ -94,6 +94,13 @@ def main() -> None:
     )
     doc_processing_status.add_argument("--document-id", required=True)
 
+    sentence_contract = sub.add_parser(
+        "sentence-contract",
+        help="Build one sentence-level contract payload (backend sentence API equivalent).",
+    )
+    sentence_contract.add_argument("--sentence-text", required=True)
+    sentence_contract.add_argument("--sentence-idx", type=int, default=0)
+
     apply_edit = sub.add_parser("apply-edit", help="Apply node edit to contract JSON and save output.")
     apply_edit.add_argument("--input-json", required=True)
     apply_edit.add_argument("--output-json", required=True)
@@ -193,6 +200,15 @@ def main() -> None:
 
     if args.cmd == "document-processing-status":
         _print_json(media_service.get_document_processing_status(document_id=args.document_id))
+        return
+
+    if args.cmd == "sentence-contract":
+        _print_json(
+            media_service.build_sentence_contract(
+                sentence_text=args.sentence_text,
+                sentence_idx=args.sentence_idx,
+            )
+        )
         return
 
     if args.cmd == "apply-edit":
