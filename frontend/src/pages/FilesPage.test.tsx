@@ -14,18 +14,29 @@ vi.mock('react-router-dom', async () => {
 })
 
 describe('FilesPage', () => {
-  it('opens visualizer on double-click for analyzed file', async () => {
+  it('opens analyze on double-click for file row', async () => {
     renderWithProviders(<FilesPage />)
     const analyzedRow = await screen.findByLabelText('file-row-file-1')
-    fireEvent.doubleClick(analyzedRow)
-    expect(mockNavigate).toHaveBeenCalledWith('/visualizer', { state: { documentId: 'doc-1' } })
+    fireEvent.click(analyzedRow)
+    fireEvent.click(analyzedRow)
+    expect(mockNavigate).toHaveBeenCalledWith('/analyze', {
+      state: {
+        selectedMedia: {
+          mediaFileId: 'file-1',
+          fileName: 'sample.mp4',
+          mediaPath: '/uploads/sample.mp4',
+          sizeBytes: 104857600,
+          durationSec: 600,
+        },
+      },
+    })
   })
 
-  it('does not navigate for non-analyzed file', async () => {
+  it('does not navigate on single tap/click', async () => {
     mockNavigate.mockClear()
     renderWithProviders(<FilesPage />)
     const draftRow = await screen.findByLabelText('file-row-file-2')
-    fireEvent.doubleClick(draftRow)
+    fireEvent.click(draftRow)
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 

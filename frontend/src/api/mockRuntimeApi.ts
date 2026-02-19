@@ -133,6 +133,9 @@ export class MockRuntimeApi implements RuntimeApi {
     {
       id: 'file-1',
       name: 'sample.mp4',
+      path: '/uploads/sample.mp4',
+      size_bytes: 104857600,
+      duration_seconds: 600,
       settings: 'GPT / Bilingual',
       updated: 'Feb 17, 2026',
       analyzed: true,
@@ -141,6 +144,9 @@ export class MockRuntimeApi implements RuntimeApi {
     {
       id: 'file-2',
       name: 'draft.mp3',
+      path: '/uploads/draft.mp3',
+      size_bytes: 5242880,
+      duration_seconds: 120,
       settings: 'HF / EN only',
       updated: 'Feb 18, 2026',
       analyzed: false,
@@ -214,6 +220,9 @@ export class MockRuntimeApi implements RuntimeApi {
     this.files.unshift({
       id: fileId,
       name: input.name,
+      path: input.mediaPath,
+      size_bytes: input.sizeBytes,
+      duration_seconds: input.durationSec,
       settings: 'HF / Runtime',
       updated: new Date().toISOString().slice(0, 10),
       analyzed: false,
@@ -253,6 +262,9 @@ export class MockRuntimeApi implements RuntimeApi {
       this.files.unshift({
         id: fileId,
         name: mediaName,
+        path: input.mediaPath,
+        size_bytes: input.sizeBytes,
+        duration_seconds: input.durationSec,
         settings: 'HF / Local',
         updated: 'Feb 18, 2026',
         analyzed: true,
@@ -272,6 +284,7 @@ export class MockRuntimeApi implements RuntimeApi {
       this.fileProjectId[fileId] = input.projectId
       const job: BackendJob = {
         id: `job-${this.jobs.length + 1}`,
+        project_id: input.projectId,
         status: 'queued',
         media_path: input.mediaPath,
         duration_seconds: input.durationSec,
@@ -283,6 +296,9 @@ export class MockRuntimeApi implements RuntimeApi {
       this.files.unshift({
         id: fileId,
         name: mediaName,
+        path: input.mediaPath,
+        size_bytes: input.sizeBytes,
+        duration_seconds: input.durationSec,
         settings: 'HF / Backend',
         updated: 'Feb 18, 2026',
         analyzed: false,

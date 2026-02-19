@@ -1,88 +1,95 @@
-import { FormEvent, useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
 import type { ProjectRow } from '../api/runtimeApi'
+
+type ProjectStat = { analyzed: number; total: number }
 
 export function ProjectsPage() {
   const api = useApi()
   const navigate = useNavigate()
   const [rows, setRows] = useState<ProjectRow[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [name, setName] = useState('')
-  const [error, setError] = useState('')
+  const [stats, setStats] = useState<Record<string, ProjectStat>>({})
+  const tapRef = useRef<{ rowId: string; ts: number } | null>(null)
 
   async function refresh() {
     const [projects, selected] = await Promise.all([api.listProjects(), api.getSelectedProject()])
     setRows(projects)
     setSelectedId(selected.project_id ?? null)
+    const pairs = await Promise.all(
+      projects.map(async (p) => {
+        const files = await api.listFiles(p.id)
+        return [p.id, { analyzed: files.filter((f) => f.analyzed).length, total: files.length }] as const
+      }),
+    )
+    setStats(Object.fromEntries(pairs))
   }
 
   useEffect(() => {
     refresh()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function onCreate(e: FormEvent) {
-    e.preventDefault()
-    const trimmed = name.trim()
-    if (!trimmed) {
-      setError('Project name is required.')
-      return
-    }
-    const created = await api.createProject(trimmed)
+  async function onNewProject() {
+    const created = await api.createProject(`New Project ${rows.length + 1}`)
     await api.setSelectedProject(created.id)
-    setName('')
-    setError('')
     await refresh()
   }
 
-  async function onSelect(row: ProjectRow) {
+  async function openFiles(row: ProjectRow) {
     await api.setSelectedProject(row.id)
     setSelectedId(row.id)
     navigate('/files')
   }
 
+  function onRowTap(row: ProjectRow) {
+    const now = Date.now()
+    const last = tapRef.current
+    if (last && last.rowId === row.id && now - last.ts < 350) {
+      openFiles(row)
+      tapRef.current = null
+      return
+    }
+    tapRef.current = { rowId: row.id, ts: now }
+  }
+
   return (
-    <section className="card">
-      <h1>Projects</h1>
-      <form onSubmit={onCreate} aria-label="project-create-form">
-        <label>
+    <section className="screen-block">
+      <div className="page-head">
+        <h2 className="page-title">Projects</h2>
+        <button type="button" className="secondary-btn" onClick={onNewProject}>
           New Project
-          <input
-            aria-label="new-project-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Project name"
-          />
-        </label>
-        <button type="submit">Create</button>
-        {error ? <p style={{ color: '#ff6b6b' }}>{error}</p> : null}
-      </form>
+        </button>
+      </div>
       <table>
         <thead>
           <tr>
             <th>Name</th>
             <th>Created</th>
             <th>Updated</th>
-            <th>Selected</th>
+            <th>Analyzed</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.id}
-              onDoubleClick={() => onSelect(row)}
-              aria-label={`project-row-${row.id}`}
-              style={{ cursor: 'pointer' }}
-            >
-              <td>{row.name}</td>
-              <td>{row.created_at}</td>
-              <td>{row.updated_at}</td>
-              <td>{selectedId === row.id ? 'yes' : ''}</td>
-            </tr>
-          ))}
+          {rows.map((row) => {
+            const stat = stats[row.id] ?? { analyzed: 0, total: 0 }
+            return (
+              <tr
+                key={row.id}
+                onClick={() => onRowTap(row)}
+                aria-label={`project-row-${row.id}`}
+                style={{ cursor: 'pointer', outline: selectedId === row.id ? '1px solid #f3d13b' : 'none' }}
+              >
+                <td>{row.name}</td>
+                <td>{new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                <td>{new Date(row.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                <td>{`${stat.analyzed}/${stat.total}`}</td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
-      <p>Double-click project row to open Files.</p>
     </section>
   )
 }
+

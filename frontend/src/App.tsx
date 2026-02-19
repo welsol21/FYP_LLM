@@ -4,6 +4,10 @@ import { AnalyzePage } from './pages/AnalyzePage'
 import { ProjectsPage } from './pages/ProjectsPage'
 import { VisualizerPage } from './pages/VisualizerPage'
 import { VocabularyPage } from './pages/VocabularyPage'
+import { ConfigPage } from './pages/ConfigPage'
+import { NewProjectPage } from './pages/NewProjectPage'
+import { NewFilePage } from './pages/NewFilePage'
+import { AnalyzeListPage } from './pages/AnalyzeListPage'
 
 function MenuLink({ to, label }: { to: string; label: string }) {
   return (
@@ -21,8 +25,12 @@ export default function App() {
     '/': 'Media',
     '/files': 'Files',
     '/analyze': 'Analyze',
+    '/analyze-list': 'Analyze Files',
     '/vocabulary': 'Vocabulary',
     '/visualizer': 'Linguistic Visualizer',
+    '/config': 'Config',
+    '/new-project': 'New Project',
+    '/new-file': 'New File',
   }
   const pageTitle = pageTitleByPath[location.pathname] ?? 'ELA'
 
@@ -40,14 +48,8 @@ export default function App() {
         </button>
         <h1 className="top-title">{pageTitle}</h1>
         <div className="top-actions">
-          <NavLink to="/files" className={({ isActive }) => (isActive ? 'top-link active' : 'top-link')}>
-            Files
-          </NavLink>
-          <NavLink
-            to="/visualizer"
-            className={({ isActive }) => (isActive ? 'top-link active' : 'top-link')}
-          >
-            Visualizer
+          <NavLink to="/config" className={({ isActive }) => (isActive ? 'top-link active' : 'top-link')}>
+            Config
           </NavLink>
         </div>
       </header>
@@ -56,8 +58,12 @@ export default function App() {
           <Route path="/" element={<ProjectsPage />} />
           <Route path="/files" element={<FilesPage />} />
           <Route path="/analyze" element={<AnalyzePage />} />
+          <Route path="/analyze-list" element={<AnalyzeListPage />} />
           <Route path="/vocabulary" element={<VocabularyPage />} />
           <Route path="/visualizer" element={<VisualizerPage />} />
+          <Route path="/config" element={<ConfigPage />} />
+          <Route path="/new-project" element={<NewProjectPage />} />
+          <Route path="/new-file" element={<NewFilePage />} />
         </Routes>
       </main>
       <nav className="bottom-nav" aria-label="Primary">

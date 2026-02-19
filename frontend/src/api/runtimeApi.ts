@@ -36,6 +36,7 @@ export type MediaSubmissionPayload = {
 
 export type BackendJob = {
   id: string
+  project_id?: string
   status: string
   media_path: string
   duration_seconds: number
@@ -65,6 +66,9 @@ export type BackendSyncPayload = {
 export type MediaFileRow = {
   id: string
   name: string
+  path?: string
+  size_bytes?: number
+  duration_seconds?: number
   settings: string
   updated: string
   analyzed: boolean

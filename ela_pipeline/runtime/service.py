@@ -260,6 +260,9 @@ class RuntimeMediaService:
                 {
                     "id": row["id"],
                     "name": row["name"],
+                    "path": row.get("path"),
+                    "size_bytes": row.get("size_bytes"),
+                    "duration_seconds": row.get("duration_seconds"),
                     "settings": "HF / Runtime",
                     "updated": row["updated_at"],
                     "analyzed": bool(row["analyzed"]),

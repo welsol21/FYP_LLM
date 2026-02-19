@@ -14,20 +14,20 @@ vi.mock('react-router-dom', async () => {
 })
 
 describe('ProjectsPage', () => {
-  it('creates project and shows it in table', async () => {
+  it('creates project from New Project button and shows it in table', async () => {
     renderWithProviders(<ProjectsPage />)
-    fireEvent.change(screen.getByLabelText('new-project-name'), { target: { value: 'New Project' } })
-    fireEvent.submit(screen.getByLabelText('project-create-form'))
+    fireEvent.click(await screen.findByRole('button', { name: 'New Project' }))
     await waitFor(() => {
-      expect(screen.getByText('New Project')).toBeInTheDocument()
+      expect(screen.getByText('New Project 2')).toBeInTheDocument()
     })
   })
 
-  it('opens files on project double click', async () => {
+  it('opens files on project double tap/click', async () => {
     mockNavigate.mockClear()
     renderWithProviders(<ProjectsPage />)
     const row = await screen.findByLabelText('project-row-proj-1')
-    fireEvent.doubleClick(row)
+    fireEvent.click(row)
+    fireEvent.click(row)
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/files')
     })

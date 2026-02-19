@@ -1,33 +1,43 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { AnalyzePage } from './AnalyzePage'
-import { renderWithProviders } from '../test/testUtils'
+import { ApiContext } from '../api/apiContext'
+import { MockRuntimeApi } from '../api/mockRuntimeApi'
 
 describe('AnalyzePage', () => {
-  it('shows backend queue feedback and syncs completed result to visualizer-ready state', async () => {
-    renderWithProviders(<AnalyzePage />)
+  it('shows compact analyze panel with selected file and submit feedback', async () => {
+    const api = new MockRuntimeApi()
+    render(
+      <ApiContext.Provider value={api}>
+        <MemoryRouter
+          initialEntries={[
+            {
+              pathname: '/analyze',
+              state: {
+                selectedMedia: {
+                  mediaFileId: 'file-1',
+                  fileName: 'sample.mp4',
+                  mediaPath: '/uploads/sample.mp4',
+                  sizeBytes: 314572800,
+                  durationSec: 1800,
+                },
+              },
+            },
+          ]}
+        >
+          <AnalyzePage />
+        </MemoryRouter>
+      </ApiContext.Provider>,
+    )
     await waitFor(() => {
-      expect(screen.getByText(/Project:\s*proj-1/i)).toBeInTheDocument()
+      expect(screen.getByText('Demo Project')).toBeInTheDocument()
+      expect(screen.getByText('sample.mp4')).toBeInTheDocument()
     })
 
-    fireEvent.change(screen.getByLabelText(/Duration/), { target: { value: '1800' } })
-    fireEvent.change(screen.getByLabelText(/Size \(bytes\)/), { target: { value: '314572800' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Start' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start pipeline' }))
 
     await waitFor(() => {
-      expect(screen.getByText('Queued for backend processing')).toBeInTheDocument()
+      expect(screen.getByText(/Queued for backend processing/i)).toBeInTheDocument()
     })
-    expect(screen.getByText(/Job ID:/)).toBeInTheDocument()
-    expect(screen.getByRole('cell', { name: /job-1/i })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Check status' }))
-    await waitFor(() => {
-      expect(screen.getByLabelText('backend-job-controls')).toHaveTextContent(/Status:\s*processing/i)
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Check status' }))
-    await waitFor(() => {
-      expect(screen.getByText(/Backend result synced to local document tables/i)).toBeInTheDocument()
-    })
-    expect(screen.getByRole('button', { name: 'Open Visualizer' })).toBeInTheDocument()
   })
 })

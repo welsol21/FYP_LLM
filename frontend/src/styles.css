@@ -46,6 +46,10 @@ body {
   gap: 10px;
 }
 
+.top-actions-spacer {
+  width: 72px;
+}
+
 .top-title {
   margin: 0;
   font-size: 18px;
@@ -90,8 +94,46 @@ button {
 }
 
 .screen {
-  padding: 12px;
+  padding: 0;
   overflow: auto;
+}
+
+.screen-block {
+  padding: 10px 2px 0;
+}
+
+.analyze-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px;
+  margin-bottom: 10px;
+}
+
+.page-title {
+  margin: 0;
+  color: #f3f02d;
+  font-size: 40px;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.secondary-btn {
+  min-width: 160px;
+  background: #5f6062;
+  color: #f2f2f2;
+  border-color: #6d6f72;
+}
+
+.actions-row {
+  display: flex;
+  gap: 10px;
 }
 
 .bottom-nav {
@@ -146,6 +188,76 @@ textarea {
 textarea {
   resize: vertical;
   min-height: 92px;
+}
+
+.analyze-panel {
+  padding: 0 14px;
+}
+
+.project-line {
+  color: #f3f02d;
+  font-size: 38px;
+  margin: 14px 0 10px;
+}
+
+.file-line {
+  color: #f3f02d;
+  font-size: 36px;
+  text-align: center;
+  margin: 12px 0 10px;
+}
+
+.analyze-grid {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  align-items: center;
+  gap: 10px 16px;
+  max-width: 920px;
+  margin: 0 auto 24px;
+}
+
+.analyze-label {
+  justify-self: end;
+  color: #ededed;
+  font-size: 24px;
+}
+
+.flat-select {
+  background: #5f6062;
+  border-color: #6d6f72;
+  color: #f2f2f2;
+}
+
+.stage-list {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 20px;
+}
+
+.stage-row {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 10px;
+  align-items: center;
+  color: #e6e6e6;
+}
+
+.stage-bar {
+  height: 6px;
+  background: #1f1f1f;
+  border: 1px solid #5a5a5a;
+}
+
+.stage-fill {
+  height: 100%;
+  background: #9ca0a6;
+}
+
+.start-btn {
+  width: 100%;
+  background: #5f6062;
+  border-color: #6d6f72;
+  color: #f2f2f2;
 }
 
 button {
@@ -518,6 +630,33 @@ button {
 
   .top-bar {
     flex-wrap: wrap;
+  }
+
+  .page-title {
+    font-size: 30px;
+  }
+
+  .actions-row {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .secondary-btn {
+    min-width: 120px;
+  }
+
+  .analyze-grid {
+    grid-template-columns: 1fr;
+    margin: 0 0 16px;
+  }
+
+  .analyze-label {
+    justify-self: start;
+  }
+
+  .stage-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }
 

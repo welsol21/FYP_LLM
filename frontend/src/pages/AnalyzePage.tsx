@@ -1,129 +1,56 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
-import type { BackendJob, MediaSubmissionPayload, RuntimeUiState, SelectedProject } from '../api/runtimeApi'
+import type { BackendJob, MediaSubmissionPayload, SelectedProject } from '../api/runtimeApi'
 import { BackendJobsTable } from '../components/BackendJobsTable'
 import { MediaSubmitForm } from '../components/MediaSubmitForm'
-import { RuntimeStatusCard } from '../components/RuntimeStatusCard'
 
 export function AnalyzePage() {
-  const navigate = useNavigate()
+  const location = useLocation()
   const api = useApi()
-  const [uiState, setUiState] = useState<RuntimeUiState | null>(null)
   const [selectedProject, setSelectedProject] = useState<SelectedProject>({ project_id: null })
-  const [submission, setSubmission] = useState<MediaSubmissionPayload | null>(null)
   const [jobs, setJobs] = useState<BackendJob[]>([])
-  const [activeJobId, setActiveJobId] = useState<string | null>(null)
-  const [activeJobStatus, setActiveJobStatus] = useState<string>('')
-  const [syncMessage, setSyncMessage] = useState<string>('')
-  const [syncedDocumentId, setSyncedDocumentId] = useState<string | null>(null)
+  const [submission, setSubmission] = useState<MediaSubmissionPayload | null>(null)
+  const selectedMedia = (location.state as
+    | {
+        selectedMedia?: {
+          mediaFileId?: string
+          mediaPath?: string
+          durationSec?: number
+          sizeBytes?: number
+          fileName?: string
+        }
+      }
+    | null
+    | undefined)?.selectedMedia
 
   useEffect(() => {
-    api.getUiState().then(setUiState)
-    api.listBackendJobs().then(setJobs)
     api.getSelectedProject().then(setSelectedProject)
+    api.listBackendJobs().then(setJobs)
   }, [api])
 
-  async function onSubmitted(payload: MediaSubmissionPayload) {
-    setSubmission(payload)
-    setSyncMessage('')
-    setSyncedDocumentId(null)
-    setActiveJobId(payload.result.job_id || null)
-    setActiveJobStatus(payload.result.route === 'backend' ? 'queued' : '')
-    const updated = await api.listBackendJobs()
-    setJobs(updated)
-  }
-
-  async function refreshJobs() {
-    const updated = await api.listBackendJobs()
-    setJobs(updated)
-  }
-
-  async function pollActiveJob() {
-    if (!activeJobId) return
-    const status = await api.getBackendJobStatus(activeJobId)
-    setActiveJobStatus(status.status)
-    await refreshJobs()
-    if (status.status === 'completed') {
-      const synced = await api.syncBackendResult(activeJobId)
-      setSyncMessage(synced.message || '')
-      setSyncedDocumentId(synced.document_id || null)
-      await refreshJobs()
-    }
-  }
-
-  async function retryActiveJob() {
-    if (!activeJobId) return
-    const result = await api.retryBackendJob(activeJobId)
-    setActiveJobStatus(result.status)
-    setSyncMessage(result.message || '')
-    setSyncedDocumentId(null)
-    await refreshJobs()
-  }
-
-  async function resumeJobs() {
-    const resumed = await api.resumeBackendJobs()
-    if (resumed.jobs.length > 0 && !activeJobId) {
-      setActiveJobId(resumed.jobs[0].job_id)
-      setActiveJobStatus(resumed.jobs[0].status)
-    }
-    await refreshJobs()
-  }
-
-  useEffect(() => {
-    if (!activeJobId) return
-    if (activeJobStatus === 'completed') return
-    const timer = window.setInterval(() => {
-      pollActiveJob()
-    }, 2500)
-    return () => window.clearInterval(timer)
-  }, [activeJobId, activeJobStatus])
+  const projectJobs = jobs.filter((job) => {
+    if (!selectedProject.project_id) return true
+    return !job.project_id || job.project_id === selectedProject.project_id
+  })
 
   return (
-    <section>
-      <RuntimeStatusCard uiState={uiState} />
-      <MediaSubmitForm onSubmitted={onSubmitted} projectId={selectedProject.project_id ?? null} />
-      {!selectedProject.project_id ? (
-        <section className="card warning" aria-label="project-required-warning">
-          <h2>Project Required</h2>
-          <p>Select a project in Media tab before running pipeline.</p>
-        </section>
-      ) : null}
+    <section className="screen-block analyze-stack">
+      <MediaSubmitForm
+        onSubmitted={(payload) => {
+          setSubmission(payload)
+          api.listBackendJobs().then(setJobs)
+        }}
+        projectId={selectedProject.project_id ?? null}
+        projectLabel={selectedProject.project_name ?? selectedProject.project_id ?? 'Project'}
+        initialMedia={selectedMedia}
+      />
       {submission ? (
         <section className={`card feedback ${submission.ui_feedback.severity}`} aria-label="submission-feedback">
-          <h2>{submission.ui_feedback.title}</h2>
           <p>{submission.ui_feedback.message}</p>
         </section>
       ) : null}
-      {activeJobId ? (
-        <section className="card compact-card" aria-label="backend-job-controls">
-          <h2>Backend Processing</h2>
-          <p>
-            Active Job: <strong>{activeJobId}</strong> | Status: <strong>{activeJobStatus || 'unknown'}</strong>
-          </p>
-          <div className="job-actions">
-            <button type="button" onClick={pollActiveJob}>
-              Check status
-            </button>
-            <button type="button" onClick={retryActiveJob}>
-              Retry
-            </button>
-            <button type="button" onClick={resumeJobs}>
-              Resume
-            </button>
-            {syncedDocumentId ? (
-              <button
-                type="button"
-                onClick={() => navigate('/visualizer', { state: { documentId: syncedDocumentId } })}
-              >
-                Open Visualizer
-              </button>
-            ) : null}
-          </div>
-          {syncMessage ? <p>{syncMessage}</p> : null}
-        </section>
-      ) : null}
-      <BackendJobsTable jobs={jobs} />
+      <BackendJobsTable jobs={projectJobs} />
     </section>
   )
 }
