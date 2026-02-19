@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import os
 from pathlib import Path
 import uuid
 from typing import Any
@@ -33,6 +34,11 @@ class RuntimeMediaService:
         self.effective_deployment_mode = resolve_deployment_mode(self.deployment_mode)
         self.caps = build_runtime_capabilities(self.effective_mode, deployment_mode=self.effective_deployment_mode)
         self.limits = self.limits or load_media_policy_limits_from_env()
+        self.media_enrichment_backend_only = os.getenv("ELA_MEDIA_ENRICHMENT_BACKEND_ONLY", "1").strip() not in {
+            "0",
+            "false",
+            "False",
+        }
 
     def get_ui_state(self) -> dict[str, Any]:
         return build_runtime_ui_state(self.caps)
@@ -138,6 +144,7 @@ class RuntimeMediaService:
             limits=self.limits,
             project_id=effective_project_id,
             media_file_id=media_file_id,
+            prefer_backend_for_enrichment=self.media_enrichment_backend_only,
         )
         if raw.get("route") == "local":
             synced = self.process_media_now(

@@ -17,6 +17,10 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
             self.assertEqual(len(result.media_sentences), 2)
             self.assertEqual(len(result.contract_sentences), 2)
             self.assertEqual(result.contract_sentences[0]["sentence_node"]["type"], "Sentence")
+            sentence_node = result.contract_sentences[0]["sentence_node"]
+            self.assertIsInstance(sentence_node.get("linguistic_notes"), list)
+            self.assertTrue(sentence_node.get("translation", {}).get("text"))
+            self.assertIn("phonetic", sentence_node)
 
     def test_audio_pipeline_uses_sidecar_transcript(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -32,4 +36,3 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

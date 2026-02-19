@@ -4,6 +4,18 @@
 
 - [x] Use project virtualenv for all commands: prefer `.venv/bin/python -m ...` (or `.venv/bin/pip ...`), avoid plain `python`.
 
+## Media Pipeline Integration (ELA Bridge, Current)
+
+- [x] Add backend-only enrichment routing flag in runtime media policy (`prefer_backend_for_enrichment`) with tests.
+- [x] Wire runtime service to enforce backend-only enrichment policy via env (`ELA_MEDIA_ENRICHMENT_BACKEND_ONLY`, default on).
+- [x] Add media pipeline enrichment stage for contract fields:
+  - [x] `linguistic_notes` via template/rule annotator.
+  - [x] `cefr_level` via rule predictor.
+  - [x] `translation` with backend provider + safe fallback.
+  - [x] `phonetic` on backend path with graceful fallback if binary unavailable.
+- [ ] Replace legacy ChatGPT sentence call in `temp/ela.zip` flow with current backend sentence-contract API (per-sentence contract request/response adapter).
+- [ ] Add text/pdf ingestion adapter parity with legacy pipeline outputs (`media contract` artifacts + sentence stream persistence).
+
 ## License Compliance Workflow
 
 - [x] Define GPL policy for planned phonetics stack in `docs/licenses_inventory.md` (backend-only allowed, distributed delivery requires legal gate).

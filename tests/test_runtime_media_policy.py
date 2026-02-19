@@ -49,6 +49,19 @@ class RuntimeMediaPolicyTests(unittest.TestCase):
         )
         self.assertEqual(decision.route, "backend")
 
+    def test_backend_route_when_enrichment_is_backend_only(self):
+        limits = MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048)
+        caps = build_runtime_capabilities("online")
+        decision = decide_media_route(
+            duration_seconds=5 * 60,
+            size_bytes=50 * 1024 * 1024,
+            limits=limits,
+            runtime_caps=caps,
+            prefer_backend_for_enrichment=True,
+        )
+        self.assertEqual(decision.route, "backend")
+        self.assertIn("backend-only enrichment policy", decision.reason)
+
     def test_reject_when_backend_size_limit_exceeded(self):
         limits = MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048)
         caps = build_runtime_capabilities("online")

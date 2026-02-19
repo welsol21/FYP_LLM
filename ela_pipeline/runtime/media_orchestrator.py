@@ -23,12 +23,14 @@ def plan_media_execution(
     size_bytes: int,
     limits: MediaPolicyLimits,
     runtime_caps: RuntimeCapabilities,
+    prefer_backend_for_enrichment: bool = False,
 ) -> MediaExecutionPlan:
     decision = decide_media_route(
         duration_seconds=duration_seconds,
         size_bytes=size_bytes,
         limits=limits,
         runtime_caps=runtime_caps,
+        prefer_backend_for_enrichment=prefer_backend_for_enrichment,
     )
     if decision.route == "local":
         return MediaExecutionPlan(

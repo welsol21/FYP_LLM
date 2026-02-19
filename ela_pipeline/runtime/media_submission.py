@@ -21,6 +21,7 @@ def submit_media_for_processing(
     limits: MediaPolicyLimits,
     project_id: str | None = None,
     media_file_id: str | None = None,
+    prefer_backend_for_enrichment: bool = False,
 ) -> dict[str, Any]:
     plan = plan_media_execution(
         media_path=media_path,
@@ -28,6 +29,7 @@ def submit_media_for_processing(
         size_bytes=size_bytes,
         limits=limits,
         runtime_caps=runtime_caps,
+        prefer_backend_for_enrichment=prefer_backend_for_enrichment,
     )
     if plan.action == "run_local":
         return {

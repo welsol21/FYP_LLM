@@ -58,6 +58,25 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             polled = svc.get_backend_job_status(job_id=jobs[0]["id"])
             self.assertEqual(polled["status"], "queued")
 
+    def test_submit_media_small_file_goes_backend_when_backend_only_enrichment_enabled(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict("os.environ", {"ELA_MEDIA_ENRICHMENT_BACKEND_ONLY": "1"}, clear=False):
+                svc = RuntimeMediaService(
+                    db_path=Path(tmpdir) / "client.sqlite3",
+                    runtime_mode="online",
+                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+                )
+            svc.repo.create_project("Project A", project_id="proj-1")
+            response = svc.submit_media(
+                media_path="/tmp/short.mp3",
+                duration_seconds=120,
+                size_bytes=5 * 1024 * 1024,
+                project_id="proj-1",
+                media_file_id="file-1",
+            )
+            self.assertEqual(response["result"]["route"], "backend")
+            self.assertEqual(response["result"]["status"], "queued_backend")
+
     def test_submit_media_reject_returns_error_feedback(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             svc = RuntimeMediaService(

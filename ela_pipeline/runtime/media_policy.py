@@ -68,6 +68,7 @@ def decide_media_route(
     size_bytes: int,
     limits: MediaPolicyLimits,
     runtime_caps: RuntimeCapabilities,
+    prefer_backend_for_enrichment: bool = False,
 ) -> MediaRoutingDecision:
     if duration_seconds <= 0:
         raise ValueError(f"duration_seconds must be > 0, got: {duration_seconds}")
@@ -84,6 +85,11 @@ def decide_media_route(
 
     local_ok = duration_seconds <= limits.max_duration_seconds and size_bytes <= limits.max_size_local_bytes
     if local_ok:
+        if prefer_backend_for_enrichment and runtime_caps.backend_jobs_enabled:
+            return MediaRoutingDecision(
+                route="backend",
+                reason=f"Media routed to backend async processing (backend-only enrichment policy); {metrics}",
+            )
         return MediaRoutingDecision(
             route="local",
             reason=f"Media accepted for local processing; {metrics}",
