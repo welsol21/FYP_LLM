@@ -1,8 +1,4 @@
 import type {
-  BackendJob,
-  BackendJobStatus,
-  BackendResumePayload,
-  BackendSyncPayload,
   MediaFileRow,
   MediaSubmissionPayload,
   ProjectRow,
@@ -89,38 +85,6 @@ export class HttpRuntimeApi implements RuntimeApi {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
-    })
-  }
-
-  async listBackendJobs(): Promise<BackendJob[]> {
-    return requestJson<BackendJob[]>('/api/backend-jobs')
-  }
-
-  async getBackendJobStatus(jobId: string): Promise<BackendJobStatus> {
-    return requestJson<BackendJobStatus>(`/api/backend-job-status?job_id=${encodeURIComponent(jobId)}`)
-  }
-
-  async retryBackendJob(jobId: string): Promise<BackendSyncPayload> {
-    return requestJson<BackendSyncPayload>('/api/retry-backend-job', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobId }),
-    })
-  }
-
-  async resumeBackendJobs(): Promise<BackendResumePayload> {
-    return requestJson<BackendResumePayload>('/api/resume-backend-jobs', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
-    })
-  }
-
-  async syncBackendResult(jobId: string): Promise<BackendSyncPayload> {
-    return requestJson<BackendSyncPayload>('/api/sync-backend-result', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobId }),
     })
   }
 

@@ -36,35 +36,12 @@ def main() -> None:
     set_selected_project = sub.add_parser("set-selected-project", help="Set selected project.")
     set_selected_project.add_argument("--project-id", required=True)
 
-    submit_media = sub.add_parser("submit-media", help="Submit media for local/backend routing.")
+    submit_media = sub.add_parser("submit-media", help="Submit media for local client-side processing.")
     submit_media.add_argument("--media-path", required=True)
     submit_media.add_argument("--duration-sec", type=int, required=True)
     submit_media.add_argument("--size-bytes", type=int, required=True)
     submit_media.add_argument("--project-id", default=None)
     submit_media.add_argument("--media-file-id", default=None)
-
-    jobs = sub.add_parser("backend-jobs", help="List local backend job queue.")
-    jobs.add_argument("--status", default=None)
-    jobs.add_argument("--limit", type=int, default=None)
-
-    backend_job_status = sub.add_parser("backend-job-status", help="Get one backend job status.")
-    backend_job_status.add_argument("--job-id", required=True)
-
-    retry_backend_job = sub.add_parser("retry-backend-job", help="Retry failed backend job.")
-    retry_backend_job.add_argument("--job-id", required=True)
-
-    resume_backend_jobs = sub.add_parser(
-        "resume-backend-jobs",
-        help="List resumable backend jobs (queued/processing) after app restart.",
-    )
-    resume_backend_jobs.add_argument("--limit", type=int, default=None)
-
-    sync_backend_result = sub.add_parser(
-        "sync-backend-result",
-        help="Materialize completed backend result into local document tables.",
-    )
-    sync_backend_result.add_argument("--job-id", required=True)
-    sync_backend_result.add_argument("--result-json", required=True)
 
     queue_missing = sub.add_parser("queue-missing-content", help="Queue missing corpus content sync request.")
     queue_missing.add_argument("--source-text", required=True)
@@ -147,28 +124,6 @@ def main() -> None:
             media_file_id=args.media_file_id,
         )
         _print_json(payload)
-        return
-
-    if args.cmd == "backend-jobs":
-        _print_json(media_service.list_backend_jobs(status=args.status, limit=args.limit))
-        return
-
-    if args.cmd == "backend-job-status":
-        _print_json(media_service.get_backend_job_status(job_id=args.job_id))
-        return
-
-    if args.cmd == "retry-backend-job":
-        _print_json(media_service.retry_backend_job(job_id=args.job_id))
-        return
-
-    if args.cmd == "resume-backend-jobs":
-        _print_json(media_service.resume_backend_jobs(limit=args.limit))
-        return
-
-    if args.cmd == "sync-backend-result":
-        with open(args.result_json, "r", encoding="utf-8") as f:
-            result = json.load(f)
-        _print_json(media_service.sync_backend_result(job_id=args.job_id, result=result))
         return
 
     if args.cmd == "queue-missing-content":

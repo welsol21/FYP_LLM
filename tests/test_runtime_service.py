@@ -34,9 +34,43 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             )
             ui_state = svc.get_ui_state()
             self.assertEqual(ui_state["runtime_mode"], "offline")
-            self.assertFalse(ui_state["features"]["backend_jobs"]["enabled"])
+            self.assertNotIn("backend_jobs", ui_state["features"])
 
-    def test_submit_media_backend_queue_and_feedback_payload(self):
+    def test_submit_media_local_processing_and_feedback_payload(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media_path = Path(tmpdir) / "short.txt"
+            media_path.write_text("She trusted him.", encoding="utf-8")
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            svc.repo.create_project("Project A", project_id="proj-1")
+            with patch.object(
+                svc,
+                "_request_sentence_contract",
+                return_value={
+                    "sentence_text": "She trusted him.",
+                    "sentence_hash": "h1",
+                    "sentence_node": {
+                        "type": "Sentence",
+                        "content": "She trusted him.",
+                        "node_id": "n1",
+                        "linguistic_elements": [],
+                    },
+                },
+            ):
+                response = svc.submit_media(
+                    media_path=str(media_path),
+                    duration_seconds=60,
+                    size_bytes=1024,
+                    project_id="proj-1",
+                )
+            self.assertEqual(response["result"]["route"], "local")
+            self.assertEqual(response["ui_feedback"]["severity"], "info")
+            self.assertEqual(response["result"]["status"], "completed_local")
+
+    def test_submit_media_reject_returns_error_feedback(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             svc = RuntimeMediaService(
                 db_path=Path(tmpdir) / "client.sqlite3",
@@ -49,49 +83,9 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                 duration_seconds=1800,
                 size_bytes=300 * 1024 * 1024,
                 project_id="proj-1",
-                media_file_id="file-1",
-            )
-            self.assertEqual(response["result"]["route"], "backend")
-            self.assertEqual(response["ui_feedback"]["severity"], "warning")
-            jobs = svc.list_backend_jobs(status="queued")
-            self.assertEqual(len(jobs), 1)
-            polled = svc.get_backend_job_status(job_id=jobs[0]["id"])
-            self.assertEqual(polled["status"], "queued")
-
-    def test_submit_media_small_file_goes_backend_when_backend_only_enrichment_enabled(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.dict("os.environ", {"ELA_MEDIA_ENRICHMENT_BACKEND_ONLY": "1"}, clear=False):
-                svc = RuntimeMediaService(
-                    db_path=Path(tmpdir) / "client.sqlite3",
-                    runtime_mode="online",
-                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
-                )
-            svc.repo.create_project("Project A", project_id="proj-1")
-            response = svc.submit_media(
-                media_path="/tmp/short.mp3",
-                duration_seconds=120,
-                size_bytes=5 * 1024 * 1024,
-                project_id="proj-1",
-                media_file_id="file-1",
-            )
-            self.assertEqual(response["result"]["route"], "backend")
-            self.assertEqual(response["result"]["status"], "queued_backend")
-
-    def test_submit_media_reject_returns_error_feedback(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            svc = RuntimeMediaService(
-                db_path=Path(tmpdir) / "client.sqlite3",
-                runtime_mode="offline",
-                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
-            )
-            response = svc.submit_media(
-                media_path="/tmp/long.mp4",
-                duration_seconds=1800,
-                size_bytes=300 * 1024 * 1024,
             )
             self.assertEqual(response["result"]["route"], "reject")
             self.assertEqual(response["ui_feedback"]["severity"], "error")
-            self.assertEqual(svc.list_backend_jobs(), [])
 
     def test_submit_media_rejects_without_selected_project(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -237,129 +231,17 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                 document_id="doc-1",
                 links=[{"sentence_idx": 0, "sentence_hash": h0}],
             )
-            svc.repo.enqueue_backend_job(
-                job_id="job-1",
-                project_id="proj-1",
-                media_file_id="file-1",
-                request_payload={"media_path": "/tmp/lesson.mp3"},
-            )
-            svc.repo.update_backend_job_status("job-1", "processing")
-
             status = svc.get_document_processing_status(document_id="doc-1")
             self.assertEqual(status["document_id"], "doc-1")
             self.assertEqual(status["status"], "processing")
             self.assertEqual(status["media_sentences_count"], 1)
             self.assertEqual(status["contract_sentences_count"], 1)
             self.assertEqual(status["linked_sentences_count"], 1)
-            self.assertIsNotNone(status["latest_backend_job"])
-            self.assertEqual(status["latest_backend_job"]["job_id"], "job-1")
+            self.assertIsNone(status["latest_backend_job"])
 
             missing = svc.get_document_processing_status(document_id="missing-doc")
             self.assertEqual(missing["document_id"], "missing-doc")
             self.assertEqual(missing["status"], "not_found")
-
-    def test_retry_and_resume_backend_jobs(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            svc = RuntimeMediaService(
-                db_path=Path(tmpdir) / "client.sqlite3",
-                runtime_mode="online",
-                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
-            )
-            job = svc.repo.enqueue_backend_job(
-                job_id="job-1",
-                project_id="proj-1",
-                media_file_id="file-1",
-                request_payload={"media_path": "/tmp/long.mp4"},
-            )
-            self.assertEqual(job["status"], "queued")
-
-            resumed = svc.resume_backend_jobs()
-            self.assertEqual(resumed["resumed_count"], 1)
-            self.assertEqual(resumed["jobs"][0]["job_id"], "job-1")
-
-            svc.repo.update_backend_job_status("job-1", "failed")
-            retry = svc.retry_backend_job(job_id="job-1")
-            self.assertEqual(retry["status"], "queued")
-
-            svc.repo.update_backend_job_status("job-1", "processing")
-            retry_blocked = svc.retry_backend_job(job_id="job-1")
-            self.assertEqual(retry_blocked["status"], "processing")
-
-    def test_sync_backend_result_materializes_document_tables(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            svc = RuntimeMediaService(
-                db_path=Path(tmpdir) / "client.sqlite3",
-                runtime_mode="online",
-                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
-            )
-            svc.repo.create_project("Project A", project_id="proj-1")
-            svc.repo.create_media_file(
-                project_id="proj-1",
-                media_file_id="file-1",
-                name="lesson.mp3",
-                path="/tmp/lesson.mp3",
-            )
-            svc.repo.enqueue_backend_job(
-                job_id="job-1",
-                project_id="proj-1",
-                media_file_id="file-1",
-                request_payload={"media_path": "/tmp/lesson.mp3"},
-            )
-            backend_result = {
-                "document": {
-                    "id": "doc-1",
-                    "project_id": "proj-1",
-                    "media_file_id": "file-1",
-                    "source_type": "audio",
-                    "source_path": "/tmp/lesson.mp3",
-                    "media_hash": "mh-1",
-                    "full_text": "She trusted him. Before making the decision.",
-                    "text_hash": "th-1",
-                    "text_version": 1,
-                },
-                "media_sentences": [
-                    {"sentence_idx": 0, "sentence_text": "She trusted him.", "start_ms": 100, "end_ms": 800},
-                    {"sentence_idx": 1, "sentence_text": "Before making the decision.", "start_ms": 801, "end_ms": 1400},
-                ],
-                "contract_sentences": [
-                    {
-                        "sentence_idx": 0,
-                        "sentence_node": {
-                            "type": "Sentence",
-                            "node_id": "s1",
-                            "content": "She trusted him.",
-                            "linguistic_elements": [],
-                        },
-                    },
-                    {
-                        "sentence_idx": 1,
-                        "sentence_node": {
-                            "type": "Sentence",
-                            "node_id": "s2",
-                            "content": "Before making the decision.",
-                            "linguistic_elements": [],
-                        },
-                    },
-                ],
-            }
-
-            synced = svc.sync_backend_result(job_id="job-1", result=backend_result)
-            self.assertEqual(synced["status"], "completed")
-            self.assertEqual(synced["document_id"], "doc-1")
-            self.assertEqual(synced["media_sentences_count"], 2)
-            self.assertEqual(synced["contract_sentences_count"], 2)
-            self.assertEqual(synced["linked_sentences_count"], 2)
-
-            doc_status = svc.get_document_processing_status(document_id="doc-1")
-            self.assertEqual(doc_status["status"], "completed")
-            self.assertEqual(doc_status["media_sentences_count"], 2)
-            self.assertEqual(doc_status["contract_sentences_count"], 2)
-            self.assertEqual(doc_status["latest_backend_job"]["status"], "completed")
-
-            payload = svc.get_visualizer_payload(document_id="doc-1")
-            self.assertEqual(len(payload), 2)
-            self.assertIn("She trusted him.", payload)
-            self.assertIn("Before making the decision.", payload)
 
     def test_build_sentence_contract_payload(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -378,6 +260,54 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertEqual(node["type"], "Sentence")
             self.assertIsInstance(node.get("linguistic_notes"), list)
             self.assertIn("translation", node)
+
+    def test_request_sentence_contract_uses_backend_endpoint_when_configured(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict("os.environ", {"ELA_SENTENCE_CONTRACT_BACKEND_URL": "http://backend.local"}, clear=False):
+                svc = RuntimeMediaService(
+                    db_path=Path(tmpdir) / "client.sqlite3",
+                    runtime_mode="online",
+                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+                )
+
+            class _Resp:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, exc_type, exc, tb):
+                    return False
+
+                def read(self):
+                    return b'{"sentence_text":"She trusted him.","sentence_hash":"h1","sentence_node":{"type":"Sentence","content":"She trusted him.","node_id":"n1","linguistic_elements":[]}}'
+
+            with patch("ela_pipeline.runtime.service.urlrequest.urlopen", return_value=_Resp()) as mocked:
+                payload = svc._request_sentence_contract(sentence_text="She trusted him.", sentence_idx=0)
+            self.assertEqual(payload["sentence_hash"], "h1")
+            called_req = mocked.call_args.args[0]
+            self.assertIn("/api/sentence-contract", called_req.full_url)
+
+    def test_request_sentence_contract_raises_when_backend_unavailable(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict("os.environ", {"ELA_SENTENCE_CONTRACT_BACKEND_URL": "http://backend.local"}, clear=False):
+                svc = RuntimeMediaService(
+                    db_path=Path(tmpdir) / "client.sqlite3",
+                    runtime_mode="online",
+                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+                )
+            with patch("ela_pipeline.runtime.service.urlrequest.urlopen", side_effect=OSError("offline")):
+                with self.assertRaisesRegex(RuntimeError, "Backend sentence-contract API unavailable"):
+                    svc._request_sentence_contract(sentence_text="She trusted him.", sentence_idx=0)
+
+    def test_request_sentence_contract_raises_when_backend_url_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.dict("os.environ", {"ELA_SENTENCE_CONTRACT_BACKEND_URL": ""}, clear=False):
+                svc = RuntimeMediaService(
+                    db_path=Path(tmpdir) / "client.sqlite3",
+                    runtime_mode="online",
+                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+                )
+            with self.assertRaisesRegex(RuntimeError, "ELA_SENTENCE_CONTRACT_BACKEND_URL is required"):
+                svc._request_sentence_contract(sentence_text="She trusted him.", sentence_idx=0)
 
 
 if __name__ == "__main__":

@@ -56,7 +56,7 @@ class RuntimeCapabilitiesTests(unittest.TestCase):
             ),
         )
 
-    def test_online_allows_all_features(self):
+    def test_online_blocks_backend_job_feature(self):
         with patch.dict("os.environ", {"ELA_PHONETIC_POLICY": "enabled"}, clear=False):
             caps = build_runtime_capabilities("online", deployment_mode="backend")
         validate_runtime_feature_request(
@@ -64,9 +64,18 @@ class RuntimeCapabilitiesTests(unittest.TestCase):
             RuntimeFeatureRequest(
                 enable_phonetic=True,
                 enable_db_persistence=True,
-                enable_backend_job=True,
+                enable_backend_job=False,
             ),
         )
+        with self.assertRaisesRegex(RuntimeError, "backend async jobs"):
+            validate_runtime_feature_request(
+                caps,
+                RuntimeFeatureRequest(
+                    enable_phonetic=True,
+                    enable_db_persistence=True,
+                    enable_backend_job=True,
+                ),
+            )
 
     def test_backend_only_policy_disables_phonetic_in_local_deployment(self):
         with patch.dict("os.environ", {"ELA_PHONETIC_POLICY": "backend_only"}, clear=False):

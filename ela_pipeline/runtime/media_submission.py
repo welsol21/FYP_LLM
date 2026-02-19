@@ -38,19 +38,6 @@ def submit_media_for_processing(
             "message": plan.message,
             "job_id": None,
         }
-    if plan.action == "enqueue_backend":
-        payload = plan.backend_job_payload or {}
-        job = repo.enqueue_backend_job(
-            request_payload=payload,
-            project_id=project_id,
-            media_file_id=media_file_id,
-        )
-        return {
-            "route": "backend",
-            "status": "queued_backend",
-            "message": plan.message,
-            "job_id": job["id"],
-        }
     return {
         "route": "reject",
         "status": "rejected",

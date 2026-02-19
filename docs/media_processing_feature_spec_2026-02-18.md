@@ -1,4 +1,4 @@
-# Media Processing Feature Spec (Backend + Frontend)
+# Media Processing Feature Spec (Client-first + Contract Backend)
 
 Date: 2026-02-18
 Status: Draft for implementation
@@ -19,15 +19,17 @@ The system must:
 ## 2. Scope
 In scope:
 - media ingestion flow
-- backend routing (local/backend/reject)
+- client-side routing (local/reject)
 - extraction stage outputs and local persistence
 - mapping from media sentence stream to main contract sentences
 - frontend flows for file upload, processing status, and visualizer entry
+- backend sentence-contract endpoint usage per sentence
 
 Out of scope (this iteration):
 - model retraining changes
 - new translation provider research
 - cloud storage for user media
+- backend media job queue / backend media processing workers
 
 ## 3. Source Reuse Strategy
 Use existing proven pipeline logic from legacy assets (`temp/ela.zip`, `temp/DualingvoMachine.zip`) as adapters, not as direct runtime scripts.
@@ -57,22 +59,15 @@ Rule:
 - no legacy shape leaks to frontend visualizer components
 
 ### 4.2 Routing policy
-Use existing runtime policy modules:
+Use runtime policy modules:
 - local route for allowed duration/size
-- backend route for oversized but accepted media
-- reject for hard limit violations
+- reject for hard-limit violations
 
-### 4.3 Backend processing path (large media)
-For media above local limits but below backend hard limits, backend processing is mandatory:
-- enqueue backend job with `job_id`, `document_id`, `media_file_id`
-- upload media as temporary processing object (no permanent final-media storage)
-- run extraction pipeline on backend worker (`ingest -> extract -> normalize -> analyze`)
-- produce:
-  - media-contract sentence stream
-  - main linguistic contract sentence nodes
-- return result package to client sync endpoint
-- client persists returned payload in local SQLite (`documents`, `media_sentences`, `contract_sentences`, `sentence_link`)
-- backend temporary artifacts are deleted by TTL policy
+### 4.3 Backend role
+Backend is used only for sentence-level contract generation API calls:
+- client extracts/splits media locally
+- for each sentence, client requests backend sentence-contract API
+- client persists results locally (`documents`, `media_sentences`, `contract_sentences`, `sentence_link`)
 
 ## 5. Data Model
 
@@ -118,10 +113,9 @@ Hash-first mapping policy:
 - for repeated text, hash input includes deterministic disambiguator (for example `normalized_text + sentence_idx`)
 
 ### 5.2 Backend storage
-- temporary processing artifacts only (TTL cleanup)
-- no permanent user final media and no permanent full text by default
-- backend job metadata is allowed (`job_id`, status, timestamps, error code/message)
-- backend may keep temporary extracted text only for active job lifecycle and TTL window
+- no backend media artifact storage
+- no backend media job storage
+- backend handles stateless sentence-contract requests
 
 ## 6. Visualizer Navigation Contract
 
@@ -142,11 +136,7 @@ Add operations:
 - `get_document_processing_status(document_id)`
 - `get_visualizer_payload(document_id)`
 - `list_document_sentences(document_id)`
-- `enqueue_backend_media_job(...)`
-- `get_backend_job(job_id)`
-- `retry_backend_job(job_id)`
-- `resume_backend_job(job_id)`
-- `sync_backend_result(job_id)` (materialize backend result into local document tables)
+- `build_sentence_contract(sentence_text, sentence_idx)` (backend sentence API)
 
 ### 7.2 Frontend API
 Extend `RuntimeApi` with document-aware methods:
@@ -161,15 +151,9 @@ Files screen:
 - double tap/click on analyzed file opens visualizer for that file
 
 Analyze screen:
-- route decision feedback (`local/backend/reject`)
+- route decision feedback (`local/reject`)
 - stage progress (`ingest -> extract -> normalize -> analyze`)
-- backend queue status with retry/resume
-- backend path UX requirements:
-  - persistent `job_id` display for current file
-  - polling until terminal state (`completed|failed|rejected`)
-  - `Retry` action for failed jobs
-  - `Resume` action when app/session restarts and job is still active
-  - auto-sync local document once backend job completes
+- no backend jobs table/control in UI
 
 Visualizer screen:
 - receives only document-scoped payload
@@ -207,10 +191,7 @@ Phase 4: End-to-end checks
 - media extraction outputs are persisted locally and reusable
 - unified main contract remains the only curation/visualizer contract
 - tests pass for mapping, persistence, routing, and UI navigation
-- backend path is fully functional for oversized media:
-  - queued job visible in UI
-  - retry/resume works
-  - completed result is synced to local SQLite and openable in visualizer
+- backend sentence-contract API integration is functional and used by local media pipeline enrichment
 
 ## 11. Risks and Controls
 

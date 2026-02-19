@@ -35,6 +35,7 @@ services:
       ELA_RUNTIME_MODE: ${ELA_RUNTIME_MODE:-online}
       ELA_DEPLOYMENT_MODE: ${ELA_DEPLOYMENT_MODE:-local}
       ELA_RUNTIME_HTTP_PORT: 8000
+      ELA_SENTENCE_CONTRACT_BACKEND_URL: ${ELA_SENTENCE_CONTRACT_BACKEND_URL:-http://127.0.0.1:8000}
     volumes:
       - inference_results:/app/inference_results
       - artifacts_data:/app/artifacts

@@ -33,6 +33,33 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
             self.assertEqual(result.source_type, "audio")
             self.assertEqual(len(result.media_sentences), 2)
 
+    def test_pipeline_uses_external_sentence_contract_builder(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "sample.txt"
+            source.write_text("She trusted him. Before making the decision.", encoding="utf-8")
+
+            calls: list[tuple[str, int]] = []
+
+            def builder(*, sentence_text: str, sentence_idx: int):
+                calls.append((sentence_text, sentence_idx))
+                return {
+                    "sentence_text": sentence_text,
+                    "sentence_hash": f"h-{sentence_idx}",
+                    "sentence_node": {
+                        "type": "Sentence",
+                        "node_id": f"n-{sentence_idx}",
+                        "content": sentence_text,
+                        "linguistic_elements": [],
+                    },
+                }
+
+            result = run_media_pipeline(source_path=str(source), sentence_contract_builder=builder)
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(calls[0][0], "She trusted him.")
+            self.assertEqual(calls[1][1], 1)
+            self.assertEqual(result.contract_sentences[0]["sentence_hash"], "h-0")
+            self.assertEqual(result.contract_sentences[1]["sentence_node"]["node_id"], "n-1")
+
 
 if __name__ == "__main__":
     unittest.main()

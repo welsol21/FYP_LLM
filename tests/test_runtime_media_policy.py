@@ -38,7 +38,7 @@ class RuntimeMediaPolicyTests(unittest.TestCase):
         self.assertIn("duration=", decision.reason)
         self.assertIn("size=", decision.reason)
 
-    def test_backend_route_when_exceeds_local_duration_but_backend_available(self):
+    def test_reject_when_exceeds_local_limits(self):
         limits = MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048)
         caps = build_runtime_capabilities("online")
         decision = decide_media_route(
@@ -47,9 +47,10 @@ class RuntimeMediaPolicyTests(unittest.TestCase):
             limits=limits,
             runtime_caps=caps,
         )
-        self.assertEqual(decision.route, "backend")
+        self.assertEqual(decision.route, "reject")
+        self.assertIn("exceeds local processing limits", decision.reason)
 
-    def test_backend_route_when_enrichment_is_backend_only(self):
+    def test_backend_enrichment_flag_is_ignored_and_keeps_local_route(self):
         limits = MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048)
         caps = build_runtime_capabilities("online")
         decision = decide_media_route(
@@ -59,36 +60,21 @@ class RuntimeMediaPolicyTests(unittest.TestCase):
             runtime_caps=caps,
             prefer_backend_for_enrichment=True,
         )
-        self.assertEqual(decision.route, "backend")
-        self.assertIn("backend-only enrichment policy", decision.reason)
+        self.assertEqual(decision.route, "local")
 
-    def test_reject_when_backend_size_limit_exceeded(self):
+    def test_reject_when_size_limit_exceeded(self):
         limits = MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048)
         caps = build_runtime_capabilities("online")
         decision = decide_media_route(
             duration_seconds=10 * 60,
-            size_bytes=(2048 + 1) * 1024 * 1024,
+            size_bytes=(250 + 1) * 1024 * 1024,
             limits=limits,
             runtime_caps=caps,
         )
         self.assertEqual(decision.route, "reject")
-        self.assertIn("exceeds backend hard size limit", decision.reason)
+        self.assertIn("exceeds local processing limits", decision.reason)
         self.assertIn("limit_local=15m", decision.reason)
-        self.assertIn("limit_backend=2048MB", decision.reason)
-
-    def test_reject_when_backend_needed_but_offline_mode(self):
-        limits = MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048)
-        caps = build_runtime_capabilities("offline")
-        decision = decide_media_route(
-            duration_seconds=16 * 60,
-            size_bytes=300 * 1024 * 1024,
-            limits=limits,
-            runtime_caps=caps,
-        )
-        self.assertEqual(decision.route, "reject")
-        self.assertIn("offline mode", decision.reason)
-        self.assertIn("duration=", decision.reason)
-        self.assertIn("size=", decision.reason)
+        self.assertIn("limit_local=250MB", decision.reason)
 
 
 if __name__ == "__main__":

@@ -18,8 +18,8 @@ describe('AnalyzePage', () => {
                   mediaFileId: 'file-1',
                   fileName: 'sample.mp4',
                   mediaPath: '/uploads/sample.mp4',
-                  sizeBytes: 314572800,
-                  durationSec: 1800,
+                  sizeBytes: 104857600,
+                  durationSec: 600,
                 },
               },
             },
@@ -37,7 +37,7 @@ describe('AnalyzePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start pipeline' }))
 
     await waitFor(() => {
-      expect(screen.getByText(/Queued for backend processing/i)).toBeInTheDocument()
+      expect(screen.getByText(/File accepted for local processing/i)).toBeInTheDocument()
     })
   })
 })

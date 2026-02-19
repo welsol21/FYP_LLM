@@ -29,7 +29,7 @@ class MediaPolicyLimits:
 
 @dataclass(frozen=True)
 class MediaRoutingDecision:
-    route: str  # local | backend | reject
+    route: str  # local | reject
     reason: str
 
 
@@ -57,8 +57,7 @@ def _fmt_metrics(duration_seconds: int, size_bytes: int, limits: MediaPolicyLimi
     size_mb = size_bytes / (1024 * 1024)
     return (
         f"duration={duration_min:.2f}m (limit_local={limits.max_duration_min}m), "
-        f"size={size_mb:.2f}MB (limit_local={limits.max_size_local_mb}MB, "
-        f"limit_backend={limits.max_size_backend_mb}MB)"
+        f"size={size_mb:.2f}MB (limit_local={limits.max_size_local_mb}MB)"
     )
 
 
@@ -77,31 +76,13 @@ def decide_media_route(
 
     metrics = _fmt_metrics(duration_seconds, size_bytes, limits)
 
-    if size_bytes > limits.max_size_backend_bytes:
-        return MediaRoutingDecision(
-            route="reject",
-            reason=f"Media rejected: exceeds backend hard size limit; {metrics}",
-        )
-
     local_ok = duration_seconds <= limits.max_duration_seconds and size_bytes <= limits.max_size_local_bytes
     if local_ok:
-        if prefer_backend_for_enrichment and runtime_caps.backend_jobs_enabled:
-            return MediaRoutingDecision(
-                route="backend",
-                reason=f"Media routed to backend async processing (backend-only enrichment policy); {metrics}",
-            )
         return MediaRoutingDecision(
             route="local",
             reason=f"Media accepted for local processing; {metrics}",
         )
-
-    if not runtime_caps.backend_jobs_enabled:
-        return MediaRoutingDecision(
-            route="reject",
-            reason=f"Media requires backend route but backend jobs are disabled in offline mode; {metrics}",
-        )
-
     return MediaRoutingDecision(
-        route="backend",
-        reason=f"Media routed to backend async processing; {metrics}",
+        route="reject",
+        reason=f"Media rejected: exceeds local processing limits; {metrics}",
     )

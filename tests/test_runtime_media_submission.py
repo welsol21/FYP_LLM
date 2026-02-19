@@ -29,7 +29,7 @@ class RuntimeMediaSubmissionTests(unittest.TestCase):
             self.assertEqual(result["status"], "accepted_local")
             self.assertIsNone(result["job_id"])
 
-    def test_backend_submission_creates_queued_job(self):
+    def test_large_submission_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = LocalSQLiteRepository(Path(tmpdir) / "client.sqlite3")
             result = submit_media_for_processing(
@@ -42,15 +42,11 @@ class RuntimeMediaSubmissionTests(unittest.TestCase):
                 project_id="proj-1",
                 media_file_id="file-1",
             )
-            self.assertEqual(result["route"], "backend")
-            self.assertEqual(result["status"], "queued_backend")
-            self.assertIsNotNone(result["job_id"])
+            self.assertEqual(result["route"], "reject")
+            self.assertEqual(result["status"], "rejected")
+            self.assertIsNone(result["job_id"])
 
-            queued = repo.list_backend_jobs(status="queued")
-            self.assertEqual(len(queued), 1)
-            self.assertEqual(queued[0]["id"], result["job_id"])
-
-    def test_offline_submission_rejects_backend_needed_media(self):
+    def test_offline_submission_rejects_oversized_media(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = LocalSQLiteRepository(Path(tmpdir) / "client.sqlite3")
             result = submit_media_for_processing(
@@ -63,7 +59,7 @@ class RuntimeMediaSubmissionTests(unittest.TestCase):
             )
             self.assertEqual(result["route"], "reject")
             self.assertEqual(result["status"], "rejected")
-            self.assertIn("offline mode", result["message"])
+            self.assertIn("local processing limits", result["message"])
             self.assertEqual(repo.list_backend_jobs(), [])
 
 

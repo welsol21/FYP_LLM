@@ -12,7 +12,6 @@ describe('RuntimeStatusCard', () => {
           badges: {
             mode: 'Mode: offline',
             deployment: 'Deployment: distributed',
-            backend_jobs: 'Backend jobs: off',
             phonetic: 'Phonetic: off',
           },
           features: {
@@ -23,10 +22,6 @@ describe('RuntimeStatusCard', () => {
             db_persistence: {
               enabled: false,
               reason_if_disabled: 'Unavailable in offline mode (requires backend connectivity).',
-            },
-            backend_jobs: {
-              enabled: false,
-              reason_if_disabled: 'Unavailable in offline mode (backend async processing is disabled).',
             },
           },
         }}

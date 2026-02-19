@@ -69,16 +69,6 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
         if path == "/api/selected-project":
             self._send_json(SERVICE.get_selected_project())
             return
-        if path == "/api/backend-jobs":
-            self._send_json(SERVICE.list_backend_jobs())
-            return
-        if path == "/api/backend-job-status":
-            job_id = (query.get("job_id") or [""])[0]
-            if not job_id:
-                self._send_json({"error": "job_id is required"}, status=400)
-                return
-            self._send_json(SERVICE.get_backend_job_status(job_id=job_id))
-            return
         if path == "/api/files":
             project_id = (query.get("project_id") or [None])[0]
             self._send_json(SERVICE.list_files(project_id=project_id))
@@ -198,26 +188,6 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": "project not found"}, status=404)
                 return
             self._send_json(created)
-            return
-
-        if path == "/api/retry-backend-job":
-            job_id = str(body.get("jobId") or body.get("job_id") or "")
-            if not job_id:
-                self._send_json({"error": "jobId is required"}, status=400)
-                return
-            self._send_json(SERVICE.retry_backend_job(job_id=job_id))
-            return
-
-        if path == "/api/resume-backend-jobs":
-            self._send_json(SERVICE.resume_backend_jobs())
-            return
-
-        if path == "/api/sync-backend-result":
-            job_id = str(body.get("jobId") or body.get("job_id") or "")
-            if not job_id:
-                self._send_json({"error": "jobId is required"}, status=400)
-                return
-            self._send_json(SERVICE.sync_backend_result_auto(job_id=job_id))
             return
 
         if path == "/api/apply-edit":

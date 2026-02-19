@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import hashlib
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from ela_pipeline.client_storage import build_sentence_hash
 from ela_pipeline.cefr import RuleBasedCEFRPredictor
@@ -197,7 +197,12 @@ def _enrich_analyzed_contract(analyzed: dict[str, Any]) -> None:
         pass
 
 
-def run_media_pipeline(*, source_path: str, spacy_model: str = "en_core_web_sm") -> MediaPipelineResult:
+def run_media_pipeline(
+    *,
+    source_path: str,
+    spacy_model: str = "en_core_web_sm",
+    sentence_contract_builder: Callable[..., dict[str, Any]] | None = None,
+) -> MediaPipelineResult:
     path = Path(source_path)
     if not path.exists():
         raise FileNotFoundError(f"Media source not found: {source_path}")
@@ -214,11 +219,17 @@ def run_media_pipeline(*, source_path: str, spacy_model: str = "en_core_web_sm")
     media_sentences: list[dict[str, Any]] = []
     contract_sentences: list[dict[str, Any]] = []
     for idx, sentence_text in enumerate(sentence_stream):
-        sentence_payload = _build_sentence_contract_with_nlp(
-            sentence_text=sentence_text,
-            sentence_idx=idx,
-            nlp=nlp,
-        )
+        if sentence_contract_builder is None:
+            sentence_payload = _build_sentence_contract_with_nlp(
+                sentence_text=sentence_text,
+                sentence_idx=idx,
+                nlp=nlp,
+            )
+        else:
+            sentence_payload = sentence_contract_builder(
+                sentence_text=sentence_text,
+                sentence_idx=idx,
+            )
         sentence_node = sentence_payload["sentence_node"]
         sent_hash = sentence_payload["sentence_hash"]
         media_sentences.append(

@@ -74,9 +74,11 @@ class RuntimeClientAPITests(unittest.TestCase):
             payload = json.loads(buf.getvalue())
             self.assertEqual(payload["runtime_mode"], "offline")
 
-    def test_submit_media_and_list_backend_jobs(self):
+    def test_submit_media_local_processing(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "client.sqlite3"
+            media_path = Path(tmpdir) / "short.txt"
+            media_path.write_text("She trusted him.", encoding="utf-8")
             submit_argv = [
                 "client_api",
                 "--db-path",
@@ -85,83 +87,34 @@ class RuntimeClientAPITests(unittest.TestCase):
                 "online",
                 "submit-media",
                 "--media-path",
-                "/tmp/long.mp4",
+                str(media_path),
                 "--duration-sec",
-                "1800",
+                "60",
                 "--size-bytes",
-                str(300 * 1024 * 1024),
+                "1024",
                 "--project-id",
                 "proj-1",
             ]
             repo = LocalSQLiteRepository(db_path)
             repo.create_project("Project A", project_id="proj-1")
-            with patch("sys.argv", submit_argv):
-                buf = io.StringIO()
-                with redirect_stdout(buf):
-                    client_api.main()
+            class _Resp:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, exc_type, exc, tb):
+                    return False
+
+                def read(self):
+                    return b'{"sentence_text":"She trusted him.","sentence_hash":"h1","sentence_node":{"type":"Sentence","content":"She trusted him.","node_id":"n1","linguistic_elements":[]}}'
+
+            with patch.dict("os.environ", {"ELA_SENTENCE_CONTRACT_BACKEND_URL": "http://backend.local"}, clear=False):
+                with patch("ela_pipeline.runtime.service.urlrequest.urlopen", return_value=_Resp()):
+                    with patch("sys.argv", submit_argv):
+                        buf = io.StringIO()
+                        with redirect_stdout(buf):
+                            client_api.main()
             submit_payload = json.loads(buf.getvalue())
-            self.assertEqual(submit_payload["result"]["route"], "backend")
-
-            list_argv = [
-                "client_api",
-                "--db-path",
-                str(db_path),
-                "backend-jobs",
-            ]
-            with patch("sys.argv", list_argv):
-                buf2 = io.StringIO()
-                with redirect_stdout(buf2):
-                    client_api.main()
-            jobs_payload = json.loads(buf2.getvalue())
-            self.assertEqual(len(jobs_payload), 1)
-            job_id = jobs_payload[0]["id"]
-
-            status_argv = [
-                "client_api",
-                "--db-path",
-                str(db_path),
-                "backend-job-status",
-                "--job-id",
-                job_id,
-            ]
-            with patch("sys.argv", status_argv):
-                buf3 = io.StringIO()
-                with redirect_stdout(buf3):
-                    client_api.main()
-            status_payload = json.loads(buf3.getvalue())
-            self.assertEqual(status_payload["job_id"], job_id)
-            self.assertEqual(status_payload["status"], "queued")
-
-            resume_argv = [
-                "client_api",
-                "--db-path",
-                str(db_path),
-                "resume-backend-jobs",
-            ]
-            with patch("sys.argv", resume_argv):
-                buf4 = io.StringIO()
-                with redirect_stdout(buf4):
-                    client_api.main()
-            resume_payload = json.loads(buf4.getvalue())
-            self.assertEqual(resume_payload["resumed_count"], 1)
-            self.assertEqual(resume_payload["jobs"][0]["job_id"], job_id)
-
-            repo = LocalSQLiteRepository(db_path)
-            repo.update_backend_job_status(job_id, "failed")
-            retry_argv = [
-                "client_api",
-                "--db-path",
-                str(db_path),
-                "retry-backend-job",
-                "--job-id",
-                job_id,
-            ]
-            with patch("sys.argv", retry_argv):
-                buf5 = io.StringIO()
-                with redirect_stdout(buf5):
-                    client_api.main()
-            retry_payload = json.loads(buf5.getvalue())
-            self.assertEqual(retry_payload["status"], "queued")
+            self.assertEqual(submit_payload["result"]["route"], "local")
 
     def test_visualizer_payload_and_apply_edit_commands(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -323,88 +276,6 @@ class RuntimeClientAPITests(unittest.TestCase):
             self.assertEqual(status["status"], "completed")
             self.assertEqual(status["media_sentences_count"], 1)
             self.assertEqual(status["contract_sentences_count"], 1)
-
-    def test_sync_backend_result_command(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "client.sqlite3"
-            repo = LocalSQLiteRepository(db_path)
-            repo.create_project("Project A", project_id="proj-1")
-            repo.create_media_file(
-                project_id="proj-1",
-                media_file_id="file-1",
-                name="lesson.mp3",
-                path="/tmp/lesson.mp3",
-            )
-            repo.enqueue_backend_job(
-                job_id="job-1",
-                project_id="proj-1",
-                media_file_id="file-1",
-                request_payload={"media_path": "/tmp/lesson.mp3"},
-            )
-            result_json = Path(tmpdir) / "backend_result.json"
-            result_json.write_text(
-                json.dumps(
-                    {
-                        "document": {
-                            "id": "doc-1",
-                            "project_id": "proj-1",
-                            "media_file_id": "file-1",
-                            "source_type": "audio",
-                            "source_path": "/tmp/lesson.mp3",
-                            "media_hash": "mh-1",
-                            "full_text": "She trusted him.",
-                            "text_hash": "th-1",
-                            "text_version": 1,
-                        },
-                        "media_sentences": [{"sentence_idx": 0, "sentence_text": "She trusted him."}],
-                        "contract_sentences": [
-                            {
-                                "sentence_idx": 0,
-                                "sentence_node": {
-                                    "type": "Sentence",
-                                    "node_id": "s1",
-                                    "content": "She trusted him.",
-                                    "linguistic_elements": [],
-                                },
-                            }
-                        ],
-                    }
-                ),
-                encoding="utf-8",
-            )
-
-            sync_argv = [
-                "client_api",
-                "--db-path",
-                str(db_path),
-                "sync-backend-result",
-                "--job-id",
-                "job-1",
-                "--result-json",
-                str(result_json),
-            ]
-            with patch("sys.argv", sync_argv):
-                buf = io.StringIO()
-                with redirect_stdout(buf):
-                    client_api.main()
-            synced = json.loads(buf.getvalue())
-            self.assertEqual(synced["status"], "completed")
-            self.assertEqual(synced["document_id"], "doc-1")
-
-            status_argv = [
-                "client_api",
-                "--db-path",
-                str(db_path),
-                "document-processing-status",
-                "--document-id",
-                "doc-1",
-            ]
-            with patch("sys.argv", status_argv):
-                buf2 = io.StringIO()
-                with redirect_stdout(buf2):
-                    client_api.main()
-            status = json.loads(buf2.getvalue())
-            self.assertEqual(status["status"], "completed")
 
     def test_sentence_contract_command(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -1,9 +1,5 @@
 import samplePayload from './frontend_contract_sample.json'
 import type {
-  BackendJob,
-  BackendJobStatus,
-  BackendResumePayload,
-  BackendSyncPayload,
   MediaFileRow,
   MediaSubmissionPayload,
   ProjectRow,
@@ -118,10 +114,6 @@ export class MockRuntimeApi implements RuntimeApi {
     },
   ]
   private selectedProjectId: string | null = 'proj-1'
-  private jobs: BackendJob[] = []
-  private jobPollCount: Record<string, number> = {}
-  private jobFileId: Record<string, string> = {}
-  private jobDocumentId: Record<string, string> = {}
   private fileProjectId: Record<string, string> = {
     'file-1': 'proj-1',
     'file-2': 'proj-1',
@@ -160,13 +152,11 @@ export class MockRuntimeApi implements RuntimeApi {
       badges: {
         mode: 'Mode: online',
         deployment: 'Deployment: local',
-        backend_jobs: 'Backend jobs: on',
         phonetic: 'Phonetic: on',
       },
       features: {
         phonetic: { enabled: true, reason_if_disabled: '' },
         db_persistence: { enabled: true, reason_if_disabled: '' },
-        backend_jobs: { enabled: true, reason_if_disabled: '' },
       },
     }
   }
@@ -271,7 +261,7 @@ export class MockRuntimeApi implements RuntimeApi {
         document_id: docId,
       })
       return {
-        result: { route: 'local', message: 'File accepted for local processing.' },
+        result: { route: 'local', message: 'File accepted for local processing.', status: 'completed_local', document_id: docId },
         ui_feedback: {
           severity: 'info',
           title: 'Local processing started',
@@ -279,104 +269,13 @@ export class MockRuntimeApi implements RuntimeApi {
         },
       }
     }
-    if (input.sizeBytes <= 2048 * 1024 * 1024) {
-      const fileId = `file-${this.files.length + 1}`
-      this.fileProjectId[fileId] = input.projectId
-      const job: BackendJob = {
-        id: `job-${this.jobs.length + 1}`,
-        project_id: input.projectId,
-        status: 'queued',
-        media_path: input.mediaPath,
-        duration_seconds: input.durationSec,
-        size_bytes: input.sizeBytes,
-      }
-      this.jobPollCount[job.id] = 0
-      this.jobFileId[job.id] = fileId
-      this.jobs.unshift(job)
-      this.files.unshift({
-        id: fileId,
-        name: mediaName,
-        path: input.mediaPath,
-        size_bytes: input.sizeBytes,
-        duration_seconds: input.durationSec,
-        settings: 'HF / Backend',
-        updated: 'Feb 18, 2026',
-        analyzed: false,
-      })
-      return {
-        result: { route: 'backend', message: 'Queued for backend processing.', job_id: job.id },
-        ui_feedback: {
-          severity: 'warning',
-          title: 'Queued for backend processing',
-          message: `Queued for backend processing. Job ID: ${job.id}`,
-        },
-      }
-    }
     return {
-      result: { route: 'reject', message: 'File exceeds backend size limit.' },
+      result: { route: 'reject', message: 'File exceeds local processing limits.' },
       ui_feedback: {
         severity: 'error',
         title: 'File rejected by media policy',
-        message: 'File exceeds backend size limit.',
+        message: 'File exceeds local processing limits.',
       },
-    }
-  }
-
-  async listBackendJobs(): Promise<BackendJob[]> {
-    return this.jobs
-  }
-
-  async getBackendJobStatus(jobId: string): Promise<BackendJobStatus> {
-    const job = this.jobs.find((j) => j.id === jobId)
-    if (!job) return { job_id: jobId, status: 'not_found' }
-    const polls = (this.jobPollCount[jobId] || 0) + 1
-    this.jobPollCount[jobId] = polls
-    if (job.status === 'queued' && polls >= 1) job.status = 'processing'
-    if (job.status === 'processing' && polls >= 2) job.status = 'completed'
-    return { job_id: job.id, status: job.status }
-  }
-
-  async retryBackendJob(jobId: string): Promise<BackendSyncPayload> {
-    const job = this.jobs.find((j) => j.id === jobId)
-    if (!job) return { job_id: jobId, status: 'not_found', message: 'Job not found.' }
-    if (!['failed', 'error', 'canceled'].includes(job.status)) {
-      return { job_id: job.id, status: job.status, message: `Job is not retryable from status '${job.status}'.` }
-    }
-    job.status = 'queued'
-    this.jobPollCount[job.id] = 0
-    return { job_id: job.id, status: 'queued', message: 'Job moved to queued.' }
-  }
-
-  async resumeBackendJobs(): Promise<BackendResumePayload> {
-    const jobs = this.jobs
-      .filter((j) => ['queued', 'processing'].includes(j.status))
-      .map((j) => ({ job_id: j.id, status: j.status }))
-    return { resumed_count: jobs.length, jobs }
-  }
-
-  async syncBackendResult(jobId: string): Promise<BackendSyncPayload> {
-    const job = this.jobs.find((j) => j.id === jobId)
-    if (!job) return { job_id: jobId, status: 'not_found', message: 'Job not found.' }
-    if (job.status !== 'completed') {
-      return { job_id: jobId, status: job.status, message: 'Job is not completed yet.' }
-    }
-    const docId = this.jobDocumentId[jobId] || `doc-${Object.keys(this.payloadByDocument).length + 1}`
-    this.jobDocumentId[jobId] = docId
-    if (!this.payloadByDocument[docId]) {
-      this.payloadByDocument[docId] = JSON.parse(JSON.stringify(samplePayload)) as VisualizerPayload
-    }
-    const fileId = this.jobFileId[jobId]
-    const file = this.files.find((f) => f.id === fileId)
-    if (file) {
-      file.analyzed = true
-      file.document_id = docId
-      file.updated = 'Feb 18, 2026'
-    }
-    return {
-      job_id: jobId,
-      status: 'completed',
-      document_id: docId,
-      message: 'Backend result synced to local document tables.',
     }
   }
 

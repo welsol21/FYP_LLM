@@ -1,13 +1,15 @@
-"""Frontend-ready runtime service: capabilities, media submit, backend queue access."""
+"""Frontend-ready runtime service: capabilities + local media processing."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-import hashlib
+import json
 import os
 from pathlib import Path
 import uuid
 from typing import Any
+from urllib import error as urlerror
+from urllib import request as urlrequest
 
 from ela_pipeline.client_storage import LocalSQLiteRepository, build_sentence_hash
 
@@ -34,11 +36,7 @@ class RuntimeMediaService:
         self.effective_deployment_mode = resolve_deployment_mode(self.deployment_mode)
         self.caps = build_runtime_capabilities(self.effective_mode, deployment_mode=self.effective_deployment_mode)
         self.limits = self.limits or load_media_policy_limits_from_env()
-        self.media_enrichment_backend_only = os.getenv("ELA_MEDIA_ENRICHMENT_BACKEND_ONLY", "1").strip() not in {
-            "0",
-            "false",
-            "False",
-        }
+        self.sentence_contract_backend_url = os.getenv("ELA_SENTENCE_CONTRACT_BACKEND_URL", "").strip()
 
     def get_ui_state(self) -> dict[str, Any]:
         return build_runtime_ui_state(self.caps)
@@ -144,7 +142,7 @@ class RuntimeMediaService:
             limits=self.limits,
             project_id=effective_project_id,
             media_file_id=media_file_id,
-            prefer_backend_for_enrichment=self.media_enrichment_backend_only,
+            prefer_backend_for_enrichment=False,
         )
         if raw.get("route") == "local":
             synced = self.process_media_now(
@@ -161,63 +159,6 @@ class RuntimeMediaService:
         return {
             "result": raw,
             "ui_feedback": build_submission_ui_feedback(raw),
-        }
-
-    def list_backend_jobs(self, *, status: str | None = None, limit: int | None = None) -> list[dict[str, Any]]:
-        return self.repo.list_backend_jobs(status=status, limit=limit)
-
-    def get_backend_job_status(self, *, job_id: str) -> dict[str, Any]:
-        row = self.repo.get_backend_job(job_id)
-        if row is None:
-            return {"job_id": job_id, "status": "not_found"}
-        if self.demo_auto_progress_jobs:
-            # Demo worker emulation: progress queued->processing->completed on status checks.
-            if row["status"] == "queued":
-                self.repo.update_backend_job_status(job_id, "processing")
-                row = self.repo.get_backend_job(job_id) or row
-            elif row["status"] == "processing":
-                self.repo.update_backend_job_status(job_id, "completed")
-                row = self.repo.get_backend_job(job_id) or row
-        return {
-            "job_id": row["id"],
-            "status": row["status"],
-            "updated_at": row["updated_at"],
-            "project_id": row["project_id"],
-            "media_file_id": row["media_file_id"],
-        }
-
-    def retry_backend_job(self, *, job_id: str) -> dict[str, Any]:
-        current = self.repo.get_backend_job(job_id)
-        if current is None:
-            return {"job_id": job_id, "status": "not_found", "message": "Job not found."}
-        if current["status"] not in {"failed", "error", "canceled"}:
-            return {
-                "job_id": job_id,
-                "status": current["status"],
-                "message": f"Job is not retryable from status '{current['status']}'.",
-            }
-        retried = self.repo.retry_backend_job(job_id)
-        assert retried is not None
-        return {
-            "job_id": job_id,
-            "status": retried["status"],
-            "message": "Job moved to queued.",
-        }
-
-    def resume_backend_jobs(self, *, limit: int | None = None) -> dict[str, Any]:
-        rows = self.repo.list_resumable_backend_jobs(limit=limit)
-        return {
-            "resumed_count": len(rows),
-            "jobs": [
-                {
-                    "job_id": row["id"],
-                    "status": row["status"],
-                    "updated_at": row["updated_at"],
-                    "project_id": row["project_id"],
-                    "media_file_id": row["media_file_id"],
-                }
-                for row in rows
-            ],
         }
 
     def list_document_sentences(self, *, document_id: str) -> list[dict[str, Any]]:
@@ -289,147 +230,26 @@ class RuntimeMediaService:
             sentence_idx=sentence_idx,
         )
 
-    def sync_backend_result(self, *, job_id: str, result: dict[str, Any]) -> dict[str, Any]:
-        job = self.repo.get_backend_job(job_id)
-        if job is None:
-            return {"job_id": job_id, "status": "not_found", "message": "Job not found."}
-
-        document_meta = (result.get("document") or {}) if isinstance(result, dict) else {}
-        document_id = (
-            result.get("document_id")
-            or document_meta.get("id")
-            or f"doc-{job_id}"
-        )
-        project_id = document_meta.get("project_id") or job.get("project_id")
-        media_file_id = document_meta.get("media_file_id") or job.get("media_file_id")
-        source_path = document_meta.get("source_path") or job.get("request_payload", {}).get("media_path") or ""
-        source_type = document_meta.get("source_type") or self._infer_source_type(source_path)
-        media_hash = document_meta.get("media_hash") or f"job:{job_id}"
-
-        existing_doc = self.repo.get_document(document_id)
-        if existing_doc is None:
-            if not project_id:
-                return {
-                    "job_id": job_id,
-                    "status": "error",
-                    "message": "Cannot create document without project_id.",
-                }
-            self.repo.create_document(
-                document_id=document_id,
-                project_id=project_id,
-                media_file_id=media_file_id,
-                source_type=source_type,
-                source_path=source_path,
-                media_hash=media_hash,
-                status="processing",
-            )
-
-        media_sentences = self._normalize_media_sentences(result.get("media_sentences") or [])
-        if not media_sentences:
-            return {
-                "job_id": job_id,
-                "status": "error",
-                "message": "Backend result has no media_sentences.",
-            }
-
-        full_text = (
-            result.get("full_text")
-            or document_meta.get("full_text")
-            or " ".join(row["sentence_text"] for row in media_sentences).strip()
-        )
-        text_hash = document_meta.get("text_hash") or hashlib.sha256(full_text.encode("utf-8")).hexdigest()
-        text_version = int(document_meta.get("text_version") or result.get("text_version") or 1)
-        self.repo.upsert_document_text(
-            document_id=document_id,
-            full_text=full_text,
-            text_hash=text_hash,
-            version=text_version,
-        )
-        self.repo.replace_media_sentences(document_id=document_id, sentences=media_sentences)
-
-        contract_rows = self._normalize_contract_sentences(
-            raw=result.get("contract_sentences"),
-            media_sentences=media_sentences,
-        )
-        for row in contract_rows:
-            self.repo.upsert_contract_sentence(
-                document_id=document_id,
-                sentence_hash=row["sentence_hash"],
-                sentence_node=row["sentence_node"],
-            )
-
-        links = self._normalize_sentence_links(
-            raw=result.get("sentence_links"),
-            media_sentences=media_sentences,
-        )
-        self.repo.replace_sentence_links(document_id=document_id, links=links)
-        self.repo.update_document_status(document_id, "completed")
-        self.repo.update_backend_job_status(job_id, "completed")
-
-        return {
-            "job_id": job_id,
-            "status": "completed",
-            "document_id": document_id,
-            "media_sentences_count": len(media_sentences),
-            "contract_sentences_count": len(contract_rows),
-            "linked_sentences_count": len(links),
-            "message": "Backend result synced to local document tables.",
-        }
-
-    def sync_backend_result_auto(self, *, job_id: str) -> dict[str, Any]:
-        job = self.repo.get_backend_job(job_id)
-        if job is None:
-            return {"job_id": job_id, "status": "not_found", "message": "Job not found."}
-        if job["status"] != "completed":
-            return {"job_id": job_id, "status": job["status"], "message": "Job is not completed yet."}
-        media_path = str(job.get("request_payload", {}).get("media_path") or "")
-        if not media_path:
-            return {"job_id": job_id, "status": "error", "message": "Missing media path in backend job payload."}
-        return self.process_media_now(
-            media_path=media_path,
-            project_id=job.get("project_id") or "proj-default",
-            media_file_id=job.get("media_file_id"),
-            job_id=job_id,
-        )
-
     def process_media_now(
         self,
         *,
         media_path: str,
         project_id: str,
         media_file_id: str | None = None,
-        job_id: str | None = None,
     ) -> dict[str, Any]:
         try:
-            pipeline = run_media_pipeline(source_path=media_path)
+            pipeline = run_media_pipeline(
+                source_path=media_path,
+                sentence_contract_builder=self._request_sentence_contract,
+            )
         except Exception as exc:
-            if job_id:
-                self.repo.update_backend_job_status(job_id, "failed")
             return {
-                "job_id": job_id,
+                "job_id": None,
                 "status": "error",
                 "message": str(exc),
             }
 
-        document_id = f"doc-{job_id}" if job_id else f"doc-{uuid.uuid4().hex[:12]}"
-        result = {
-            "document": {
-                "id": document_id,
-                "project_id": project_id,
-                "media_file_id": media_file_id,
-                "source_type": pipeline.source_type,
-                "source_path": media_path,
-                "media_hash": f"job:{job_id}" if job_id else f"local:{media_file_id or 'media'}",
-                "full_text": pipeline.full_text,
-                "text_hash": pipeline.text_hash,
-                "text_version": 1,
-            },
-            "media_sentences": pipeline.media_sentences,
-            "contract_sentences": pipeline.contract_sentences,
-        }
-        if job_id:
-            return self.sync_backend_result(job_id=job_id, result=result)
-
+        document_id = f"doc-{uuid.uuid4().hex[:12]}"
         existing_doc = self.repo.get_document(document_id)
         if existing_doc is None:
             self.repo.create_document(
@@ -472,6 +292,28 @@ class RuntimeMediaService:
             "message": "Local media processed and synced.",
         }
 
+    def _request_sentence_contract(self, *, sentence_text: str, sentence_idx: int) -> dict[str, Any]:
+        if not self.sentence_contract_backend_url:
+            raise RuntimeError("ELA_SENTENCE_CONTRACT_BACKEND_URL is required for sentence contract requests.")
+        endpoint = f"{self.sentence_contract_backend_url.rstrip('/')}/api/sentence-contract"
+        payload = json.dumps({"sentenceText": sentence_text, "sentenceIdx": sentence_idx}).encode("utf-8")
+        req = urlrequest.Request(endpoint, data=payload, method="POST")
+        req.add_header("Content-Type", "application/json")
+        try:
+            with urlrequest.urlopen(req, timeout=30) as resp:  # nosec B310
+                raw = resp.read().decode("utf-8")
+        except (urlerror.URLError, TimeoutError, OSError) as exc:
+            raise RuntimeError(f"Backend sentence-contract API unavailable: {endpoint}") from exc
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Invalid JSON from backend sentence-contract API: {endpoint}") from exc
+        if not isinstance(parsed, dict):
+            raise RuntimeError(f"Invalid payload type from backend sentence-contract API: {endpoint}")
+        if "sentence_node" not in parsed or "sentence_hash" not in parsed:
+            raise RuntimeError(f"Incomplete payload from backend sentence-contract API: {endpoint}")
+        return parsed
+
     def apply_document_edit(
         self,
         *,
@@ -505,17 +347,6 @@ class RuntimeMediaService:
             sentence_node=root,
         )
         return {"status": "ok", "message": "Edit applied."}
-
-    @staticmethod
-    def _infer_source_type(source_path: str) -> str:
-        suffix = Path(source_path or "").suffix.lower()
-        if suffix in {".mp3", ".wav", ".m4a", ".flac", ".ogg"}:
-            return "audio"
-        if suffix in {".mp4", ".mkv", ".mov", ".avi", ".webm"}:
-            return "video"
-        if suffix in {".pdf"}:
-            return "pdf"
-        return "text"
 
     @staticmethod
     def _normalize_media_sentences(raw_sentences: list[dict[str, Any]]) -> list[dict[str, Any]]:

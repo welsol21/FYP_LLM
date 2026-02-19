@@ -102,7 +102,7 @@ def build_runtime_capabilities(mode: str, deployment_mode: str = DEPLOYMENT_MODE
         deployment_mode=resolved_deployment,
         phonetic_enabled=phonetic_allowed,
         db_persistence_enabled=True,
-        backend_jobs_enabled=True,
+        backend_jobs_enabled=False,
     )
 
 

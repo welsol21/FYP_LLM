@@ -6,14 +6,16 @@
 
 ## Media Pipeline Integration (ELA Bridge, Current)
 
-- [x] Add backend-only enrichment routing flag in runtime media policy (`prefer_backend_for_enrichment`) with tests.
-- [x] Wire runtime service to enforce backend-only enrichment policy via env (`ELA_MEDIA_ENRICHMENT_BACKEND_ONLY`, default on).
-- [x] Add media pipeline enrichment stage for contract fields:
+- [x] Switch architecture to **client-only media analysis** (no backend media processing queue).
+- [x] Remove backend jobs UI block from Analyze screen.
+- [x] Remove runtime API/CLI endpoints for backend media job flow (`backend-jobs`, retry/resume/sync backend result).
+- [x] Keep backend as **sentence-contract provider only** (`/api/sentence-contract`).
+- [x] Keep media pipeline enrichment stage for contract fields:
   - [x] `linguistic_notes` via template/rule annotator.
   - [x] `cefr_level` via rule predictor.
-  - [x] `translation` with backend provider + safe fallback.
-  - [x] `phonetic` on backend path with graceful fallback if binary unavailable.
-- [ ] Replace legacy ChatGPT sentence call in `temp/ela.zip` flow with current backend sentence-contract API (per-sentence contract request/response adapter).
+  - [x] `translation` with runtime provider + safe fallback.
+  - [x] `phonetic` in runtime enrichment with graceful fallback if binary unavailable.
+- [x] Replace legacy ChatGPT sentence call in media flow with backend sentence-contract API adapter (client pipeline uses per-sentence backend contract requests via `ELA_SENTENCE_CONTRACT_BACKEND_URL`; no local fallback).
 - [x] Add backend sentence-contract API surface (`runtime service` + `client_api` + HTTP endpoint) for per-sentence contract generation.
 - [x] Add legacy bridge adapter (`media sentence` -> `backend sentence contract`) with unit tests.
 - [ ] Add text/pdf ingestion adapter parity with legacy pipeline outputs (`media contract` artifacts + sentence stream persistence).

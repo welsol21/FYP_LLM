@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from .capabilities import RuntimeCapabilities
 from .media_policy import MediaPolicyLimits, decide_media_route
@@ -11,9 +10,8 @@ from .media_policy import MediaPolicyLimits, decide_media_route
 
 @dataclass(frozen=True)
 class MediaExecutionPlan:
-    action: str  # run_local | enqueue_backend | reject
+    action: str  # run_local | reject
     message: str
-    backend_job_payload: dict[str, Any] | None = None
 
 
 def plan_media_execution(
@@ -33,24 +31,8 @@ def plan_media_execution(
         prefer_backend_for_enrichment=prefer_backend_for_enrichment,
     )
     if decision.route == "local":
-        return MediaExecutionPlan(
-            action="run_local",
-            message=decision.reason,
-            backend_job_payload=None,
-        )
-    if decision.route == "backend":
-        return MediaExecutionPlan(
-            action="enqueue_backend",
-            message=decision.reason,
-            backend_job_payload={
-                "media_path": media_path,
-                "duration_seconds": duration_seconds,
-                "size_bytes": size_bytes,
-                "policy_reason": decision.reason,
-            },
-        )
+        return MediaExecutionPlan(action="run_local", message=decision.reason)
     return MediaExecutionPlan(
         action="reject",
         message=decision.reason,
-        backend_job_payload=None,
     )
