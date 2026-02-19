@@ -7,7 +7,7 @@ export function ConfigPage() {
   const api = useApi()
   const [uiState, setUiState] = useState<RuntimeUiState | null>(null)
   const [translationConfig, setTranslationConfig] = useState<TranslationConfig | null>(null)
-  const [saveMsg, setSaveMsg] = useState<string>('')
+  const [providerErrors, setProviderErrors] = useState<Record<string, string>>({})
   const [newProviderId, setNewProviderId] = useState('')
   const [newProviderLabel, setNewProviderLabel] = useState('')
   const [newCredentialFields, setNewCredentialFields] = useState('')
@@ -22,22 +22,43 @@ export function ConfigPage() {
     [translationConfig],
   )
 
-  function patchProvider(providerId: string, patch: Partial<TranslationProviderConfig>) {
-    if (!translationConfig) return
-    const nextProviders = translationConfig.providers.map((p) => (p.id === providerId ? { ...p, ...patch } : p))
-    setTranslationConfig({ ...translationConfig, providers: nextProviders })
+  function missingCredentialFields(provider: TranslationProviderConfig): string[] {
+    return provider.credential_fields.filter((field) => !String(provider.credentials[field] || '').trim())
   }
 
-  function patchProviderCred(providerId: string, key: string, value: string) {
+  async function persistConfig(nextConfig: TranslationConfig) {
+    const saved = await api.saveTranslationConfig(nextConfig)
+    setTranslationConfig(saved)
+  }
+
+  async function patchProvider(providerId: string, patch: Partial<TranslationProviderConfig>) {
+    if (!translationConfig) return
+    const current = translationConfig.providers.find((p) => p.id === providerId)
+    if (!current) return
+    const draft = { ...current, ...patch }
+    if (patch.enabled === true) {
+      const missing = missingCredentialFields(draft)
+      if (missing.length > 0) {
+        setProviderErrors((prev) => ({ ...prev, [providerId]: `Missing credentials: ${missing.join(', ')}` }))
+        return
+      }
+    }
+    setProviderErrors((prev) => ({ ...prev, [providerId]: '' }))
+    const nextProviders = translationConfig.providers.map((p) => (p.id === providerId ? { ...p, ...patch } : p))
+    await persistConfig({ ...translationConfig, providers: nextProviders })
+  }
+
+  async function patchProviderCred(providerId: string, key: string, value: string) {
     if (!translationConfig) return
     const nextProviders = translationConfig.providers.map((p) => {
       if (p.id !== providerId) return p
       return { ...p, credentials: { ...p.credentials, [key]: value } }
     })
-    setTranslationConfig({ ...translationConfig, providers: nextProviders })
+    setProviderErrors((prev) => ({ ...prev, [providerId]: '' }))
+    await persistConfig({ ...translationConfig, providers: nextProviders })
   }
 
-  function addCustomProvider() {
+  async function addCustomProvider() {
     if (!translationConfig) return
     const id = newProviderId.trim().toLowerCase()
     const label = newProviderLabel.trim()
@@ -48,7 +69,7 @@ export function ConfigPage() {
       .filter(Boolean)
     const credentials: Record<string, string> = {}
     for (const field of fields) credentials[field] = ''
-    setTranslationConfig({
+    await persistConfig({
       ...translationConfig,
       providers: [
         ...translationConfig.providers,
@@ -67,19 +88,11 @@ export function ConfigPage() {
     setNewCredentialFields('')
   }
 
-  function removeCustomProvider(providerId: string) {
+  async function removeCustomProvider(providerId: string) {
     if (!translationConfig) return
     const next = translationConfig.providers.filter((p) => p.id !== providerId)
     const defaultProvider = translationConfig.default_provider === providerId ? 'm2m100' : translationConfig.default_provider
-    setTranslationConfig({ ...translationConfig, providers: next, default_provider: defaultProvider })
-  }
-
-  async function saveConfig() {
-    if (!translationConfig) return
-    const saved = await api.saveTranslationConfig(translationConfig)
-    setTranslationConfig(saved)
-    setSaveMsg('Saved')
-    setTimeout(() => setSaveMsg(''), 1200)
+    await persistConfig({ ...translationConfig, providers: next, default_provider: defaultProvider })
   }
 
   return (
@@ -90,19 +103,20 @@ export function ConfigPage() {
         {translationConfig ? (
           <>
             <label className="analyze-label">Default Provider</label>
-            <select
-              className="flat-select"
-              value={translationConfig.default_provider}
-              onChange={(e) => setTranslationConfig({ ...translationConfig, default_provider: e.target.value })}
-            >
+            <div className="touch-options-grid">
               {translationConfig.providers
                 .filter((p) => p.enabled)
                 .map((p) => (
-                  <option key={p.id} value={p.id}>
+                  <button
+                    key={p.id}
+                    type="button"
+                    className={`touch-option-btn${translationConfig.default_provider === p.id ? ' active' : ''}`}
+                    onClick={() => persistConfig({ ...translationConfig, default_provider: p.id })}
+                  >
                     {p.label}
-                  </option>
+                  </button>
                 ))}
-            </select>
+            </div>
 
             <div className="card compact-card">
               <h3>Add Custom Provider</h3>
@@ -129,6 +143,7 @@ export function ConfigPage() {
                   <input type="checkbox" checked={p.enabled} onChange={(e) => patchProvider(p.id, { enabled: e.target.checked })} />
                   Enabled
                 </label>
+                {providerErrors[p.id] ? <p className="config-error">{providerErrors[p.id]}</p> : null}
                 {p.credential_fields.map((field) => (
                   <div key={`${p.id}-${field}`}>
                     <label className="analyze-label">{field}</label>
@@ -147,11 +162,6 @@ export function ConfigPage() {
                 ) : null}
               </div>
             ))}
-
-            <button type="button" onClick={saveConfig}>
-              Save Translation Config
-            </button>
-            {saveMsg ? <p>{saveMsg}</p> : null}
           </>
         ) : (
           <p>Loading translation config...</p>

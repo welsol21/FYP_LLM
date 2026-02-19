@@ -20,6 +20,11 @@ type Props = {
 
 const STAGES = ['Loading file', 'Transcribing audio', 'Translating text', 'Generating media', 'Exporting files']
 
+function hasRequiredCredentials(provider: TranslationProviderConfig): boolean {
+  if (!provider.credential_fields.length) return true
+  return provider.credential_fields.every((field) => String(provider.credentials[field] || '').trim().length > 0)
+}
+
 export function MediaSubmitForm({
   onSubmitted,
   projectId,
@@ -39,6 +44,9 @@ export function MediaSubmitForm({
   const [subtitles, setSubtitles] = useState('Bilingual')
   const [voice, setVoice] = useState('Male')
   const [submitting, setSubmitting] = useState(false)
+  const enabledProviders = translatorOptions.filter((p) => p.enabled && hasRequiredCredentials(p))
+  const subtitleOptions = ['Bilingual', 'Target only', 'Source only']
+  const voiceOptions = ['Male', 'Female']
 
   useEffect(() => {
     if (!initialMedia) return
@@ -52,6 +60,12 @@ export function MediaSubmitForm({
   useEffect(() => {
     if (defaultTranslator) setTranslator(defaultTranslator)
   }, [defaultTranslator])
+
+  useEffect(() => {
+    if (!enabledProviders.length) return
+    const hasCurrent = enabledProviders.some((p) => p.id === translator)
+    if (!hasCurrent) setTranslator(enabledProviders[0].id)
+  }, [enabledProviders, translator])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -80,28 +94,46 @@ export function MediaSubmitForm({
 
       <div className="analyze-grid">
         <label className="analyze-label">Translator:</label>
-        <select className="flat-select" value={translator} onChange={(e) => setTranslator(e.target.value)}>
-          {translatorOptions
-            .filter((p) => p.enabled)
-            .map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-        </select>
+        <div className="touch-options-grid">
+          {enabledProviders.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`touch-option-btn${translator === p.id ? ' active' : ''}`}
+              onClick={() => setTranslator(p.id)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
 
         <label className="analyze-label">Subtitles:</label>
-        <select className="flat-select" value={subtitles} onChange={(e) => setSubtitles(e.target.value)}>
-          <option>Bilingual</option>
-          <option>Target only</option>
-          <option>Source only</option>
-        </select>
+        <div className="touch-options-grid">
+          {subtitleOptions.map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={`touch-option-btn${subtitles === option ? ' active' : ''}`}
+              onClick={() => setSubtitles(option)}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
 
         <label className="analyze-label">Voice:</label>
-        <select className="flat-select" value={voice} onChange={(e) => setVoice(e.target.value)}>
-          <option>Male</option>
-          <option>Female</option>
-        </select>
+        <div className="touch-options-grid">
+          {voiceOptions.map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={`touch-option-btn${voice === option ? ' active' : ''}`}
+              onClick={() => setVoice(option)}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="stage-list">
