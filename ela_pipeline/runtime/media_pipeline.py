@@ -168,12 +168,73 @@ class _EchoTranslator:
         return (text or "").strip()
 
 
-def _resolve_media_translator() -> Any:
-    provider = os.getenv("ELA_MEDIA_TRANSLATION_PROVIDER", "echo").strip().lower()
-    if provider != "m2m100":
-        return _EchoTranslator()
+class _OpenAITranslator:
+    model_name = "gpt-4o-mini"
 
-    model_name = os.getenv("ELA_MEDIA_TRANSLATION_MODEL", "").strip() or "facebook/m2m100_418M"
+    def __init__(self, api_key: str) -> None:
+        self.api_key = api_key
+
+    def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
+        try:
+            from openai import OpenAI  # type: ignore[import-not-found]
+        except Exception as exc:
+            raise RuntimeError("OpenAI provider requires `openai` package.") from exc
+        client = OpenAI(api_key=self.api_key)
+        prompt = f"Translate from {source_lang} to {target_lang}. Return only translation.\n\n{text}"
+        resp = client.chat.completions.create(
+            model=self.model_name,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+        )
+        return str(resp.choices[0].message.content or "").strip()
+
+
+class _DeepLTranslator:
+    model_name = "deepl"
+
+    def __init__(self, auth_key: str) -> None:
+        self.auth_key = auth_key
+
+    def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
+        try:
+            import deepl  # type: ignore[import-not-found]
+        except Exception as exc:
+            raise RuntimeError("DeepL provider requires `deepl` package.") from exc
+        tr = deepl.Translator(self.auth_key)
+        return str(
+            tr.translate_text(
+                text,
+                source_lang=source_lang.upper(),
+                target_lang=target_lang.upper(),
+            ).text
+        ).strip()
+
+
+def _resolve_media_translator(
+    *,
+    provider_override: str | None = None,
+    provider_credentials: dict[str, str] | None = None,
+) -> Any:
+    provider = str(provider_override or os.getenv("ELA_MEDIA_TRANSLATION_PROVIDER", "echo")).strip().lower()
+    creds = provider_credentials or {}
+    if provider in {"original", "echo", "none"}:
+        return _EchoTranslator()
+    if provider == "gpt":
+        key = str(creds.get("api_key") or os.getenv("OPENAI_API_KEY") or "").strip()
+        if not key:
+            raise RuntimeError("OpenAI provider selected but API key is missing.")
+        return _OpenAITranslator(key)
+    if provider == "deepl":
+        key = str(creds.get("auth_key") or os.getenv("DEEPL_AUTH_KEY") or "").strip()
+        if not key:
+            raise RuntimeError("DeepL provider selected but auth key is missing.")
+        return _DeepLTranslator(key)
+    if provider == "lara":
+        raise RuntimeError("Lara provider is not yet wired in runtime translator adapters.")
+
+    model_name = os.getenv("ELA_MEDIA_TRANSLATION_MODEL", "").strip() or (
+        "facebook/m2m100_418M" if provider in {"m2m100", "hf"} else provider
+    )
     if model_name == "facebook/m2m100_418M" and os.path.isdir(DEFAULT_LOCAL_TRANSLATION_MODEL_DIR):
         model_name = DEFAULT_LOCAL_TRANSLATION_MODEL_DIR
     device = os.getenv("ELA_MEDIA_TRANSLATION_DEVICE", "cpu").strip() or "cpu"
@@ -233,7 +294,12 @@ def _attach_cefr_runtime(analyzed: dict[str, Any], *, predictor: Any) -> None:
             node["cefr_level"] = str(predictor.predict_level(node, source_text, sentence_text)).strip().upper() or "B1"
 
 
-def _enrich_analyzed_contract(analyzed: dict[str, Any]) -> None:
+def _enrich_analyzed_contract(
+    analyzed: dict[str, Any],
+    *,
+    translation_provider: str | None = None,
+    provider_credentials: dict[str, str] | None = None,
+) -> None:
     # Notes: deterministic template/rule mode, no model dependency required.
     annotator = LocalT5Annotator(model_dir=".", note_mode="template_only")
     annotator.annotate(analyzed)
@@ -242,7 +308,10 @@ def _enrich_analyzed_contract(analyzed: dict[str, Any]) -> None:
     _attach_cefr_runtime(analyzed, predictor=RuleBasedCEFRPredictor())
 
     # Translation: backend provider if configured, with safe echo fallback.
-    translator = _resolve_media_translator()
+    translator = _resolve_media_translator(
+        provider_override=translation_provider,
+        provider_credentials=provider_credentials,
+    )
     _attach_translation_runtime(
         analyzed,
         translator=translator,
@@ -375,12 +444,16 @@ def build_sentence_contract(
     sentence_text: str,
     sentence_idx: int = 0,
     spacy_model: str = "en_core_web_sm",
+    translation_provider: str | None = None,
+    provider_credentials: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     nlp = load_nlp(spacy_model)
     return _build_sentence_contract_with_nlp(
         sentence_text=sentence_text,
         sentence_idx=sentence_idx,
         nlp=nlp,
+        translation_provider=translation_provider,
+        provider_credentials=provider_credentials,
     )
 
 
@@ -389,6 +462,8 @@ def _build_sentence_contract_with_nlp(
     sentence_text: str,
     sentence_idx: int,
     nlp: Any,
+    translation_provider: str | None = None,
+    provider_credentials: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     text = (sentence_text or "").strip()
     if not text:
@@ -397,7 +472,11 @@ def _build_sentence_contract_with_nlp(
     if not skeleton:
         raise RuntimeError("Unable to build sentence skeleton.")
     analyzed = apply_tam(skeleton, nlp)
-    _enrich_analyzed_contract(analyzed)
+    _enrich_analyzed_contract(
+        analyzed,
+        translation_provider=translation_provider,
+        provider_credentials=provider_credentials,
+    )
 
     if text in analyzed:
         node = analyzed[text]

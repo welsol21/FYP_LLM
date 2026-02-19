@@ -14,3 +14,5 @@ nltk
 psycopg[binary]>=3.2
 pypdf
 openai-whisper
+openai
+deepl

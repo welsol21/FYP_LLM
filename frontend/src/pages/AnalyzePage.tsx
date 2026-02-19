@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
-import type { MediaSubmissionPayload, SelectedProject } from '../api/runtimeApi'
+import type { MediaSubmissionPayload, SelectedProject, TranslationConfig } from '../api/runtimeApi'
 import { MediaSubmitForm } from '../components/MediaSubmitForm'
 
 export function AnalyzePage() {
@@ -10,6 +10,7 @@ export function AnalyzePage() {
   const api = useApi()
   const [selectedProject, setSelectedProject] = useState<SelectedProject>({ project_id: null })
   const [submission, setSubmission] = useState<MediaSubmissionPayload | null>(null)
+  const [translationConfig, setTranslationConfig] = useState<TranslationConfig | null>(null)
   const selectedMedia = (location.state as
     | {
         selectedMedia?: {
@@ -25,6 +26,7 @@ export function AnalyzePage() {
 
   useEffect(() => {
     api.getSelectedProject().then(setSelectedProject)
+    api.getTranslationConfig().then(setTranslationConfig)
   }, [api])
 
   const stageProgress = useMemo(() => {
@@ -44,6 +46,8 @@ export function AnalyzePage() {
         projectLabel={selectedProject.project_name ?? selectedProject.project_id ?? 'Project'}
         stageProgress={stageProgress}
         initialMedia={selectedMedia}
+        translatorOptions={translationConfig?.providers || []}
+        defaultTranslator={translationConfig?.default_provider || 'm2m100'}
       />
       {submission ? (
         <section className={`card feedback ${submission.ui_feedback.severity}`} aria-label="submission-feedback">

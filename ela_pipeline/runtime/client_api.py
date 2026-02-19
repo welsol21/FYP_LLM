@@ -28,6 +28,9 @@ def main() -> None:
 
     sub.add_parser("ui-state", help="Return runtime UI payload.")
     sub.add_parser("projects", help="List projects.")
+    sub.add_parser("translation-config", help="Get translation providers config.")
+    set_translation_config = sub.add_parser("set-translation-config", help="Set translation providers config from JSON file.")
+    set_translation_config.add_argument("--input-json", required=True)
 
     create_project = sub.add_parser("create-project", help="Create project and select it.")
     create_project.add_argument("--name", required=True)
@@ -42,6 +45,9 @@ def main() -> None:
     submit_media.add_argument("--size-bytes", type=int, required=True)
     submit_media.add_argument("--project-id", default=None)
     submit_media.add_argument("--media-file-id", default=None)
+    submit_media.add_argument("--translation-provider", default=None)
+    submit_media.add_argument("--subtitles-mode", default=None)
+    submit_media.add_argument("--voice-choice", default=None)
 
     queue_missing = sub.add_parser("queue-missing-content", help="Queue missing corpus content sync request.")
     queue_missing.add_argument("--source-text", required=True)
@@ -102,6 +108,14 @@ def main() -> None:
     if args.cmd == "projects":
         _print_json(media_service.list_projects())
         return
+    if args.cmd == "translation-config":
+        _print_json(media_service.get_translation_config())
+        return
+    if args.cmd == "set-translation-config":
+        with open(args.input_json, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+        _print_json(media_service.save_translation_config(payload))
+        return
 
     if args.cmd == "create-project":
         _print_json(media_service.create_project(name=args.name))
@@ -122,6 +136,9 @@ def main() -> None:
             size_bytes=args.size_bytes,
             project_id=args.project_id,
             media_file_id=args.media_file_id,
+            translation_provider=args.translation_provider,
+            subtitles_mode=args.subtitles_mode,
+            voice_choice=args.voice_choice,
         )
         _print_json(payload)
         return

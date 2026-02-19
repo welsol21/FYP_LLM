@@ -8,6 +8,38 @@ from ela_pipeline.client_storage import build_sentence_hash
 
 
 class RuntimeMediaServiceTests(unittest.TestCase):
+    def test_translation_config_defaults_and_save(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            cfg = svc.get_translation_config()
+            self.assertEqual(cfg["default_provider"], "m2m100")
+            provider_ids = {row["id"] for row in cfg["providers"]}
+            self.assertIn("m2m100", provider_ids)
+            self.assertIn("gpt", provider_ids)
+
+            saved = svc.save_translation_config(
+                {
+                    "default_provider": "gpt",
+                    "providers": cfg["providers"]
+                    + [
+                        {
+                            "id": "myapi",
+                            "label": "My API",
+                            "kind": "custom",
+                            "enabled": True,
+                            "credential_fields": ["token"],
+                            "credentials": {"token": "abc"},
+                        }
+                    ],
+                }
+            )
+            self.assertEqual(saved["default_provider"], "gpt")
+            self.assertIn("myapi", {row["id"] for row in saved["providers"]})
+
     def test_projects_create_select_and_list(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             svc = RuntimeMediaService(

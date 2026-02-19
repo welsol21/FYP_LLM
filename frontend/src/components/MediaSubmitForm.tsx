@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useApi } from '../api/apiContext'
-import type { MediaSubmissionPayload } from '../api/runtimeApi'
+import type { MediaSubmissionPayload, TranslationProviderConfig } from '../api/runtimeApi'
 
 type Props = {
   onSubmitted: (payload: MediaSubmissionPayload) => void
@@ -14,18 +14,28 @@ type Props = {
     sizeBytes?: number
     fileName?: string
   }
+  translatorOptions: TranslationProviderConfig[]
+  defaultTranslator: string
 }
 
 const STAGES = ['Loading file', 'Transcribing audio', 'Translating text', 'Generating media', 'Exporting files']
 
-export function MediaSubmitForm({ onSubmitted, projectId, projectLabel, stageProgress, initialMedia }: Props) {
+export function MediaSubmitForm({
+  onSubmitted,
+  projectId,
+  projectLabel,
+  stageProgress,
+  initialMedia,
+  translatorOptions,
+  defaultTranslator,
+}: Props) {
   const api = useApi()
   const [mediaPath, setMediaPath] = useState('')
   const [durationSec, setDurationSec] = useState(600)
   const [sizeBytes, setSizeBytes] = useState(100 * 1024 * 1024)
   const [mediaFileId, setMediaFileId] = useState<string | undefined>(undefined)
   const [selectedFileName, setSelectedFileName] = useState('')
-  const [translator, setTranslator] = useState('GPT')
+  const [translator, setTranslator] = useState(defaultTranslator || 'm2m100')
   const [subtitles, setSubtitles] = useState('Bilingual')
   const [voice, setVoice] = useState('Male')
   const [submitting, setSubmitting] = useState(false)
@@ -39,6 +49,10 @@ export function MediaSubmitForm({ onSubmitted, projectId, projectLabel, stagePro
     setSelectedFileName(initialMedia.fileName ?? '')
   }, [initialMedia])
 
+  useEffect(() => {
+    if (defaultTranslator) setTranslator(defaultTranslator)
+  }, [defaultTranslator])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
@@ -49,6 +63,9 @@ export function MediaSubmitForm({ onSubmitted, projectId, projectLabel, stagePro
         sizeBytes,
         projectId: projectId ?? undefined,
         mediaFileId,
+        translationProvider: translator,
+        subtitlesMode: subtitles.toLowerCase(),
+        voiceChoice: voice.toLowerCase(),
       })
       onSubmitted(payload)
     } finally {
@@ -64,8 +81,13 @@ export function MediaSubmitForm({ onSubmitted, projectId, projectLabel, stagePro
       <div className="analyze-grid">
         <label className="analyze-label">Translator:</label>
         <select className="flat-select" value={translator} onChange={(e) => setTranslator(e.target.value)}>
-          <option>GPT</option>
-          <option>HF</option>
+          {translatorOptions
+            .filter((p) => p.enabled)
+            .map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
         </select>
 
         <label className="analyze-label">Subtitles:</label>

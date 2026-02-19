@@ -19,6 +19,80 @@ from .media_pipeline import build_sentence_contract, run_media_pipeline
 from .media_submission import submit_media_for_processing
 from .ui_state import build_runtime_ui_state, build_submission_ui_feedback
 
+TRANSLATION_CONFIG_STATE_KEY = "translation_config"
+MEDIA_FILE_SETTINGS_PREFIX = "media_file_settings:"
+
+
+def _builtin_translation_providers() -> list[dict[str, Any]]:
+    return [
+        {"id": "m2m100", "label": "Our Translator (M2M100)", "kind": "builtin", "enabled": True, "credential_fields": [], "credentials": {}},
+        {"id": "hf", "label": "HuggingFace", "kind": "builtin", "enabled": True, "credential_fields": [], "credentials": {}},
+        {"id": "gpt", "label": "OpenAI GPT", "kind": "builtin", "enabled": False, "credential_fields": ["api_key"], "credentials": {"api_key": ""}},
+        {"id": "deepl", "label": "DeepL", "kind": "builtin", "enabled": False, "credential_fields": ["auth_key"], "credentials": {"auth_key": ""}},
+        {
+            "id": "lara",
+            "label": "Lara",
+            "kind": "builtin",
+            "enabled": False,
+            "credential_fields": ["api_id", "api_secret"],
+            "credentials": {"api_id": "", "api_secret": ""},
+        },
+        {
+            "id": "original",
+            "label": "Original only (no translation)",
+            "kind": "builtin",
+            "enabled": True,
+            "credential_fields": [],
+            "credentials": {},
+        },
+    ]
+
+
+def _default_translation_config() -> dict[str, Any]:
+    return {"default_provider": "m2m100", "providers": _builtin_translation_providers()}
+
+
+def _normalize_translation_config(raw: dict[str, Any] | None) -> dict[str, Any]:
+    base = _default_translation_config()
+    incoming = raw if isinstance(raw, dict) else {}
+    merged: dict[str, dict[str, Any]] = {p["id"]: dict(p) for p in base["providers"]}
+    incoming_providers = incoming.get("providers")
+    if isinstance(incoming_providers, list):
+        for row in incoming_providers:
+            if not isinstance(row, dict):
+                continue
+            pid = str(row.get("id") or "").strip().lower()
+            if not pid:
+                continue
+            item = merged.get(pid, {"id": pid, "kind": "custom", "credential_fields": [], "credentials": {}, "enabled": True})
+            item["label"] = str(row.get("label") or item.get("label") or pid).strip() or pid
+            item["kind"] = "builtin" if item.get("kind") == "builtin" else str(row.get("kind") or item.get("kind") or "custom")
+            item["enabled"] = bool(row.get("enabled", item.get("enabled", True)))
+            fields = row.get("credential_fields", item.get("credential_fields", []))
+            if not isinstance(fields, list):
+                fields = []
+            item["credential_fields"] = [str(x).strip() for x in fields if str(x).strip()]
+            creds = row.get("credentials", item.get("credentials", {}))
+            if not isinstance(creds, dict):
+                creds = {}
+            normalized_creds: dict[str, str] = {}
+            for k, v in creds.items():
+                key = str(k).strip()
+                if key:
+                    normalized_creds[key] = str(v or "")
+            for field in item["credential_fields"]:
+                normalized_creds.setdefault(field, "")
+            item["credentials"] = normalized_creds
+            merged[pid] = item
+    default_provider = str(incoming.get("default_provider") or base["default_provider"]).strip().lower() or "m2m100"
+    if default_provider in merged:
+        merged[default_provider]["enabled"] = True
+    providers = sorted(merged.values(), key=lambda p: (0 if p.get("kind") == "builtin" else 1, str(p.get("label") or p.get("id"))))
+    enabled_ids = {str(p.get("id")) for p in providers if p.get("enabled")}
+    if default_provider not in enabled_ids:
+        default_provider = "m2m100" if "m2m100" in enabled_ids else next(iter(enabled_ids), "m2m100")
+    return {"default_provider": default_provider, "providers": providers}
+
 
 def _srt_ts(total_ms: int) -> str:
     ms = max(0, int(total_ms))
@@ -82,6 +156,35 @@ class RuntimeMediaService:
     def list_projects(self) -> list[dict[str, Any]]:
         return self.repo.list_projects()
 
+    def get_translation_config(self) -> dict[str, Any]:
+        stored = self.repo.get_workspace_state(TRANSLATION_CONFIG_STATE_KEY)
+        normalized = _normalize_translation_config(stored)
+        self.repo.set_workspace_state(TRANSLATION_CONFIG_STATE_KEY, normalized)
+        return normalized
+
+    def save_translation_config(self, config: dict[str, Any]) -> dict[str, Any]:
+        normalized = _normalize_translation_config(config)
+        self.repo.set_workspace_state(TRANSLATION_CONFIG_STATE_KEY, normalized)
+        return normalized
+
+    @staticmethod
+    def _provider_credentials(*, provider_id: str, config: dict[str, Any]) -> dict[str, str]:
+        for row in config.get("providers", []):
+            if not isinstance(row, dict):
+                continue
+            if str(row.get("id") or "").strip().lower() != provider_id:
+                continue
+            creds = row.get("credentials")
+            if not isinstance(creds, dict):
+                return {}
+            out: dict[str, str] = {}
+            for k, v in creds.items():
+                key = str(k).strip()
+                if key:
+                    out[key] = str(v or "")
+            return out
+        return {}
+
     def create_project(self, *, name: str) -> dict[str, Any]:
         created = self.repo.create_project(name=name)
         self.set_selected_project(project_id=created["id"])
@@ -134,7 +237,13 @@ class RuntimeMediaService:
         size_bytes: int,
         project_id: str | None = None,
         media_file_id: str | None = None,
+        translation_provider: str | None = None,
+        subtitles_mode: str | None = None,
+        voice_choice: str | None = None,
     ) -> dict[str, Any]:
+        translation_cfg = self.get_translation_config()
+        selected_provider = str(translation_provider or translation_cfg.get("default_provider") or "m2m100").strip().lower()
+        provider_credentials = self._provider_credentials(provider_id=selected_provider, config=translation_cfg)
         selected = self.get_selected_project()
         effective_project_id = project_id or selected.get("project_id")
         if not effective_project_id:
@@ -170,6 +279,14 @@ class RuntimeMediaService:
                 duration_seconds=duration_seconds,
                 size_bytes=size_bytes,
             )
+        self.repo.set_workspace_state(
+            f"{MEDIA_FILE_SETTINGS_PREFIX}{media_file_id}",
+            {
+                "translation_provider": selected_provider,
+                "subtitles_mode": str(subtitles_mode or "bilingual"),
+                "voice_choice": str(voice_choice or "male"),
+            },
+        )
 
         raw = submit_media_for_processing(
             repo=self.repo,
@@ -187,6 +304,8 @@ class RuntimeMediaService:
                 media_path=media_path,
                 project_id=effective_project_id,
                 media_file_id=media_file_id,
+                translation_provider=selected_provider,
+                provider_credentials=provider_credentials,
             )
             raw["document_id"] = synced.get("document_id")
             raw["status"] = "completed_local" if synced.get("status") == "completed" else raw.get("status")
@@ -242,6 +361,10 @@ class RuntimeMediaService:
         rows = self.repo.list_media_files_with_analysis(project_id=project_id)
         out: list[dict[str, Any]] = []
         for row in rows:
+            settings_state = self.repo.get_workspace_state(f"{MEDIA_FILE_SETTINGS_PREFIX}{row['id']}") or {}
+            tp = str(settings_state.get("translation_provider") or "m2m100")
+            subs = str(settings_state.get("subtitles_mode") or "bilingual")
+            voice = str(settings_state.get("voice_choice") or "male")
             out.append(
                 {
                     "id": row["id"],
@@ -249,7 +372,7 @@ class RuntimeMediaService:
                     "path": row.get("path"),
                     "size_bytes": row.get("size_bytes"),
                     "duration_seconds": row.get("duration_seconds"),
-                    "settings": "HF / Runtime",
+                    "settings": f"Transl: {tp} / Subs: {subs} / Voice: {voice}",
                     "updated": row["updated_at"],
                     "analyzed": bool(row["analyzed"]),
                     "document_id": row.get("document_id"),
@@ -262,10 +385,14 @@ class RuntimeMediaService:
         *,
         sentence_text: str,
         sentence_idx: int = 0,
+        translation_provider: str | None = None,
+        provider_credentials: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         return build_sentence_contract(
             sentence_text=sentence_text,
             sentence_idx=sentence_idx,
+            translation_provider=translation_provider,
+            provider_credentials=provider_credentials,
         )
 
     def process_media_now(
@@ -274,11 +401,18 @@ class RuntimeMediaService:
         media_path: str,
         project_id: str,
         media_file_id: str | None = None,
+        translation_provider: str | None = None,
+        provider_credentials: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         try:
             pipeline = run_media_pipeline(
                 source_path=media_path,
-                sentence_contract_builder=self._request_sentence_contract,
+                sentence_contract_builder=lambda *, sentence_text, sentence_idx: self._request_sentence_contract(
+                    sentence_text=sentence_text,
+                    sentence_idx=sentence_idx,
+                    translation_provider=translation_provider,
+                    provider_credentials=provider_credentials,
+                ),
             )
         except Exception as exc:
             return {
@@ -408,11 +542,25 @@ class RuntimeMediaService:
             encoding="utf-8",
         )
 
-    def _request_sentence_contract(self, *, sentence_text: str, sentence_idx: int) -> dict[str, Any]:
+    def _request_sentence_contract(
+        self,
+        *,
+        sentence_text: str,
+        sentence_idx: int,
+        translation_provider: str | None = None,
+        provider_credentials: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         if not self.sentence_contract_backend_url:
             raise RuntimeError("ELA_SENTENCE_CONTRACT_BACKEND_URL is required for sentence contract requests.")
         endpoint = f"{self.sentence_contract_backend_url.rstrip('/')}/api/sentence-contract"
-        payload = json.dumps({"sentenceText": sentence_text, "sentenceIdx": sentence_idx}).encode("utf-8")
+        payload = json.dumps(
+            {
+                "sentenceText": sentence_text,
+                "sentenceIdx": sentence_idx,
+                "translationProvider": translation_provider,
+                "providerCredentials": provider_credentials or {},
+            }
+        ).encode("utf-8")
         req = urlrequest.Request(endpoint, data=payload, method="POST")
         req.add_header("Content-Type", "application/json")
         try:

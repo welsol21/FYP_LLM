@@ -95,6 +95,11 @@ describe('VisualizerPage', () => {
       uploadMedia: async () => ({ fileName: 'uploaded.txt', mediaPath: '/tmp/uploaded.txt', sizeBytes: 12 }),
       getVisualizerPayload,
       applyEdit: async () => ({ status: 'ok', message: 'Edit applied.' }),
+      getTranslationConfig: async () => ({
+        default_provider: 'm2m100',
+        providers: [{ id: 'm2m100', label: 'Our Translator (M2M100)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} }],
+      }),
+      saveTranslationConfig: async (config) => config,
     }
 
     render(

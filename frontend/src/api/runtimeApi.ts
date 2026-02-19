@@ -69,6 +69,20 @@ export type VisualizerNode = {
 
 export type VisualizerPayload = Record<string, VisualizerNode>
 
+export type TranslationProviderConfig = {
+  id: string
+  label: string
+  kind: 'builtin' | 'custom' | string
+  enabled: boolean
+  credential_fields: string[]
+  credentials: Record<string, string>
+}
+
+export type TranslationConfig = {
+  default_provider: string
+  providers: TranslationProviderConfig[]
+}
+
 export interface RuntimeApi {
   getUiState(): Promise<RuntimeUiState>
   listProjects(): Promise<ProjectRow[]>
@@ -89,7 +103,12 @@ export interface RuntimeApi {
     sizeBytes: number
     projectId?: string
     mediaFileId?: string
+    translationProvider?: string
+    subtitlesMode?: string
+    voiceChoice?: string
   }): Promise<MediaSubmissionPayload>
+  getTranslationConfig(): Promise<TranslationConfig>
+  saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig>
   listFiles(projectId?: string): Promise<MediaFileRow[]>
   getVisualizerPayload(documentId?: string): Promise<VisualizerPayload>
   applyEdit(input: {

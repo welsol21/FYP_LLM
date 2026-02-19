@@ -6,6 +6,7 @@ import type {
   RuntimeApi,
   RuntimeUiState,
   SelectedProject,
+  TranslationConfig,
   VisualizerNode,
   VisualizerPayload,
 } from './runtimeApi'
@@ -105,6 +106,17 @@ function coerceInputValue(raw: string, existing: unknown): unknown {
 }
 
 export class MockRuntimeApi implements RuntimeApi {
+  private translationConfig: TranslationConfig = {
+    default_provider: 'm2m100',
+    providers: [
+      { id: 'm2m100', label: 'Our Translator (M2M100)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} },
+      { id: 'hf', label: 'HuggingFace', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} },
+      { id: 'gpt', label: 'OpenAI GPT', kind: 'builtin', enabled: false, credential_fields: ['api_key'], credentials: { api_key: '' } },
+      { id: 'deepl', label: 'DeepL', kind: 'builtin', enabled: false, credential_fields: ['auth_key'], credentials: { auth_key: '' } },
+      { id: 'lara', label: 'Lara', kind: 'builtin', enabled: false, credential_fields: ['api_id', 'api_secret'], credentials: { api_id: '', api_secret: '' } },
+      { id: 'original', label: 'Original only (no translation)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} },
+    ],
+  }
   private projects: ProjectRow[] = [
     {
       id: 'proj-1',
@@ -213,7 +225,7 @@ export class MockRuntimeApi implements RuntimeApi {
       path: input.mediaPath,
       size_bytes: input.sizeBytes,
       duration_seconds: input.durationSec,
-      settings: 'HF / Runtime',
+      settings: `Transl: ${this.translationConfig.default_provider} / Subs: bilingual / Voice: male`,
       updated: new Date().toISOString().slice(0, 10),
       analyzed: false,
     })
@@ -232,6 +244,9 @@ export class MockRuntimeApi implements RuntimeApi {
     durationSec: number
     sizeBytes: number
     projectId?: string
+    translationProvider?: string
+    subtitlesMode?: string
+    voiceChoice?: string
   }): Promise<MediaSubmissionPayload> {
     if (!input.projectId) {
       return {
@@ -255,7 +270,7 @@ export class MockRuntimeApi implements RuntimeApi {
         path: input.mediaPath,
         size_bytes: input.sizeBytes,
         duration_seconds: input.durationSec,
-        settings: 'HF / Local',
+        settings: `Transl: ${input.translationProvider || this.translationConfig.default_provider} / Subs: ${input.subtitlesMode || 'bilingual'} / Voice: ${input.voiceChoice || 'male'}`,
         updated: 'Feb 18, 2026',
         analyzed: true,
         document_id: docId,
@@ -277,6 +292,15 @@ export class MockRuntimeApi implements RuntimeApi {
         message: 'File exceeds local processing limits.',
       },
     }
+  }
+
+  async getTranslationConfig(): Promise<TranslationConfig> {
+    return JSON.parse(JSON.stringify(this.translationConfig)) as TranslationConfig
+  }
+
+  async saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig> {
+    this.translationConfig = JSON.parse(JSON.stringify(config)) as TranslationConfig
+    return this.getTranslationConfig()
   }
 
   async listFiles(projectId?: string): Promise<MediaFileRow[]> {

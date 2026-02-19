@@ -66,6 +66,9 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
         if path == "/api/projects":
             self._send_json(SERVICE.list_projects())
             return
+        if path == "/api/translation-config":
+            self._send_json(SERVICE.get_translation_config())
+            return
         if path == "/api/selected-project":
             self._send_json(SERVICE.get_selected_project())
             return
@@ -137,11 +140,21 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                     size_bytes=size,
                     project_id=body.get("projectId"),
                     media_file_id=body.get("mediaFileId"),
+                    translation_provider=body.get("translationProvider"),
+                    subtitles_mode=body.get("subtitlesMode"),
+                    voice_choice=body.get("voiceChoice"),
                 )
             except ValueError as exc:
                 self._send_json({"error": str(exc)}, status=400)
                 return
             self._send_json(payload)
+            return
+        if path == "/api/translation-config":
+            cfg = body.get("config")
+            if not isinstance(cfg, dict):
+                self._send_json({"error": "config object is required"}, status=400)
+                return
+            self._send_json(SERVICE.save_translation_config(cfg))
             return
         if path == "/api/projects":
             name = str(body.get("name") or "").strip()
@@ -223,6 +236,8 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 payload = SERVICE.build_sentence_contract(
                     sentence_text=sentence_text,
                     sentence_idx=sentence_idx,
+                    translation_provider=str(body.get("translationProvider") or "").strip().lower() or None,
+                    provider_credentials=body.get("providerCredentials") if isinstance(body.get("providerCredentials"), dict) else None,
                 )
             except Exception as exc:
                 self._send_json({"error": str(exc)}, status=400)

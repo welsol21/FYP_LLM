@@ -5,6 +5,7 @@ import type {
   RuntimeApi,
   RuntimeUiState,
   SelectedProject,
+  TranslationConfig,
   VisualizerPayload,
 } from './runtimeApi'
 
@@ -80,11 +81,26 @@ export class HttpRuntimeApi implements RuntimeApi {
     sizeBytes: number
     projectId?: string
     mediaFileId?: string
+    translationProvider?: string
+    subtitlesMode?: string
+    voiceChoice?: string
   }): Promise<MediaSubmissionPayload> {
     return requestJson<MediaSubmissionPayload>('/api/submit-media', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
+    })
+  }
+
+  async getTranslationConfig(): Promise<TranslationConfig> {
+    return requestJson<TranslationConfig>('/api/translation-config')
+  }
+
+  async saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig> {
+    return requestJson<TranslationConfig>('/api/translation-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config }),
     })
   }
 
