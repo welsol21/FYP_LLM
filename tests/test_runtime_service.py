@@ -70,6 +70,49 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertEqual(response["ui_feedback"]["severity"], "info")
             self.assertEqual(response["result"]["status"], "completed_local")
 
+    def test_process_media_now_persists_media_contract_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media_path = Path(tmpdir) / "short.txt"
+            media_path.write_text("She trusted him.", encoding="utf-8")
+            artifacts_dir = Path(tmpdir) / "contracts"
+            with patch.dict(
+                "os.environ",
+                {
+                    "MEDIA_CONTRACT_ARTIFACTS_DIR": str(artifacts_dir),
+                },
+                clear=False,
+            ):
+                svc = RuntimeMediaService(
+                    db_path=Path(tmpdir) / "client.sqlite3",
+                    runtime_mode="online",
+                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+                )
+                svc.repo.create_project("Project A", project_id="proj-1")
+                with patch.object(
+                    svc,
+                    "_request_sentence_contract",
+                    return_value={
+                        "sentence_text": "She trusted him.",
+                        "sentence_hash": "h1",
+                        "sentence_node": {
+                            "type": "Sentence",
+                            "content": "She trusted him.",
+                            "node_id": "n1",
+                            "linguistic_elements": [],
+                        },
+                    },
+                ):
+                    result = svc.process_media_now(
+                        media_path=str(media_path),
+                        project_id="proj-1",
+                    )
+            self.assertEqual(result["status"], "completed")
+            doc_dir = artifacts_dir / result["document_id"]
+            self.assertTrue((doc_dir / "full_text.txt").exists())
+            self.assertTrue((doc_dir / "media_contract.json").exists())
+            self.assertTrue((doc_dir / "contract_sentences.json").exists())
+            self.assertTrue((doc_dir / "sentence_link.json").exists())
+
     def test_submit_media_reject_returns_error_feedback(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             svc = RuntimeMediaService(

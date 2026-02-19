@@ -18,7 +18,7 @@
 - [x] Replace legacy ChatGPT sentence call in media flow with backend sentence-contract API adapter (client pipeline uses per-sentence backend contract requests via `ELA_SENTENCE_CONTRACT_BACKEND_URL`; no local fallback).
 - [x] Add backend sentence-contract API surface (`runtime service` + `client_api` + HTTP endpoint) for per-sentence contract generation.
 - [x] Add legacy bridge adapter (`media sentence` -> `backend sentence contract`) with unit tests.
-- [ ] Add text/pdf ingestion adapter parity with legacy pipeline outputs (`media contract` artifacts + sentence stream persistence).
+- [x] Add text/pdf ingestion adapter parity with legacy pipeline outputs (`media contract` artifacts + sentence stream persistence).
 
 ## License Compliance Workflow
 

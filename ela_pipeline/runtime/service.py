@@ -281,6 +281,15 @@ class RuntimeMediaService:
                 for row in pipeline.media_sentences
             ],
         )
+        self._persist_media_contract_artifacts(
+            document_id=document_id,
+            media_path=media_path,
+            source_type=pipeline.source_type,
+            full_text=pipeline.full_text,
+            text_hash=pipeline.text_hash,
+            media_sentences=pipeline.media_sentences,
+            contract_sentences=pipeline.contract_sentences,
+        )
         self.repo.update_document_status(document_id, "completed")
         return {
             "job_id": None,
@@ -291,6 +300,47 @@ class RuntimeMediaService:
             "linked_sentences_count": len(pipeline.media_sentences),
             "message": "Local media processed and synced.",
         }
+
+    def _persist_media_contract_artifacts(
+        self,
+        *,
+        document_id: str,
+        media_path: str,
+        source_type: str,
+        full_text: str,
+        text_hash: str,
+        media_sentences: list[dict[str, Any]],
+        contract_sentences: list[dict[str, Any]],
+    ) -> None:
+        base = Path(os.getenv("MEDIA_CONTRACT_ARTIFACTS_DIR", "artifacts/media_contracts"))
+        doc_dir = base / document_id
+        doc_dir.mkdir(parents=True, exist_ok=True)
+
+        links = [
+            {"sentence_idx": row["sentence_idx"], "sentence_hash": row["sentence_hash"]}
+            for row in media_sentences
+        ]
+        media_contract = {
+            "document_id": document_id,
+            "source_type": source_type,
+            "source_path": media_path,
+            "text_hash": text_hash,
+            "media_sentences": media_sentences,
+        }
+
+        (doc_dir / "full_text.txt").write_text(full_text, encoding="utf-8")
+        (doc_dir / "media_contract.json").write_text(
+            json.dumps(media_contract, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        (doc_dir / "contract_sentences.json").write_text(
+            json.dumps(contract_sentences, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        (doc_dir / "sentence_link.json").write_text(
+            json.dumps(links, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
 
     def _request_sentence_contract(self, *, sentence_text: str, sentence_idx: int) -> dict[str, Any]:
         if not self.sentence_contract_backend_url:
