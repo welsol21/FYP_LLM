@@ -8,6 +8,7 @@ type VocabRow = {
   file: string
   items: number
   created: string
+  documentId: string | null
 }
 
 function pseudoCount(seed: string): number {
@@ -37,6 +38,7 @@ export function VocabularyPage() {
             file: f.name,
             items: pseudoCount(f.id),
             created: new Date(f.updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            documentId: f.document_id ?? null,
             }))
         }),
       )
@@ -48,13 +50,23 @@ export function VocabularyPage() {
   }, [api])
 
   const selectedCount = useMemo(() => Object.values(checked).filter(Boolean).length, [checked])
+  const selectedRows = useMemo(() => rows.filter((row) => checked[row.id]), [rows, checked])
+  const selectedDocumentId = selectedRows.find((row) => row.documentId)?.documentId ?? null
 
   return (
     <section className="screen-block">
       <div className="page-head">
         <h2 className="page-title">Vocabulary</h2>
         <div className="actions-row">
-          <button type="button" className="secondary-btn" onClick={() => navigate('/visualizer')}>
+          <button
+            type="button"
+            className="secondary-btn"
+            disabled={!selectedDocumentId}
+            onClick={() => {
+              if (!selectedDocumentId) return
+              navigate('/visualizer', { state: { documentId: selectedDocumentId } })
+            }}
+          >
             Visualizer
           </button>
           <button type="button" className="secondary-btn" onClick={() => window.alert(`Export JSON (${selectedCount})`)}>

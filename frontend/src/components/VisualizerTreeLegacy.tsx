@@ -33,6 +33,7 @@ function colorOf(label: string): string {
 }
 
 type Token = { text: string; tone: string }
+const GAP_TONE = '#6b7280'
 
 function orderedChildren(node: VisualizerNode): VisualizerNode[] {
   const src = node.linguistic_elements.map((child, idx) => ({ child, idx }))
@@ -77,10 +78,55 @@ function textColorForBg(hexColor: string): string {
 
 function nodeTokens(node: VisualizerNode, level: number): Token[] {
   if (level === 0 && node.linguistic_elements.length > 0) {
-    return orderedChildren(node).map((child) => ({
-      text: child.content,
-      tone: colorOf(labelOf(child)),
-    }))
+    const parentText = node.content ?? ''
+    const parentStart = node.source_span?.start ?? 0
+    const children = orderedChildren(node)
+      .map((child, idx) => {
+        const startAbs = child.source_span?.start
+        const endAbs = child.source_span?.end
+        if (typeof startAbs !== 'number' || typeof endAbs !== 'number') return null
+        const start = Math.max(0, startAbs - parentStart)
+        const end = Math.min(parentText.length, endAbs - parentStart)
+        if (end <= start) return null
+        return {
+          idx,
+          start,
+          end,
+          tone: colorOf(labelOf(child)),
+        }
+      })
+      .filter((item): item is { idx: number; start: number; end: number; tone: string } => item !== null)
+      .sort((a, b) => (a.start - b.start) || (a.end - b.end) || (a.idx - b.idx))
+
+    if (children.length > 0) {
+      const out: Token[] = []
+      let cursor = 0
+      for (const child of children) {
+        if (child.start > cursor) {
+          const gap = parentText.slice(cursor, child.start).trim()
+          if (gap) out.push({ text: gap, tone: GAP_TONE })
+        }
+        if (child.start < cursor) {
+          continue
+        }
+        const text = parentText.slice(child.start, child.end).trim()
+        if (text) out.push({ text, tone: child.tone })
+        cursor = Math.max(cursor, child.end)
+      }
+      if (cursor < parentText.length) {
+        const tail = parentText.slice(cursor).trim()
+        if (tail) out.push({ text: tail, tone: GAP_TONE })
+      }
+      if (out.length > 0) return out
+    }
+
+    return orderedChildren(node).reduce<Token[]>((acc, child) => {
+      const text = child.content?.trim()
+      if (!text) return acc
+      if (acc.length > 0 && acc[acc.length - 1].text.toLowerCase() === text.toLowerCase()) return acc
+      acc.push({ text, tone: colorOf(labelOf(child)) })
+      return acc
+    }, [])
   }
   const tone = level === 1 && node.linguistic_elements.length === 0 ? stableTopLevelTone(node.node_id) : colorOf(labelOf(node))
   return [{ text: node.content, tone }]

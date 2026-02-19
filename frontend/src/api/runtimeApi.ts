@@ -79,6 +79,7 @@ export type VisualizerNode = {
   node_id: string
   type: string
   content: string
+  source_span?: { start: number; end: number }
   tense: string
   linguistic_notes: string[]
   notes?: Array<{ text?: string }>
