@@ -210,6 +210,46 @@ class _DeepLTranslator:
         ).strip()
 
 
+def _lara_locale(lang: str) -> str:
+    value = str(lang or "").strip().lower()
+    mapping = {
+        "en": "en-US",
+        "ru": "ru-RU",
+        "uk": "uk-UA",
+        "de": "de-DE",
+        "fr": "fr-FR",
+        "es": "es-ES",
+        "it": "it-IT",
+        "pt": "pt-PT",
+        "pl": "pl-PL",
+        "tr": "tr-TR",
+    }
+    return mapping.get(value, f"{value}-{value.upper()}") if value else "en-US"
+
+
+class _LaraTranslator:
+    model_name = "lara"
+
+    def __init__(self, api_id: str, api_secret: str) -> None:
+        self.api_id = api_id
+        self.api_secret = api_secret
+
+    def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
+        try:
+            from lara_sdk import Credentials, Translator as LaraTranslator  # type: ignore[import-not-found]
+        except Exception as exc:
+            raise RuntimeError("Lara provider requires `lara-sdk` package.") from exc
+        creds = Credentials(self.api_id, self.api_secret)
+        client = LaraTranslator(creds)
+        response = client.translate(
+            text,
+            source=_lara_locale(source_lang),
+            target=_lara_locale(target_lang),
+        )
+        translated = getattr(response, "translation", "")
+        return str(translated or "").strip()
+
+
 def _resolve_media_translator(
     *,
     provider_override: str | None = None,
@@ -230,7 +270,11 @@ def _resolve_media_translator(
             raise RuntimeError("DeepL provider selected but auth key is missing.")
         return _DeepLTranslator(key)
     if provider == "lara":
-        raise RuntimeError("Lara provider is not yet wired in runtime translator adapters.")
+        api_id = str(creds.get("api_id") or os.getenv("LARA_API_ID") or "").strip()
+        api_secret = str(creds.get("api_secret") or os.getenv("LARA_API_SECRET") or "").strip()
+        if not api_id or not api_secret:
+            raise RuntimeError("Lara provider selected but API credentials are missing.")
+        return _LaraTranslator(api_id=api_id, api_secret=api_secret)
 
     model_name = os.getenv("ELA_MEDIA_TRANSLATION_MODEL", "").strip() or (
         "facebook/m2m100_418M" if provider in {"m2m100", "hf"} else provider

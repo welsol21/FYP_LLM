@@ -16,3 +16,4 @@ pypdf
 openai-whisper
 openai
 deepl
+lara-sdk
