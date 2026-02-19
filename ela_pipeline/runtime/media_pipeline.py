@@ -209,14 +209,18 @@ def run_media_pipeline(*, source_path: str, spacy_model: str = "en_core_web_sm")
 
     nlp = load_nlp(spacy_model)
     skeleton = build_skeleton(full_text, nlp)
-    analyzed = apply_tam(skeleton, nlp)
-    _enrich_analyzed_contract(analyzed)
+    sentence_stream = [str(text).strip() for text in skeleton.keys() if str(text).strip()]
 
     media_sentences: list[dict[str, Any]] = []
     contract_sentences: list[dict[str, Any]] = []
-    for idx, (sentence_text, sentence_node) in enumerate(analyzed.items()):
-        _ensure_visualizer_fields(sentence_node)
-        sent_hash = build_sentence_hash(sentence_text, idx)
+    for idx, sentence_text in enumerate(sentence_stream):
+        sentence_payload = _build_sentence_contract_with_nlp(
+            sentence_text=sentence_text,
+            sentence_idx=idx,
+            nlp=nlp,
+        )
+        sentence_node = sentence_payload["sentence_node"]
+        sent_hash = sentence_payload["sentence_hash"]
         media_sentences.append(
             {
                 "sentence_idx": idx,
@@ -248,11 +252,23 @@ def build_sentence_contract(
     sentence_idx: int = 0,
     spacy_model: str = "en_core_web_sm",
 ) -> dict[str, Any]:
+    nlp = load_nlp(spacy_model)
+    return _build_sentence_contract_with_nlp(
+        sentence_text=sentence_text,
+        sentence_idx=sentence_idx,
+        nlp=nlp,
+    )
+
+
+def _build_sentence_contract_with_nlp(
+    *,
+    sentence_text: str,
+    sentence_idx: int,
+    nlp: Any,
+) -> dict[str, Any]:
     text = (sentence_text or "").strip()
     if not text:
         raise ValueError("sentence_text must be non-empty")
-
-    nlp = load_nlp(spacy_model)
     skeleton = build_skeleton(text, nlp)
     if not skeleton:
         raise RuntimeError("Unable to build sentence skeleton.")
