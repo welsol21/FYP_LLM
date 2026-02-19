@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useApi } from '../api/apiContext'
 import type { MediaSubmissionPayload } from '../api/runtimeApi'
 
@@ -6,6 +6,7 @@ type Props = {
   onSubmitted: (payload: MediaSubmissionPayload) => void
   projectId: string | null
   projectLabel: string
+  stageProgress: number[]
   initialMedia?: {
     mediaFileId?: string
     mediaPath?: string
@@ -17,7 +18,7 @@ type Props = {
 
 const STAGES = ['Loading file', 'Transcribing audio', 'Translating text', 'Generating media', 'Exporting files']
 
-export function MediaSubmitForm({ onSubmitted, projectId, projectLabel, initialMedia }: Props) {
+export function MediaSubmitForm({ onSubmitted, projectId, projectLabel, stageProgress, initialMedia }: Props) {
   const api = useApi()
   const [mediaPath, setMediaPath] = useState('')
   const [durationSec, setDurationSec] = useState(600)
@@ -28,7 +29,6 @@ export function MediaSubmitForm({ onSubmitted, projectId, projectLabel, initialM
   const [subtitles, setSubtitles] = useState('Bilingual')
   const [voice, setVoice] = useState('Male')
   const [submitting, setSubmitting] = useState(false)
-  const [lastRoute, setLastRoute] = useState<'local' | 'backend' | 'reject' | null>(null)
 
   useEffect(() => {
     if (!initialMedia) return
@@ -38,13 +38,6 @@ export function MediaSubmitForm({ onSubmitted, projectId, projectLabel, initialM
     setMediaFileId(initialMedia.mediaFileId)
     setSelectedFileName(initialMedia.fileName ?? '')
   }, [initialMedia])
-
-  const stageProgress = useMemo(() => {
-    if (!lastRoute) return [0, 0, 0, 0, 0]
-    if (lastRoute === 'reject') return [100, 0, 0, 0, 0]
-    if (lastRoute === 'backend') return [100, 100, 100, 35, 0]
-    return [100, 100, 100, 100, 100]
-  }, [lastRoute])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -57,7 +50,6 @@ export function MediaSubmitForm({ onSubmitted, projectId, projectLabel, initialM
         projectId: projectId ?? undefined,
         mediaFileId,
       })
-      setLastRoute(payload.result.route)
       onSubmitted(payload)
     } finally {
       setSubmitting(false)
@@ -107,4 +99,3 @@ export function MediaSubmitForm({ onSubmitted, projectId, projectLabel, initialM
     </form>
   )
 }
-
