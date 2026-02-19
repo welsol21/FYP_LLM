@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import hashlib
 import os
 from pathlib import Path
+import re
 from typing import Any, Callable
 
 from ela_pipeline.client_storage import build_sentence_hash
@@ -42,9 +43,46 @@ def _detect_source_type(path: Path) -> str:
     return "text"
 
 
-def _extract_text(source_path: Path, source_type: str) -> str:
+def _estimate_sentence_duration_seconds(text: str) -> float:
+    words = len(re.findall(r"\w+", text or "", flags=re.UNICODE))
+    return float(max(1.0, min(8.0, 0.35 * words + 0.8)))
+
+
+def _tokenize_semantic_units(text: str, *, start_sec: float, end_sec: float) -> list[dict[str, Any]]:
+    tokens = re.findall(r"\d+|[A-Za-zА-Яа-яЁё]+|[^\w\s]", text or "", flags=re.UNICODE)
+    if not tokens:
+        return []
+
+    span = max(end_sec - start_sec, 0.001)
+    unit = span / max(len(tokens), 1)
+    out: list[dict[str, Any]] = []
+    for idx, tok in enumerate(tokens, start=1):
+        tok_start = start_sec + (idx - 1) * unit
+        tok_end = start_sec + idx * unit
+        out.append(
+            {
+                "id": idx,
+                "type": "number" if tok.isdigit() else ("word" if tok.isalpha() else "symbol"),
+                "text": tok,
+                "audio": {
+                    "origin_start": round(tok_start, 3),
+                    "origin_end": round(tok_end, 3),
+                },
+            }
+        )
+    return out
+
+
+def _extract_translation_text(sentence_node: dict[str, Any]) -> str:
+    tr = sentence_node.get("translation")
+    if isinstance(tr, dict):
+        return str(tr.get("text") or "").strip()
+    return ""
+
+
+def _extract_text_and_sentence_chunks(source_path: Path, source_type: str) -> tuple[str, list[dict[str, Any]]]:
     if source_type == "text":
-        return source_path.read_text(encoding="utf-8", errors="ignore").strip()
+        return source_path.read_text(encoding="utf-8", errors="ignore").strip(), []
 
     if source_type == "pdf":
         try:
@@ -57,20 +95,46 @@ def _extract_text(source_path: Path, source_type: str) -> str:
             page_text = (page.extract_text() or "").strip()
             if page_text:
                 chunks.append(page_text)
-        return "\n".join(chunks).strip()
+        return "\n".join(chunks).strip(), []
 
     if source_type in {"audio", "video"}:
-        # Current pragmatic path before ASR integration:
-        # use sidecar transcript file if present: <media>.txt
-        sidecar = source_path.with_suffix(source_path.suffix + ".txt")
-        if sidecar.exists():
-            return sidecar.read_text(encoding="utf-8", errors="ignore").strip()
-        raise RuntimeError(
-            f"No transcript sidecar found for {source_type} file. "
-            f"Expected: {sidecar.name}. Add ASR integration for direct transcription."
+        model_name = os.getenv("ELA_MEDIA_ASR_MODEL", "base").strip() or "base"
+        source_lang = os.getenv("ELA_MEDIA_ASR_SOURCE_LANG", "en").strip() or "en"
+        try:
+            import whisper  # type: ignore[import-not-found]
+        except Exception as exc:  # pragma: no cover
+            raise RuntimeError(
+                "Audio/video processing requires local ASR. Install `openai-whisper` for client pipeline."
+            ) from exc
+        model = whisper.load_model(model_name)
+        result = model.transcribe(
+            str(source_path),
+            language=source_lang,
+            word_timestamps=False,
+            verbose=False,
         )
+        segments: list[dict[str, Any]] = []
+        texts: list[str] = []
+        for seg in result.get("segments", []) or []:
+            text = str(seg.get("text") or "").strip()
+            if not text:
+                continue
+            start_sec = float(seg.get("start") or 0.0)
+            end_sec = float(seg.get("end") or start_sec + _estimate_sentence_duration_seconds(text))
+            segments.append(
+                {
+                    "sentence_text": text,
+                    "start_sec": start_sec,
+                    "end_sec": max(end_sec, start_sec + 0.2),
+                }
+            )
+            texts.append(text)
 
-    return source_path.read_text(encoding="utf-8", errors="ignore").strip()
+        if not segments:
+            raise RuntimeError("ASR produced no transcript segments for media file.")
+        return " ".join(texts).strip(), segments
+
+    return source_path.read_text(encoding="utf-8", errors="ignore").strip(), []
 
 
 def _ensure_visualizer_fields(node: dict[str, Any]) -> None:
@@ -208,16 +272,34 @@ def run_media_pipeline(
         raise FileNotFoundError(f"Media source not found: {source_path}")
 
     source_type = _detect_source_type(path)
-    full_text = _extract_text(path, source_type).strip()
+    full_text, extracted_sentence_chunks = _extract_text_and_sentence_chunks(path, source_type)
+    full_text = full_text.strip()
     if not full_text:
         raise RuntimeError("Extracted text is empty.")
 
     nlp = load_nlp(spacy_model)
-    skeleton = build_skeleton(full_text, nlp)
-    sentence_stream = [str(text).strip() for text in skeleton.keys() if str(text).strip()]
+    sentence_stream: list[str] = []
+    sentence_timeline: list[dict[str, float] | None] = []
+    if extracted_sentence_chunks:
+        for row in extracted_sentence_chunks:
+            text = str(row.get("sentence_text") or "").strip()
+            if not text:
+                continue
+            sentence_stream.append(text)
+            sentence_timeline.append(
+                {
+                    "start_sec": float(row.get("start_sec") or 0.0),
+                    "end_sec": float(row.get("end_sec") or 0.0),
+                }
+            )
+    else:
+        skeleton = build_skeleton(full_text, nlp)
+        sentence_stream = [str(text).strip() for text in skeleton.keys() if str(text).strip()]
+        sentence_timeline = [None] * len(sentence_stream)
 
     media_sentences: list[dict[str, Any]] = []
     contract_sentences: list[dict[str, Any]] = []
+    time_cursor_sec = 0.0
     for idx, sentence_text in enumerate(sentence_stream):
         if sentence_contract_builder is None:
             sentence_payload = _build_sentence_contract_with_nlp(
@@ -231,12 +313,43 @@ def run_media_pipeline(
                 sentence_idx=idx,
             )
         sentence_node = sentence_payload["sentence_node"]
+        sentence_text_resolved = str(sentence_payload.get("sentence_text") or sentence_text).strip()
         sent_hash = sentence_payload["sentence_hash"]
+        timing = sentence_timeline[idx] if idx < len(sentence_timeline) else None
+        if timing is not None:
+            start_sec = float(timing.get("start_sec") or 0.0)
+            end_sec = float(timing.get("end_sec") or start_sec + 0.2)
+            if end_sec <= start_sec:
+                end_sec = start_sec + _estimate_sentence_duration_seconds(sentence_text_resolved)
+            time_cursor_sec = max(time_cursor_sec, end_sec + 0.2)
+        else:
+            start_sec = time_cursor_sec
+            end_sec = start_sec + _estimate_sentence_duration_seconds(sentence_text_resolved)
+            time_cursor_sec = end_sec + 0.2
+
+        ru_text = _extract_translation_text(sentence_node)
         media_sentences.append(
             {
                 "sentence_idx": idx,
-                "sentence_text": sentence_text,
+                "sentence_text": sentence_text_resolved,
                 "sentence_hash": sent_hash,
+                "start_ms": int(round(start_sec * 1000)),
+                "end_ms": int(round(end_sec * 1000)),
+                "id": idx + 1,
+                "text_eng": sentence_text_resolved,
+                "units": _tokenize_semantic_units(
+                    sentence_text_resolved,
+                    start_sec=start_sec,
+                    end_sec=end_sec,
+                ),
+                "start": round(start_sec, 3),
+                "end": round(end_sec, 3),
+                "text_ru": ru_text,
+                "units_ru": _tokenize_semantic_units(
+                    ru_text,
+                    start_sec=start_sec,
+                    end_sec=end_sec,
+                ),
             }
         )
         contract_sentences.append(

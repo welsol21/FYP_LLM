@@ -98,6 +98,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                             "type": "Sentence",
                             "content": "She trusted him.",
                             "node_id": "n1",
+                            "translation": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."},
                             "linguistic_elements": [],
                         },
                     },
@@ -112,6 +113,13 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertTrue((doc_dir / "media_contract.json").exists())
             self.assertTrue((doc_dir / "contract_sentences.json").exists())
             self.assertTrue((doc_dir / "sentence_link.json").exists())
+            self.assertTrue((doc_dir / "semantic_units_runtime.json").exists())
+            self.assertTrue((doc_dir / "bilingual_objects_runtime.json").exists())
+            self.assertTrue((doc_dir / "subtitles_en.srt").exists())
+            self.assertTrue((doc_dir / "subtitles_bilingual.srt").exists())
+            bilingual_srt = (doc_dir / "subtitles_bilingual.srt").read_text(encoding="utf-8")
+            self.assertIn("She trusted him.", bilingual_srt)
+            self.assertIn("Она доверяла ему.", bilingual_srt)
 
     def test_submit_media_reject_returns_error_feedback(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from ela_pipeline.runtime.media_pipeline import run_media_pipeline
 
@@ -21,17 +22,32 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
             self.assertIsInstance(sentence_node.get("linguistic_notes"), list)
             self.assertTrue(sentence_node.get("translation", {}).get("text"))
             self.assertIn("phonetic", sentence_node)
+            media_row = result.media_sentences[0]
+            self.assertIn("start_ms", media_row)
+            self.assertIn("end_ms", media_row)
+            self.assertIn("units", media_row)
+            self.assertIn("text_eng", media_row)
+            self.assertIn("text_ru", media_row)
 
-    def test_audio_pipeline_uses_sidecar_transcript(self):
+    def test_audio_pipeline_uses_asr_extraction_chunks(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             media = Path(tmpdir) / "sample.mp3"
             media.write_bytes(b"fake-audio")
-            sidecar = Path(tmpdir) / "sample.mp3.txt"
-            sidecar.write_text("This is transcript text. It has two sentences.", encoding="utf-8")
-
-            result = run_media_pipeline(source_path=str(media))
+            with patch(
+                "ela_pipeline.runtime.media_pipeline._extract_text_and_sentence_chunks",
+                return_value=(
+                    "This is transcript text. It has two sentences.",
+                    [
+                        {"sentence_text": "This is transcript text.", "start_sec": 0.0, "end_sec": 1.2},
+                        {"sentence_text": "It has two sentences.", "start_sec": 1.3, "end_sec": 2.7},
+                    ],
+                ),
+            ):
+                result = run_media_pipeline(source_path=str(media))
             self.assertEqual(result.source_type, "audio")
             self.assertEqual(len(result.media_sentences), 2)
+            self.assertEqual(result.media_sentences[0]["start_ms"], 0)
+            self.assertEqual(result.media_sentences[1]["start_ms"], 1300)
 
     def test_pipeline_uses_external_sentence_contract_builder(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -59,6 +75,8 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
             self.assertEqual(calls[1][1], 1)
             self.assertEqual(result.contract_sentences[0]["sentence_hash"], "h-0")
             self.assertEqual(result.contract_sentences[1]["sentence_node"]["node_id"], "n-1")
+            self.assertEqual(result.media_sentences[0]["text_eng"], "She trusted him.")
+            self.assertEqual(result.media_sentences[0]["text_ru"], "")
 
 
 if __name__ == "__main__":

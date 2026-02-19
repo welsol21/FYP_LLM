@@ -487,20 +487,20 @@
   - [x] Implement hash-first sentence linking (`sentence_hash`) between media sentence stream and main contract nodes.
   - [x] Build deterministic sentence hash policy for repeated text (include stable disambiguator such as sentence index).
   - [x] Persist full extracted text locally (SQLite) and keep backend text/media temporary-only (TTL).
-  - [ ] Implement backend large-media processing path end-to-end:
-    - [x] enqueue job for oversized media
-    - [x] poll job state
-    - [x] retry failed job
-    - [x] resume active job after app restart
-    - [x] sync completed backend result into local document tables
+  - [x] Remove backend large-media processing path (architecture switch to client-only media pipeline + backend sentence-contract only).
   - [x] Real upload + extraction pipeline wiring:
     - [x] Analyze screen uploads media via runtime API (`multipart/form-data`)
     - [x] Runtime API persists upload to temp media dir (`MEDIA_TEMP_DIR/uploads`)
     - [x] Extraction pipeline implemented for `text/pdf/audio/video` source types
     - [x] Local route performs immediate extraction->analyze->sync into document tables
-    - [x] Backend route performs poll->completed->sync into document tables
+    - [x] Backend route removed from media processing (no backend media jobs).
     - [x] Files screen reflects analyzed state after sync and provides visualizer entry
-  - [ ] Audio/video direct ASR extraction (remove sidecar transcript fallback)
+  - [x] Audio/video direct ASR extraction (remove sidecar transcript fallback)
+  - [x] Persist legacy-compatible media artifacts for client outputs:
+    - [x] `semantic_units_runtime.json`
+    - [x] `bilingual_objects_runtime.json`
+    - [x] `subtitles_en.srt`
+    - [x] `subtitles_bilingual.srt`
   - [ ] Add runtime API endpoints/services for document-scoped visualizer flow:
     - [x] `get_visualizer_payload(document_id)`
     - [x] `list_document_sentences(document_id)`

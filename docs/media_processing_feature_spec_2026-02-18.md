@@ -1,7 +1,7 @@
 # Media Processing Feature Spec (Client-first + Contract Backend)
 
 Date: 2026-02-18
-Status: Draft for implementation
+Status: In progress
 
 ## 1. Goal
 Implement end-to-end media ingestion and analysis for:
@@ -155,6 +155,21 @@ Analyze screen:
 - stage progress (`ingest -> extract -> normalize -> analyze`)
 - no backend jobs table/control in UI
 
+Current runtime outputs after local analyze:
+- `artifacts/media_contracts/<document_id>/full_text.txt`
+- `artifacts/media_contracts/<document_id>/media_contract.json`
+- `artifacts/media_contracts/<document_id>/contract_sentences.json`
+- `artifacts/media_contracts/<document_id>/sentence_link.json`
+- `artifacts/media_contracts/<document_id>/semantic_units_runtime.json`
+- `artifacts/media_contracts/<document_id>/bilingual_objects_runtime.json`
+- `artifacts/media_contracts/<document_id>/subtitles_en.srt`
+- `artifacts/media_contracts/<document_id>/subtitles_bilingual.srt`
+
+ASR runtime requirement for audio/video:
+- client uses local Whisper (`openai-whisper`)
+- ffmpeg is required in runtime environment
+- ASR model configurable via `ELA_MEDIA_ASR_MODEL` (default: `base`)
+
 Visualizer screen:
 - receives only document-scoped payload
 - `Prev/Next` within current document only
@@ -180,9 +195,9 @@ Phase 4: End-to-end checks
 1. one text sample E2E
 2. one PDF sample E2E
 3. one audio sample E2E (local)
-4. one oversized sample route-to-backend scenario
-5. backend failure + retry scenario
-6. app restart + resume backend polling scenario
+4. one oversized sample reject scenario
+5. backend sentence-contract failure + retry scenario
+6. app restart + visualizer reopen for processed document scenario
 
 ## 10. Acceptance Criteria
 - analyzed file opens visualizer by double-click

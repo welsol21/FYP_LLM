@@ -20,6 +20,44 @@ from .media_submission import submit_media_for_processing
 from .ui_state import build_runtime_ui_state, build_submission_ui_feedback
 
 
+def _srt_ts(total_ms: int) -> str:
+    ms = max(0, int(total_ms))
+    hours = ms // 3_600_000
+    ms %= 3_600_000
+    minutes = ms // 60_000
+    ms %= 60_000
+    seconds = ms // 1_000
+    millis = ms % 1_000
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d},{millis:03d}"
+
+
+def _build_srt(segments: list[dict[str, Any]], *, bilingual: bool) -> str:
+    lines: list[str] = []
+    idx_out = 1
+    for seg in segments:
+        start_ms = int(seg.get("start_ms") or 0)
+        end_ms = int(seg.get("end_ms") or 0)
+        if end_ms <= start_ms:
+            end_ms = start_ms + 1000
+        text_en = str(seg.get("text_eng") or "").strip()
+        text_ru = str(seg.get("text_ru") or "").strip()
+        if bilingual:
+            if text_en and text_ru:
+                body = f"{text_en}\n{text_ru}"
+            else:
+                body = text_en or text_ru
+        else:
+            body = text_en
+        if not body:
+            continue
+        lines.append(str(idx_out))
+        lines.append(f"{_srt_ts(start_ms)} --> {_srt_ts(end_ms)}")
+        lines.append(body)
+        lines.append("")
+        idx_out += 1
+    return "\n".join(lines).strip() + "\n"
+
+
 @dataclass
 class RuntimeMediaService:
     """Single integration point for UI/desktop layer."""
@@ -327,6 +365,18 @@ class RuntimeMediaService:
             "text_hash": text_hash,
             "media_sentences": media_sentences,
         }
+        legacy_segments = [
+            {
+                "id": int(row.get("id") or row.get("sentence_idx", 0) + 1),
+                "text_eng": str(row.get("text_eng") or row.get("sentence_text") or ""),
+                "units": row.get("units") or [],
+                "start": float(row.get("start") or 0.0),
+                "end": float(row.get("end") or 0.0),
+                "text_ru": str(row.get("text_ru") or ""),
+                "units_ru": row.get("units_ru") or [],
+            }
+            for row in media_sentences
+        ]
 
         (doc_dir / "full_text.txt").write_text(full_text, encoding="utf-8")
         (doc_dir / "media_contract.json").write_text(
@@ -339,6 +389,22 @@ class RuntimeMediaService:
         )
         (doc_dir / "sentence_link.json").write_text(
             json.dumps(links, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        (doc_dir / "semantic_units_runtime.json").write_text(
+            json.dumps(legacy_segments, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        (doc_dir / "bilingual_objects_runtime.json").write_text(
+            json.dumps(legacy_segments, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        (doc_dir / "subtitles_en.srt").write_text(
+            _build_srt(media_sentences, bilingual=False),
+            encoding="utf-8",
+        )
+        (doc_dir / "subtitles_bilingual.srt").write_text(
+            _build_srt(media_sentences, bilingual=True),
             encoding="utf-8",
         )
 
