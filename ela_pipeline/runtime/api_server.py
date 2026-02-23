@@ -27,7 +27,6 @@ SERVICE = RuntimeMediaService(
     db_path=os.getenv("ELA_CLIENT_DB_PATH", "artifacts/client_state.sqlite3"),
     runtime_mode=os.getenv("ELA_RUNTIME_MODE", "auto"),
     deployment_mode=os.getenv("ELA_DEPLOYMENT_MODE", "auto"),
-    demo_auto_progress_jobs=os.getenv("ELA_DEMO_AUTO_PROGRESS_JOBS", "1") == "1",
 )
 
 

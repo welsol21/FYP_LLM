@@ -140,7 +140,6 @@ class RuntimeMediaService:
     runtime_mode: str = "auto"
     deployment_mode: str = "auto"
     limits: MediaPolicyLimits | None = None
-    demo_auto_progress_jobs: bool = False
 
     def __post_init__(self) -> None:
         self.repo = LocalSQLiteRepository(self.db_path)

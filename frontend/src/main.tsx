@@ -7,7 +7,7 @@ import { HttpRuntimeApi } from './api/httpRuntimeApi'
 import { MockRuntimeApi } from './api/mockRuntimeApi'
 import './styles.css'
 
-const runtimeApi = (import.meta.env.VITE_USE_MOCK_API === '1')
+const runtimeApi = (import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_API === '1')
   ? new MockRuntimeApi()
   : new HttpRuntimeApi()
 
