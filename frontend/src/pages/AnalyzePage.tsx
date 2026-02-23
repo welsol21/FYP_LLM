@@ -60,6 +60,7 @@ export function AnalyzePage() {
   }, [api, jobId])
 
   const activeDocumentId = jobStatus?.document_id || submission?.result.document_id
+  const stageLogLines = (jobStatus?.stage_logs || []).slice(-10)
 
   useEffect(() => {
     if (!activeDocumentId) {
@@ -112,6 +113,12 @@ export function AnalyzePage() {
       {submission ? (
         <section className={`card feedback ${submission.ui_feedback.severity}`} aria-label="submission-feedback">
           <p>{jobStatus?.message || submission.ui_feedback.message}</p>
+          {jobStatus?.stage_name ? (
+            <p className="stage-log-title">Stage: {jobStatus.stage_name.replace(/_/g, ' ')}</p>
+          ) : null}
+          {stageLogLines.length > 0 ? (
+            <pre className="stage-log-box">{stageLogLines.join('\n')}</pre>
+          ) : null}
         </section>
       ) : null}
       {activeDocumentId ? (

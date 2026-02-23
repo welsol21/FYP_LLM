@@ -354,6 +354,9 @@ class RuntimeMediaService:
                 "job_id": job_id,
                 "status": "not_found",
                 "message": "Job not found.",
+                "stage_name": "not_found",
+                "stage_log": "Job not found.",
+                "stage_logs": ["Job not found."],
                 "stage_progress": [0, 0, 0, 0, 0],
             }
         return dict(row)
@@ -465,13 +468,13 @@ class RuntimeMediaService:
         translation_provider: str | None = None,
         provider_credentials: dict[str, str] | None = None,
         document_id: str | None = None,
-        stage_callback: Callable[[str], None] | None = None,
+        stage_callback: Callable[[str, float | None, str | None], None] | None = None,
     ) -> dict[str, Any]:
         if stage_callback is not None:
-            stage_callback("loading_file")
+            stage_callback("loading_file", 0.25, "Loading source file")
         source_type = self._detect_source_type(media_path)
         if source_type in {"audio", "video"} and stage_callback is not None:
-            stage_callback("transcribing_audio")
+            stage_callback("transcribing_audio", 0.05, "Preparing ASR")
         try:
             pipeline = run_media_pipeline(
                 source_path=media_path,
@@ -481,6 +484,7 @@ class RuntimeMediaService:
                     translation_provider=translation_provider,
                     provider_credentials=provider_credentials,
                 ),
+                progress_callback=stage_callback,
             )
         except Exception as exc:
             return {
@@ -490,7 +494,7 @@ class RuntimeMediaService:
             }
 
         if stage_callback is not None:
-            stage_callback("translating_text")
+            stage_callback("translating_text", 1.0, "Sentence contract build completed")
 
         document_id = document_id or f"doc-{uuid.uuid4().hex[:12]}"
         existing_doc = self.repo.get_document(document_id)
@@ -525,7 +529,7 @@ class RuntimeMediaService:
             ],
         )
         if stage_callback is not None:
-            stage_callback("generating_media")
+            stage_callback("generating_media", 0.25, "Persisting contract artifacts")
         self._persist_media_contract_artifacts(
             document_id=document_id,
             media_path=media_path,
@@ -536,7 +540,7 @@ class RuntimeMediaService:
             contract_sentences=pipeline.contract_sentences,
         )
         if stage_callback is not None:
-            stage_callback("exporting_files")
+            stage_callback("exporting_files", 1.0, "Artifacts exported")
         self.repo.update_document_status(document_id, "completed")
         return {
             "job_id": None,
@@ -562,7 +566,22 @@ class RuntimeMediaService:
         return "text"
 
     @staticmethod
-    def _stage_progress(stage_name: str) -> list[int]:
+    def _stage_progress(stage_name: str, ratio: float | None = None) -> list[int]:
+        def clamp(v: float) -> int:
+            return max(0, min(100, int(round(v))))
+
+        if ratio is not None:
+            r = max(0.0, min(1.0, float(ratio)))
+            if stage_name == "loading_file":
+                return [clamp(5 + 95 * r), 0, 0, 0, 0]
+            if stage_name == "transcribing_audio":
+                return [100, clamp(5 + 95 * r), 0, 0, 0]
+            if stage_name == "translating_text":
+                return [100, 100, clamp(5 + 95 * r), 0, 0]
+            if stage_name == "generating_media":
+                return [100, 100, 100, clamp(5 + 95 * r), 0]
+            if stage_name == "exporting_files":
+                return [100, 100, 100, 100, clamp(5 + 95 * r)]
         mapping = {
             "queued": [2, 0, 0, 0, 0],
             "loading_file": [25, 0, 0, 0, 0],
@@ -583,16 +602,39 @@ class RuntimeMediaService:
         message: str,
         stage_name: str | None = None,
         document_id: str | None = None,
+        progress_ratio: float | None = None,
+        stage_log: str | None = None,
     ) -> None:
-        stage_progress = self._stage_progress(stage_name or status)
+        stage_progress = self._stage_progress(stage_name or status, progress_ratio)
+        stage_name_resolved = stage_name or str(status or "")
+        message_resolved = str(message or "")
+        stage_log_resolved = str(stage_log or "").strip() or None
+        with self._local_jobs_lock:
+            previous = dict(self._local_jobs.get(job_id) or {})
+            logs = list(previous.get("stage_logs") or [])
+            if stage_log_resolved:
+                if not logs or logs[-1] != stage_log_resolved:
+                    logs.append(stage_log_resolved)
+            elif message_resolved:
+                if not logs or logs[-1] != message_resolved:
+                    logs.append(message_resolved)
+            logs = logs[-80:]
+
         payload: dict[str, Any] = {
             "job_id": job_id,
             "status": status,
-            "message": message,
+            "message": message_resolved,
+            "stage_name": stage_name_resolved,
+            "stage_log": stage_log_resolved or (logs[-1] if logs else ""),
+            "stage_logs": logs,
             "stage_progress": stage_progress,
         }
         if document_id:
             payload["document_id"] = document_id
+        elif previous.get("document_id"):
+            payload["document_id"] = previous.get("document_id")
+        if previous.get("document_id") and "document_id" not in payload:
+            payload["document_id"] = previous.get("document_id")
         with self._local_jobs_lock:
             self._local_jobs[job_id] = payload
 
@@ -623,12 +665,14 @@ class RuntimeMediaService:
                     translation_provider=translation_provider,
                     provider_credentials=provider_credentials,
                     document_id=document_id,
-                    stage_callback=lambda stage: self._set_local_job_state(
+                    stage_callback=lambda stage, ratio, log_line: self._set_local_job_state(
                         job_id=job_id,
                         status="running_local",
                         message=f"Stage: {stage.replace('_', ' ')}",
                         stage_name=stage,
                         document_id=document_id,
+                        progress_ratio=ratio,
+                        stage_log=log_line,
                     ),
                 )
                 if result.get("status") == "completed":

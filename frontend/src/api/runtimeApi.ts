@@ -45,6 +45,9 @@ export type BackendJobStatus = {
   job_id: string
   status: string
   message: string
+  stage_name?: string
+  stage_log?: string
+  stage_logs?: string[]
   stage_progress: number[]
   document_id?: string
 }

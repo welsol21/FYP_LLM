@@ -7,6 +7,9 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import subprocess
+import threading
+import time
 from typing import Any, Callable
 
 from ela_pipeline.client_storage import build_sentence_hash
@@ -85,7 +88,35 @@ def _extract_translation_text(sentence_node: dict[str, Any]) -> str:
     return ""
 
 
-def _extract_text_and_sentence_chunks(source_path: Path, source_type: str) -> tuple[str, list[dict[str, Any]]]:
+def _probe_media_duration_seconds(source_path: Path) -> float:
+    try:
+        proc = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(source_path),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        value = float((proc.stdout or "").strip() or "0")
+        return max(0.0, value)
+    except Exception:
+        return 0.0
+
+
+def _extract_text_and_sentence_chunks(
+    source_path: Path,
+    source_type: str,
+    *,
+    progress_callback: Callable[[str, float | None, str | None], None] | None = None,
+) -> tuple[str, list[dict[str, Any]]]:
     if source_type == "text":
         return source_path.read_text(encoding="utf-8", errors="ignore").strip(), []
 
@@ -123,13 +154,43 @@ def _extract_text_and_sentence_chunks(source_path: Path, source_type: str) -> tu
             raise RuntimeError(
                 "Audio/video ASR component is unavailable in this build."
             ) from exc
+        if progress_callback is not None:
+            progress_callback("transcribing_audio", 0.05, f"Loading ASR model: {model_name}")
         model = whisper.load_model(model_name, download_root=str(asr_cache_dir))
-        result = model.transcribe(
-            str(source_path),
-            language=source_lang,
-            word_timestamps=False,
-            verbose=False,
-        )
+        media_duration_sec = _probe_media_duration_seconds(source_path)
+        result_holder: dict[str, Any] = {}
+        error_holder: dict[str, Exception] = {}
+
+        def _run_transcribe() -> None:
+            try:
+                result_holder["result"] = model.transcribe(
+                    str(source_path),
+                    language=source_lang,
+                    word_timestamps=False,
+                    verbose=False,
+                )
+            except Exception as exc:  # pragma: no cover
+                error_holder["error"] = exc
+
+        worker = threading.Thread(target=_run_transcribe, daemon=True)
+        worker.start()
+        started = time.monotonic()
+        while worker.is_alive():
+            worker.join(timeout=0.8)
+            if progress_callback is None:
+                continue
+            elapsed = max(0.0, time.monotonic() - started)
+            if media_duration_sec > 0:
+                ratio = min(0.92, 0.08 + (elapsed / max(media_duration_sec * 1.25, 8.0)) * 0.84)
+            else:
+                ratio = min(0.92, 0.08 + min(elapsed / 90.0, 1.0) * 0.84)
+            progress_callback("transcribing_audio", ratio, f"ASR running ({int(ratio * 100)}%)")
+
+        if "error" in error_holder:
+            raise RuntimeError(str(error_holder["error"])) from error_holder["error"]
+        result = result_holder.get("result") or {}
+        if progress_callback is not None:
+            progress_callback("transcribing_audio", 1.0, "ASR completed.")
         segments: list[dict[str, Any]] = []
         texts: list[str] = []
         for seg in result.get("segments", []) or []:
@@ -463,13 +524,18 @@ def run_media_pipeline(
     source_path: str,
     spacy_model: str = "en_core_web_sm",
     sentence_contract_builder: Callable[..., dict[str, Any]] | None = None,
+    progress_callback: Callable[[str, float | None, str | None], None] | None = None,
 ) -> MediaPipelineResult:
     path = Path(source_path)
     if not path.exists():
         raise FileNotFoundError(f"Media source not found: {source_path}")
 
     source_type = _detect_source_type(path)
-    full_text, extracted_sentence_chunks = _extract_text_and_sentence_chunks(path, source_type)
+    full_text, extracted_sentence_chunks = _extract_text_and_sentence_chunks(
+        path,
+        source_type,
+        progress_callback=progress_callback,
+    )
     full_text = full_text.strip()
     if not full_text:
         raise RuntimeError("Extracted text is empty.")
@@ -497,7 +563,14 @@ def run_media_pipeline(
     media_sentences: list[dict[str, Any]] = []
     contract_sentences: list[dict[str, Any]] = []
     time_cursor_sec = 0.0
+    total_sentences = max(len(sentence_stream), 1)
     for idx, sentence_text in enumerate(sentence_stream):
+        if progress_callback is not None:
+            progress_callback(
+                "translating_text",
+                idx / total_sentences,
+                f"Building sentence contract {idx + 1}/{total_sentences}",
+            )
         if sentence_contract_builder is None:
             sentence_payload = _build_sentence_contract_with_nlp(
                 sentence_text=sentence_text,
@@ -556,6 +629,12 @@ def run_media_pipeline(
                 "sentence_node": sentence_node,
             }
         )
+        if progress_callback is not None:
+            progress_callback(
+                "translating_text",
+                (idx + 1) / total_sentences,
+                f"Built sentence contract {idx + 1}/{total_sentences}",
+            )
 
     text_hash = hashlib.sha256(full_text.encode("utf-8")).hexdigest()
     return MediaPipelineResult(
