@@ -77,6 +77,15 @@ export function AnalyzePage() {
     return [0, 0, 0, 0, 0]
   }, [submission, jobId, liveProgress])
 
+  const activeStageIndex = useMemo(() => {
+    if (!jobId) return null
+    for (let i = stageProgress.length - 1; i >= 0; i -= 1) {
+      const value = Number(stageProgress[i] ?? 0)
+      if (value > 0 && value < 100) return i
+    }
+    return null
+  }, [jobId, stageProgress])
+
   return (
     <section className="screen-block analyze-stack">
       <MediaSubmitForm
@@ -95,6 +104,7 @@ export function AnalyzePage() {
         projectId={selectedProject.project_id ?? null}
         projectLabel={selectedProject.project_name ?? selectedProject.project_id ?? 'Project'}
         stageProgress={stageProgress}
+        activeStageIndex={activeStageIndex}
         initialMedia={selectedMedia}
         translatorOptions={translationConfig?.providers || []}
         defaultTranslator={translationConfig?.default_provider || 'm2m100'}

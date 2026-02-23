@@ -302,6 +302,21 @@ textarea {
   background: linear-gradient(90deg, #3aa9ff 0%, #6ac8ff 100%);
 }
 
+.stage-fill.active {
+  background: linear-gradient(90deg, #2f98f0 0%, #8fd6ff 45%, #2f98f0 100%);
+  background-size: 220% 100%;
+  animation: stage-fill-pulse 1.2s linear infinite;
+}
+
+@keyframes stage-fill-pulse {
+  0% {
+    background-position: 0% 0%;
+  }
+  100% {
+    background-position: 220% 0%;
+  }
+}
+
 .start-btn {
   width: 100%;
   background: #5f6062;

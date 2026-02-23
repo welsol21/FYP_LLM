@@ -8,6 +8,7 @@ type Props = {
   projectId: string | null
   projectLabel: string
   stageProgress: number[]
+  activeStageIndex?: number | null
   initialMedia?: {
     mediaFileId?: string
     mediaPath?: string
@@ -32,6 +33,7 @@ export function MediaSubmitForm({
   projectId,
   projectLabel,
   stageProgress,
+  activeStageIndex = null,
   initialMedia,
   translatorOptions,
   defaultTranslator,
@@ -145,7 +147,10 @@ export function MediaSubmitForm({
           <div className="stage-row" key={stage}>
             <span>{stage}</span>
             <div className="stage-bar">
-              <div className="stage-fill" style={{ width: `${stageProgress[idx]}%` }} />
+              <div
+                className={`stage-fill${activeStageIndex === idx ? " active" : ""}`}
+                style={{ width: `${stageProgress[idx]}%` }}
+              />
             </div>
           </div>
         ))}
