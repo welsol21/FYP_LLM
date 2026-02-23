@@ -324,6 +324,13 @@ button {
   margin: 8px 0;
 }
 
+.artifact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
 .visualizer-root {
   display: grid;
   gap: 14px;

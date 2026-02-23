@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -368,6 +369,11 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertEqual(payload["sentence_hash"], "h1")
             called_req = mocked.call_args.args[0]
             self.assertIn("/api/sentence-contract", called_req.full_url)
+            body = json.loads(called_req.data.decode("utf-8"))
+            self.assertEqual(body["sentenceText"], "She trusted him.")
+            self.assertEqual(body["sentenceIdx"], 0)
+            self.assertNotIn("translationProvider", body)
+            self.assertNotIn("providerCredentials", body)
 
     def test_request_sentence_contract_raises_when_backend_unavailable(self):
         with tempfile.TemporaryDirectory() as tmpdir:

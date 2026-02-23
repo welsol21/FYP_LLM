@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import cgi
 import json
+import mimetypes
 import os
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -82,6 +83,33 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self._send_json({}, status=200)
                 return
             self._send_json(SERVICE.get_visualizer_payload(document_id=document_id))
+            return
+        if path == "/api/document-artifacts":
+            document_id = (query.get("document_id") or [""])[0]
+            if not document_id:
+                self._send_json([], status=200)
+                return
+            self._send_json(SERVICE.list_document_artifacts(document_id=document_id))
+            return
+        if path == "/api/document-artifact-download":
+            document_id = (query.get("document_id") or [""])[0]
+            name = (query.get("name") or [""])[0]
+            if not document_id or not name:
+                self._send_json({"error": "document_id and name are required"}, status=400)
+                return
+            base = Path(os.getenv("MEDIA_CONTRACT_ARTIFACTS_DIR", "artifacts/media_contracts")).resolve()
+            target = (base / document_id / Path(name).name).resolve()
+            if not str(target).startswith(str(base)) or not target.exists() or not target.is_file():
+                self._send_json({"error": "artifact not found"}, status=404)
+                return
+            data = target.read_bytes()
+            content_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Disposition", f'attachment; filename="{target.name}"')
+            self.end_headers()
+            self.wfile.write(data)
             return
 
         self._send_json({"error": "Not found"}, status=404)

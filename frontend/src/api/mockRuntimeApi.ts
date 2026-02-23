@@ -1,5 +1,6 @@
 import samplePayload from './frontend_contract_sample.json'
 import type {
+  DocumentArtifact,
   MediaFileRow,
   MediaSubmissionPayload,
   ProjectRow,
@@ -306,6 +307,32 @@ export class MockRuntimeApi implements RuntimeApi {
   async listFiles(projectId?: string): Promise<MediaFileRow[]> {
     if (!projectId) return this.files
     return this.files.filter((row) => this.fileProjectId[row.id] === projectId)
+  }
+
+  async listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]> {
+    if (!documentId) return []
+    return [
+      {
+        name: 'full_text.txt',
+        size_bytes: 2048,
+        download_url: `/api/document-artifact-download?document_id=${encodeURIComponent(documentId)}&name=full_text.txt`,
+      },
+      {
+        name: 'subtitles_en.srt',
+        size_bytes: 1024,
+        download_url: `/api/document-artifact-download?document_id=${encodeURIComponent(documentId)}&name=subtitles_en.srt`,
+      },
+      {
+        name: 'subtitles_bilingual.srt',
+        size_bytes: 2048,
+        download_url: `/api/document-artifact-download?document_id=${encodeURIComponent(documentId)}&name=subtitles_bilingual.srt`,
+      },
+      {
+        name: 'contract_sentences.json',
+        size_bytes: 8192,
+        download_url: `/api/document-artifact-download?document_id=${encodeURIComponent(documentId)}&name=contract_sentences.json`,
+      },
+    ]
   }
 
   async getVisualizerPayload(_documentId?: string): Promise<VisualizerPayload> {

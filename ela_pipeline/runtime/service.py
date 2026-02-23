@@ -15,7 +15,7 @@ from ela_pipeline.client_storage import LocalSQLiteRepository, build_sentence_ha
 
 from .capabilities import build_runtime_capabilities, resolve_deployment_mode, resolve_runtime_mode
 from .media_policy import MediaPolicyLimits, load_media_policy_limits_from_env
-from .media_pipeline import build_sentence_contract, run_media_pipeline
+from .media_pipeline import apply_translation_to_sentence_node, build_sentence_contract, run_media_pipeline
 from .media_submission import submit_media_for_processing
 from .ui_state import build_runtime_ui_state, build_submission_ui_feedback
 
@@ -329,6 +329,27 @@ class RuntimeMediaService:
             for row in rows
         ]
 
+    def list_document_artifacts(self, *, document_id: str) -> list[dict[str, Any]]:
+        base = Path(os.getenv("MEDIA_CONTRACT_ARTIFACTS_DIR", "artifacts/media_contracts"))
+        doc_dir = (base / document_id).resolve()
+        base_resolved = base.resolve()
+        if not str(doc_dir).startswith(str(base_resolved)):
+            return []
+        if not doc_dir.exists() or not doc_dir.is_dir():
+            return []
+        out: list[dict[str, Any]] = []
+        for entry in sorted(doc_dir.iterdir(), key=lambda p: p.name.lower()):
+            if not entry.is_file():
+                continue
+            out.append(
+                {
+                    "name": entry.name,
+                    "size_bytes": int(entry.stat().st_size),
+                    "download_url": f"/api/document-artifact-download?document_id={document_id}&name={entry.name}",
+                }
+            )
+        return out
+
     def get_visualizer_payload(self, *, document_id: str) -> dict[str, Any]:
         rows = self.repo.list_document_visualizer_rows(document_id=document_id)
         payload: dict[str, Any] = {}
@@ -407,7 +428,7 @@ class RuntimeMediaService:
         try:
             pipeline = run_media_pipeline(
                 source_path=media_path,
-                sentence_contract_builder=lambda *, sentence_text, sentence_idx: self._request_sentence_contract(
+                sentence_contract_builder=lambda *, sentence_text, sentence_idx: self._build_sentence_contract_from_backend_and_local_translation(
                     sentence_text=sentence_text,
                     sentence_idx=sentence_idx,
                     translation_provider=translation_provider,
@@ -472,6 +493,27 @@ class RuntimeMediaService:
             "linked_sentences_count": len(pipeline.media_sentences),
             "message": "Local media processed and synced.",
         }
+
+    def _build_sentence_contract_from_backend_and_local_translation(
+        self,
+        *,
+        sentence_text: str,
+        sentence_idx: int,
+        translation_provider: str | None = None,
+        provider_credentials: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        payload = self._request_sentence_contract(
+            sentence_text=sentence_text,
+            sentence_idx=sentence_idx,
+        )
+        sentence_node = payload.get("sentence_node")
+        if isinstance(sentence_node, dict):
+            apply_translation_to_sentence_node(
+                sentence_node=sentence_node,
+                translation_provider=translation_provider,
+                provider_credentials=provider_credentials,
+            )
+        return payload
 
     def _persist_media_contract_artifacts(
         self,
@@ -547,8 +589,6 @@ class RuntimeMediaService:
         *,
         sentence_text: str,
         sentence_idx: int,
-        translation_provider: str | None = None,
-        provider_credentials: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         if not self.sentence_contract_backend_url:
             raise RuntimeError("ELA_SENTENCE_CONTRACT_BACKEND_URL is required for sentence contract requests.")
@@ -557,8 +597,6 @@ class RuntimeMediaService:
             {
                 "sentenceText": sentence_text,
                 "sentenceIdx": sentence_idx,
-                "translationProvider": translation_provider,
-                "providerCredentials": provider_credentials or {},
             }
         ).encode("utf-8")
         req = urlrequest.Request(endpoint, data=payload, method="POST")

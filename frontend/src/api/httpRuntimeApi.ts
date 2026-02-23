@@ -1,4 +1,5 @@
 import type {
+  DocumentArtifact,
   MediaFileRow,
   MediaSubmissionPayload,
   ProjectRow,
@@ -107,6 +108,10 @@ export class HttpRuntimeApi implements RuntimeApi {
   async listFiles(projectId?: string): Promise<MediaFileRow[]> {
     const suffix = projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''
     return requestJson<MediaFileRow[]>(`/api/files${suffix}`)
+  }
+
+  async listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]> {
+    return requestJson<DocumentArtifact[]>(`/api/document-artifacts?document_id=${encodeURIComponent(documentId)}`)
   }
 
   async getVisualizerPayload(documentId?: string): Promise<VisualizerPayload> {

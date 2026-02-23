@@ -4,6 +4,7 @@ import type { MediaSubmissionPayload, TranslationProviderConfig } from '../api/r
 
 type Props = {
   onSubmitted: (payload: MediaSubmissionPayload) => void
+  onSubmittingChange?: (value: boolean) => void
   projectId: string | null
   projectLabel: string
   stageProgress: number[]
@@ -27,6 +28,7 @@ function hasRequiredCredentials(provider: TranslationProviderConfig): boolean {
 
 export function MediaSubmitForm({
   onSubmitted,
+  onSubmittingChange,
   projectId,
   projectLabel,
   stageProgress,
@@ -70,6 +72,7 @@ export function MediaSubmitForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
+    onSubmittingChange?.(true)
     try {
       const payload = await api.submitMedia({
         mediaPath,
@@ -84,6 +87,7 @@ export function MediaSubmitForm({
       onSubmitted(payload)
     } finally {
       setSubmitting(false)
+      onSubmittingChange?.(false)
     }
   }
 

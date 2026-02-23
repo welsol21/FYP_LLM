@@ -316,6 +316,58 @@ def _attach_translation_runtime(
             }
 
 
+def apply_translation_to_sentence_node(
+    *,
+    sentence_node: dict[str, Any],
+    translation_provider: str | None = None,
+    provider_credentials: dict[str, str] | None = None,
+    source_lang: str | None = None,
+    target_lang: str | None = None,
+) -> None:
+    translator = _resolve_media_translator(
+        provider_override=translation_provider,
+        provider_credentials=provider_credentials,
+    )
+    source_lang_resolved = source_lang or os.getenv("ELA_MEDIA_TRANSLATION_SOURCE_LANG", "en")
+    target_lang_resolved = target_lang or os.getenv("ELA_MEDIA_TRANSLATION_TARGET_LANG", "ru")
+
+    existing_text_by_node_id: dict[int, str] = {}
+    for node in _walk_nodes(sentence_node):
+        tr = node.get("translation")
+        if isinstance(tr, dict):
+            existing_text_by_node_id[id(node)] = str(tr.get("text") or "").strip()
+
+    analyzed = {"_": sentence_node}
+    _attach_translation_runtime(
+        analyzed,
+        translator=translator,
+        source_lang=source_lang_resolved,
+        target_lang=target_lang_resolved,
+    )
+
+    if str(source_lang_resolved).strip().lower() == str(target_lang_resolved).strip().lower():
+        return
+
+    for node in _walk_nodes(sentence_node):
+        source_text = str(node.get("content") or "").strip()
+        if not source_text:
+            continue
+
+        tr = node.get("translation")
+        if not isinstance(tr, dict):
+            continue
+
+        new_text = str(tr.get("text") or "").strip()
+        if not new_text:
+            continue
+
+        # If local provider returned unchanged source text, keep pre-existing backend translation.
+        if new_text.casefold() == source_text.casefold():
+            existing_translation = existing_text_by_node_id.get(id(node), "").strip()
+            if existing_translation and existing_translation.casefold() != source_text.casefold():
+                tr["text"] = existing_translation
+
+
 def _attach_phonetic_runtime(analyzed: dict[str, Any], *, transcriber: Any) -> None:
     for sentence_node in analyzed.values():
         if not isinstance(sentence_node, dict):

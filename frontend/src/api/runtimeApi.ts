@@ -35,6 +35,12 @@ export type MediaSubmissionPayload = {
   }
 }
 
+export type DocumentArtifact = {
+  name: string
+  size_bytes: number
+  download_url: string
+}
+
 export type MediaFileRow = {
   id: string
   name: string
@@ -110,6 +116,7 @@ export interface RuntimeApi {
   getTranslationConfig(): Promise<TranslationConfig>
   saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig>
   listFiles(projectId?: string): Promise<MediaFileRow[]>
+  listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]>
   getVisualizerPayload(documentId?: string): Promise<VisualizerPayload>
   applyEdit(input: {
     sentenceText: string

@@ -92,6 +92,7 @@ describe('VisualizerPage', () => {
         ui_feedback: { severity: 'info', title: '', message: '' },
       }),
       listFiles: async () => [],
+      listDocumentArtifacts: async () => [],
       uploadMedia: async () => ({ fileName: 'uploaded.txt', mediaPath: '/tmp/uploaded.txt', sizeBytes: 12 }),
       getVisualizerPayload,
       applyEdit: async () => ({ status: 'ok', message: 'Edit applied.' }),
