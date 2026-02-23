@@ -1,5 +1,6 @@
 import samplePayload from './frontend_contract_sample.json'
 import type {
+  BackendJobStatus,
   DocumentArtifact,
   MediaFileRow,
   MediaSubmissionPayload,
@@ -107,6 +108,7 @@ function coerceInputValue(raw: string, existing: unknown): unknown {
 }
 
 export class MockRuntimeApi implements RuntimeApi {
+  private localJobs: Record<string, { ticks: number; document_id: string }> = {}
   private translationConfig: TranslationConfig = {
     default_provider: 'm2m100',
     providers: [
@@ -276,8 +278,10 @@ export class MockRuntimeApi implements RuntimeApi {
         analyzed: true,
         document_id: docId,
       })
+      const jobId = `local-${Date.now()}`
+      this.localJobs[jobId] = { ticks: 0, document_id: docId }
       return {
-        result: { route: 'local', message: 'File accepted for local processing.', status: 'completed_local', document_id: docId },
+        result: { route: 'local', message: 'File accepted for local processing.', status: 'accepted_local', job_id: jobId },
         ui_feedback: {
           severity: 'info',
           title: 'Local processing started',
@@ -333,6 +337,41 @@ export class MockRuntimeApi implements RuntimeApi {
         download_url: `/api/document-artifact-download?document_id=${encodeURIComponent(documentId)}&name=contract_sentences.json`,
       },
     ]
+  }
+
+  async getBackendJobStatus(jobId: string): Promise<BackendJobStatus> {
+    const row = this.localJobs[jobId]
+    if (!row) {
+      return {
+        job_id: jobId,
+        status: 'not_found',
+        message: 'Job not found.',
+        stage_progress: [0, 0, 0, 0, 0],
+      }
+    }
+    row.ticks += 1
+    if (row.ticks >= 4) {
+      return {
+        job_id: jobId,
+        status: 'completed_local',
+        message: 'Local processing completed.',
+        stage_progress: [100, 100, 100, 100, 100],
+        document_id: row.document_id,
+      }
+    }
+    const progressByTick = [
+      [25, 0, 0, 0, 0],
+      [100, 50, 0, 0, 0],
+      [100, 100, 65, 0, 0],
+      [100, 100, 100, 80, 0],
+    ] as number[][]
+    return {
+      job_id: jobId,
+      status: 'running_local',
+      message: 'Local processing in progress.',
+      stage_progress: progressByTick[row.ticks - 1] ?? [100, 100, 100, 100, 95],
+      document_id: row.document_id,
+    }
   }
 
   async getVisualizerPayload(_documentId?: string): Promise<VisualizerPayload> {

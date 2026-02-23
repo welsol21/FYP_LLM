@@ -1,4 +1,5 @@
 import type {
+  BackendJobStatus,
   DocumentArtifact,
   MediaFileRow,
   MediaSubmissionPayload,
@@ -112,6 +113,10 @@ export class HttpRuntimeApi implements RuntimeApi {
 
   async listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]> {
     return requestJson<DocumentArtifact[]>(`/api/document-artifacts?document_id=${encodeURIComponent(documentId)}`)
+  }
+
+  async getBackendJobStatus(jobId: string): Promise<BackendJobStatus> {
+    return requestJson<BackendJobStatus>(`/api/backend-job-status?job_id=${encodeURIComponent(jobId)}`)
   }
 
   async getVisualizerPayload(documentId?: string): Promise<VisualizerPayload> {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
-import type { DocumentArtifact, MediaSubmissionPayload, SelectedProject, TranslationConfig } from '../api/runtimeApi'
+import type { BackendJobStatus, DocumentArtifact, MediaSubmissionPayload, SelectedProject, TranslationConfig } from '../api/runtimeApi'
 import { MediaSubmitForm } from '../components/MediaSubmitForm'
 
 export function AnalyzePage() {
@@ -12,7 +12,8 @@ export function AnalyzePage() {
   const [submission, setSubmission] = useState<MediaSubmissionPayload | null>(null)
   const [translationConfig, setTranslationConfig] = useState<TranslationConfig | null>(null)
   const [artifacts, setArtifacts] = useState<DocumentArtifact[]>([])
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [jobId, setJobId] = useState<string | null>(null)
+  const [jobStatus, setJobStatus] = useState<BackendJobStatus | null>(null)
   const [liveProgress, setLiveProgress] = useState<number[]>([0, 0, 0, 0, 0])
   const selectedMedia = (location.state as
     | {
@@ -33,66 +34,64 @@ export function AnalyzePage() {
   }, [api])
 
   useEffect(() => {
-    if (!isSubmitting) return
-    setLiveProgress([12, 0, 0, 0, 0])
-    const timer = window.setInterval(() => {
-      setLiveProgress((prev) => {
-        const next = [...prev]
-        if (next[0] < 100) {
-          next[0] = Math.min(100, next[0] + 12)
-          if (next[0] >= 70 && next[1] < 50) next[1] = 50
-          return next
+    if (!jobId) return
+    let stopped = false
+    const poll = async () => {
+      try {
+        const status = await api.getBackendJobStatus(jobId)
+        if (stopped) return
+        setJobStatus(status)
+        if (Array.isArray(status.stage_progress) && status.stage_progress.length === 5) {
+          setLiveProgress(status.stage_progress)
         }
-        if (next[1] < 100) {
-          next[1] = Math.min(100, next[1] + 9)
-          if (next[1] >= 65 && next[2] < 45) next[2] = 45
-          return next
+        if (status.status === 'completed_local' || status.status === 'rejected' || status.status === 'error' || status.status === 'not_found') {
+          setJobId(null)
         }
-        if (next[2] < 100) {
-          next[2] = Math.min(100, next[2] + 8)
-          if (next[2] >= 65 && next[3] < 35) next[3] = 35
-          return next
-        }
-        if (next[3] < 95) {
-          next[3] = Math.min(95, next[3] + 6)
-          if (next[3] >= 60 && next[4] < 25) next[4] = 25
-          return next
-        }
-        if (next[4] < 90) {
-          next[4] = Math.min(90, next[4] + 5)
-          return next
-        }
-        return next
-      })
-    }, 450)
-    return () => window.clearInterval(timer)
-  }, [isSubmitting])
+      } catch {
+        if (!stopped) setJobId(null)
+      }
+    }
+    poll()
+    const timer = window.setInterval(poll, 800)
+    return () => {
+      stopped = true
+      window.clearInterval(timer)
+    }
+  }, [api, jobId])
+
+  const activeDocumentId = jobStatus?.document_id || submission?.result.document_id
 
   useEffect(() => {
-    if (!submission?.result.document_id) {
+    if (!activeDocumentId) {
       setArtifacts([])
       return
     }
-    api.listDocumentArtifacts(submission.result.document_id).then(setArtifacts).catch(() => setArtifacts([]))
-  }, [api, submission?.result.document_id])
+    api.listDocumentArtifacts(activeDocumentId).then(setArtifacts).catch(() => setArtifacts([]))
+  }, [api, activeDocumentId])
 
   const stageProgress = useMemo(() => {
-    if (isSubmitting) return liveProgress
+    if (jobId) return liveProgress
     if (!submission) return [0, 0, 0, 0, 0]
     if (submission.result.route === 'reject') return [100, 0, 0, 0, 0]
     if (submission.result.route === 'local') return [100, 100, 100, 100, 100]
     return [0, 0, 0, 0, 0]
-  }, [submission, isSubmitting, liveProgress])
+  }, [submission, jobId, liveProgress])
 
   return (
     <section className="screen-block analyze-stack">
       <MediaSubmitForm
         onSubmitted={(payload) => {
-          setIsSubmitting(false)
           setSubmission(payload)
-          setLiveProgress(payload.result.route === 'local' ? [100, 100, 100, 100, 100] : [100, 0, 0, 0, 0])
+          setJobStatus(null)
+          if (payload.result.route === 'local' && payload.result.status === 'accepted_local' && payload.result.job_id) {
+            setJobId(payload.result.job_id)
+            setLiveProgress([2, 0, 0, 0, 0])
+          } else {
+            setJobId(null)
+            setLiveProgress(payload.result.route === 'local' ? [100, 100, 100, 100, 100] : [100, 0, 0, 0, 0])
+          }
         }}
-        onSubmittingChange={setIsSubmitting}
+        onSubmittingChange={() => {}}
         projectId={selectedProject.project_id ?? null}
         projectLabel={selectedProject.project_name ?? selectedProject.project_id ?? 'Project'}
         stageProgress={stageProgress}
@@ -102,12 +101,12 @@ export function AnalyzePage() {
       />
       {submission ? (
         <section className={`card feedback ${submission.ui_feedback.severity}`} aria-label="submission-feedback">
-          <p>{submission.ui_feedback.message}</p>
+          <p>{jobStatus?.message || submission.ui_feedback.message}</p>
         </section>
       ) : null}
-      {submission?.result.document_id ? (
+      {activeDocumentId ? (
         <section className="card compact-card" aria-label="analyze-open-visualizer">
-          <button type="button" onClick={() => navigate('/visualizer', { state: { documentId: submission.result.document_id } })}>
+          <button type="button" onClick={() => navigate('/visualizer', { state: { documentId: activeDocumentId } })}>
             Open Visualizer
           </button>
           {artifacts.length > 0 ? (

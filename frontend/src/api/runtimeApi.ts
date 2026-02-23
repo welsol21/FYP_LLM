@@ -41,6 +41,14 @@ export type DocumentArtifact = {
   download_url: string
 }
 
+export type BackendJobStatus = {
+  job_id: string
+  status: string
+  message: string
+  stage_progress: number[]
+  document_id?: string
+}
+
 export type MediaFileRow = {
   id: string
   name: string
@@ -117,6 +125,7 @@ export interface RuntimeApi {
   saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig>
   listFiles(projectId?: string): Promise<MediaFileRow[]>
   listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]>
+  getBackendJobStatus(jobId: string): Promise<BackendJobStatus>
   getVisualizerPayload(documentId?: string): Promise<VisualizerPayload>
   applyEdit(input: {
     sentenceText: string

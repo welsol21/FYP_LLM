@@ -90,6 +90,13 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(SERVICE.list_document_artifacts(document_id=document_id))
             return
+        if path == "/api/backend-job-status":
+            job_id = (query.get("job_id") or [""])[0]
+            if not job_id:
+                self._send_json({"error": "job_id is required"}, status=400)
+                return
+            self._send_json(SERVICE.get_backend_job_status(job_id=job_id))
+            return
         if path == "/api/document-artifact-download":
             document_id = (query.get("document_id") or [""])[0]
             name = (query.get("name") or [""])[0]
@@ -170,6 +177,7 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                     translation_provider=body.get("translationProvider"),
                     subtitles_mode=body.get("subtitlesMode"),
                     voice_choice=body.get("voiceChoice"),
+                    async_local_processing=True,
                 )
             except ValueError as exc:
                 self._send_json({"error": str(exc)}, status=400)

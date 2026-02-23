@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
+import threading
 import uuid
-from typing import Any
+from typing import Any, Callable
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
@@ -140,6 +141,8 @@ class RuntimeMediaService:
     runtime_mode: str = "auto"
     deployment_mode: str = "auto"
     limits: MediaPolicyLimits | None = None
+    _local_jobs: dict[str, dict[str, Any]] = field(default_factory=dict, init=False, repr=False)
+    _local_jobs_lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.repo = LocalSQLiteRepository(self.db_path)
@@ -239,6 +242,7 @@ class RuntimeMediaService:
         translation_provider: str | None = None,
         subtitles_mode: str | None = None,
         voice_choice: str | None = None,
+        async_local_processing: bool = False,
     ) -> dict[str, Any]:
         translation_cfg = self.get_translation_config()
         selected_provider = str(translation_provider or translation_cfg.get("default_provider") or "m2m100").strip().lower()
@@ -299,23 +303,47 @@ class RuntimeMediaService:
             prefer_backend_for_enrichment=False,
         )
         if raw.get("route") == "local":
-            synced = self.process_media_now(
-                media_path=media_path,
-                project_id=effective_project_id,
-                media_file_id=media_file_id,
-                translation_provider=selected_provider,
-                provider_credentials=provider_credentials,
-            )
-            raw["document_id"] = synced.get("document_id")
-            raw["status"] = "completed_local" if synced.get("status") == "completed" else raw.get("status")
-            if synced.get("status") != "completed":
-                raw["route"] = "reject"
-                raw["status"] = "rejected"
-                raw["message"] = str(synced.get("message") or "Local media processing failed.")
+            if async_local_processing:
+                job_id = self._start_local_processing_job(
+                    media_path=media_path,
+                    project_id=effective_project_id,
+                    media_file_id=media_file_id,
+                    translation_provider=selected_provider,
+                    provider_credentials=provider_credentials,
+                )
+                raw["job_id"] = job_id
+                raw["status"] = "accepted_local"
+                raw["message"] = "Local processing started."
+            else:
+                synced = self.process_media_now(
+                    media_path=media_path,
+                    project_id=effective_project_id,
+                    media_file_id=media_file_id,
+                    translation_provider=selected_provider,
+                    provider_credentials=provider_credentials,
+                )
+                raw["document_id"] = synced.get("document_id")
+                raw["status"] = "completed_local" if synced.get("status") == "completed" else raw.get("status")
+                if synced.get("status") != "completed":
+                    raw["route"] = "reject"
+                    raw["status"] = "rejected"
+                    raw["message"] = str(synced.get("message") or "Local media processing failed.")
         return {
             "result": raw,
             "ui_feedback": build_submission_ui_feedback(raw),
         }
+
+    def get_backend_job_status(self, *, job_id: str) -> dict[str, Any]:
+        with self._local_jobs_lock:
+            row = self._local_jobs.get(job_id)
+        if row is None:
+            return {
+                "job_id": job_id,
+                "status": "not_found",
+                "message": "Job not found.",
+                "stage_progress": [0, 0, 0, 0, 0],
+            }
+        return dict(row)
 
     def list_document_sentences(self, *, document_id: str) -> list[dict[str, Any]]:
         rows = self.repo.list_document_visualizer_rows(document_id=document_id)
@@ -423,7 +451,14 @@ class RuntimeMediaService:
         media_file_id: str | None = None,
         translation_provider: str | None = None,
         provider_credentials: dict[str, str] | None = None,
+        document_id: str | None = None,
+        stage_callback: Callable[[str], None] | None = None,
     ) -> dict[str, Any]:
+        if stage_callback is not None:
+            stage_callback("loading_file")
+        source_type = self._detect_source_type(media_path)
+        if source_type in {"audio", "video"} and stage_callback is not None:
+            stage_callback("transcribing_audio")
         try:
             pipeline = run_media_pipeline(
                 source_path=media_path,
@@ -441,7 +476,10 @@ class RuntimeMediaService:
                 "message": str(exc),
             }
 
-        document_id = f"doc-{uuid.uuid4().hex[:12]}"
+        if stage_callback is not None:
+            stage_callback("translating_text")
+
+        document_id = document_id or f"doc-{uuid.uuid4().hex[:12]}"
         existing_doc = self.repo.get_document(document_id)
         if existing_doc is None:
             self.repo.create_document(
@@ -473,6 +511,8 @@ class RuntimeMediaService:
                 for row in pipeline.media_sentences
             ],
         )
+        if stage_callback is not None:
+            stage_callback("generating_media")
         self._persist_media_contract_artifacts(
             document_id=document_id,
             media_path=media_path,
@@ -482,6 +522,8 @@ class RuntimeMediaService:
             media_sentences=pipeline.media_sentences,
             contract_sentences=pipeline.contract_sentences,
         )
+        if stage_callback is not None:
+            stage_callback("exporting_files")
         self.repo.update_document_status(document_id, "completed")
         return {
             "job_id": None,
@@ -492,6 +534,117 @@ class RuntimeMediaService:
             "linked_sentences_count": len(pipeline.media_sentences),
             "message": "Local media processed and synced.",
         }
+
+    @staticmethod
+    def _detect_source_type(media_path: str) -> str:
+        suffix = Path(media_path).suffix.lower()
+        if suffix in {".txt", ".md", ".rtf"}:
+            return "text"
+        if suffix == ".pdf":
+            return "pdf"
+        if suffix in {".mp3", ".wav", ".m4a", ".flac", ".ogg"}:
+            return "audio"
+        if suffix in {".mp4", ".mkv", ".mov", ".avi", ".webm"}:
+            return "video"
+        return "text"
+
+    @staticmethod
+    def _stage_progress(stage_name: str) -> list[int]:
+        mapping = {
+            "queued": [2, 0, 0, 0, 0],
+            "loading_file": [25, 0, 0, 0, 0],
+            "transcribing_audio": [100, 45, 0, 0, 0],
+            "translating_text": [100, 100, 65, 0, 0],
+            "generating_media": [100, 100, 100, 75, 0],
+            "exporting_files": [100, 100, 100, 100, 85],
+            "completed": [100, 100, 100, 100, 100],
+            "error": [100, 100, 100, 100, 100],
+        }
+        return list(mapping.get(stage_name, [0, 0, 0, 0, 0]))
+
+    def _set_local_job_state(
+        self,
+        *,
+        job_id: str,
+        status: str,
+        message: str,
+        stage_name: str | None = None,
+        document_id: str | None = None,
+    ) -> None:
+        stage_progress = self._stage_progress(stage_name or status)
+        payload: dict[str, Any] = {
+            "job_id": job_id,
+            "status": status,
+            "message": message,
+            "stage_progress": stage_progress,
+        }
+        if document_id:
+            payload["document_id"] = document_id
+        with self._local_jobs_lock:
+            self._local_jobs[job_id] = payload
+
+    def _start_local_processing_job(
+        self,
+        *,
+        media_path: str,
+        project_id: str,
+        media_file_id: str | None,
+        translation_provider: str | None,
+        provider_credentials: dict[str, str] | None,
+    ) -> str:
+        job_id = f"local-{uuid.uuid4().hex[:12]}"
+        self._set_local_job_state(
+            job_id=job_id,
+            status="accepted_local",
+            message="Local processing started.",
+            stage_name="queued",
+        )
+
+        def _runner() -> None:
+            document_id = f"doc-{uuid.uuid4().hex[:12]}"
+            try:
+                result = self.process_media_now(
+                    media_path=media_path,
+                    project_id=project_id,
+                    media_file_id=media_file_id,
+                    translation_provider=translation_provider,
+                    provider_credentials=provider_credentials,
+                    document_id=document_id,
+                    stage_callback=lambda stage: self._set_local_job_state(
+                        job_id=job_id,
+                        status="running_local",
+                        message=f"Stage: {stage.replace('_', ' ')}",
+                        stage_name=stage,
+                        document_id=document_id,
+                    ),
+                )
+                if result.get("status") == "completed":
+                    self._set_local_job_state(
+                        job_id=job_id,
+                        status="completed_local",
+                        message="Local processing completed.",
+                        stage_name="completed",
+                        document_id=document_id,
+                    )
+                else:
+                    self._set_local_job_state(
+                        job_id=job_id,
+                        status="rejected",
+                        message=str(result.get("message") or "Local processing failed."),
+                        stage_name="error",
+                        document_id=document_id,
+                    )
+            except Exception as exc:
+                self._set_local_job_state(
+                    job_id=job_id,
+                    status="error",
+                    message=str(exc),
+                    stage_name="error",
+                    document_id=document_id,
+                )
+
+        threading.Thread(target=_runner, daemon=True).start()
+        return job_id
 
     def _build_sentence_contract_from_backend_and_local_translation(
         self,

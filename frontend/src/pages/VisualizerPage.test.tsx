@@ -93,6 +93,7 @@ describe('VisualizerPage', () => {
       }),
       listFiles: async () => [],
       listDocumentArtifacts: async () => [],
+      getBackendJobStatus: async (jobId: string) => ({ job_id: jobId, status: 'completed_local', message: 'ok', stage_progress: [100, 100, 100, 100, 100] }),
       uploadMedia: async () => ({ fileName: 'uploaded.txt', mediaPath: '/tmp/uploaded.txt', sizeBytes: 12 }),
       getVisualizerPayload,
       applyEdit: async () => ({ status: 'ok', message: 'Edit applied.' }),
