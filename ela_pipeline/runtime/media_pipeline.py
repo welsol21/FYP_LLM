@@ -100,13 +100,17 @@ def _extract_text_and_sentence_chunks(source_path: Path, source_type: str) -> tu
     if source_type in {"audio", "video"}:
         model_name = os.getenv("ELA_MEDIA_ASR_MODEL", "base").strip() or "base"
         source_lang = os.getenv("ELA_MEDIA_ASR_SOURCE_LANG", "en").strip() or "en"
+        asr_cache_dir = Path(
+            os.getenv("ELA_MEDIA_ASR_CACHE_DIR", "artifacts/models/whisper")
+        ).resolve()
+        asr_cache_dir.mkdir(parents=True, exist_ok=True)
         try:
             import whisper  # type: ignore[import-not-found]
         except Exception as exc:  # pragma: no cover
             raise RuntimeError(
-                "Audio/video processing requires local ASR. Install `openai-whisper` for client pipeline."
+                "Audio/video ASR component is unavailable in this build."
             ) from exc
-        model = whisper.load_model(model_name)
+        model = whisper.load_model(model_name, download_root=str(asr_cache_dir))
         result = model.transcribe(
             str(source_path),
             language=source_lang,

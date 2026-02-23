@@ -169,6 +169,8 @@ ASR runtime requirement for audio/video:
 - client uses local Whisper (`openai-whisper`)
 - ffmpeg is required in runtime environment
 - ASR model configurable via `ELA_MEDIA_ASR_MODEL` (default: `base`)
+- Whisper dependency is shipped with the application build (no manual user install step).
+- ASR models are auto-cached locally under `ELA_MEDIA_ASR_CACHE_DIR` (default: `artifacts/models/whisper`).
 
 Visualizer screen:
 - receives only document-scoped payload

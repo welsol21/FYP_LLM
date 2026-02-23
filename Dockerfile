@@ -18,6 +18,9 @@ RUN pip install --upgrade pip \
     && pip install --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple "torch==${TORCH_VERSION}" \
     && pip install -r /app/requirements-docker-cpu.txt
 
+# Fail image build early if ASR dependency is missing.
+RUN python -c "import whisper"
+
 COPY . /app
 
 RUN mkdir -p /app/inference_results /app/artifacts /opt/hf-cache
