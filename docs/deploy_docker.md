@@ -34,6 +34,15 @@ CPU-only container profile:
 - This prevents pulling NVIDIA CUDA wheel stacks during `docker compose build`.
 - Torch version is configurable via `.env`: `TORCH_VERSION=2.5.1`.
 
+No runtime model downloads (user-ready behavior):
+- Container runs with `ELA_MEDIA_DISABLE_RUNTIME_DOWNLOADS=1` by default.
+- If ASR/translation models are missing locally, pipeline fails fast with explicit error.
+- To ship a fully bundled image, build with:
+  - `PRELOAD_RUNTIME_MODELS=1`
+  - This preloads:
+    - Whisper ASR `base` into `/app/artifacts/models/whisper`
+    - M2M100 into `/app/artifacts/models/m2m100_418M`
+
 Media limits (default profile):
 - `MEDIA_MAX_DURATION_MIN=15`
 - `MEDIA_MAX_SIZE_LOCAL_MB=250` (targeting ~15 min medium-quality source files)
@@ -135,4 +144,4 @@ docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELE
 - Media extraction pipeline in current runtime API:
   - `text`: native extraction
   - `pdf`: `pypdf`
-  - `audio/video`: transcript sidecar fallback (`<media>.<ext>.txt`) until ASR is integrated
+  - `audio/video`: local Whisper ASR (bundled model required in strict no-download mode)

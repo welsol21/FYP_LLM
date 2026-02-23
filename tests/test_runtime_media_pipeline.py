@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from ela_pipeline.runtime.media_pipeline import run_media_pipeline
+from ela_pipeline.runtime.media_pipeline import _extract_text_and_sentence_chunks, run_media_pipeline
 
 
 class RuntimeMediaPipelineTests(unittest.TestCase):
@@ -77,6 +77,22 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
             self.assertEqual(result.contract_sentences[1]["sentence_node"]["node_id"], "n-1")
             self.assertEqual(result.media_sentences[0]["text_eng"], "She trusted him.")
             self.assertEqual(result.media_sentences[0]["text_ru"], "")
+
+    def test_audio_asr_fails_fast_when_runtime_downloads_disabled_and_model_not_bundled(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media = Path(tmpdir) / "sample.mp3"
+            media.write_bytes(b"fake-audio")
+            with patch.dict(
+                "os.environ",
+                {
+                    "ELA_MEDIA_DISABLE_RUNTIME_DOWNLOADS": "1",
+                    "ELA_MEDIA_ASR_MODEL": "base",
+                    "ELA_MEDIA_ASR_CACHE_DIR": str(Path(tmpdir) / "whisper_cache"),
+                },
+                clear=False,
+            ):
+                with self.assertRaises(RuntimeError):
+                    _extract_text_and_sentence_chunks(media, "audio")
 
 
 if __name__ == "__main__":

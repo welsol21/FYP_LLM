@@ -293,13 +293,13 @@ textarea {
 
 .stage-bar {
   height: 6px;
-  background: #1f1f1f;
-  border: 1px solid #5a5a5a;
+  background: #0b1422;
+  border: 1px solid #35527f;
 }
 
 .stage-fill {
   height: 100%;
-  background: #9ca0a6;
+  background: linear-gradient(90deg, #3aa9ff 0%, #6ac8ff 100%);
 }
 
 .start-btn {

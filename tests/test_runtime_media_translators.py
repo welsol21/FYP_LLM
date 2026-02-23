@@ -49,6 +49,18 @@ class RuntimeMediaTranslatorTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             _resolve_media_translator(provider_override="lara", provider_credentials={})
 
+    def test_resolve_m2m100_fails_fast_when_runtime_downloads_disabled_and_model_not_bundled(self):
+        with patch.dict(
+            "os.environ",
+            {
+                "ELA_MEDIA_DISABLE_RUNTIME_DOWNLOADS": "1",
+                "ELA_MEDIA_TRANSLATION_MODEL": "/tmp/ela_missing_models/m2m100_418M",
+            },
+            clear=False,
+        ):
+            with self.assertRaises(RuntimeError):
+                _resolve_media_translator(provider_override="m2m100", provider_credentials={})
+
 
 if __name__ == "__main__":
     unittest.main()

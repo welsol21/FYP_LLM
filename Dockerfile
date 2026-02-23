@@ -3,7 +3,10 @@ FROM python:3.10-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    HF_HOME=/opt/hf-cache
+    HF_HOME=/opt/hf-cache \
+    ELA_MEDIA_DISABLE_RUNTIME_DOWNLOADS=1 \
+    ELA_MEDIA_ASR_MODEL=base \
+    ELA_MEDIA_ASR_CACHE_DIR=/app/artifacts/models/whisper
 
 WORKDIR /app
 
@@ -12,6 +15,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 ARG TORCH_VERSION=2.6.0
+ARG PRELOAD_RUNTIME_MODELS=0
 
 COPY requirements-docker-cpu.txt /app/requirements-docker-cpu.txt
 RUN pip install --upgrade pip \
@@ -20,6 +24,12 @@ RUN pip install --upgrade pip \
 
 # Fail image build early if ASR dependency is missing.
 RUN python -c "import whisper"
+
+# Optional release-mode preload: bundle ASR + translation models in image to avoid runtime downloads for users.
+RUN if [ "${PRELOAD_RUNTIME_MODELS}" = "1" ]; then \
+      python -c "import whisper; whisper.load_model('base', download_root='/app/artifacts/models/whisper')" && \
+      python -c "from transformers import AutoModelForSeq2SeqLM, AutoTokenizer; p='/app/artifacts/models/m2m100_418M'; m='facebook/m2m100_418M'; AutoTokenizer.from_pretrained(m).save_pretrained(p); AutoModelForSeq2SeqLM.from_pretrained(m).save_pretrained(p)"; \
+    fi
 
 COPY . /app
 

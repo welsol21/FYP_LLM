@@ -21,6 +21,11 @@ from ela_pipeline.translate import M2M100Translator
 DEFAULT_LOCAL_TRANSLATION_MODEL_DIR = "artifacts/models/m2m100_418M"
 
 
+def _runtime_downloads_disabled() -> bool:
+    value = str(os.getenv("ELA_MEDIA_DISABLE_RUNTIME_DOWNLOADS", "0")).strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
 @dataclass(frozen=True)
 class MediaPipelineResult:
     source_type: str
@@ -104,6 +109,14 @@ def _extract_text_and_sentence_chunks(source_path: Path, source_type: str) -> tu
             os.getenv("ELA_MEDIA_ASR_CACHE_DIR", "artifacts/models/whisper")
         ).resolve()
         asr_cache_dir.mkdir(parents=True, exist_ok=True)
+        if _runtime_downloads_disabled():
+            expected_model_path = asr_cache_dir / f"{model_name}.pt"
+            if not expected_model_path.is_file():
+                raise RuntimeError(
+                    f"ASR model '{model_name}' is not bundled. "
+                    f"Expected local file: {expected_model_path}. "
+                    "Runtime downloads are disabled."
+                )
         try:
             import whisper  # type: ignore[import-not-found]
         except Exception as exc:  # pragma: no cover
@@ -261,6 +274,7 @@ def _resolve_media_translator(
 ) -> Any:
     provider = str(provider_override or os.getenv("ELA_MEDIA_TRANSLATION_PROVIDER", "echo")).strip().lower()
     creds = provider_credentials or {}
+    downloads_disabled = _runtime_downloads_disabled()
     if provider in {"original", "echo", "none"}:
         return _EchoTranslator()
     if provider == "gpt":
@@ -285,11 +299,25 @@ def _resolve_media_translator(
     )
     if model_name == "facebook/m2m100_418M" and os.path.isdir(DEFAULT_LOCAL_TRANSLATION_MODEL_DIR):
         model_name = DEFAULT_LOCAL_TRANSLATION_MODEL_DIR
+    if downloads_disabled and model_name == "facebook/m2m100_418M":
+        raise RuntimeError(
+            f"Translation model is not bundled. Expected local directory: {DEFAULT_LOCAL_TRANSLATION_MODEL_DIR}. "
+            "Runtime downloads are disabled."
+        )
+    if downloads_disabled and os.path.sep in model_name and not os.path.isdir(model_name):
+        raise RuntimeError(
+            f"Translation model path does not exist: {model_name}. Runtime downloads are disabled."
+        )
     device = os.getenv("ELA_MEDIA_TRANSLATION_DEVICE", "cpu").strip() or "cpu"
 
     try:
+        if downloads_disabled:
+            os.environ.setdefault("HF_HUB_OFFLINE", "1")
+            os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
         return M2M100Translator(model_name=model_name, device=device)
     except Exception:
+        if downloads_disabled:
+            raise
         return _EchoTranslator()
 
 
