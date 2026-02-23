@@ -295,6 +295,44 @@ class LocalSQLiteRepositoryTests(unittest.TestCase):
             self.assertEqual(status["latest_backend_job"]["job_id"], "job-1")
             self.assertEqual(status["latest_backend_job"]["status"], "processing")
 
+    def test_list_media_files_with_analysis_returns_one_row_per_media_file(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "client.sqlite3"
+            repo = LocalSQLiteRepository(db_path)
+
+            repo.create_project("Project A", project_id="proj-1")
+            repo.create_media_file(
+                project_id="proj-1",
+                media_file_id="file-1",
+                name="01.Intro.mp3",
+                path="artifacts/media_tmp/uploads/01.Intro.mp3",
+                duration_seconds=10,
+                size_bytes=1000,
+            )
+            repo.create_document(
+                document_id="doc-1",
+                project_id="proj-1",
+                media_file_id="file-1",
+                source_type="audio",
+                source_path="artifacts/media_tmp/uploads/01.Intro.mp3",
+                media_hash="mh-1",
+                status="completed",
+            )
+            repo.create_document(
+                document_id="doc-2",
+                project_id="proj-1",
+                media_file_id="file-1",
+                source_type="audio",
+                source_path="artifacts/media_tmp/uploads/01.Intro.mp3",
+                media_hash="mh-2",
+                status="completed",
+            )
+
+            rows = repo.list_media_files_with_analysis(project_id="proj-1")
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["id"], "file-1")
+            self.assertTrue(rows[0]["analyzed"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -58,6 +58,67 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             switched = svc.set_selected_project(project_id=created["id"])
             self.assertEqual(switched["project_name"], "Project A")
 
+    def test_register_media_file_is_idempotent_by_project_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            svc.repo.create_project("Project A", project_id="proj-1")
+
+            first = svc.register_media_file(
+                project_id="proj-1",
+                name="01.Intro.mp3",
+                media_path="artifacts/media_tmp/uploads/01.Intro.mp3",
+                size_bytes=1111,
+                duration_seconds=10,
+            )
+            second = svc.register_media_file(
+                project_id="proj-1",
+                name="01.Intro.mp3",
+                media_path="artifacts/media_tmp/uploads/01.Intro.mp3",
+                size_bytes=2222,
+                duration_seconds=11,
+            )
+
+            self.assertEqual(first["id"], second["id"])
+            rows = svc.list_files(project_id="proj-1")
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["size_bytes"], 2222)
+            self.assertEqual(rows[0]["duration_seconds"], 11)
+
+    def test_cleanup_duplicate_media_files_removes_legacy_duplicates(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            svc.repo.create_project("Project A", project_id="proj-1")
+            with svc.repo._connect() as conn:  # legacy duplicate fixture
+                conn.execute(
+                    """
+                    INSERT INTO media_files (
+                        id, project_id, name, path, duration_seconds, size_bytes, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    ("f1", "proj-1", "01.Intro.mp3", "artifacts/media_tmp/uploads/01.Intro.mp3", 10, 1000, "2026-02-19T00:00:00Z", "2026-02-19T00:00:00Z"),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO media_files (
+                        id, project_id, name, path, duration_seconds, size_bytes, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    ("f2", "proj-1", "01.Intro.mp3", "artifacts/media_tmp/uploads/01.Intro.mp3", 11, 1001, "2026-02-19T00:01:00Z", "2026-02-19T00:01:00Z"),
+                )
+                conn.commit()
+            removed = svc.repo.cleanup_duplicate_media_files()
+            self.assertEqual(removed, 1)
+            rows = svc.list_files(project_id="proj-1")
+            self.assertEqual(len(rows), 1)
+
     def test_ui_state_exposes_mode_and_feature_flags(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             svc = RuntimeMediaService(

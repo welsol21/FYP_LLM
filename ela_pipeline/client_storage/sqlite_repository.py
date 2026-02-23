@@ -155,6 +155,48 @@ class LocalSQLiteRepository:
                 CREATE INDEX IF NOT EXISTS idx_sync_requests_status ON sync_requests(status);
                 """
             )
+        # Keep DB consistent for legacy states: one media row per (project_id, path).
+        self.cleanup_duplicate_media_files()
+
+    def cleanup_duplicate_media_files(self) -> int:
+        """Remove legacy duplicate media rows and keep the newest row per (project_id, path)."""
+        deleted = 0
+        with self._connect() as conn:
+            dup_groups = conn.execute(
+                """
+                SELECT project_id, path
+                FROM media_files
+                GROUP BY project_id, path
+                HAVING COUNT(*) > 1
+                """
+            ).fetchall()
+            for project_id, path in dup_groups:
+                rows = conn.execute(
+                    """
+                    SELECT id
+                    FROM media_files
+                    WHERE project_id = ? AND path = ?
+                    ORDER BY updated_at DESC, created_at DESC, id DESC
+                    """,
+                    (project_id, path),
+                ).fetchall()
+                if len(rows) <= 1:
+                    continue
+                keep_id = str(rows[0][0])
+                drop_ids = [str(row[0]) for row in rows[1:]]
+                for drop_id in drop_ids:
+                    conn.execute(
+                        "UPDATE documents SET media_file_id = ? WHERE media_file_id = ?",
+                        (keep_id, drop_id),
+                    )
+                    conn.execute(
+                        "UPDATE backend_jobs SET media_file_id = ? WHERE media_file_id = ?",
+                        (keep_id, drop_id),
+                    )
+                    conn.execute("DELETE FROM media_files WHERE id = ?", (drop_id,))
+                    deleted += 1
+            conn.commit()
+        return deleted
 
     def create_document(
         self,
@@ -462,6 +504,40 @@ class LocalSQLiteRepository:
         media_file_id: str | None = None,
     ) -> dict[str, Any]:
         now = _utc_now()
+        with self._connect() as conn:
+            existing = conn.execute(
+                """
+                SELECT id, created_at
+                FROM media_files
+                WHERE project_id = ? AND path = ?
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """,
+                (project_id, path),
+            ).fetchone()
+            if existing is not None:
+                existing_id = str(existing[0])
+                created_at = str(existing[1])
+                conn.execute(
+                    """
+                    UPDATE media_files
+                    SET name = ?, duration_seconds = ?, size_bytes = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (name, duration_seconds, size_bytes, now, existing_id),
+                )
+                conn.commit()
+                return {
+                    "id": existing_id,
+                    "project_id": project_id,
+                    "name": name,
+                    "path": path,
+                    "duration_seconds": duration_seconds,
+                    "size_bytes": size_bytes,
+                    "created_at": created_at,
+                    "updated_at": now,
+                }
+
         fid = media_file_id or str(uuid.uuid4())
         with self._connect() as conn:
             conn.execute(
@@ -529,7 +605,14 @@ class LocalSQLiteRepository:
                 d.id AS document_id
             FROM media_files mf
             LEFT JOIN documents d
-              ON d.media_file_id = mf.id AND d.status = 'completed'
+              ON d.id = (
+                  SELECT d2.id
+                  FROM documents d2
+                  WHERE d2.media_file_id = mf.id
+                    AND d2.status = 'completed'
+                  ORDER BY d2.updated_at DESC, d2.id DESC
+                  LIMIT 1
+              )
             {where_sql}
             ORDER BY mf.updated_at DESC
         """

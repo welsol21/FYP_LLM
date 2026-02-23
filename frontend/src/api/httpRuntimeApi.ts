@@ -54,6 +54,9 @@ export class HttpRuntimeApi implements RuntimeApi {
     form.append('file', file, file.name)
     const res = await fetch('/api/upload', { method: 'POST', body: form })
     if (!res.ok) {
+      if (res.status === 413) {
+        throw new Error('Upload rejected: file is too large for current upload limit.')
+      }
       const text = await res.text()
       throw new Error(`HTTP ${res.status}: ${text}`)
     }
