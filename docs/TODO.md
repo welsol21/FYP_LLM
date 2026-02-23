@@ -501,6 +501,8 @@
     - [x] `bilingual_objects_runtime.json`
     - [x] `subtitles_en.srt`
     - [x] `subtitles_bilingual.srt`
+    - [x] `translated_audio_ru.mp3` for `audio|video` sources
+    - [x] `translated_video_ru.mp4` for `video` sources
   - [ ] Add runtime API endpoints/services for document-scoped visualizer flow:
     - [x] `get_visualizer_payload(document_id)`
     - [x] `list_document_sentences(document_id)`

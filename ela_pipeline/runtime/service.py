@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
+import subprocess
 import threading
 import uuid
 from typing import Any, Callable
@@ -131,6 +132,18 @@ def _build_srt(segments: list[dict[str, Any]], *, bilingual: bool) -> str:
         lines.append("")
         idx_out += 1
     return "\n".join(lines).strip() + "\n"
+
+
+def _translated_text_for_tts(media_sentences: list[dict[str, Any]]) -> str:
+    parts: list[str] = []
+    for row in media_sentences:
+        ru = str(row.get("text_ru") or "").strip()
+        en = str(row.get("sentence_text") or row.get("text_eng") or "").strip()
+        if ru:
+            parts.append(ru)
+        elif en:
+            parts.append(en)
+    return " ".join(parts).strip()
 
 
 @dataclass
@@ -735,6 +748,79 @@ class RuntimeMediaService:
             _build_srt(media_sentences, bilingual=True),
             encoding="utf-8",
         )
+        self._export_final_media_artifacts(
+            source_type=source_type,
+            source_path=media_path,
+            doc_dir=doc_dir,
+            media_sentences=media_sentences,
+        )
+
+    def _export_final_media_artifacts(
+        self,
+        *,
+        source_type: str,
+        source_path: str,
+        doc_dir: Path,
+        media_sentences: list[dict[str, Any]],
+    ) -> None:
+        if source_type not in {"audio", "video"}:
+            return
+
+        translated_text = _translated_text_for_tts(media_sentences)
+        if not translated_text:
+            return
+
+        tts_wav = doc_dir / "translated_audio_ru.wav"
+        tts_mp3 = doc_dir / "translated_audio_ru.mp3"
+        source = Path(source_path)
+        try:
+            # TTS synthesis from translated sentence stream.
+            subprocess.run(
+                ["espeak-ng", "-v", "ru", "-w", str(tts_wav)],
+                input=translated_text,
+                text=True,
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            # MP3 export for download.
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", str(tts_wav), "-acodec", "libmp3lame", "-q:a", "2", str(tts_mp3)],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            if tts_wav.exists():
+                tts_wav.unlink(missing_ok=True)
+
+            if source_type == "video" and source.exists():
+                out_video = doc_dir / "translated_video_ru.mp4"
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-y",
+                        "-i",
+                        str(source),
+                        "-i",
+                        str(tts_mp3),
+                        "-map",
+                        "0:v:0",
+                        "-map",
+                        "1:a:0",
+                        "-c:v",
+                        "copy",
+                        "-c:a",
+                        "aac",
+                        "-shortest",
+                        str(out_video),
+                    ],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+        except Exception as exc:
+            # Keep pipeline successful even if media rendering fails on one environment.
+            (doc_dir / "media_export_error.txt").write_text(str(exc), encoding="utf-8")
 
     def _request_sentence_contract(
         self,

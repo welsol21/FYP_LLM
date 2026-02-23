@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from types import SimpleNamespace
 
 from ela_pipeline.runtime import MediaPolicyLimits, RuntimeMediaService
 from ela_pipeline.client_storage import build_sentence_hash
@@ -214,6 +215,36 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             bilingual_srt = (doc_dir / "subtitles_bilingual.srt").read_text(encoding="utf-8")
             self.assertIn("She trusted him.", bilingual_srt)
             self.assertIn("Она доверяла ему.", bilingual_srt)
+
+    def test_export_final_media_artifacts_creates_audio_for_audio_source(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            doc_dir = Path(tmpdir) / "contracts" / "doc-1"
+            doc_dir.mkdir(parents=True, exist_ok=True)
+            src_audio = Path(tmpdir) / "sample.mp3"
+            src_audio.write_bytes(b"fake")
+
+            def _fake_run(cmd, **kwargs):
+                out_path = Path(cmd[-1])
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_bytes(b"ok")
+                return SimpleNamespace(returncode=0)
+
+            with patch("ela_pipeline.runtime.service.subprocess.run", side_effect=_fake_run):
+                svc._export_final_media_artifacts(
+                    source_type="audio",
+                    source_path=str(src_audio),
+                    doc_dir=doc_dir,
+                    media_sentences=[
+                        {"text_ru": "Она доверяла ему.", "sentence_text": "She trusted him."},
+                    ],
+                )
+
+            self.assertTrue((doc_dir / "translated_audio_ru.mp3").exists())
 
     def test_submit_media_reject_returns_error_feedback(self):
         with tempfile.TemporaryDirectory() as tmpdir:
