@@ -354,6 +354,10 @@ button {
   line-height: 1.35;
 }
 
+.muted {
+  color: #98a7bb;
+}
+
 .job-actions {
   display: flex;
   flex-wrap: wrap;

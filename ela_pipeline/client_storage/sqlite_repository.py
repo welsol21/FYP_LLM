@@ -66,6 +66,7 @@ class LocalSQLiteRepository:
                     source_path TEXT NOT NULL,
                     media_hash TEXT NOT NULL,
                     status TEXT NOT NULL,
+                    processing_duration_ms INTEGER,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
@@ -155,6 +156,10 @@ class LocalSQLiteRepository:
                 CREATE INDEX IF NOT EXISTS idx_sync_requests_status ON sync_requests(status);
                 """
             )
+            cols = {str(row[1]) for row in conn.execute("PRAGMA table_info(documents)").fetchall()}
+            if "processing_duration_ms" not in cols:
+                conn.execute("ALTER TABLE documents ADD COLUMN processing_duration_ms INTEGER")
+            conn.commit()
         # Keep DB consistent for legacy states: one media row per (project_id, path).
         self.cleanup_duplicate_media_files()
 
@@ -215,11 +220,11 @@ class LocalSQLiteRepository:
             conn.execute(
                 """
                 INSERT INTO documents (
-                    id, project_id, media_file_id, source_type, source_path, media_hash, status, created_at, updated_at
+                    id, project_id, media_file_id, source_type, source_path, media_hash, status, processing_duration_ms, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (doc_id, project_id, media_file_id, source_type, source_path, media_hash, status, now, now),
+                (doc_id, project_id, media_file_id, source_type, source_path, media_hash, status, None, now, now),
             )
             conn.commit()
         return {
@@ -230,6 +235,7 @@ class LocalSQLiteRepository:
             "source_path": source_path,
             "media_hash": media_hash,
             "status": status,
+            "processing_duration_ms": None,
             "created_at": now,
             "updated_at": now,
         }
@@ -238,7 +244,7 @@ class LocalSQLiteRepository:
         with self._connect() as conn:
             row = conn.execute(
                 """
-                SELECT id, project_id, media_file_id, source_type, source_path, media_hash, status, created_at, updated_at
+                SELECT id, project_id, media_file_id, source_type, source_path, media_hash, status, processing_duration_ms, created_at, updated_at
                 FROM documents
                 WHERE id = ?
                 LIMIT 1
@@ -255,20 +261,21 @@ class LocalSQLiteRepository:
             "source_path": row[4],
             "media_hash": row[5],
             "status": row[6],
-            "created_at": row[7],
-            "updated_at": row[8],
+            "processing_duration_ms": row[7],
+            "created_at": row[8],
+            "updated_at": row[9],
         }
 
-    def update_document_status(self, document_id: str, status: str) -> None:
+    def update_document_status(self, document_id: str, status: str, processing_duration_ms: int | None = None) -> None:
         now = _utc_now()
         with self._connect() as conn:
             conn.execute(
                 """
                 UPDATE documents
-                SET status = ?, updated_at = ?
+                SET status = ?, processing_duration_ms = COALESCE(?, processing_duration_ms), updated_at = ?
                 WHERE id = ?
                 """,
-                (status, now, document_id),
+                (status, processing_duration_ms, now, document_id),
             )
             conn.commit()
 
@@ -391,6 +398,7 @@ class LocalSQLiteRepository:
                 d.source_path,
                 d.media_file_id,
                 d.updated_at,
+                d.processing_duration_ms,
                 (
                     SELECT COUNT(1)
                     FROM media_sentences ms
@@ -448,12 +456,13 @@ class LocalSQLiteRepository:
             "source_path": row[3],
             "media_file_id": media_file_id,
             "updated_at": row[5],
-            "media_sentences_count": int(row[6] or 0),
-            "contract_sentences_count": int(row[7] or 0),
-            "linked_sentences_count": int(row[8] or 0),
-            "text_present": row[10] is not None and int(row[10]) > 0,
-            "text_length": int(row[10] or 0),
-            "text_version": int(row[9] or 0),
+            "processing_duration_ms": int(row[6] or 0),
+            "media_sentences_count": int(row[7] or 0),
+            "contract_sentences_count": int(row[8] or 0),
+            "linked_sentences_count": int(row[9] or 0),
+            "text_present": row[11] is not None and int(row[11]) > 0,
+            "text_length": int(row[11] or 0),
+            "text_version": int(row[10] or 0),
             "latest_backend_job": (
                 {
                     "job_id": job_row[0],

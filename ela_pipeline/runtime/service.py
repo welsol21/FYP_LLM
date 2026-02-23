@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import subprocess
 import threading
+import time
 import uuid
 from typing import Any, Callable
 from urllib import error as urlerror
@@ -470,6 +471,7 @@ class RuntimeMediaService:
         document_id: str | None = None,
         stage_callback: Callable[[str, float | None, str | None], None] | None = None,
     ) -> dict[str, Any]:
+        started = time.monotonic()
         if stage_callback is not None:
             stage_callback("loading_file", 0.25, "Loading source file")
         source_type = self._detect_source_type(media_path)
@@ -541,11 +543,13 @@ class RuntimeMediaService:
         )
         if stage_callback is not None:
             stage_callback("exporting_files", 1.0, "Artifacts exported")
-        self.repo.update_document_status(document_id, "completed")
+        duration_ms = int((time.monotonic() - started) * 1000)
+        self.repo.update_document_status(document_id, "completed", processing_duration_ms=duration_ms)
         return {
             "job_id": None,
             "status": "completed",
             "document_id": document_id,
+            "processing_duration_ms": duration_ms,
             "media_sentences_count": len(pipeline.media_sentences),
             "contract_sentences_count": len(pipeline.contract_sentences),
             "linked_sentences_count": len(pipeline.media_sentences),
@@ -682,6 +686,7 @@ class RuntimeMediaService:
                         message="Local processing completed.",
                         stage_name="completed",
                         document_id=document_id,
+                        stage_log=f"Total duration: {int(result.get('processing_duration_ms') or 0)} ms",
                     )
                 else:
                     self._set_local_job_state(

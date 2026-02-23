@@ -15,6 +15,8 @@ export function AnalyzePage() {
   const [jobId, setJobId] = useState<string | null>(null)
   const [jobStatus, setJobStatus] = useState<BackendJobStatus | null>(null)
   const [liveProgress, setLiveProgress] = useState<number[]>([0, 0, 0, 0, 0])
+  const [analysisStartedAt, setAnalysisStartedAt] = useState<number | null>(null)
+  const [nowTs, setNowTs] = useState<number>(Date.now())
   const selectedMedia = (location.state as
     | {
         selectedMedia?: {
@@ -32,6 +34,12 @@ export function AnalyzePage() {
     api.getSelectedProject().then(setSelectedProject)
     api.getTranslationConfig().then(setTranslationConfig)
   }, [api])
+
+  useEffect(() => {
+    if (!jobId) return
+    const ticker = window.setInterval(() => setNowTs(Date.now()), 1000)
+    return () => window.clearInterval(ticker)
+  }, [jobId])
 
   useEffect(() => {
     if (!jobId) return
@@ -67,8 +75,27 @@ export function AnalyzePage() {
       setArtifacts([])
       return
     }
-    api.listDocumentArtifacts(activeDocumentId).then(setArtifacts).catch(() => setArtifacts([]))
-  }, [api, activeDocumentId])
+    let stopped = false
+    const fetchArtifacts = async () => {
+      try {
+        const rows = await api.listDocumentArtifacts(activeDocumentId)
+        if (!stopped) setArtifacts(rows)
+      } catch {
+        if (!stopped) setArtifacts([])
+      }
+    }
+    fetchArtifacts()
+    if (jobId) {
+      const timer = window.setInterval(fetchArtifacts, 1200)
+      return () => {
+        stopped = true
+        window.clearInterval(timer)
+      }
+    }
+    return () => {
+      stopped = true
+    }
+  }, [api, activeDocumentId, jobId, jobStatus?.status])
 
   const stageProgress = useMemo(() => {
     if (jobId) return liveProgress
@@ -86,6 +113,21 @@ export function AnalyzePage() {
     }
     return null
   }, [jobId, stageProgress])
+  const elapsedSec = useMemo(() => {
+    if (!analysisStartedAt) return 0
+    return Math.max(0, Math.floor((nowTs - analysisStartedAt) / 1000))
+  }, [analysisStartedAt, nowTs])
+  const estimatedSec = useMemo(() => {
+    const src = Number(selectedMedia?.durationSec ?? 0)
+    if (src > 0) return Math.max(20, Math.round(src * 1.8))
+    return 60
+  }, [selectedMedia?.durationSec])
+  const stageTitle = useMemo(() => {
+    const value = String(jobStatus?.stage_name || '').trim().toLowerCase()
+    if (!value) return ''
+    if (value === 'translating_text') return 'linguistic parsing'
+    return value.replace(/_/g, ' ')
+  }, [jobStatus?.stage_name])
 
   return (
     <section className="screen-block analyze-stack">
@@ -93,6 +135,8 @@ export function AnalyzePage() {
         onSubmitted={(payload) => {
           setSubmission(payload)
           setJobStatus(null)
+          setAnalysisStartedAt(Date.now())
+          setNowTs(Date.now())
           if (payload.result.route === 'local' && payload.result.status === 'accepted_local' && payload.result.job_id) {
             setJobId(payload.result.job_id)
             setLiveProgress([2, 0, 0, 0, 0])
@@ -113,8 +157,9 @@ export function AnalyzePage() {
       {submission ? (
         <section className={`card feedback ${submission.ui_feedback.severity}`} aria-label="submission-feedback">
           <p>{jobStatus?.message || submission.ui_feedback.message}</p>
-          {jobStatus?.stage_name ? (
-            <p className="stage-log-title">Stage: {jobStatus.stage_name.replace(/_/g, ' ')}</p>
+          <p className="stage-log-title">Elapsed: {elapsedSec}s / Estimated: {estimatedSec}s</p>
+          {stageTitle ? (
+            <p className="stage-log-title">Stage: {stageTitle}</p>
           ) : null}
           {stageLogLines.length > 0 ? (
             <pre className="stage-log-box">{stageLogLines.join('\n')}</pre>
@@ -126,15 +171,18 @@ export function AnalyzePage() {
           <button type="button" onClick={() => navigate('/visualizer', { state: { documentId: activeDocumentId } })}>
             Open Visualizer
           </button>
-          {artifacts.length > 0 ? (
-            <div className="artifact-actions">
-              {artifacts.map((artifact) => (
+          <p className="stage-log-title">Available artifacts</p>
+          <div className="artifact-actions">
+            {artifacts.length > 0 ? (
+              artifacts.map((artifact) => (
                 <a key={artifact.name} className="top-link" href={artifact.download_url} target="_blank" rel="noreferrer">
                   Download {artifact.name}
                 </a>
-              ))}
-            </div>
-          ) : null}
+              ))
+            ) : (
+              <span className="muted">Artifacts are not ready yet.</span>
+            )}
+          </div>
         </section>
       ) : null}
     </section>

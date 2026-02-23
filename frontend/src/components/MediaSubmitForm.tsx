@@ -20,7 +20,7 @@ type Props = {
   defaultTranslator: string
 }
 
-const STAGES = ['Loading file', 'Transcribing audio', 'Translating text', 'Generating media', 'Exporting files']
+const STAGES = ['Loading file', 'Transcribing audio', 'Linguistic parsing', 'Generating media', 'Exporting files']
 
 function hasRequiredCredentials(provider: TranslationProviderConfig): boolean {
   if (!provider.credential_fields.length) return true
