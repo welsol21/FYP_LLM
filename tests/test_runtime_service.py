@@ -1,4 +1,5 @@
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -170,10 +171,12 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             media_path = Path(tmpdir) / "short.txt"
             media_path.write_text("She trusted him.", encoding="utf-8")
             artifacts_dir = Path(tmpdir) / "contracts"
+            archive_dir = Path(tmpdir) / "contracts_archive"
             with patch.dict(
                 "os.environ",
                 {
                     "MEDIA_CONTRACT_ARTIFACTS_DIR": str(artifacts_dir),
+                    "MEDIA_CONTRACT_ARCHIVE_DIR": str(archive_dir),
                 },
                 clear=False,
             ):
@@ -215,6 +218,9 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             bilingual_srt = (doc_dir / "subtitles_bilingual.srt").read_text(encoding="utf-8")
             self.assertIn("She trusted him.", bilingual_srt)
             self.assertIn("Она доверяла ему.", bilingual_srt)
+            snapshots = list((archive_dir / "unbound").glob(f"*_{result['document_id']}"))
+            self.assertTrue(snapshots)
+            self.assertTrue((snapshots[0] / "media_contract.json").exists())
 
     def test_non_default_provider_applies_ui_overlay_without_mutating_canonical_contract(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -279,7 +285,19 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                 out_path.write_bytes(b"ok")
                 return SimpleNamespace(returncode=0)
 
-            with patch("ela_pipeline.runtime.service.subprocess.run", side_effect=_fake_run):
+            class _FakeCommunicate:
+                def __init__(self, text: str, voice: str):
+                    self.text = text
+                    self.voice = voice
+
+                async def save(self, path: str) -> None:
+                    Path(path).write_bytes(b"x" * 2048)
+
+            fake_edge_tts = SimpleNamespace(Communicate=_FakeCommunicate)
+
+            with patch.dict(sys.modules, {"edge_tts": fake_edge_tts}), patch(
+                "ela_pipeline.runtime.service.subprocess.run", side_effect=_fake_run
+            ), patch("ela_pipeline.runtime.service._probe_audio_duration_ms", return_value=800):
                 svc._export_final_media_artifacts(
                     source_type="audio",
                     source_path=str(src_audio),
@@ -290,6 +308,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                 )
 
             self.assertTrue((doc_dir / "translated_audio_ru.mp3").exists())
+            self.assertTrue((doc_dir / "translated_video_ru.mp4").exists())
 
     def test_submit_media_reject_returns_error_feedback(self):
         with tempfile.TemporaryDirectory() as tmpdir:

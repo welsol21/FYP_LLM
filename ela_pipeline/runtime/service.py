@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
+import datetime as dt
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
+import tempfile
 import threading
 import time
 import uuid
@@ -145,6 +149,82 @@ def _translated_text_for_tts(media_sentences: list[dict[str, Any]]) -> str:
         elif en:
             parts.append(en)
     return " ".join(parts).strip()
+
+
+def _ffmpeg_escape_filter_path(path: Path) -> str:
+    raw = str(path.resolve())
+    return raw.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+
+
+def _subtitle_path_for_mode(*, doc_dir: Path, subtitles_mode: str) -> Path:
+    mode = str(subtitles_mode or "bilingual").strip().lower()
+    if mode in {"source", "source_only", "source only", "en"}:
+        return doc_dir / "subtitles_en.srt"
+    if mode in {"target", "target_only", "target only", "ru"}:
+        return doc_dir / "subtitles_target.srt"
+    return doc_dir / "subtitles_bilingual.srt"
+
+
+def _voice_name_for_choice(voice_choice: str) -> str:
+    choice = str(voice_choice or "male").strip().lower()
+    if choice.startswith("f"):
+        return "ru-RU-SvetlanaNeural"
+    return "ru-RU-DmitryNeural"
+
+
+def _probe_audio_duration_ms(path: Path) -> int:
+    try:
+        proc = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        sec = float((proc.stdout or "").strip() or "0")
+        return max(0, int(round(sec * 1000)))
+    except Exception:
+        return 0
+
+
+def _extract_audio_segment_mp3(*, source: Path, start_ms: int, end_ms: int, out_path: Path) -> bool:
+    if end_ms <= start_ms:
+        return False
+    start_sec = max(0.0, float(start_ms) / 1000.0)
+    end_sec = max(start_sec + 0.01, float(end_ms) / 1000.0)
+    try:
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-ss",
+                f"{start_sec:.3f}",
+                "-to",
+                f"{end_sec:.3f}",
+                "-i",
+                str(source),
+                "-vn",
+                "-acodec",
+                "libmp3lame",
+                "-q:a",
+                "3",
+                str(out_path),
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return out_path.exists() and out_path.stat().st_size > 1024
+    except Exception:
+        return False
 
 
 @dataclass
@@ -324,6 +404,8 @@ class RuntimeMediaService:
                     media_file_id=media_file_id,
                     translation_provider=selected_provider,
                     provider_credentials=provider_credentials,
+                    subtitles_mode=str(subtitles_mode or "bilingual"),
+                    voice_choice=str(voice_choice or "male"),
                 )
                 raw["job_id"] = job_id
                 raw["status"] = "accepted_local"
@@ -335,6 +417,8 @@ class RuntimeMediaService:
                     media_file_id=media_file_id,
                     translation_provider=selected_provider,
                     provider_credentials=provider_credentials,
+                    subtitles_mode=str(subtitles_mode or "bilingual"),
+                    voice_choice=str(voice_choice or "male"),
                 )
                 raw["document_id"] = synced.get("document_id")
                 raw["status"] = "completed_local" if synced.get("status") == "completed" else raw.get("status")
@@ -531,6 +615,8 @@ class RuntimeMediaService:
         media_file_id: str | None = None,
         translation_provider: str | None = None,
         provider_credentials: dict[str, str] | None = None,
+        subtitles_mode: str = "bilingual",
+        voice_choice: str = "male",
         document_id: str | None = None,
         stage_callback: Callable[[str, float | None, str | None], None] | None = None,
     ) -> dict[str, Any]:
@@ -613,12 +699,15 @@ class RuntimeMediaService:
             stage_callback("generating_media", 0.25, "Persisting contract artifacts")
         self._persist_media_contract_artifacts(
             document_id=document_id,
+            media_file_id=media_file_id,
             media_path=media_path,
             source_type=pipeline.source_type,
             full_text=pipeline.full_text,
             text_hash=pipeline.text_hash,
             media_sentences=pipeline.media_sentences,
             contract_sentences=pipeline.contract_sentences,
+            subtitles_mode=subtitles_mode,
+            voice_choice=voice_choice,
         )
         if stage_callback is not None:
             stage_callback("exporting_files", 1.0, "Artifacts exported")
@@ -729,6 +818,8 @@ class RuntimeMediaService:
         media_file_id: str | None,
         translation_provider: str | None,
         provider_credentials: dict[str, str] | None,
+        subtitles_mode: str,
+        voice_choice: str,
     ) -> str:
         job_id = f"local-{uuid.uuid4().hex[:12]}"
         self._set_local_job_state(
@@ -747,6 +838,8 @@ class RuntimeMediaService:
                     media_file_id=media_file_id,
                     translation_provider=translation_provider,
                     provider_credentials=provider_credentials,
+                    subtitles_mode=subtitles_mode,
+                    voice_choice=voice_choice,
                     document_id=document_id,
                     stage_callback=lambda stage, ratio, log_line: self._set_local_job_state(
                         job_id=job_id,
@@ -802,12 +895,15 @@ class RuntimeMediaService:
         self,
         *,
         document_id: str,
+        media_file_id: str | None,
         media_path: str,
         source_type: str,
         full_text: str,
         text_hash: str,
         media_sentences: list[dict[str, Any]],
         contract_sentences: list[dict[str, Any]],
+        subtitles_mode: str = "bilingual",
+        voice_choice: str = "male",
     ) -> None:
         base = Path(os.getenv("MEDIA_CONTRACT_ARTIFACTS_DIR", "artifacts/media_contracts"))
         doc_dir = base / document_id
@@ -866,12 +962,42 @@ class RuntimeMediaService:
             _build_srt(media_sentences, bilingual=True),
             encoding="utf-8",
         )
+        (doc_dir / "subtitles_target.srt").write_text(
+            _build_srt([{**row, "text_eng": ""} for row in media_sentences], bilingual=True),
+            encoding="utf-8",
+        )
         self._export_final_media_artifacts(
             source_type=source_type,
             source_path=media_path,
             doc_dir=doc_dir,
             media_sentences=media_sentences,
+            subtitles_mode=subtitles_mode,
+            voice_choice=voice_choice,
         )
+        self._archive_artifacts_snapshot(
+            document_id=document_id,
+            media_file_id=media_file_id,
+            source_dir=doc_dir,
+        )
+
+    @staticmethod
+    def _archive_artifacts_snapshot(
+        *,
+        document_id: str,
+        media_file_id: str | None,
+        source_dir: Path,
+    ) -> None:
+        if not source_dir.exists() or not source_dir.is_dir():
+            return
+        archive_base = Path(os.getenv("MEDIA_CONTRACT_ARCHIVE_DIR", "artifacts/media_contract_archive"))
+        file_key = str(media_file_id or "unbound").strip() or "unbound"
+        stamp = dt.datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        snapshot_dir = archive_base / file_key / f"{stamp}_{document_id}"
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        for entry in source_dir.iterdir():
+            if not entry.is_file():
+                continue
+            shutil.copy2(entry, snapshot_dir / entry.name)
 
     def _export_final_media_artifacts(
         self,
@@ -880,39 +1006,139 @@ class RuntimeMediaService:
         source_path: str,
         doc_dir: Path,
         media_sentences: list[dict[str, Any]],
+        subtitles_mode: str = "bilingual",
+        voice_choice: str = "male",
     ) -> None:
         if source_type not in {"audio", "video"}:
             return
 
-        translated_text = _translated_text_for_tts(media_sentences)
-        if not translated_text:
-            return
-
-        tts_wav = doc_dir / "translated_audio_ru.wav"
         tts_mp3 = doc_dir / "translated_audio_ru.mp3"
         source = Path(source_path)
         try:
-            # TTS synthesis from translated sentence stream.
-            subprocess.run(
-                ["espeak-ng", "-v", "ru", "-w", str(tts_wav)],
-                input=translated_text,
-                text=True,
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            # MP3 export for download.
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", str(tts_wav), "-acodec", "libmp3lame", "-q:a", "2", str(tts_mp3)],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            if tts_wav.exists():
-                tts_wav.unlink(missing_ok=True)
+            import edge_tts  # type: ignore
 
+            mode = str(subtitles_mode or "bilingual").strip().lower()
+            source_modes = {"source", "source_only", "source only", "en"}
+            target_modes = {"target", "target_only", "target only", "ru"}
+            include_source = mode in source_modes or mode not in source_modes.union(target_modes)
+            include_target = mode in target_modes or mode not in source_modes.union(target_modes)
+
+            timeline_segments: list[dict[str, Any]] = []
+            segment_audio_files: list[Path] = []
+            current_ms = 0
+            gap_ms = 120
+            voice_name = _voice_name_for_choice(voice_choice)
+            with tempfile.TemporaryDirectory(prefix="ela_tts_") as tmpdir:
+                tmp = Path(tmpdir)
+                for idx, row in enumerate(media_sentences, start=1):
+                    text_en = str(row.get("sentence_text") or row.get("text_eng") or "").strip()
+                    text_ru = str(row.get("text_ru") or "").strip()
+
+                    if include_source:
+                        start_ms_raw = int(row.get("start_ms") or 0)
+                        end_ms_raw = int(row.get("end_ms") or 0)
+                        source_seg = tmp / f"src_{idx:04d}.mp3"
+                        if (
+                            source.exists()
+                            and end_ms_raw > start_ms_raw
+                            and _extract_audio_segment_mp3(
+                                source=source,
+                                start_ms=start_ms_raw,
+                                end_ms=end_ms_raw,
+                                out_path=source_seg,
+                            )
+                        ):
+                            dur_ms = _probe_audio_duration_ms(source_seg)
+                            if dur_ms <= 0:
+                                dur_ms = max(300, end_ms_raw - start_ms_raw)
+                            start_ms = current_ms
+                            end_ms = start_ms + dur_ms
+                            timeline_segments.append(
+                                {
+                                    "start_ms": start_ms,
+                                    "end_ms": end_ms,
+                                    "text_eng": text_en,
+                                    "text_ru": "",
+                                }
+                            )
+                            current_ms = end_ms + gap_ms
+                            segment_audio_files.append(source_seg)
+
+                    if include_target:
+                        text_for_tts = text_ru or text_en
+                        if not text_for_tts:
+                            continue
+                        target_seg = tmp / f"tgt_{idx:04d}.mp3"
+
+                        async def _save_segment(path: Path = target_seg, text: str = text_for_tts) -> None:
+                            await edge_tts.Communicate(text, voice_name).save(str(path))
+
+                        asyncio.run(_save_segment())
+                        if not target_seg.exists() or target_seg.stat().st_size <= 1024:
+                            raise RuntimeError(f"edge-tts synthesis failed for sentence {idx}.")
+                        dur_ms = _probe_audio_duration_ms(target_seg)
+                        if dur_ms <= 0:
+                            raise RuntimeError(f"Unable to probe TTS duration for sentence {idx}.")
+                        start_ms = current_ms
+                        end_ms = start_ms + dur_ms
+                        timeline_segments.append(
+                            {
+                                "start_ms": start_ms,
+                                "end_ms": end_ms,
+                                "text_eng": "",
+                                "text_ru": text_for_tts,
+                            }
+                        )
+                        current_ms = end_ms + gap_ms
+                        segment_audio_files.append(target_seg)
+
+                if not segment_audio_files:
+                    return
+
+                concat_txt = tmp / "concat.txt"
+                concat_txt.write_text(
+                    "\n".join(f"file '{p.as_posix()}'" for p in segment_audio_files),
+                    encoding="utf-8",
+                )
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-y",
+                        "-f",
+                        "concat",
+                        "-safe",
+                        "0",
+                        "-i",
+                        str(concat_txt),
+                        "-c:a",
+                        "libmp3lame",
+                        "-q:a",
+                        "2",
+                        str(tts_mp3),
+                    ],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+
+            # Rebuild subtitle files using real rendered timeline.
+            (doc_dir / "subtitles_en.srt").write_text(
+                _build_srt(timeline_segments, bilingual=False),
+                encoding="utf-8",
+            )
+            (doc_dir / "subtitles_bilingual.srt").write_text(
+                _build_srt(timeline_segments, bilingual=True),
+                encoding="utf-8",
+            )
+            (doc_dir / "subtitles_target.srt").write_text(
+                _build_srt([{**row, "text_eng": ""} for row in timeline_segments], bilingual=True),
+                encoding="utf-8",
+            )
+
+            out_video = doc_dir / "translated_video_ru.mp4"
+            subtitle_path = _subtitle_path_for_mode(doc_dir=doc_dir, subtitles_mode=subtitles_mode)
+            escaped_subs = _ffmpeg_escape_filter_path(subtitle_path)
             if source_type == "video" and source.exists():
-                out_video = doc_dir / "translated_video_ru.mp4"
                 subprocess.run(
                     [
                         "ffmpeg",
@@ -921,12 +1147,46 @@ class RuntimeMediaService:
                         str(source),
                         "-i",
                         str(tts_mp3),
+                        "-vf",
+                        f"subtitles='{escaped_subs}'",
                         "-map",
                         "0:v:0",
                         "-map",
                         "1:a:0",
                         "-c:v",
-                        "copy",
+                        "libx264",
+                        "-preset",
+                        "veryfast",
+                        "-crf",
+                        "23",
+                        "-c:a",
+                        "aac",
+                        "-shortest",
+                        str(out_video),
+                    ],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            else:
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-y",
+                        "-f",
+                        "lavfi",
+                        "-i",
+                        "color=c=black:s=1280x720:r=25",
+                        "-i",
+                        str(tts_mp3),
+                        "-vf",
+                        f"subtitles='{escaped_subs}'",
+                        "-c:v",
+                        "libx264",
+                        "-preset",
+                        "veryfast",
+                        "-tune",
+                        "stillimage",
                         "-c:a",
                         "aac",
                         "-shortest",
