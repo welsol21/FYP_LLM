@@ -40,4 +40,25 @@ describe('AnalyzePage', () => {
       expect(screen.getByText(/File accepted for local processing/i)).toBeInTheDocument()
     })
   })
+
+  it('allows selecting project and file when opened directly', async () => {
+    const api = new MockRuntimeApi()
+    render(
+      <ApiContext.Provider value={api}>
+        <MemoryRouter initialEntries={[{ pathname: '/analyze' }]}>
+          <AnalyzePage />
+        </MemoryRouter>
+      </ApiContext.Provider>,
+    )
+
+    expect(await screen.findByLabelText('analyze-direct-select')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Project' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'File' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use selected file' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('sample.mp4')).toBeInTheDocument()
+    })
+  })
 })

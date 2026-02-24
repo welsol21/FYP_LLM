@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
-import type { BackendJobStatus, DocumentArtifact, MediaSubmissionPayload, SelectedProject, TranslationConfig } from '../api/runtimeApi'
+import type {
+  BackendJobStatus,
+  DocumentArtifact,
+  MediaFileRow,
+  MediaSubmissionPayload,
+  ProjectRow,
+  SelectedProject,
+  TranslationConfig,
+} from '../api/runtimeApi'
 import { MediaSubmitForm } from '../components/MediaSubmitForm'
 
 export function AnalyzePage() {
@@ -17,7 +25,7 @@ export function AnalyzePage() {
   const [liveProgress, setLiveProgress] = useState<number[]>([0, 0, 0, 0, 0])
   const [analysisStartedAt, setAnalysisStartedAt] = useState<number | null>(null)
   const [nowTs, setNowTs] = useState<number>(Date.now())
-  const selectedMedia = (location.state as
+  const selectedMediaFromRoute = (location.state as
     | {
         selectedMedia?: {
           mediaFileId?: string
@@ -30,11 +38,47 @@ export function AnalyzePage() {
       }
     | null
     | undefined)?.selectedMedia
+  const [activeMedia, setActiveMedia] = useState<typeof selectedMediaFromRoute | null>(selectedMediaFromRoute ?? null)
+  const [projects, setProjects] = useState<ProjectRow[]>([])
+  const [directProjectId, setDirectProjectId] = useState<string>('')
+  const [directFiles, setDirectFiles] = useState<MediaFileRow[]>([])
+  const [directFileId, setDirectFileId] = useState<string>('')
 
   useEffect(() => {
-    api.getSelectedProject().then(setSelectedProject)
-    api.getTranslationConfig().then(setTranslationConfig)
+    let stopped = false
+    Promise.all([api.getSelectedProject(), api.getTranslationConfig(), api.listProjects()]).then(([selected, cfg, allProjects]) => {
+      if (stopped) return
+      setSelectedProject(selected)
+      setTranslationConfig(cfg)
+      setProjects(allProjects)
+      const initialProjectId = selected.project_id || allProjects[0]?.id || ''
+      setDirectProjectId(initialProjectId)
+    })
+    return () => {
+      stopped = true
+    }
   }, [api])
+
+  useEffect(() => {
+    setActiveMedia(selectedMediaFromRoute ?? null)
+  }, [selectedMediaFromRoute])
+
+  useEffect(() => {
+    if (!directProjectId) {
+      setDirectFiles([])
+      setDirectFileId('')
+      return
+    }
+    let stopped = false
+    api.listFiles(directProjectId).then((rows) => {
+      if (stopped) return
+      setDirectFiles(rows)
+      setDirectFileId((prev) => (prev && rows.some((row) => row.id === prev) ? prev : rows[0]?.id || ''))
+    })
+    return () => {
+      stopped = true
+    }
+  }, [api, directProjectId])
 
   useEffect(() => {
     if (!jobId) return
@@ -68,7 +112,7 @@ export function AnalyzePage() {
     }
   }, [api, jobId])
 
-  const activeDocumentId = jobStatus?.document_id || submission?.result.document_id || selectedMedia?.documentId
+  const activeDocumentId = jobStatus?.document_id || submission?.result.document_id || activeMedia?.documentId
   const stageLogLines = (jobStatus?.stage_logs || []).slice(-10)
 
   useEffect(() => {
@@ -128,10 +172,10 @@ export function AnalyzePage() {
     if (elapsedSec > 0 && progressFraction >= 0.03) {
       return Math.max(elapsedSec + 1, Math.round(elapsedSec / Math.max(progressFraction, 0.03)))
     }
-    const src = Number(selectedMedia?.durationSec ?? 0)
+    const src = Number(activeMedia?.durationSec ?? 0)
     if (src > 0) return Math.max(20, Math.round(src * 1.8))
     return 60
-  }, [elapsedSec, stageProgress, selectedMedia?.durationSec])
+  }, [elapsedSec, stageProgress, activeMedia?.durationSec])
   const stageTitle = useMemo(() => {
     const value = String(jobStatus?.stage_name || '').trim().toLowerCase()
     if (!value) return ''
@@ -141,6 +185,56 @@ export function AnalyzePage() {
 
   return (
     <section className="screen-block analyze-stack">
+      {!activeMedia ? (
+        <section className="card compact-card" aria-label="analyze-direct-select">
+          <p className="stage-log-title">Select project and file</p>
+          <div className="analyze-grid">
+            <label className="analyze-label" htmlFor="analyze-project-select">Project</label>
+            <select
+              id="analyze-project-select"
+              value={directProjectId}
+              onChange={async (e) => {
+                const projectId = e.target.value
+                setDirectProjectId(projectId)
+                const selected = await api.setSelectedProject(projectId)
+                setSelectedProject(selected)
+              }}
+            >
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>{project.name}</option>
+              ))}
+            </select>
+            <label className="analyze-label" htmlFor="analyze-file-select">File</label>
+            <select
+              id="analyze-file-select"
+              value={directFileId}
+              onChange={(e) => setDirectFileId(e.target.value)}
+            >
+              {directFiles.map((file) => (
+                <option key={file.id} value={file.id}>{file.name}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const row = directFiles.find((file) => file.id === directFileId)
+              if (!row) return
+              setActiveMedia({
+                mediaFileId: row.id,
+                documentId: row.document_id,
+                fileName: row.name,
+                mediaPath: row.path ?? `/uploads/${row.name}`,
+                sizeBytes: row.size_bytes ?? 100 * 1024 * 1024,
+                durationSec: row.duration_seconds ?? 600,
+              })
+            }}
+            disabled={!directFileId}
+          >
+            Use selected file
+          </button>
+        </section>
+      ) : null}
       <MediaSubmitForm
         onSubmitted={(payload) => {
           setSubmission(payload)
@@ -157,10 +251,10 @@ export function AnalyzePage() {
         }}
         onSubmittingChange={() => {}}
         projectId={selectedProject.project_id ?? null}
-        projectLabel={selectedProject.project_name ?? selectedProject.project_id ?? 'Project'}
+        projectLabel={activeMedia ? (selectedProject.project_name ?? selectedProject.project_id ?? 'Project') : '-'}
         stageProgress={stageProgress}
         activeStageIndex={activeStageIndex}
-        initialMedia={selectedMedia}
+        initialMedia={activeMedia ?? undefined}
         translatorOptions={translationConfig?.providers || []}
         defaultTranslator={translationConfig?.default_provider || 'm2m100'}
       />
