@@ -88,6 +88,7 @@ class LocalSQLiteRepository:
                     document_id TEXT NOT NULL,
                     sentence_idx INTEGER NOT NULL,
                     sentence_text TEXT NOT NULL,
+                    text_ru TEXT,
                     start_ms INTEGER,
                     end_ms INTEGER,
                     page_no INTEGER,
@@ -159,6 +160,9 @@ class LocalSQLiteRepository:
             cols = {str(row[1]) for row in conn.execute("PRAGMA table_info(documents)").fetchall()}
             if "processing_duration_ms" not in cols:
                 conn.execute("ALTER TABLE documents ADD COLUMN processing_duration_ms INTEGER")
+            media_cols = {str(row[1]) for row in conn.execute("PRAGMA table_info(media_sentences)").fetchall()}
+            if "text_ru" not in media_cols:
+                conn.execute("ALTER TABLE media_sentences ADD COLUMN text_ru TEXT")
             conn.commit()
         # Keep DB consistent for legacy states: one media row per (project_id, path).
         self.cleanup_duplicate_media_files()
@@ -311,15 +315,16 @@ class LocalSQLiteRepository:
                 conn.execute(
                     """
                     INSERT INTO media_sentences (
-                        document_id, sentence_idx, sentence_text, start_ms, end_ms, page_no,
+                        document_id, sentence_idx, sentence_text, text_ru, start_ms, end_ms, page_no,
                         char_start, char_end, sentence_hash
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         document_id,
                         int(row["sentence_idx"]),
                         str(row["sentence_text"]),
+                        str(row.get("text_ru") or ""),
                         row.get("start_ms"),
                         row.get("end_ms"),
                         row.get("page_no"),
@@ -366,6 +371,7 @@ class LocalSQLiteRepository:
                 m.sentence_idx,
                 m.sentence_text,
                 m.sentence_hash,
+                m.text_ru,
                 c.sentence_node_json
             FROM media_sentences m
             JOIN sentence_link l
@@ -384,7 +390,8 @@ class LocalSQLiteRepository:
                     "sentence_idx": int(row[0]),
                     "sentence_text": row[1],
                     "sentence_hash": row[2],
-                    "sentence_node": json.loads(row[3]),
+                    "text_ru": row[3],
+                    "sentence_node": json.loads(row[4]),
                 }
             )
         return out

@@ -23,6 +23,13 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
 SERVICE = RuntimeMediaService(
     db_path=os.getenv("ELA_CLIENT_DB_PATH", "artifacts/client_state.sqlite3"),
     runtime_mode=os.getenv("ELA_RUNTIME_MODE", "auto"),
@@ -271,8 +278,44 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 payload = SERVICE.build_sentence_contract(
                     sentence_text=sentence_text,
                     sentence_idx=sentence_idx,
-                    translation_provider=str(body.get("translationProvider") or "").strip().lower() or None,
-                    provider_credentials=body.get("providerCredentials") if isinstance(body.get("providerCredentials"), dict) else None,
+                    model_dir=str(body.get("modelDir") or os.getenv("ELA_SENTENCE_CONTRACT_MODEL_DIR") or "").strip() or None,
+                    note_mode=str(
+                        body.get("noteMode")
+                        or os.getenv("ELA_SENTENCE_CONTRACT_NOTE_MODE", "template_only")
+                    ).strip()
+                    or "template_only",
+                    validation_mode=str(
+                        body.get("validationMode")
+                        or os.getenv("ELA_SENTENCE_CONTRACT_VALIDATION_MODE", "v2_strict")
+                    ).strip()
+                    or "v2_strict",
+                    enable_translation=_env_bool("ELA_SENTENCE_CONTRACT_ENABLE_TRANSLATION", True),
+                    translation_model=str(
+                        os.getenv("ELA_SENTENCE_CONTRACT_TRANSLATION_MODEL", "facebook/m2m100_418M")
+                    ).strip()
+                    or "facebook/m2m100_418M",
+                    translation_source_lang=str(
+                        os.getenv("ELA_SENTENCE_CONTRACT_TRANSLATION_SOURCE_LANG", "en")
+                    ).strip()
+                    or "en",
+                    translation_target_lang=str(
+                        os.getenv("ELA_SENTENCE_CONTRACT_TRANSLATION_TARGET_LANG", "ru")
+                    ).strip()
+                    or "ru",
+                    translation_device=str(
+                        os.getenv("ELA_SENTENCE_CONTRACT_TRANSLATION_DEVICE", "auto")
+                    ).strip()
+                    or "auto",
+                    enable_phonetic=_env_bool("ELA_SENTENCE_CONTRACT_ENABLE_PHONETIC", True),
+                    phonetic_binary=str(os.getenv("ELA_SENTENCE_CONTRACT_PHONETIC_BINARY", "auto")).strip() or "auto",
+                    enable_synonyms=_env_bool("ELA_SENTENCE_CONTRACT_ENABLE_SYNONYMS", False),
+                    synonyms_top_k=_env_int("ELA_SENTENCE_CONTRACT_SYNONYMS_TOP_K", 5),
+                    enable_cefr=_env_bool("ELA_SENTENCE_CONTRACT_ENABLE_CEFR", True),
+                    cefr_provider=str(os.getenv("ELA_SENTENCE_CONTRACT_CEFR_PROVIDER", "rule")).strip() or "rule",
+                    cefr_model_path=str(
+                        os.getenv("ELA_SENTENCE_CONTRACT_CEFR_MODEL_PATH", "artifacts/models/t5_cefr/best_model")
+                    ).strip()
+                    or "artifacts/models/t5_cefr/best_model",
                 )
             except Exception as exc:
                 self._send_json({"error": str(exc)}, status=400)

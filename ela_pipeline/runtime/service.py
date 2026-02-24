@@ -15,10 +15,11 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 
 from ela_pipeline.client_storage import LocalSQLiteRepository, build_sentence_hash
+from ela_pipeline.inference.run import run_pipeline
 
 from .capabilities import build_runtime_capabilities, resolve_deployment_mode, resolve_runtime_mode
 from .media_policy import MediaPolicyLimits, load_media_policy_limits_from_env
-from .media_pipeline import apply_translation_to_sentence_node, build_sentence_contract, run_media_pipeline
+from .media_pipeline import run_media_pipeline, translate_text_with_provider
 from .media_submission import submit_media_for_processing
 from .ui_state import build_runtime_ui_state, build_submission_ui_feedback
 
@@ -403,7 +404,15 @@ class RuntimeMediaService:
             seen = duplicates.get(base, 0)
             duplicates[base] = seen + 1
             key = base if seen == 0 else f"{base} #{seen + 1}"
-            payload[key] = row["sentence_node"]
+            node = row["sentence_node"]
+            text_ru = str(row.get("text_ru") or "").strip()
+            if text_ru and isinstance(node, dict):
+                tr = node.get("translation")
+                if not isinstance(tr, dict):
+                    node["translation"] = {"source_lang": "en", "target_lang": "ru", "text": text_ru}
+                else:
+                    tr["text"] = text_ru
+            payload[key] = node
         return payload
 
     def get_document_processing_status(self, *, document_id: str) -> dict[str, Any]:
@@ -450,15 +459,68 @@ class RuntimeMediaService:
         *,
         sentence_text: str,
         sentence_idx: int = 0,
-        translation_provider: str | None = None,
-        provider_credentials: dict[str, str] | None = None,
+        model_dir: str | None = None,
+        note_mode: str = "template_only",
+        validation_mode: str = "v2_strict",
+        enable_translation: bool = False,
+        translation_model: str = "facebook/m2m100_418M",
+        translation_source_lang: str = "en",
+        translation_target_lang: str = "ru",
+        translation_device: str = "auto",
+        enable_phonetic: bool = False,
+        phonetic_binary: str = "auto",
+        enable_synonyms: bool = False,
+        synonyms_top_k: int = 5,
+        enable_cefr: bool = False,
+        cefr_provider: str = "rule",
+        cefr_model_path: str = "artifacts/models/t5_cefr/best_model",
     ) -> dict[str, Any]:
-        return build_sentence_contract(
-            sentence_text=sentence_text,
-            sentence_idx=sentence_idx,
-            translation_provider=translation_provider,
-            provider_credentials=provider_credentials,
+        text = str(sentence_text or "").strip()
+        if not text:
+            raise ValueError("sentence_text must be non-empty")
+
+        contract = run_pipeline(
+            text=text,
+            model_dir=model_dir,
+            validation_mode=validation_mode,
+            note_mode=note_mode,
+            enable_translation=enable_translation,
+            translation_provider="m2m100",
+            translation_model=translation_model,
+            translation_source_lang=translation_source_lang,
+            translation_target_lang=translation_target_lang,
+            translation_device=translation_device,
+            enable_phonetic=enable_phonetic,
+            phonetic_binary=phonetic_binary,
+            enable_synonyms=enable_synonyms,
+            synonyms_top_k=synonyms_top_k,
+            enable_cefr=enable_cefr,
+            cefr_provider=cefr_provider,
+            cefr_model_path=cefr_model_path,
         )
+        sentence_node = self._select_sentence_node_from_contract(contract=contract, sentence_text=text)
+        sentence_text_resolved = str(sentence_node.get("content") or text).strip() or text
+        return {
+            "sentence_text": sentence_text_resolved,
+            "sentence_hash": build_sentence_hash(sentence_text_resolved, int(sentence_idx)),
+            "sentence_node": sentence_node,
+        }
+
+    @staticmethod
+    def _select_sentence_node_from_contract(*, contract: dict[str, Any], sentence_text: str) -> dict[str, Any]:
+        if not isinstance(contract, dict) or not contract:
+            raise RuntimeError("run_pipeline returned empty contract.")
+        source_norm = " ".join(sentence_text.strip().split()).casefold()
+        for _, value in contract.items():
+            if not isinstance(value, dict):
+                continue
+            content = " ".join(str(value.get("content") or "").strip().split()).casefold()
+            if content and content == source_norm:
+                return value
+        for _, value in contract.items():
+            if isinstance(value, dict):
+                return value
+        raise RuntimeError("run_pipeline returned no sentence node.")
 
     def process_media_now(
         self,
@@ -483,8 +545,6 @@ class RuntimeMediaService:
                 sentence_contract_builder=lambda *, sentence_text, sentence_idx: self._build_sentence_contract_from_backend_and_local_translation(
                     sentence_text=sentence_text,
                     sentence_idx=sentence_idx,
-                    translation_provider=translation_provider,
-                    provider_credentials=provider_credentials,
                 ),
                 progress_callback=stage_callback,
             )
@@ -497,6 +557,24 @@ class RuntimeMediaService:
 
         if stage_callback is not None:
             stage_callback("translating_text", 1.0, "Sentence contract build completed")
+
+        selected_provider = str(translation_provider or "").strip().lower()
+        if selected_provider and selected_provider not in {"m2m100", "our", "backend", "default"}:
+            total = max(len(pipeline.media_sentences), 1)
+            for idx, row in enumerate(pipeline.media_sentences):
+                source_text = str(row.get("sentence_text") or "").strip()
+                translated = translate_text_with_provider(
+                    text=source_text,
+                    translation_provider=selected_provider,
+                    provider_credentials=provider_credentials,
+                )
+                row["text_ru"] = translated
+                if stage_callback is not None:
+                    stage_callback(
+                        "translating_text",
+                        (idx + 1) / total,
+                        f"Overlay translation {idx + 1}/{total} via {selected_provider}",
+                    )
 
         document_id = document_id or f"doc-{uuid.uuid4().hex[:12]}"
         existing_doc = self.repo.get_document(document_id)
@@ -713,21 +791,11 @@ class RuntimeMediaService:
         *,
         sentence_text: str,
         sentence_idx: int,
-        translation_provider: str | None = None,
-        provider_credentials: dict[str, str] | None = None,
     ) -> dict[str, Any]:
-        payload = self._request_sentence_contract(
+        return self._request_sentence_contract(
             sentence_text=sentence_text,
             sentence_idx=sentence_idx,
         )
-        sentence_node = payload.get("sentence_node")
-        if isinstance(sentence_node, dict):
-            apply_translation_to_sentence_node(
-                sentence_node=sentence_node,
-                translation_provider=translation_provider,
-                provider_credentials=provider_credentials,
-            )
-        return payload
 
     def _persist_media_contract_artifacts(
         self,

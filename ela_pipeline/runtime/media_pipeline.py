@@ -461,6 +461,28 @@ def apply_translation_to_sentence_node(
                 tr["text"] = existing_translation
 
 
+def translate_text_with_provider(
+    *,
+    text: str,
+    translation_provider: str | None = None,
+    provider_credentials: dict[str, str] | None = None,
+    source_lang: str | None = None,
+    target_lang: str | None = None,
+) -> str:
+    source_text = str(text or "").strip()
+    if not source_text:
+        return ""
+    translator = _resolve_media_translator(
+        provider_override=translation_provider,
+        provider_credentials=provider_credentials,
+    )
+    source_lang_resolved = source_lang or os.getenv("ELA_MEDIA_TRANSLATION_SOURCE_LANG", "en")
+    target_lang_resolved = target_lang or os.getenv("ELA_MEDIA_TRANSLATION_TARGET_LANG", "ru")
+    return str(
+        translator.translate_text(source_text, source_lang=source_lang_resolved, target_lang=target_lang_resolved) or ""
+    ).strip()
+
+
 def _attach_phonetic_runtime(analyzed: dict[str, Any], *, transcriber: Any) -> None:
     for sentence_node in analyzed.values():
         if not isinstance(sentence_node, dict):

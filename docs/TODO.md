@@ -488,6 +488,8 @@
   - [x] Build deterministic sentence hash policy for repeated text (include stable disambiguator such as sentence index).
   - [x] Persist full extracted text locally (SQLite) and keep backend text/media temporary-only (TTL).
   - [x] Remove backend large-media processing path (architecture switch to client-only media pipeline + backend sentence-contract only).
+  - [x] Switch `/api/sentence-contract` to canonical inference contour (`ela_pipeline.inference.run_pipeline`) with backend-side enrichment defaults.
+  - [x] Keep third-party translator output as UI overlay only; canonical backend contract in storage is immutable.
   - [x] Real upload + extraction pipeline wiring:
     - [x] Analyze screen uploads media via runtime API (`multipart/form-data`)
     - [x] Runtime API persists upload to temp media dir (`MEDIA_TEMP_DIR/uploads`)

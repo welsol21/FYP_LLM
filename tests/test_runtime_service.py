@@ -216,6 +216,51 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertIn("She trusted him.", bilingual_srt)
             self.assertIn("Она доверяла ему.", bilingual_srt)
 
+    def test_non_default_provider_applies_ui_overlay_without_mutating_canonical_contract(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media_path = Path(tmpdir) / "short.txt"
+            media_path.write_text("She trusted him.", encoding="utf-8")
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            svc.repo.create_project("Project A", project_id="proj-1")
+            with patch.object(
+                svc,
+                "_request_sentence_contract",
+                return_value={
+                    "sentence_text": "She trusted him.",
+                    "sentence_hash": "h1",
+                    "sentence_node": {
+                        "type": "Sentence",
+                        "content": "She trusted him.",
+                        "node_id": "n1",
+                        "translation": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."},
+                        "linguistic_elements": [],
+                    },
+                },
+            ):
+                with patch("ela_pipeline.runtime.service.translate_text_with_provider", return_value="Клиентский перевод"):
+                    result = svc.process_media_now(
+                        media_path=str(media_path),
+                        project_id="proj-1",
+                        translation_provider="gpt",
+                        provider_credentials={"api_key": "x"},
+                    )
+
+            self.assertEqual(result["status"], "completed")
+            rows = svc.repo.list_document_visualizer_rows(document_id=result["document_id"])
+            self.assertEqual(
+                rows[0]["sentence_node"]["translation"]["text"],
+                "Она доверяла ему.",
+            )
+            payload = svc.get_visualizer_payload(document_id=result["document_id"])
+            self.assertEqual(
+                payload["She trusted him."]["translation"]["text"],
+                "Клиентский перевод",
+            )
+
     def test_export_final_media_artifacts_creates_audio_for_audio_source(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             svc = RuntimeMediaService(
@@ -435,7 +480,6 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             node = payload["sentence_node"]
             self.assertEqual(node["type"], "Sentence")
             self.assertIsInstance(node.get("linguistic_notes"), list)
-            self.assertIn("translation", node)
 
     def test_request_sentence_contract_uses_backend_endpoint_when_configured(self):
         with tempfile.TemporaryDirectory() as tmpdir:
