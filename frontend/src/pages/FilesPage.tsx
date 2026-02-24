@@ -42,6 +42,7 @@ export function FilesPage() {
       state: {
         selectedMedia: {
           mediaFileId: row.id,
+          documentId: row.document_id,
           fileName: row.name,
           mediaPath: row.path ?? `/uploads/${row.name}`,
           sizeBytes: row.size_bytes ?? 100 * 1024 * 1024,
@@ -128,4 +129,3 @@ export function FilesPage() {
     </section>
   )
 }
-

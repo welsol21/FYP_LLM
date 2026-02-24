@@ -23,6 +23,7 @@ describe('FilesPage', () => {
       state: {
         selectedMedia: {
           mediaFileId: 'file-1',
+          documentId: 'doc-1',
           fileName: 'sample.mp4',
           mediaPath: '/uploads/sample.mp4',
           sizeBytes: 104857600,

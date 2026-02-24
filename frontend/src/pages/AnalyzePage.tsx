@@ -21,6 +21,7 @@ export function AnalyzePage() {
     | {
         selectedMedia?: {
           mediaFileId?: string
+          documentId?: string
           mediaPath?: string
           durationSec?: number
           sizeBytes?: number
@@ -67,7 +68,7 @@ export function AnalyzePage() {
     }
   }, [api, jobId])
 
-  const activeDocumentId = jobStatus?.document_id || submission?.result.document_id
+  const activeDocumentId = jobStatus?.document_id || submission?.result.document_id || selectedMedia?.documentId
   const stageLogLines = (jobStatus?.stage_logs || []).slice(-10)
 
   useEffect(() => {
