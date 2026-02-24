@@ -708,6 +708,7 @@ class RuntimeMediaService:
             contract_sentences=pipeline.contract_sentences,
             subtitles_mode=subtitles_mode,
             voice_choice=voice_choice,
+            stage_callback=stage_callback,
         )
         if stage_callback is not None:
             stage_callback("exporting_files", 1.0, "Artifacts exported")
@@ -904,6 +905,7 @@ class RuntimeMediaService:
         contract_sentences: list[dict[str, Any]],
         subtitles_mode: str = "bilingual",
         voice_choice: str = "male",
+        stage_callback: Callable[[str, float | None, str | None], None] | None = None,
     ) -> None:
         base = Path(os.getenv("MEDIA_CONTRACT_ARTIFACTS_DIR", "artifacts/media_contracts"))
         doc_dir = base / document_id
@@ -933,39 +935,59 @@ class RuntimeMediaService:
             for row in media_sentences
         ]
 
+        if stage_callback is not None:
+            stage_callback("generating_media", 0.32, "Writing full_text.txt")
         (doc_dir / "full_text.txt").write_text(full_text, encoding="utf-8")
+        if stage_callback is not None:
+            stage_callback("generating_media", 0.38, "Writing media_contract.json")
         (doc_dir / "media_contract.json").write_text(
             json.dumps(media_contract, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        if stage_callback is not None:
+            stage_callback("generating_media", 0.45, "Writing contract_sentences.json")
         (doc_dir / "contract_sentences.json").write_text(
             json.dumps(contract_sentences, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        if stage_callback is not None:
+            stage_callback("generating_media", 0.5, "Writing sentence_link.json")
         (doc_dir / "sentence_link.json").write_text(
             json.dumps(links, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        if stage_callback is not None:
+            stage_callback("generating_media", 0.56, "Writing semantic_units_runtime.json")
         (doc_dir / "semantic_units_runtime.json").write_text(
             json.dumps(legacy_segments, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        if stage_callback is not None:
+            stage_callback("generating_media", 0.62, "Writing bilingual_objects_runtime.json")
         (doc_dir / "bilingual_objects_runtime.json").write_text(
             json.dumps(legacy_segments, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+        if stage_callback is not None:
+            stage_callback("generating_media", 0.68, "Writing source subtitles")
         (doc_dir / "subtitles_en.srt").write_text(
             _build_srt(media_sentences, bilingual=False),
             encoding="utf-8",
         )
+        if stage_callback is not None:
+            stage_callback("generating_media", 0.72, "Writing bilingual subtitles")
         (doc_dir / "subtitles_bilingual.srt").write_text(
             _build_srt(media_sentences, bilingual=True),
             encoding="utf-8",
         )
+        if stage_callback is not None:
+            stage_callback("generating_media", 0.76, "Writing target subtitles")
         (doc_dir / "subtitles_target.srt").write_text(
             _build_srt([{**row, "text_eng": ""} for row in media_sentences], bilingual=True),
             encoding="utf-8",
         )
+        if stage_callback is not None:
+            stage_callback("generating_media", 0.82, "Rendering final media artifacts")
         self._export_final_media_artifacts(
             source_type=source_type,
             source_path=media_path,
@@ -973,12 +995,17 @@ class RuntimeMediaService:
             media_sentences=media_sentences,
             subtitles_mode=subtitles_mode,
             voice_choice=voice_choice,
+            stage_callback=stage_callback,
         )
+        if stage_callback is not None:
+            stage_callback("generating_media", 0.96, "Archiving artifact snapshot")
         self._archive_artifacts_snapshot(
             document_id=document_id,
             media_file_id=media_file_id,
             source_dir=doc_dir,
         )
+        if stage_callback is not None:
+            stage_callback("generating_media", 1.0, "Contract artifacts persisted")
 
     @staticmethod
     def _archive_artifacts_snapshot(
@@ -1008,6 +1035,7 @@ class RuntimeMediaService:
         media_sentences: list[dict[str, Any]],
         subtitles_mode: str = "bilingual",
         voice_choice: str = "male",
+        stage_callback: Callable[[str, float | None, str | None], None] | None = None,
     ) -> None:
         if source_type not in {"audio", "video"}:
             return
@@ -1016,6 +1044,8 @@ class RuntimeMediaService:
         source = Path(source_path)
         try:
             import edge_tts  # type: ignore
+            if stage_callback is not None:
+                stage_callback("exporting_files", 0.1, "Preparing audio segments")
 
             mode = str(subtitles_mode or "bilingual_sequential").strip().lower()
             source_modes = {"source", "source_only", "source only", "en"}
@@ -1036,6 +1066,13 @@ class RuntimeMediaService:
             with tempfile.TemporaryDirectory(prefix="ela_tts_") as tmpdir:
                 tmp = Path(tmpdir)
                 for idx, row in enumerate(media_sentences, start=1):
+                    total_segments = max(1, len(media_sentences))
+                    if stage_callback is not None:
+                        stage_callback(
+                            "exporting_files",
+                            min(0.55, 0.12 + (idx - 1) / total_segments * 0.4),
+                            f"Rendering media segment {idx}/{total_segments}",
+                        )
                     text_en = str(row.get("sentence_text") or row.get("text_eng") or "").strip()
                     text_ru = str(row.get("text_ru") or "").strip()
                     window: dict[str, Any] = {
@@ -1129,6 +1166,8 @@ class RuntimeMediaService:
                 if not segment_audio_files:
                     return
 
+                if stage_callback is not None:
+                    stage_callback("exporting_files", 0.62, "Concatenating final audio track")
                 concat_txt = tmp / "concat.txt"
                 concat_txt.write_text(
                     "\n".join(f"file '{p.as_posix()}'" for p in segment_audio_files),
@@ -1156,6 +1195,8 @@ class RuntimeMediaService:
                 )
 
             # Rebuild subtitle files using real rendered timeline.
+            if stage_callback is not None:
+                stage_callback("exporting_files", 0.72, "Building subtitle files")
             bilingual_subtitle_segments: list[dict[str, Any]] = []
             if bilingual_simultaneous:
                 for row in sentence_windows:
@@ -1190,6 +1231,8 @@ class RuntimeMediaService:
                 encoding="utf-8",
             )
 
+            if stage_callback is not None:
+                stage_callback("exporting_files", 0.84, "Rendering final video")
             out_video = doc_dir / "translated_video_ru.mp4"
             subtitle_path = _subtitle_path_for_mode(doc_dir=doc_dir, subtitles_mode=subtitles_mode)
             escaped_subs = _ffmpeg_escape_filter_path(subtitle_path)
@@ -1251,6 +1294,8 @@ class RuntimeMediaService:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
+            if stage_callback is not None:
+                stage_callback("exporting_files", 1.0, "Media artifacts exported")
         except Exception as exc:
             # Keep pipeline successful even if media rendering fails on one environment.
             (doc_dir / "media_export_error.txt").write_text(str(exc), encoding="utf-8")

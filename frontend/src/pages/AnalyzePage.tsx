@@ -118,10 +118,19 @@ export function AnalyzePage() {
     return Math.max(0, Math.floor((nowTs - analysisStartedAt) / 1000))
   }, [analysisStartedAt, nowTs])
   const estimatedSec = useMemo(() => {
+    const progressValues = stageProgress.map((value) => {
+      const n = Number(value)
+      if (!Number.isFinite(n)) return 0
+      return Math.max(0, Math.min(100, n))
+    })
+    const progressFraction = progressValues.reduce((acc, value) => acc + value, 0) / (progressValues.length * 100)
+    if (elapsedSec > 0 && progressFraction >= 0.03) {
+      return Math.max(elapsedSec + 1, Math.round(elapsedSec / Math.max(progressFraction, 0.03)))
+    }
     const src = Number(selectedMedia?.durationSec ?? 0)
     if (src > 0) return Math.max(20, Math.round(src * 1.8))
     return 60
-  }, [selectedMedia?.durationSec])
+  }, [elapsedSec, stageProgress, selectedMedia?.durationSec])
   const stageTitle = useMemo(() => {
     const value = String(jobStatus?.stage_name || '').trim().toLowerCase()
     if (!value) return ''
