@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
+import type { VisualizerNode, VisualizerPayload } from '../api/runtimeApi'
 
 type VocabRow = {
   id: string
@@ -9,12 +10,107 @@ type VocabRow = {
   items: number
   created: string
   documentId: string | null
+  payload: VisualizerPayload | null
 }
 
-function pseudoCount(seed: string): number {
-  let acc = 0
-  for (let i = 0; i < seed.length; i += 1) acc = (acc * 31 + seed.charCodeAt(i)) >>> 0
-  return 30 + (acc % 40)
+type ExportRow = {
+  project: string
+  file: string
+  created: string
+  document_id: string
+  sentence: string
+  node_id: string
+  node_type: string
+  content: string
+  cefr_level: string
+  tense: string
+  linguistic_notes: string
+  translation: string
+  phonetic_uk: string
+  phonetic_us: string
+}
+
+function collectLinguisticElements(node: VisualizerNode): VisualizerNode[] {
+  const out: VisualizerNode[] = []
+  const stack = [...(node.linguistic_elements || [])]
+  while (stack.length) {
+    const current = stack.shift()
+    if (!current) continue
+    out.push(current)
+    for (const child of current.linguistic_elements || []) stack.push(child)
+  }
+  return out
+}
+
+function countPayloadElements(payload: VisualizerPayload | null): number {
+  if (!payload) return 0
+  let total = 0
+  for (const root of Object.values(payload)) {
+    if (!root) continue
+    total += collectLinguisticElements(root).length
+  }
+  return total
+}
+
+function toExportRows(row: VocabRow): ExportRow[] {
+  if (!row.payload || !row.documentId) return []
+  const out: ExportRow[] = []
+  for (const [sentence, root] of Object.entries(row.payload)) {
+    const elements = collectLinguisticElements(root)
+    for (const node of elements) {
+      out.push({
+        project: row.project,
+        file: row.file,
+        created: row.created,
+        document_id: row.documentId,
+        sentence,
+        node_id: String(node.node_id || ''),
+        node_type: String(node.type || ''),
+        content: String(node.content || ''),
+        cefr_level: String(node.cefr_level || ''),
+        tense: String(node.tense || ''),
+        linguistic_notes: Array.isArray(node.linguistic_notes) ? node.linguistic_notes.join(' | ') : '',
+        translation: String(node.translation?.text || ''),
+        phonetic_uk: String(node.phonetic?.uk || ''),
+        phonetic_us: String(node.phonetic?.us || ''),
+      })
+    }
+  }
+  return out
+}
+
+function downloadTextFile(filename: string, text: string, mimeType: string): void {
+  const blob = new Blob([text], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+function toCsv(rows: ExportRow[]): string {
+  const headers = Object.keys(rows[0] || {
+    project: '',
+    file: '',
+    created: '',
+    document_id: '',
+    sentence: '',
+    node_id: '',
+    node_type: '',
+    content: '',
+    cefr_level: '',
+    tense: '',
+    linguistic_notes: '',
+    translation: '',
+    phonetic_uk: '',
+    phonetic_us: '',
+  })
+  const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const body = rows.map((row) => headers.map((h) => esc((row as Record<string, unknown>)[h])).join(','))
+  return [headers.join(','), ...body].join('\n')
 }
 
 export function VocabularyPage() {
@@ -30,19 +126,24 @@ export function VocabularyPage() {
       const grouped = await Promise.all(
         projects.map(async (p) => {
           const files = await api.listFiles(p.id)
-          return files
-            .filter((f) => f.analyzed)
-            .map((f) => ({
-            id: `${p.id}:${f.id}`,
-            project: p.name,
-            file: f.name,
-            items: pseudoCount(f.id),
-            created: new Date(f.updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            documentId: f.document_id ?? null,
-            }))
+          const analyzed = files.filter((f) => f.analyzed)
+          return Promise.all(
+            analyzed.map(async (f) => {
+              const payload = f.document_id ? await api.getVisualizerPayload(f.document_id) : null
+              return {
+                id: `${p.id}:${f.id}`,
+                project: p.name,
+                file: f.name,
+                items: countPayloadElements(payload),
+                created: new Date(f.updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                documentId: f.document_id ?? null,
+                payload,
+              }
+            }),
+          )
         }),
       )
-      if (alive) setRows(grouped.flat())
+      if (alive) setRows(grouped.flat().flat())
     })()
     return () => {
       alive = false
@@ -51,6 +152,7 @@ export function VocabularyPage() {
 
   const selectedCount = useMemo(() => Object.values(checked).filter(Boolean).length, [checked])
   const selectedRows = useMemo(() => rows.filter((row) => checked[row.id]), [rows, checked])
+  const exportRows = useMemo(() => selectedRows.flatMap((row) => toExportRows(row)), [selectedRows])
   const selectedDocumentId = selectedRows.find((row) => row.documentId)?.documentId ?? null
 
   return (
@@ -69,10 +171,26 @@ export function VocabularyPage() {
           >
             Visualizer
           </button>
-          <button type="button" className="secondary-btn" onClick={() => window.alert(`Export JSON (${selectedCount})`)}>
+          <button
+            type="button"
+            className="secondary-btn"
+            disabled={selectedCount === 0}
+            onClick={() =>
+              downloadTextFile(
+                `vocabulary_export_${Date.now()}.json`,
+                JSON.stringify(exportRows, null, 2),
+                'application/json;charset=utf-8',
+              )
+            }
+          >
             Export JSON
           </button>
-          <button type="button" className="secondary-btn" onClick={() => window.alert(`Export CSV (${selectedCount})`)}>
+          <button
+            type="button"
+            className="secondary-btn"
+            disabled={selectedCount === 0}
+            onClick={() => downloadTextFile(`vocabulary_export_${Date.now()}.csv`, toCsv(exportRows), 'text/csv;charset=utf-8')}
+          >
             Export CSV
           </button>
         </div>
