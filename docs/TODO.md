@@ -24,20 +24,20 @@
 
 ### A) Translation Contract: provider-keyed translations
 
-- [ ] Introduce provider-keyed translation storage in contract:
-  - [ ] add `translations: { [provider_key]: { text, source_lang, target_lang, created_at, origin } }`
-  - [ ] keep backward compatibility for legacy `translation` during migration window.
-- [ ] Define canonical backend provider key (e.g. `backend_m2m100`) and enforce it in sentence-contract response handling.
-- [ ] Save user-selected translator outputs in the same `translations` map (client-side), without overwriting backend canonical translation.
-- [ ] Update visualizer rendering logic:
-  - [ ] show active user-selected provider translation as primary
-  - [ ] fallback to `backend_m2m100` when selected provider translation is absent
+- [x] Introduce provider-keyed translation storage in contract:
+  - [x] add `translations: { [provider_key]: { text, source_lang, target_lang, created_at, origin } }`
+  - [x] keep backward compatibility for legacy `translation` during migration window.
+- [x] Define canonical backend provider key (e.g. `backend_m2m100`) and enforce it in sentence-contract response handling.
+- [x] Save user-selected translator outputs in the same `translations` map (client-side), without overwriting backend canonical translation.
+- [x] Update visualizer rendering logic:
+  - [x] show active user-selected provider translation as primary
+  - [x] fallback to `backend_m2m100` when selected provider translation is absent
   - [ ] keep other provider translations collapsed under "More translations".
-- [ ] Update Vocabulary export JSON/CSV to include `translation_provider` + selected translation text (with optional full translations map in JSON export).
-- [ ] Add migration/adapter layer (`translation` -> `translations`) at contract boundaries.
+- [x] Update Vocabulary export JSON/CSV to include `translation_provider` + selected translation text (with optional full translations map in JSON export).
+- [x] Add migration/adapter layer (`translation` -> `translations`) at contract boundaries.
 - [ ] Add regression tests:
-  - [ ] contract roundtrip with multiple providers
-  - [ ] visualizer provider switch + fallback behavior
+  - [x] contract roundtrip with multiple providers
+  - [x] visualizer provider switch + fallback behavior
   - [ ] export correctness for selected provider.
 
 ### B) Incremental Pipeline Reuse (no unnecessary Whisper rerun)
@@ -430,7 +430,7 @@
 - [x] Implement local client persistence (SQLite) for projects/files/local edits/workspace state.
   - [x] Added `ela_pipeline/client_storage/sqlite_repository.py`.
   - [x] Added unit tests `tests/test_client_sqlite_repository.py`.
-- [ ] Define and implement offline/online capability matrix in runtime + UI (feature flags and graceful degradation).
+- [x] Define and implement offline/online capability matrix in runtime + UI (feature flags and graceful degradation).
   - [x] Runtime policy layer added (`ela_pipeline/runtime/capabilities.py`) with fail-fast checks for offline disallowed features.
   - [x] Inference CLI wired with `--runtime-mode auto|offline|online` + `ELA_RUNTIME_MODE`.
   - [x] UI state contract added (`ela_pipeline/runtime/ui_state.py`):
@@ -441,7 +441,7 @@
   - [x] Visual UI components to render this payload in frontend screens.
     - [x] React component `RuntimeStatusCard` added (badges + disabled reasons).
     - [x] React page `AnalyzePage` renders runtime payload + feedback block.
-- [ ] Enforce **client-only** media routing policy (no backend media queue):
+- [x] Enforce **client-only** media routing policy (no backend media queue):
   - [x] Runtime policy engine added (`ela_pipeline/runtime/media_policy.py`) with decision routes: `local|backend|reject`.
   - [x] local processing for files <= policy limits (duration/size).
   - [x] reject path for files above limits with explicit reason in UI.
