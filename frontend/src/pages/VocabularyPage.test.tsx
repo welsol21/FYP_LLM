@@ -85,5 +85,7 @@ describe('VocabularyPage', () => {
     const rows = toExportRows(row)
     expect(rows[0].translation_provider).toBe('gpt')
     expect(rows[0].translation).toBe('Она (GPT)')
+    expect(rows[0].translation_backend_m2m100).toBe('Она')
+    expect(rows[0].translation_gpt).toBe('Она (GPT)')
   })
 })

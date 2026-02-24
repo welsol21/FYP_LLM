@@ -32,6 +32,15 @@ export type ExportRow = {
   translations_json: string
   phonetic_uk: string
   phonetic_us: string
+} & Record<string, string>
+
+function toProviderColumn(provider: string): string {
+  const normalized = String(provider || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  return normalized ? `translation_${normalized}` : 'translation_unknown'
 }
 
 function collectLinguisticElements(node: VisualizerNode): VisualizerNode[] {
@@ -67,7 +76,7 @@ export function toExportRows(row: VocabRow): ExportRow[] {
   for (const [sentence, root] of Object.entries(row.payload)) {
     const elements = collectLinguisticElements(root)
     for (const node of elements) {
-      out.push({
+      const exportRow: ExportRow = {
         project: row.project,
         file: row.file,
         created: row.created,
@@ -84,7 +93,14 @@ export function toExportRows(row: VocabRow): ExportRow[] {
         translations_json: JSON.stringify(node.translations || {}),
         phonetic_uk: String(node.phonetic?.uk || ''),
         phonetic_us: String(node.phonetic?.us || ''),
-      })
+      }
+      if (node.translations && typeof node.translations === 'object') {
+        for (const [provider, payload] of Object.entries(node.translations)) {
+          const col = toProviderColumn(provider)
+          exportRow[col] = String(payload?.text || '')
+        }
+      }
+      out.push(exportRow)
     }
   }
   return out
@@ -103,7 +119,7 @@ function downloadTextFile(filename: string, text: string, mimeType: string): voi
 }
 
 function toCsv(rows: ExportRow[]): string {
-  const headers = Object.keys(rows[0] || {
+  const fallbackHeaders = Object.keys({
     project: '',
     file: '',
     created: '',
@@ -121,9 +137,16 @@ function toCsv(rows: ExportRow[]): string {
     phonetic_uk: '',
     phonetic_us: '',
   })
+  const headers = rows.length
+    ? Array.from(rows.reduce((set, row) => {
+      Object.keys(row).forEach((k) => set.add(k))
+      return set
+    }, new Set<string>()))
+    : fallbackHeaders
+  const csvHeaders = headers.filter((h) => h !== 'translations_json')
   const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
-  const body = rows.map((row) => headers.map((h) => esc((row as Record<string, unknown>)[h])).join(','))
-  return [headers.join(','), ...body].join('\n')
+  const body = rows.map((row) => csvHeaders.map((h) => esc((row as Record<string, unknown>)[h])).join(','))
+  return [csvHeaders.join(','), ...body].join('\n')
 }
 
 export function VocabularyPage() {
