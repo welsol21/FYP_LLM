@@ -544,6 +544,154 @@ def _attach_cefr(
                 enrich_node(child)
 
 
+def _attach_grammar_classes(doc: dict) -> None:
+    def tense_table_bucket(node: dict) -> str | None:
+        mood = str(node.get("mood") or "").strip().lower()
+        tense = str(node.get("tense") or "").strip().lower()
+        aspect = str(node.get("aspect") or "").strip().lower()
+        voice = str(node.get("voice") or "").strip().lower()
+        construction = str(node.get("tam_construction") or "").strip().lower()
+
+        if construction == "modal_perfect":
+            return "modal_perfect"
+        if mood == "modal" and aspect == "perfect":
+            return "modal_perfect"
+        if tense in {"null", "none"}:
+            tense = ""
+        if aspect in {"null", "none"}:
+            aspect = ""
+        if voice in {"null", "none"}:
+            voice = ""
+        if not tense and not aspect and not voice:
+            return None
+        parts = [p for p in (tense, aspect, voice) if p]
+        if not parts:
+            return None
+        return "_".join(parts)
+
+    def build_classes(node: dict) -> list[dict[str, Any]]:
+        classes: list[dict[str, Any]] = []
+        seen: set[str] = set()
+
+        def add_class(class_id: str, confidence: float) -> None:
+            cid = str(class_id or "").strip().lower()
+            if not cid or cid in seen:
+                return
+            seen.add(cid)
+            classes.append({"class_id": cid, "confidence": confidence})
+
+        node_type = str(node.get("type") or "").strip().lower()
+        if node_type:
+            add_class(f"type::{node_type}", 0.7)
+
+        pos = str(node.get("part_of_speech") or "").strip().lower()
+        if pos:
+            normalized_pos = "_".join(pos.split())
+            add_class(f"pos::{normalized_pos}", 0.82)
+
+        grammatical_role = str(node.get("grammatical_role") or "").strip().lower()
+        if grammatical_role and grammatical_role not in {"unknown", "none", "null"}:
+            normalized_role = "_".join(grammatical_role.split())
+            add_class(f"role::{normalized_role}", 0.75)
+
+        tam = str(node.get("tam_construction") or "").strip().lower()
+        if tam and tam not in {"none", "null"}:
+            add_class(f"tam::{tam}", 0.9)
+
+        tense_bucket = tense_table_bucket(node)
+        if tense_bucket:
+            add_class(f"tense_table::{tense_bucket}", 0.93)
+
+        return classes
+
+    def walk(node: dict) -> None:
+        node["grammar_classes"] = build_classes(node)
+        for child in node.get("linguistic_elements", []) or []:
+            if isinstance(child, dict):
+                walk(child)
+
+    for sentence_node in doc.values():
+        if isinstance(sentence_node, dict):
+            walk(sentence_node)
+
+
+def _attach_generated_notes(doc: dict) -> None:
+    def build_notes(node: dict) -> dict[str, str]:
+        node_type = str(node.get("type") or "").strip().lower() or "node"
+        pos = str(node.get("part_of_speech") or "").strip().lower() or "unknown"
+        role = str(node.get("grammatical_role") or "").strip().lower() or "unknown"
+        tam = str(node.get("tam_construction") or "").strip().lower() or "none"
+        cefr = str(node.get("cefr_level") or "").strip().upper() or "B1"
+        content = str(node.get("content") or "").strip()
+
+        class_ids = []
+        for item in node.get("grammar_classes") or []:
+            if isinstance(item, dict):
+                class_id = str(item.get("class_id") or "").strip()
+                if class_id:
+                    class_ids.append(class_id)
+        primary = class_ids[0] if class_ids else f"type::{node_type}"
+        secondary = class_ids[1] if len(class_ids) > 1 else f"pos::{'_'.join(pos.split())}"
+        compact_classes = ", ".join(class_ids[:3]) if class_ids else primary
+
+        elementary = (
+            f"This {node_type} expresses '{content}'. "
+            f"Main grammar focus: {primary}."
+        )
+        intermediate = (
+            f"This {node_type} ({pos}) is used as {role} and maps to {secondary}. "
+            f"Estimated level: {cefr}."
+        )
+        advanced = (
+            f"Grammar profile: [{compact_classes}] | role={role} | tam={tam} | cefr={cefr}."
+        )
+        return {
+            "elementary_text": elementary.strip(),
+            "intermediate_text": intermediate.strip(),
+            "advanced_text": advanced.strip(),
+        }
+
+    def walk(node: dict) -> None:
+        generated = build_notes(node)
+        node["generated_notes"] = generated
+        existing_notes = node.get("linguistic_notes")
+        if isinstance(existing_notes, list) and len(existing_notes) == 0:
+            node["linguistic_notes"] = [generated["intermediate_text"]]
+        for child in node.get("linguistic_elements", []) or []:
+            if isinstance(child, dict):
+                walk(child)
+
+    for sentence_node in doc.values():
+        if isinstance(sentence_node, dict):
+            walk(sentence_node)
+
+
+def _attach_classifier_profiles(doc: dict, classifier: Any) -> None:
+    def walk(node: dict, sentence_text: str) -> None:
+        source_text = _node_source_text(node, sentence_text)
+        profile = classifier.classify_node(node=node, source_text=source_text, sentence_text=sentence_text)
+        node["cefr_level"] = str(profile.get("cefr_level") or "B1").strip().upper()
+        grammar_classes = profile.get("grammar_classes")
+        node["grammar_classes"] = grammar_classes if isinstance(grammar_classes, list) else []
+        generated_notes = profile.get("generated_notes")
+        if isinstance(generated_notes, dict):
+            node["generated_notes"] = generated_notes
+            existing_notes = node.get("linguistic_notes")
+            if isinstance(existing_notes, list) and len(existing_notes) == 0:
+                intermediate = str(generated_notes.get("intermediate_text") or "").strip()
+                if intermediate:
+                    node["linguistic_notes"] = [intermediate]
+        for child in node.get("linguistic_elements", []) or []:
+            if isinstance(child, dict):
+                walk(child, sentence_text)
+
+    for sentence_node in doc.values():
+        if not isinstance(sentence_node, dict):
+            continue
+        sentence_text = str(sentence_node.get("content") or "")
+        walk(sentence_node, sentence_text)
+
+
 def _enforce_linguistic_elements_last(doc: dict) -> None:
     def reorder_node(node: dict) -> None:
         children = node.get("linguistic_elements", [])
@@ -557,6 +705,22 @@ def _enforce_linguistic_elements_last(doc: dict) -> None:
     for sentence_node in doc.values():
         if isinstance(sentence_node, dict):
             reorder_node(sentence_node)
+
+
+def _attach_note_generator_version(doc: dict, version: str) -> None:
+    resolved = str(version or "").strip()
+    if not resolved:
+        return
+
+    def walk(node: dict) -> None:
+        node["note_generator_version"] = resolved
+        for child in node.get("linguistic_elements", []) or []:
+            if isinstance(child, dict):
+                walk(child)
+
+    for sentence_node in doc.values():
+        if isinstance(sentence_node, dict):
+            walk(sentence_node)
 
 
 def _resolve_translation_model_name(
@@ -606,6 +770,10 @@ def run_pipeline(
     cefr_provider: str = "rule",
     cefr_model_path: str = DEFAULT_CEFR_MODEL_PATH,
     cefr_nodes: bool = True,
+    enable_grammar_classes: bool = True,
+    classifier_provider: str = "rule",
+    classifier_model_path: str | None = None,
+    classifier_device: str = "cuda",
 ) -> dict:
     nlp = load_nlp(spacy_model)
 
@@ -626,6 +794,10 @@ def run_pipeline(
             backoff_debug_summary=backoff_debug_summary,
         )
         annotator.annotate(enriched)
+        _attach_note_generator_version(
+            enriched,
+            version=f"local_t5::{note_mode}",
+        )
 
     if enable_translation:
         if translation_provider != "m2m100":
@@ -675,23 +847,38 @@ def run_pipeline(
             include_node_synonyms=synonym_nodes,
         )
 
-    if enable_cefr:
-        if cefr_provider == "rule":
-            from ela_pipeline.cefr import RuleBasedCEFRPredictor
+    if classifier_provider == "deberta":
+        from ela_pipeline.classifier.deberta import DebertaProfileClassifier
 
-            predictor = RuleBasedCEFRPredictor()
-        elif cefr_provider == "t5":
-            from ela_pipeline.cefr import T5CEFRPredictor
-
-            predictor = T5CEFRPredictor(model_path=cefr_model_path, device="cuda")
-        else:
-            raise ValueError("cefr_provider must be one of: rule | t5")
-
-        _attach_cefr(
-            enriched,
-            predictor=predictor,
-            include_node_cefr=cefr_nodes,
+        classifier = DebertaProfileClassifier(
+            model_path=classifier_model_path,
+            device=classifier_device,
         )
+        _attach_classifier_profiles(enriched, classifier=classifier)
+    elif classifier_provider == "rule":
+        if enable_cefr:
+            if cefr_provider == "rule":
+                from ela_pipeline.cefr import RuleBasedCEFRPredictor
+
+                predictor = RuleBasedCEFRPredictor()
+            elif cefr_provider == "t5":
+                from ela_pipeline.cefr import T5CEFRPredictor
+
+                predictor = T5CEFRPredictor(model_path=cefr_model_path, device="cuda")
+            else:
+                raise ValueError("cefr_provider must be one of: rule | t5")
+
+            _attach_cefr(
+                enriched,
+                predictor=predictor,
+                include_node_cefr=cefr_nodes,
+            )
+
+        if enable_grammar_classes:
+            _attach_grammar_classes(enriched)
+            _attach_generated_notes(enriched)
+    else:
+        raise ValueError("classifier_provider must be one of: rule | deberta")
 
     raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
     raise_if_invalid(validate_frozen_structure(skeleton, enriched))
@@ -802,6 +989,28 @@ def main() -> None:
         action="store_true",
         help="Attach CEFR level to sentence only (skip phrase/word node CEFR).",
     )
+    parser.add_argument(
+        "--classifier-provider",
+        default="rule",
+        choices=["rule", "deberta"],
+        help="Classifier profile provider (CEFR + grammar classes + generated note blueprints).",
+    )
+    parser.add_argument(
+        "--classifier-model-path",
+        default=None,
+        help="Local model path for classifier_provider=deberta.",
+    )
+    parser.add_argument(
+        "--classifier-device",
+        default="cuda",
+        choices=["cuda"],
+        help="Device for classifier_provider=deberta.",
+    )
+    parser.add_argument(
+        "--no-grammar-classes",
+        action="store_true",
+        help="Disable grammar_classes enrichment.",
+    )
     parser.add_argument("--output", default=None)
     parser.add_argument("--media-duration-sec", type=int, default=None, help="Optional media duration for routing validation.")
     parser.add_argument("--media-size-bytes", type=int, default=None, help="Optional media size in bytes for routing validation.")
@@ -879,6 +1088,10 @@ def main() -> None:
         cefr_provider=args.cefr_provider,
         cefr_model_path=args.cefr_model_path,
         cefr_nodes=not args.no_cefr_nodes,
+        enable_grammar_classes=not args.no_grammar_classes,
+        classifier_provider=args.classifier_provider,
+        classifier_model_path=args.classifier_model_path,
+        classifier_device=args.classifier_device,
     )
 
     out_path = args.output

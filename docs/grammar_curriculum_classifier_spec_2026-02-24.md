@@ -110,6 +110,11 @@ Pipeline is iterative, not one-shot:
 Each stage has hard quality gates.  
 If a gate fails, repeat only the required stage (or previous stage), not the full run.
 
+Implementation note:
+- iterative loop runner is implemented in `ela_pipeline/classifier/iterative_loop.py`
+- stopping criterion: required consecutive full-pass runs (`required_consecutive_passes`, default `3`)
+- gate-level retry execution/telemetry is implemented in `ela_pipeline/classifier/quality_loop.py`
+
 ## 6. Stage Gates
 
 1. **KB generation gate**

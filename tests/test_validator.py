@@ -207,6 +207,97 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
+    def test_accepts_optional_note_generator_version(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["note_generator_version"] = "local_t5::template_only"
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertTrue(result.ok, msg=str(result.errors))
+
+    def test_rejects_invalid_optional_note_generator_version(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["note_generator_version"] = ""
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("note_generator_version" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
+    def test_accepts_optional_grammar_classes(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["grammar_classes"] = [
+            {"class_id": "tam::modal_perfect", "confidence": 0.95},
+            {"class_id": "role::predicate", "confidence": 0.8, "scope_span": {"start": 0, "end": 4}},
+        ]
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertTrue(result.ok, msg=str(result.errors))
+
+    def test_rejects_invalid_optional_grammar_classes(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["grammar_classes"] = [
+            {"class_id": "", "confidence": 2.0},
+        ]
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("grammar_classes" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
+    def test_accepts_optional_generated_notes(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["generated_notes"] = {
+            "elementary_text": "Simple note.",
+            "intermediate_text": "Intermediate note.",
+            "advanced_text": "Advanced note.",
+        }
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertTrue(result.ok, msg=str(result.errors))
+
+    def test_rejects_invalid_optional_generated_notes(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["generated_notes"] = {
+            "elementary_text": "ok",
+            "intermediate_text": "",
+            "advanced_text": "ok",
+        }
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("generated_notes.intermediate_text" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
     def test_accepts_arbitrary_tam_construction_value(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)

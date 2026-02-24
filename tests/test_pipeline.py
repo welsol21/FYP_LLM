@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from ela_pipeline.annotate.local_generator import LocalT5Annotator
 from ela_pipeline.inference.run import (
@@ -531,6 +531,115 @@ class PipelineTests(unittest.TestCase):
         self.assertIsInstance(out, dict)
         key = next(iter(out))
         self.assertEqual(out[key]["type"], "Sentence")
+
+    @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.annotate")
+    @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.__init__", return_value=None)
+    def test_pipeline_sets_note_generator_version_when_annotator_enabled(self, _mock_init, mock_annotate):
+        mock_annotate.return_value = None
+        out = run_pipeline(
+            "She trusted him.",
+            model_dir="artifacts/models/fake_notes_model",
+            note_mode="template_only",
+        )
+        sentence = out[next(iter(out))]
+        self.assertEqual(sentence.get("note_generator_version"), "local_t5::template_only")
+        for phrase in self._iter_by_type(sentence, "Phrase"):
+            self.assertEqual(phrase.get("note_generator_version"), "local_t5::template_only")
+        for word in self._iter_by_type(sentence, "Word"):
+            self.assertEqual(word.get("note_generator_version"), "local_t5::template_only")
+
+    def test_pipeline_attaches_grammar_classes(self):
+        out = run_pipeline("She trusted him.", model_dir=None)
+        sentence = out[next(iter(out))]
+        sentence_classes = sentence.get("grammar_classes")
+        self.assertIsInstance(sentence_classes, list)
+        self.assertGreater(len(sentence_classes), 0)
+        for cls in sentence_classes:
+            self.assertIn("class_id", cls)
+            self.assertIn("confidence", cls)
+
+        phrases = list(self._iter_by_type(sentence, "Phrase"))
+        self.assertGreaterEqual(len(phrases), 1)
+        for phrase in phrases:
+            phrase_classes = phrase.get("grammar_classes")
+            self.assertIsInstance(phrase_classes, list)
+            self.assertGreater(len(phrase_classes), 0)
+
+    def test_pipeline_attaches_tense_table_grammar_class(self):
+        out = run_pipeline(
+            "She should have trusted her instincts before making the decision.",
+            model_dir=None,
+            validation_mode="v2_strict",
+        )
+        sentence = out[next(iter(out))]
+        classes = sentence.get("grammar_classes") or []
+        class_ids = {str(item.get("class_id")) for item in classes if isinstance(item, dict)}
+        self.assertIn("tense_table::modal_perfect", class_ids)
+
+    def test_pipeline_attaches_generated_notes_and_populates_linguistic_notes(self):
+        out = run_pipeline("She trusted him.", model_dir=None)
+        sentence = out[next(iter(out))]
+        generated = sentence.get("generated_notes")
+        self.assertIsInstance(generated, dict)
+        self.assertTrue(generated.get("elementary_text"))
+        self.assertTrue(generated.get("intermediate_text"))
+        self.assertTrue(generated.get("advanced_text"))
+        notes = sentence.get("linguistic_notes")
+        self.assertIsInstance(notes, list)
+        self.assertGreater(len(notes), 0)
+
+    @patch("ela_pipeline.classifier.deberta.DebertaProfileClassifier")
+    def test_pipeline_uses_deberta_classifier_provider(self, mock_classifier_cls):
+        fake_classifier = MagicMock()
+        fake_classifier.classify_node.return_value = {
+            "cefr_level": "B2",
+            "grammar_classes": [{"class_id": "tam::modal_perfect", "confidence": 0.9}],
+            "generated_notes": {
+                "elementary_text": "Elementary note.",
+                "intermediate_text": "Intermediate note.",
+                "advanced_text": "Advanced note.",
+            },
+        }
+        mock_classifier_cls.return_value = fake_classifier
+
+        out = run_pipeline(
+            "She trusted him.",
+            model_dir=None,
+            classifier_provider="deberta",
+            classifier_model_path="/tmp/fake-deberta",
+            classifier_device="cuda",
+        )
+        sentence = out[next(iter(out))]
+        self.assertEqual(sentence.get("cefr_level"), "B2")
+        self.assertEqual(sentence.get("grammar_classes")[0]["class_id"], "tam::modal_perfect")
+        self.assertEqual(sentence.get("generated_notes", {}).get("intermediate_text"), "Intermediate note.")
+        self.assertGreaterEqual(fake_classifier.classify_node.call_count, 1)
+
+    @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.annotate")
+    @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.__init__", return_value=None)
+    def test_t5_annotation_cannot_override_classifier_truth_fields(self, _mock_init, mock_annotate):
+        def _tamper(doc):
+            sentence = doc[next(iter(doc))]
+            sentence["cefr_level"] = "C2"
+            sentence["grammar_classes"] = [{"class_id": "tampered::from_t5", "confidence": 1.0}]
+            sentence["generated_notes"] = {
+                "elementary_text": "tampered",
+                "intermediate_text": "tampered",
+                "advanced_text": "tampered",
+            }
+
+        mock_annotate.side_effect = _tamper
+        out = run_pipeline(
+            "She trusted him.",
+            model_dir="artifacts/models/fake_notes_model",
+            classifier_provider="rule",
+            enable_cefr=True,
+            cefr_provider="rule",
+        )
+        sentence = out[next(iter(out))]
+        class_ids = {row["class_id"] for row in sentence.get("grammar_classes", []) if isinstance(row, dict)}
+        self.assertNotIn("tampered::from_t5", class_ids)
+        self.assertNotEqual(sentence.get("generated_notes", {}).get("intermediate_text"), "tampered")
 
     def test_pipeline_allows_one_word_phrases(self):
         out = run_pipeline("I run.", model_dir=None)

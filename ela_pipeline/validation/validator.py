@@ -653,6 +653,92 @@ def _validate_optional_schema_version(node: Dict[str, Any], path: str, errors: L
         )
 
 
+def _validate_optional_note_generator_version(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "note_generator_version" not in node:
+        return
+    value = node.get("note_generator_version")
+    _expect(
+        isinstance(value, str),
+        errors,
+        f"{path}.note_generator_version",
+        "note_generator_version must be string",
+    )
+    if isinstance(value, str):
+        _expect(
+            value.strip() != "",
+            errors,
+            f"{path}.note_generator_version",
+            "note_generator_version must be non-empty",
+        )
+
+
+def _validate_optional_grammar_classes(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "grammar_classes" not in node:
+        return
+    classes = node.get("grammar_classes")
+    _expect(
+        isinstance(classes, list),
+        errors,
+        f"{path}.grammar_classes",
+        "grammar_classes must be list",
+    )
+    if not isinstance(classes, list):
+        return
+    for idx, item in enumerate(classes):
+        item_path = f"{path}.grammar_classes[{idx}]"
+        _expect(isinstance(item, dict), errors, item_path, "grammar class item must be object")
+        if not isinstance(item, dict):
+            continue
+        class_id = item.get("class_id")
+        _expect(isinstance(class_id, str), errors, f"{item_path}.class_id", "class_id must be string")
+        if isinstance(class_id, str):
+            _expect(class_id.strip() != "", errors, f"{item_path}.class_id", "class_id must be non-empty")
+        confidence = item.get("confidence")
+        _expect(
+            isinstance(confidence, (float, int)),
+            errors,
+            f"{item_path}.confidence",
+            "confidence must be number",
+        )
+        if isinstance(confidence, (float, int)):
+            _expect(
+                0.0 <= float(confidence) <= 1.0,
+                errors,
+                f"{item_path}.confidence",
+                "confidence must be in range [0, 1]",
+            )
+        if "scope_span" in item:
+            span = item.get("scope_span")
+            _expect(isinstance(span, dict), errors, f"{item_path}.scope_span", "scope_span must be object")
+            if isinstance(span, dict):
+                start = span.get("start")
+                end = span.get("end")
+                _expect(isinstance(start, int), errors, f"{item_path}.scope_span.start", "start must be integer")
+                _expect(isinstance(end, int), errors, f"{item_path}.scope_span.end", "end must be integer")
+                if isinstance(start, int) and isinstance(end, int):
+                    _expect(start >= 0, errors, f"{item_path}.scope_span.start", "start must be >= 0")
+                    _expect(end >= start, errors, f"{item_path}.scope_span.end", "end must be >= start")
+
+
+def _validate_optional_generated_notes(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "generated_notes" not in node:
+        return
+    generated = node.get("generated_notes")
+    _expect(
+        isinstance(generated, dict),
+        errors,
+        f"{path}.generated_notes",
+        "generated_notes must be object",
+    )
+    if not isinstance(generated, dict):
+        return
+    for key in ("elementary_text", "intermediate_text", "advanced_text"):
+        value = generated.get(key)
+        _expect(isinstance(value, str), errors, f"{path}.generated_notes.{key}", f"{key} must be string")
+        if isinstance(value, str):
+            _expect(value.strip() != "", errors, f"{path}.generated_notes.{key}", f"{key} must be non-empty")
+
+
 def _validate_required_fields(
     node: Dict[str, Any],
     path: str,
@@ -730,6 +816,9 @@ def _validate_node(
     _validate_optional_backoff_summary(node, path, errors)
     _validate_optional_rejected_candidate_stats(node, path, errors)
     _validate_optional_schema_version(node, path, errors)
+    _validate_optional_note_generator_version(node, path, errors)
+    _validate_optional_grammar_classes(node, path, errors)
+    _validate_optional_generated_notes(node, path, errors)
     if validation_mode == "v2_strict":
         _expect(node.get("schema_version") == "v2", errors, f"{path}.schema_version", "schema_version must be 'v2' in strict mode")
     _validate_optional_ids(node, path, errors, seen_ids, expected_parent_id)

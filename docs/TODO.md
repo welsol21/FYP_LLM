@@ -8,42 +8,42 @@
 
 - [x] Lock model split: `DeBERTa-v3-base` for classification, `T5` for controlled note generation.
 - [x] Record rationale and time-impact estimate in docs (classifier stage faster and more stable than T5-as-classifier).
-- [ ] Adopt classifier-first note pipeline (`classification -> controlled generation`) as backend default.
-- [ ] Implement DeBERTa-based classifier stage for:
-  - [ ] `cefr_level`
-  - [ ] `grammar_classes[]`
-  - [ ] level-aware note blueprints (Elementary/Intermediate/Advanced outputs per node)
-- [ ] Use English tense table as curriculum core for initial grammar classes.
-- [ ] Enforce per-class CEFR ladder: `A1 -> A2 -> B1 -> B2 -> C1 -> C2`.
-- [ ] Implement phased rollout:
-  - [ ] Phase 1: `A1 -> A2 -> B1`
-  - [ ] Phase 2: `B2`
-  - [ ] Phase 3: `C1 -> C2`
-  - [ ] Gate rule: start next phase only after repeated-pass quality runs in previous phase.
-  - [ ] Track and publish phase time estimates in summary:
-    - [ ] Phase 1: MVP `1.5-2.5 weeks`, stable `3-4 weeks`
-    - [ ] Phase 2: `1-2.5 weeks`
-    - [ ] Phase 3: `2-4 weeks`
-    - [ ] Full ladder target: `6-10 weeks`
-- [ ] Implement many-to-many grammar classes in contract for `Sentence`/`Phrase` nodes (`grammar_classes[]`).
-- [ ] Build grammar KB in three pedagogical bands:
-  - [ ] Elementary (`A1-A2`)
-  - [ ] Intermediate (`B1-B2`)
-  - [ ] Advanced (`C1-C2`)
-- [ ] Add scalable spaCy enrichment stage for KB examples (token/lemma/POS/morph/dep/head + derived TAM features).
-- [ ] Add stage quality gates with retry policy:
-  - [ ] KB generation gate
-  - [ ] spaCy enrichment gate
-  - [ ] classifier gate
-  - [ ] contract gate
-  - [ ] NLG gate
-- [ ] Add quality loop telemetry storage:
-  - [ ] `quality_events`
-  - [ ] `repair_actions`
-- [ ] Add TDD suite for each stage and gate failure/retry behavior.
-- [ ] Keep T5 in constrained role: generate note text only, never overwrite classifier truth fields.
-- [ ] Track note generator provenance in contract (`note_generator_version`).
-- [ ] Document and run iterative improvement loop until all gates pass for repeated runs.
+- [x] Adopt classifier-first note pipeline (`classification -> controlled generation`) as backend default.
+- [x] Implement DeBERTa-based classifier stage for:
+  - [x] `cefr_level`
+  - [x] `grammar_classes[]`
+  - [x] level-aware note blueprints (Elementary/Intermediate/Advanced outputs per node)
+- [x] Use English tense table as curriculum core for initial grammar classes.
+- [x] Enforce per-class CEFR ladder: `A1 -> A2 -> B1 -> B2 -> C1 -> C2`.
+- [x] Implement phased rollout:
+  - [x] Phase 1: `A1 -> A2 -> B1`
+  - [x] Phase 2: `B2`
+  - [x] Phase 3: `C1 -> C2`
+  - [x] Gate rule: start next phase only after repeated-pass quality runs in previous phase.
+  - [x] Track and publish phase time estimates in summary:
+    - [x] Phase 1: MVP `1.5-2.5 weeks`, stable `3-4 weeks`
+    - [x] Phase 2: `1-2.5 weeks`
+    - [x] Phase 3: `2-4 weeks`
+    - [x] Full ladder target: `6-10 weeks`
+- [x] Implement many-to-many grammar classes in contract for `Sentence`/`Phrase` nodes (`grammar_classes[]`).
+- [x] Build grammar KB in three pedagogical bands:
+  - [x] Elementary (`A1-A2`)
+  - [x] Intermediate (`B1-B2`)
+  - [x] Advanced (`C1-C2`)
+- [x] Add scalable spaCy enrichment stage for KB examples (token/lemma/POS/morph/dep/head + derived TAM features).
+- [x] Add stage quality gates with retry policy:
+  - [x] KB generation gate
+  - [x] spaCy enrichment gate
+  - [x] classifier gate
+  - [x] contract gate
+  - [x] NLG gate
+- [x] Add quality loop telemetry storage:
+  - [x] `quality_events`
+  - [x] `repair_actions`
+- [x] Add TDD suite for each stage and gate failure/retry behavior.
+- [x] Keep T5 in constrained role: generate note text only, never overwrite classifier truth fields.
+- [x] Track note generator provenance in contract (`note_generator_version`).
+- [x] Document and run iterative improvement loop until all gates pass for repeated runs.
 
 ## Media Pipeline Integration (ELA Bridge, Current)
 
