@@ -15,6 +15,30 @@ Core idea:
 - store level-specific note blueprints,
 - let T5 generate final user-facing note text from those blueprints.
 
+## 1.1 Model Split Decision (Locked)
+
+Approved model split for backend rebuild:
+
+- **Classification stage (`CEFR + grammar_classes`)**: `DeBERTa-v3-base`
+- **Generation stage (note text realization)**: `T5` (controlled generation only)
+
+Why this decision:
+- CEFR/grammar labeling is a classification task; encoder-only models are more stable and contract-safe here.
+- T5 remains useful for controlled text rendering from classifier outputs/blueprints.
+- This split reduces schema-risk (fewer free-form label errors) and improves deterministic validation behavior.
+
+## 1.2 Time Impact vs T5-as-Classifier
+
+Using `DeBERTa-v3-base` for classification instead of T5 classification is expected to:
+
+- reduce ML-stage training/evaluation time by roughly `40-65%` (T5 is typically `1.7-2.8x` slower for label generation-style classification),
+- reduce classifier inference latency by roughly `50-75%` (T5 is typically `2-4x` slower for this workload),
+- reduce full-program delivery time by roughly `20-35%` due to faster iteration cycles and fewer contract-format failures in classification stage.
+
+Important:
+- major time consumption still remains in KB quality loops and gate retries, not in one model run.
+- T5 runtime remains in scope only for note text generation.
+
 ## 2. Core Curriculum Backbone
 
 Use the **English tense table** as curriculum core.

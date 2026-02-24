@@ -206,6 +206,18 @@ If `--model-dir` is omitted:
   - node CEFR reuses canonical prediction via `ref_node_id`,
   - duplicate source spans/text reuse cached CEFR by normalized source key.
 
+### 4.8.1 Planned Classifier/Generator Split (Roadmap Lock)
+- CEFR + grammar-class prediction is being migrated to **`DeBERTa-v3-base`** (encoder-only classifier stage).
+- T5 remains in backend only for controlled note text generation from classifier outputs and level blueprints.
+- Rationale:
+  - classification workload matches encoder-only architecture better than seq2seq generation,
+  - lower contract-risk for strict schema fields (fewer free-form label errors),
+  - faster train/eval/inference cycles for iterative quality gates.
+- Estimated impact versus T5-as-classifier:
+  - classifier train/eval wall-time: ~`40-65%` faster,
+  - classifier inference latency: ~`50-75%` faster,
+  - full backend rebuild schedule: ~`20-35%` faster (assuming same gate quality thresholds).
+
 ### 4.9 PostgreSQL Persistence (`ela_pipeline/db/*`)
 - Optional runtime stage behind CLI flag `--persist-db`.
 - Driver: `psycopg` (PostgreSQL).

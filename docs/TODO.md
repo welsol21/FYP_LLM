@@ -6,7 +6,13 @@
 
 ## Backend Rebuild: Grammar Curriculum Classifier (New)
 
+- [x] Lock model split: `DeBERTa-v3-base` for classification, `T5` for controlled note generation.
+- [x] Record rationale and time-impact estimate in docs (classifier stage faster and more stable than T5-as-classifier).
 - [ ] Adopt classifier-first note pipeline (`classification -> controlled generation`) as backend default.
+- [ ] Implement DeBERTa-based classifier stage for:
+  - [ ] `cefr_level`
+  - [ ] `grammar_classes[]`
+  - [ ] level-aware note blueprints (Elementary/Intermediate/Advanced outputs per node)
 - [ ] Use English tense table as curriculum core for initial grammar classes.
 - [ ] Enforce per-class CEFR ladder: `A1 -> A2 -> B1 -> B2 -> C1 -> C2`.
 - [ ] Implement phased rollout:
