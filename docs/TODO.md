@@ -20,6 +20,44 @@
 - [x] Add legacy bridge adapter (`media sentence` -> `backend sentence contract`) with unit tests.
 - [x] Add text/pdf ingestion adapter parity with legacy pipeline outputs (`media contract` artifacts + sentence stream persistence).
 
+## Translation Contract (Multi-Provider) + Pipeline Reuse (New)
+
+### A) Translation Contract: provider-keyed translations
+
+- [ ] Introduce provider-keyed translation storage in contract:
+  - [ ] add `translations: { [provider_key]: { text, source_lang, target_lang, created_at, origin } }`
+  - [ ] keep backward compatibility for legacy `translation` during migration window.
+- [ ] Define canonical backend provider key (e.g. `backend_m2m100`) and enforce it in sentence-contract response handling.
+- [ ] Save user-selected translator outputs in the same `translations` map (client-side), without overwriting backend canonical translation.
+- [ ] Update visualizer rendering logic:
+  - [ ] show active user-selected provider translation as primary
+  - [ ] fallback to `backend_m2m100` when selected provider translation is absent
+  - [ ] keep other provider translations collapsed under "More translations".
+- [ ] Update Vocabulary export JSON/CSV to include `translation_provider` + selected translation text (with optional full translations map in JSON export).
+- [ ] Add migration/adapter layer (`translation` -> `translations`) at contract boundaries.
+- [ ] Add regression tests:
+  - [ ] contract roundtrip with multiple providers
+  - [ ] visualizer provider switch + fallback behavior
+  - [ ] export correctness for selected provider.
+
+### B) Incremental Pipeline Reuse (no unnecessary Whisper rerun)
+
+- [ ] Introduce stage manifest persistence per processed media (`media_hash`, pipeline/version settings, artifact pointers).
+- [ ] Split pipeline into immutable and variant stages:
+  - [ ] immutable: load/transcribe/sentence-timestamps
+  - [ ] variant: translations/subtitles/voice/media render.
+- [ ] Reuse cached immutable stage outputs when `media_hash` and ASR settings are unchanged.
+- [ ] Recompute only variant stages when user changes translator/subtitle mode/voice.
+- [ ] Rebuild sentence contracts only when contract-provider/version settings change (without rerunning Whisper).
+- [ ] Add explicit `Force full reprocess` option in Analyze UI.
+- [ ] Stage logs/UI:
+  - [ ] show `Reusing cached transcription` when cache-hit path is used
+  - [ ] keep progress and elapsed/estimated coherent in mixed reuse/full runs.
+- [ ] Add TDD coverage for cache invalidation rules:
+  - [ ] same media + same ASR settings -> skip transcription
+  - [ ] same media + changed translation/subtitle/voice -> rerun only variant stages
+  - [ ] changed media hash or ASR settings -> full transcription rerun.
+
 ## License Compliance Workflow
 
 - [x] Define GPL policy for planned phonetics stack in `docs/licenses_inventory.md` (backend-only allowed, distributed delivery requires legal gate).
