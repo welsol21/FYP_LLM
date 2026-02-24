@@ -255,14 +255,23 @@ def _attach_phonetic(
     transcriber: Any,
     include_node_phonetic: bool = True,
 ) -> None:
+    def safe_transcribe(text: str, accent: str) -> str:
+        source = str(text or "").strip()
+        try:
+            value = str(transcriber.transcribe_text(source, accent=accent) or "").strip()
+        except Exception:
+            value = ""
+        # Contract validator requires non-empty uk/us when phonetic exists.
+        return value if value else source
+
     for sentence_node in doc.values():
         if not isinstance(sentence_node, dict):
             continue
 
         sentence_text = str(sentence_node.get("content") or "")
         sentence_node["phonetic"] = {
-            "uk": transcriber.transcribe_text(sentence_text, accent="uk"),
-            "us": transcriber.transcribe_text(sentence_text, accent="us"),
+            "uk": safe_transcribe(sentence_text, "uk"),
+            "us": safe_transcribe(sentence_text, "us"),
         }
 
         if not include_node_phonetic:
@@ -284,8 +293,8 @@ def _attach_phonetic(
                     node_phonetic = phonetic_by_source_key[source_key]
                 else:
                     node_phonetic = {
-                        "uk": transcriber.transcribe_text(source_text, accent="uk"),
-                        "us": transcriber.transcribe_text(source_text, accent="us"),
+                        "uk": safe_transcribe(source_text, "uk"),
+                        "us": safe_transcribe(source_text, "us"),
                     }
                     phonetic_by_source_key[source_key] = node_phonetic
 

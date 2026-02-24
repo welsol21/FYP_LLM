@@ -15,7 +15,6 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 
 from ela_pipeline.client_storage import LocalSQLiteRepository, build_sentence_hash
-from ela_pipeline.inference.run import run_pipeline
 
 from .capabilities import build_runtime_capabilities, resolve_deployment_mode, resolve_runtime_mode
 from .media_policy import MediaPolicyLimits, load_media_policy_limits_from_env
@@ -475,6 +474,8 @@ class RuntimeMediaService:
         cefr_provider: str = "rule",
         cefr_model_path: str = "artifacts/models/t5_cefr/best_model",
     ) -> dict[str, Any]:
+        from ela_pipeline.inference.run import run_pipeline
+
         text = str(sentence_text or "").strip()
         if not text:
             raise ValueError("sentence_text must be non-empty")
@@ -959,6 +960,16 @@ class RuntimeMediaService:
         try:
             with urlrequest.urlopen(req, timeout=30) as resp:  # nosec B310
                 raw = resp.read().decode("utf-8")
+        except urlerror.HTTPError as exc:
+            body = ""
+            try:
+                body = exc.read().decode("utf-8")
+            except Exception:
+                body = ""
+            message = f"Backend sentence-contract API error {exc.code}: {endpoint}"
+            if body:
+                message = f"{message}; body={body}"
+            raise RuntimeError(message) from exc
         except (urlerror.URLError, TimeoutError, OSError) as exc:
             raise RuntimeError(f"Backend sentence-contract API unavailable: {endpoint}") from exc
         try:

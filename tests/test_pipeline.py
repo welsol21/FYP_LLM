@@ -261,6 +261,36 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(len(trusted_uk_calls), 1)
         self.assertEqual(len(trusted_us_calls), 1)
 
+    def test_attach_phonetic_falls_back_to_source_text_when_transcriber_returns_empty(self):
+        doc = {
+            "Or, maybe.": {
+                "type": "Sentence",
+                "content": "Or, maybe.",
+                "node_id": "n_sentence",
+                "linguistic_elements": [
+                    {
+                        "type": "Word",
+                        "content": ",",
+                        "node_id": "n_comma",
+                        "linguistic_elements": [],
+                    }
+                ],
+            }
+        }
+
+        class EmptyPhonetic:
+            @staticmethod
+            def transcribe_text(text: str, accent: str) -> str:  # noqa: ARG004
+                return ""
+
+        _attach_phonetic(doc, transcriber=EmptyPhonetic(), include_node_phonetic=True)
+        sentence = doc["Or, maybe."]
+        comma = sentence["linguistic_elements"][0]
+        self.assertEqual(sentence["phonetic"]["uk"], "Or, maybe.")
+        self.assertEqual(sentence["phonetic"]["us"], "Or, maybe.")
+        self.assertEqual(comma["phonetic"]["uk"], ",")
+        self.assertEqual(comma["phonetic"]["us"], ",")
+
     def test_attach_synonyms_enriches_sentence_and_nodes_with_dedup(self):
         doc = {
             "She trusted him.": {
