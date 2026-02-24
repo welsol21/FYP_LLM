@@ -82,9 +82,18 @@ def _tokenize_semantic_units(text: str, *, start_sec: float, end_sec: float) -> 
 
 
 def _extract_translation_text(sentence_node: dict[str, Any]) -> str:
-    tr = sentence_node.get("translation")
-    if isinstance(tr, dict):
-        return str(tr.get("text") or "").strip()
+    translations = sentence_node.get("translations")
+    if isinstance(translations, dict):
+        preferred = translations.get("backend_m2m100")
+        if isinstance(preferred, dict):
+            text = str(preferred.get("text") or "").strip()
+            if text:
+                return text
+        for row in translations.values():
+            if isinstance(row, dict):
+                text = str(row.get("text") or "").strip()
+                if text:
+                    return text
     return ""
 
 
@@ -220,12 +229,23 @@ def _ensure_visualizer_fields(node: dict[str, Any]) -> None:
         node["cefr_level"] = "B1"
     if "linguistic_notes" not in node:
         node["linguistic_notes"] = []
-    if "translation" not in node or not isinstance(node.get("translation"), dict):
-        node["translation"] = {"source_lang": "en", "target_lang": "ru", "text": str(node.get("content") or "")}
+    translations = node.get("translations")
+    if not isinstance(translations, dict):
+        translations = {}
+    backend = translations.get("backend_m2m100")
+    if not isinstance(backend, dict):
+        backend = {
+            "source_lang": "en",
+            "target_lang": "ru",
+            "text": str(node.get("content") or ""),
+        }
     else:
-        node["translation"].setdefault("source_lang", "en")
-        node["translation"].setdefault("target_lang", "ru")
-        node["translation"].setdefault("text", str(node.get("content") or ""))
+        backend.setdefault("source_lang", "en")
+        backend.setdefault("target_lang", "ru")
+        backend.setdefault("text", str(node.get("content") or ""))
+    translations["backend_m2m100"] = backend
+    node["translations"] = translations
+    node["active_translation_provider"] = "backend_m2m100"
     if "phonetic" not in node or not isinstance(node.get("phonetic"), dict):
         node["phonetic"] = {"uk": "", "us": ""}
     else:
@@ -402,11 +422,14 @@ def _attach_translation_runtime(
         for node in _walk_nodes(sentence_node):
             source_text = str(node.get("content") or "").strip()
             translated = translator.translate_text(source_text, source_lang=source_lang, target_lang=target_lang)
-            node["translation"] = {
-                "source_lang": source_lang,
-                "target_lang": target_lang,
-                "text": translated,
+            node["translations"] = {
+                "backend_m2m100": {
+                    "source_lang": source_lang,
+                    "target_lang": target_lang,
+                    "text": translated,
+                }
             }
+            node["active_translation_provider"] = "backend_m2m100"
 
 
 def apply_translation_to_sentence_node(
@@ -426,9 +449,12 @@ def apply_translation_to_sentence_node(
 
     existing_text_by_node_id: dict[int, str] = {}
     for node in _walk_nodes(sentence_node):
-        tr = node.get("translation")
-        if isinstance(tr, dict):
-            existing_text_by_node_id[id(node)] = str(tr.get("text") or "").strip()
+        translations = node.get("translations")
+        if not isinstance(translations, dict):
+            continue
+        row = translations.get("backend_m2m100")
+        if isinstance(row, dict):
+            existing_text_by_node_id[id(node)] = str(row.get("text") or "").strip()
 
     analyzed = {"_": sentence_node}
     _attach_translation_runtime(
@@ -446,7 +472,10 @@ def apply_translation_to_sentence_node(
         if not source_text:
             continue
 
-        tr = node.get("translation")
+        translations = node.get("translations")
+        if not isinstance(translations, dict):
+            continue
+        tr = translations.get("backend_m2m100")
         if not isinstance(tr, dict):
             continue
 

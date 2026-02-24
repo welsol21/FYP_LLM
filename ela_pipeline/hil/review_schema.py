@@ -7,7 +7,7 @@ import re
 
 ALLOWED_REVIEW_ROOT_FIELDS = {
     "notes",
-    "translation",
+    "translations",
     "phonetic",
     "synonyms",
     "cefr_level",

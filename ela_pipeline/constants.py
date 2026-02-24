@@ -8,6 +8,7 @@ REQUIRED_NODE_FIELDS = {
     "tense",
     "linguistic_notes",
     "part_of_speech",
+    "translations",
     "linguistic_elements",
 }
 

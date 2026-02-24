@@ -141,7 +141,6 @@ describe('VisualizerPage', () => {
         linguistic_notes: [],
         part_of_speech: 'sentence',
         active_translation_provider: 'gpt',
-        translation: { text: 'Backend translation', source_lang: 'en', target_lang: 'ru' },
         translations: {
           backend_m2m100: { text: 'Backend translation', source_lang: 'en', target_lang: 'ru' },
           gpt: { text: 'GPT translation', source_lang: 'en', target_lang: 'ru' },

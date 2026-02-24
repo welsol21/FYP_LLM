@@ -9,7 +9,7 @@ class EnrichmentQualityControlTests(unittest.TestCase):
             "She trusted him.": {
                 "type": "Sentence",
                 "content": "She trusted him.",
-                "translation": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."},
+                "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}},
                 "phonetic": {"uk": "ʃi", "us": "ʃi"},
                 "synonyms": ["depend", "rely on"],
                 "cefr_level": "A2",
@@ -17,7 +17,7 @@ class EnrichmentQualityControlTests(unittest.TestCase):
                     {
                         "type": "Phrase",
                         "content": "trusted him",
-                        "translation": {"source_lang": "en", "target_lang": "ru", "text": "доверяла ему"},
+                        "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "доверяла ему"}},
                         "phonetic": {"uk": "t", "us": "t"},
                         "synonyms": ["trust"],
                         "cefr_level": "A2",
@@ -25,7 +25,7 @@ class EnrichmentQualityControlTests(unittest.TestCase):
                             {
                                 "type": "Word",
                                 "content": "trusted",
-                                "translation": {"source_lang": "en", "target_lang": "ru", "text": "доверяла"},
+                                "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "доверяла"}},
                                 "phonetic": {"uk": "t", "us": "t"},
                                 "synonyms": ["rely on", "bank on"],
                                 "cefr_level": "B1",
@@ -34,7 +34,7 @@ class EnrichmentQualityControlTests(unittest.TestCase):
                             {
                                 "type": "Word",
                                 "content": "him",
-                                "translation": {"source_lang": "en", "target_lang": "ru", "text": ""},
+                                "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": ""}},
                                 "phonetic": {"uk": "h", "us": ""},
                                 "synonyms": ["", "same", "same"],
                                 "cefr_level": "B3",
@@ -49,13 +49,13 @@ class EnrichmentQualityControlTests(unittest.TestCase):
 
         self.assertEqual(stats["nodes"], 4)
         self.assertEqual(stats["non_sentence_nodes"], 3)
-        self.assertTrue(stats["sentence"]["translation_ok"])
+        self.assertTrue(stats["sentence"]["translations_ok"])
         self.assertTrue(stats["sentence"]["phonetic_ok"])
         self.assertTrue(stats["sentence"]["synonyms_ok"])
         self.assertTrue(stats["sentence"]["cefr_ok"])
 
-        self.assertEqual(stats["node_fields"]["translation"]["valid"], 2)
-        self.assertEqual(stats["node_fields"]["translation"]["invalid"], 1)
+        self.assertEqual(stats["node_fields"]["translations"]["valid"], 2)
+        self.assertEqual(stats["node_fields"]["translations"]["invalid"], 1)
         self.assertEqual(stats["node_fields"]["phonetic"]["valid"], 2)
         self.assertEqual(stats["node_fields"]["phonetic"]["invalid"], 1)
         self.assertEqual(stats["node_fields"]["synonyms"]["valid"], 2)
@@ -68,7 +68,7 @@ class EnrichmentQualityControlTests(unittest.TestCase):
             "S.": {
                 "type": "Sentence",
                 "content": "S.",
-                "translation": {"source_lang": "en", "target_lang": "ru", "text": "S"},
+                "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "S"}},
                 "phonetic": {"uk": "s", "us": "s"},
                 "synonyms": [],
                 "cefr_level": "A1",
@@ -77,7 +77,7 @@ class EnrichmentQualityControlTests(unittest.TestCase):
                         "type": "Word",
                         "content": "the",
                         "part_of_speech": "article",
-                        "translation": {"source_lang": "en", "target_lang": "ru", "text": "the"},
+                        "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "the"}},
                         "phonetic": {"uk": "ðə", "us": "ðə"},
                         "synonyms": [],
                         "cefr_level": "A1",
@@ -87,7 +87,7 @@ class EnrichmentQualityControlTests(unittest.TestCase):
                         "type": "Word",
                         "content": "decision",
                         "part_of_speech": "noun",
-                        "translation": {"source_lang": "en", "target_lang": "ru", "text": "decision"},
+                        "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "decision"}},
                         "phonetic": {"uk": "d", "us": "d"},
                         "synonyms": [],
                         "cefr_level": "B1",

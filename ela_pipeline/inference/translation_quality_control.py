@@ -44,7 +44,14 @@ def _extract_translation_probe_stats(
     # Node coverage excludes sentence node because sentence translation is tracked separately.
     non_sentence_nodes = [n for n in nodes if str(n.get("type") or "").strip() != "Sentence"]
     for node in non_sentence_nodes:
-        tr = node.get("translation")
+        translations = node.get("translations")
+        if not isinstance(translations, dict):
+            missing_translation_nodes += 1
+            continue
+        tr = translations.get("backend_m2m100")
+        if not isinstance(tr, dict):
+            rows = [row for row in translations.values() if isinstance(row, dict)]
+            tr = rows[0] if rows else None
         if not isinstance(tr, dict):
             missing_translation_nodes += 1
             continue
@@ -56,7 +63,13 @@ def _extract_translation_probe_stats(
         if tr.get("source_lang") != source_lang or tr.get("target_lang") != target_lang:
             lang_mismatch_nodes += 1
 
-    sentence_tr = root.get("translation")
+    sentence_tr = None
+    root_translations = root.get("translations")
+    if isinstance(root_translations, dict):
+        sentence_tr = root_translations.get("backend_m2m100")
+        if not isinstance(sentence_tr, dict):
+            rows = [row for row in root_translations.values() if isinstance(row, dict)]
+            sentence_tr = rows[0] if rows else None
     sentence_translation_ok = (
         isinstance(sentence_tr, dict)
         and isinstance(sentence_tr.get("text"), str)

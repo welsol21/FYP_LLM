@@ -22,28 +22,25 @@ describe('resolveNodeTranslation', () => {
         backend_m2m100: { text: 'Она доверяла ему.' },
         gpt: { text: 'Она ему доверяла.' },
       },
-      translation: { text: 'Она доверяла ему.' },
     }
     expect(resolveNodeTranslation(node)).toBe('Она ему доверяла.')
   })
 
-  it('falls back to backend provider then legacy translation', () => {
+  it('falls back to backend provider', () => {
     const nodeWithBackend: VisualizerNode = {
       ...baseNode(),
       active_translation_provider: 'deepl',
       translations: {
         backend_m2m100: { text: 'Она доверяла ему.' },
       },
-      translation: { text: 'LEGACY' },
     }
     expect(resolveNodeTranslation(nodeWithBackend)).toBe('Она доверяла ему.')
 
-    const nodeLegacyOnly: VisualizerNode = {
+    const nodeWithoutTranslations: VisualizerNode = {
       ...baseNode(),
       active_translation_provider: 'deepl',
-      translation: { text: 'Legacy only' },
     }
-    expect(resolveNodeTranslation(nodeLegacyOnly)).toBe('Legacy only')
+    expect(resolveNodeTranslation(nodeWithoutTranslations)).toBe('-')
   })
 
   it('respects explicit preferred provider parameter', () => {
@@ -55,7 +52,6 @@ describe('resolveNodeTranslation', () => {
         deepl: { text: 'DeepL translation' },
         gpt: { text: 'GPT translation' },
       },
-      translation: { text: 'Legacy translation' },
     }
     expect(resolveNodeTranslation(node, 'deepl')).toBe('DeepL translation')
   })

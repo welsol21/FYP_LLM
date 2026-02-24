@@ -42,11 +42,11 @@ class TranslateDualChannelsTests(unittest.TestCase):
         sent = doc["She trusted him."]
         self.assertIn("translation_literary", sent)
         self.assertIn("translation_idiomatic", sent)
-        self.assertIn("translation", sent)
+        self.assertIn("translations", sent)
         phrase = sent["linguistic_elements"][0]
         self.assertIn("translation_literary", phrase)
         self.assertIn("translation_idiomatic", phrase)
-        self.assertIn("translation", phrase)
+        self.assertIn("translations", phrase)
 
 
 if __name__ == "__main__":

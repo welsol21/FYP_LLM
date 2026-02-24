@@ -96,13 +96,13 @@ class PipelineTests(unittest.TestCase):
         )
 
         sentence = doc["She trusted him."]
-        self.assertEqual(sentence["translation"]["text"], "ru:She trusted him.")
+        self.assertEqual(sentence["translations"]["backend_m2m100"]["text"], "ru:She trusted him.")
         phrase = sentence["linguistic_elements"][0]
         word = phrase["linguistic_elements"][0]
         dup_word = phrase["linguistic_elements"][1]
-        self.assertEqual(phrase["translation"]["text"], "ru:trusted him")
-        self.assertEqual(word["translation"]["text"], "ru:trusted")
-        self.assertEqual(dup_word["translation"]["text"], "ru:trusted")
+        self.assertEqual(phrase["translations"]["backend_m2m100"]["text"], "ru:trusted him")
+        self.assertEqual(word["translations"]["backend_m2m100"]["text"], "ru:trusted")
+        self.assertEqual(dup_word["translations"]["backend_m2m100"]["text"], "ru:trusted")
 
         self.assertEqual(
             FakeTranslator.calls.count("trusted"),

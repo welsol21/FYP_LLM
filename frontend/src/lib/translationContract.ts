@@ -27,8 +27,7 @@ export function resolveNodeTranslation(
       if (text) return text
     }
   }
-  const legacy = String(node.translation?.text || '').trim()
-  return legacy || '-'
+  return '-'
 }
 
 export type TranslationVariant = {

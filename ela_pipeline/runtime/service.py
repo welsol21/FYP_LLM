@@ -67,17 +67,6 @@ def _ensure_node_translations_map(
             if created_at:
                 translations[provider_key]["created_at"] = created_at
 
-    legacy = node.get("translation")
-    if isinstance(legacy, dict):
-        text = str(legacy.get("text") or "").strip()
-        if text and canonical_provider not in translations:
-            translations[canonical_provider] = {
-                "text": text,
-                "source_lang": str(legacy.get("source_lang") or "en").strip() or "en",
-                "target_lang": str(legacy.get("target_lang") or "ru").strip() or "ru",
-                "origin": "backend_contract",
-            }
-
     if translations:
         node["translations"] = translations
 
@@ -107,9 +96,6 @@ def _pick_translation_entry(
         for row in translations.values():
             if isinstance(row, dict) and str(row.get("text") or "").strip():
                 return row
-    legacy = node.get("translation")
-    if isinstance(legacy, dict) and str(legacy.get("text") or "").strip():
-        return legacy
     return None
 
 
@@ -605,12 +591,8 @@ class RuntimeMediaService:
                     preferred_provider=effective_provider,
                     canonical_provider=BACKEND_TRANSLATION_PROVIDER_KEY,
                 )
-                if active is not None:
-                    node["translation"] = {
-                        "source_lang": str(active.get("source_lang") or "en").strip() or "en",
-                        "target_lang": str(active.get("target_lang") or "ru").strip() or "ru",
-                        "text": str(active.get("text") or "").strip(),
-                    }
+                if active is not None and normalized_selected_provider:
+                    node["active_translation_provider"] = normalized_selected_provider
             payload[key] = node
         return payload
 

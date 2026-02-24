@@ -11,7 +11,10 @@
       "uk": "ʃi ʃʊd hæv ˈtrʌstɪd hɜːr ˈɪnstɪŋkts bɪˈfɔː ˈmeɪkɪŋ ðə dɪˈsɪʒən",
       "us": "ʃi ʃʊd hæv ˈtrʌstɪd hɝ ˈɪnstɪŋkts bɪˈfɔɹ ˈmeɪkɪŋ ðə dɪˈsɪʒən"
     },
-    "synonyms": ["trust", "rely"],
+    "synonyms": [
+      "trust",
+      "rely"
+    ],
     "cefr_level": "B2",
     "linguistic_elements": [
       {
@@ -37,10 +40,21 @@
               "A pronoun used to refer to a female person or animal previously mentioned or easily identified."
             ],
             "part_of_speech": "pronoun",
-            "phonetic": {"uk": "ʃi", "us": "ʃi"},
+            "phonetic": {
+              "uk": "ʃi",
+              "us": "ʃi"
+            },
             "synonyms": [],
             "cefr_level": "A1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "She"
+              }
+            },
+            "active_translation_provider": "backend_m2m100"
           },
           {
             "type": "Word",
@@ -50,10 +64,23 @@
               "A modal verb used to indicate obligation, duty, or correctness, typically when criticizing someone's actions."
             ],
             "part_of_speech": "modal verb",
-            "phonetic": {"uk": "ʃʊd", "us": "ʃʊd"},
-            "synonyms": ["ought to"],
+            "phonetic": {
+              "uk": "ʃʊd",
+              "us": "ʃʊd"
+            },
+            "synonyms": [
+              "ought to"
+            ],
             "cefr_level": "A2",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "should"
+              }
+            },
+            "active_translation_provider": "backend_m2m100"
           },
           {
             "type": "Word",
@@ -63,11 +90,21 @@
               "An auxiliary verb used with past participles to form perfect tenses."
             ],
             "part_of_speech": "auxiliary verb",
-            "translations": ["иметь"],
-            "phonetic": {"uk": "hæv", "us": "hæv"},
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "have"
+              }
+            },
+            "phonetic": {
+              "uk": "hæv",
+              "us": "hæv"
+            },
             "synonyms": [],
             "cefr_level": "A2",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "active_translation_provider": "backend_m2m100"
           },
           {
             "type": "Word",
@@ -77,10 +114,24 @@
               "The past participle form of the verb 'trust', used to express a completed action."
             ],
             "part_of_speech": "verb",
-            "phonetic": {"uk": "ˈtrʌstɪd", "us": "ˈtrʌstɪd"},
-            "synonyms": ["relied", "believed"],
+            "phonetic": {
+              "uk": "ˈtrʌstɪd",
+              "us": "ˈtrʌstɪd"
+            },
+            "synonyms": [
+              "relied",
+              "believed"
+            ],
             "cefr_level": "B1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "trusted"
+              }
+            },
+            "active_translation_provider": "backend_m2m100"
           },
           {
             "type": "Word",
@@ -90,10 +141,21 @@
               "A pronoun used to refer to a female person or animal previously mentioned or easily identified."
             ],
             "part_of_speech": "pronoun",
-            "phonetic": {"uk": "hɜː", "us": "hɝ"},
+            "phonetic": {
+              "uk": "hɜː",
+              "us": "hɝ"
+            },
             "synonyms": [],
             "cefr_level": "A1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "her"
+              }
+            },
+            "active_translation_provider": "backend_m2m100"
           },
           {
             "type": "Word",
@@ -103,12 +165,33 @@
               "A noun referring to an innate, typically fixed pattern of behavior in animals in response to certain stimuli."
             ],
             "part_of_speech": "noun",
-            "phonetic": {"uk": "ˈɪnstɪŋkts", "us": "ˈɪnstɪŋkts"},
-            "synonyms": ["intuition"],
+            "phonetic": {
+              "uk": "ˈɪnstɪŋkts",
+              "us": "ˈɪnstɪŋkts"
+            },
+            "synonyms": [
+              "intuition"
+            ],
             "cefr_level": "B2",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "instincts"
+              }
+            },
+            "active_translation_provider": "backend_m2m100"
           }
-        ]
+        ],
+        "translations": {
+          "backend_m2m100": {
+            "source_lang": "en",
+            "target_lang": "ru",
+            "text": "She should have trusted her instincts"
+          }
+        },
+        "active_translation_provider": "backend_m2m100"
       },
       {
         "type": "Phrase",
@@ -133,10 +216,23 @@
               "A preposition used to indicate the time or event preceding another."
             ],
             "part_of_speech": "preposition",
-            "phonetic": {"uk": "bɪˈfɔː", "us": "bɪˈfɔɹ"},
-            "synonyms": ["prior to"],
+            "phonetic": {
+              "uk": "bɪˈfɔː",
+              "us": "bɪˈfɔɹ"
+            },
+            "synonyms": [
+              "prior to"
+            ],
             "cefr_level": "A2",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "before"
+              }
+            },
+            "active_translation_provider": "backend_m2m100"
           },
           {
             "type": "Word",
@@ -146,10 +242,23 @@
               "The present participle form of the verb 'make', used to form continuous tenses."
             ],
             "part_of_speech": "verb",
-            "phonetic": {"uk": "ˈmeɪkɪŋ", "us": "ˈmeɪkɪŋ"},
-            "synonyms": ["creating"],
+            "phonetic": {
+              "uk": "ˈmeɪkɪŋ",
+              "us": "ˈmeɪkɪŋ"
+            },
+            "synonyms": [
+              "creating"
+            ],
             "cefr_level": "B1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "making"
+              }
+            },
+            "active_translation_provider": "backend_m2m100"
           },
           {
             "type": "Word",
@@ -159,10 +268,21 @@
               "A definite article used to specify a particular noun that is known to the reader or listener."
             ],
             "part_of_speech": "article",
-            "phonetic": {"uk": "ðə", "us": "ðə"},
+            "phonetic": {
+              "uk": "ðə",
+              "us": "ðə"
+            },
             "synonyms": [],
             "cefr_level": "A1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "the"
+              }
+            },
+            "active_translation_provider": "backend_m2m100"
           },
           {
             "type": "Word",
@@ -172,13 +292,43 @@
               "A noun referring to a conclusion or resolution reached after consideration."
             ],
             "part_of_speech": "noun",
-            "phonetic": {"uk": "dɪˈsɪʒən", "us": "dɪˈsɪʒən"},
-            "synonyms": ["choice", "resolution"],
+            "phonetic": {
+              "uk": "dɪˈsɪʒən",
+              "us": "dɪˈsɪʒən"
+            },
+            "synonyms": [
+              "choice",
+              "resolution"
+            ],
             "cefr_level": "B2",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "decision"
+              }
+            },
+            "active_translation_provider": "backend_m2m100"
           }
-        ]
+        ],
+        "translations": {
+          "backend_m2m100": {
+            "source_lang": "en",
+            "target_lang": "ru",
+            "text": "before making the decision"
+          }
+        },
+        "active_translation_provider": "backend_m2m100"
       }
-    ]
+    ],
+    "translations": {
+      "backend_m2m100": {
+        "source_lang": "en",
+        "target_lang": "ru",
+        "text": "She should have trusted her instincts before making the decision."
+      }
+    },
+    "active_translation_provider": "backend_m2m100"
   }
 }

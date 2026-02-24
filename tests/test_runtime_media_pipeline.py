@@ -20,7 +20,7 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
             self.assertEqual(result.contract_sentences[0]["sentence_node"]["type"], "Sentence")
             sentence_node = result.contract_sentences[0]["sentence_node"]
             self.assertIsInstance(sentence_node.get("linguistic_notes"), list)
-            self.assertTrue(sentence_node.get("translation", {}).get("text"))
+            self.assertTrue(sentence_node.get("translations", {}).get("backend_m2m100", {}).get("text"))
             self.assertIn("phonetic", sentence_node)
             media_row = result.media_sentences[0]
             self.assertIn("start_ms", media_row)

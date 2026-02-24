@@ -56,12 +56,6 @@
     "backoff_leaf_nodes_count": 5,
     "backoff_aggregate_nodes_count": 1,
     "backoff_unique_spans_count": 4,
-    "translation": {
-      "source_lang": "en",
-      "target_lang": "ru",
-      "model": "facebook/m2m100_418M",
-      "text": "Она должна была доверять своим инстинктам до принятия решения."
-    },
     "phonetic": {
       "uk": "ʃiː ʃˌʊdəv tɹˈʌstɪd hɜːɹ ˈɪnstɪŋkts bɪfˌɔː mˌe‍ɪkɪŋ ðə dɪsˈɪʒən",
       "us": "ʃiː ʃˌʊdəv tɹˈʌstᵻd hɜːɹ ˈɪnstɪŋkts bᵻfˌɔː‍ɹ mˌe‍ɪkɪŋ ðə dᵻsˈɪʒən"
@@ -120,11 +114,6 @@
           "selection_mode": "rule_l1_exact"
         },
         "backoff_in_subtree": true,
-        "translation": {
-          "source_lang": "en",
-          "target_lang": "ru",
-          "text": "Она"
-        },
         "phonetic": {
           "uk": "ʃˈiː",
           "us": "ʃˈiː"
@@ -206,20 +195,29 @@
               ]
             },
             "backoff_in_subtree": false,
-            "translation": {
-              "source_lang": "en",
-              "target_lang": "ru",
-              "text": "Она"
-            },
             "phonetic": {
               "uk": "ʃˈiː",
               "us": "ʃˈiː"
             },
             "synonyms": [],
             "cefr_level": "A1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "Она"
+              }
+            }
           }
-        ]
+        ],
+        "translations": {
+          "backend_m2m100": {
+            "source_lang": "en",
+            "target_lang": "ru",
+            "text": "Она"
+          }
+        }
       },
       {
         "type": "Phrase",
@@ -272,11 +270,6 @@
           "selection_mode": "rule_l1_exact"
         },
         "backoff_in_subtree": true,
-        "translation": {
-          "source_lang": "en",
-          "target_lang": "ru",
-          "text": "Она должна доверять своим инстинктам."
-        },
         "phonetic": {
           "uk": "ʃˌʊdəv tɹˈʌstɪd hɜːɹ ˈɪnstɪŋkts",
           "us": "ʃˌʊdəv tɹˈʌstᵻd hɜːɹ ˈɪnstɪŋkts"
@@ -346,18 +339,20 @@
               "selection_mode": "rule_l1_exact"
             },
             "backoff_in_subtree": false,
-            "translation": {
-              "source_lang": "en",
-              "target_lang": "ru",
-              "text": "должно быть"
-            },
             "phonetic": {
               "uk": "ʃˈʊd",
               "us": "ʃˈʊd"
             },
             "synonyms": [],
             "cefr_level": "A1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "должно быть"
+              }
+            }
           },
           {
             "type": "Word",
@@ -421,18 +416,20 @@
               "selection_mode": "rule_l1_exact"
             },
             "backoff_in_subtree": false,
-            "translation": {
-              "source_lang": "en",
-              "target_lang": "ru",
-              "text": "Иметь"
-            },
             "phonetic": {
               "uk": "hˈav",
               "us": "hˈæv"
             },
             "synonyms": [],
             "cefr_level": "A1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "Иметь"
+              }
+            }
           },
           {
             "type": "Word",
@@ -496,11 +493,6 @@
               "selection_mode": "rule_l1_exact"
             },
             "backoff_in_subtree": false,
-            "translation": {
-              "source_lang": "en",
-              "target_lang": "ru",
-              "text": "Доверяем"
-            },
             "phonetic": {
               "uk": "tɹˈʌstɪd",
               "us": "tɹˈʌstᵻd"
@@ -512,7 +504,14 @@
               "believed"
             ],
             "cefr_level": "A1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "Доверяем"
+              }
+            }
           },
           {
             "type": "Word",
@@ -576,18 +575,20 @@
               "selection_mode": "rule_l1_exact"
             },
             "backoff_in_subtree": false,
-            "translation": {
-              "source_lang": "en",
-              "target_lang": "ru",
-              "text": "Ее"
-            },
             "phonetic": {
               "uk": "hˈɜː",
               "us": "hˈɜː"
             },
             "synonyms": [],
             "cefr_level": "A1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "Ее"
+              }
+            }
           },
           {
             "type": "Word",
@@ -652,11 +653,6 @@
               "selection_mode": "rule_l2_drop_tam"
             },
             "backoff_in_subtree": false,
-            "translation": {
-              "source_lang": "en",
-              "target_lang": "ru",
-              "text": "Инстинкт"
-            },
             "phonetic": {
               "uk": "ˈɪnstɪŋkts",
               "us": "ˈɪnstɪŋkts"
@@ -666,9 +662,23 @@
               "inherent aptitude"
             ],
             "cefr_level": "A2",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "Инстинкт"
+              }
+            }
           }
-        ]
+        ],
+        "translations": {
+          "backend_m2m100": {
+            "source_lang": "en",
+            "target_lang": "ru",
+            "text": "Она должна доверять своим инстинктам."
+          }
+        }
       },
       {
         "type": "Phrase",
@@ -721,11 +731,6 @@
           "selection_mode": "rule_l1_exact"
         },
         "backoff_in_subtree": true,
-        "translation": {
-          "source_lang": "en",
-          "target_lang": "ru",
-          "text": "Ее инстинкты"
-        },
         "phonetic": {
           "uk": "hɜːɹ ˈɪnstɪŋkts",
           "us": "hɜːɹ ˈɪnstɪŋkts"
@@ -796,18 +801,20 @@
               "selection_mode": "rule_l1_exact"
             },
             "backoff_in_subtree": false,
-            "translation": {
-              "source_lang": "en",
-              "target_lang": "ru",
-              "text": "Ее"
-            },
             "phonetic": {
               "uk": "hˈɜː",
               "us": "hˈɜː"
             },
             "synonyms": [],
             "cefr_level": "A1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "Ее"
+              }
+            }
           },
           {
             "type": "Word",
@@ -873,11 +880,6 @@
               "selection_mode": "rule_l2_drop_tam"
             },
             "backoff_in_subtree": false,
-            "translation": {
-              "source_lang": "en",
-              "target_lang": "ru",
-              "text": "Инстинкт"
-            },
             "phonetic": {
               "uk": "ˈɪnstɪŋkts",
               "us": "ˈɪnstɪŋkts"
@@ -887,9 +889,23 @@
               "inherent aptitude"
             ],
             "cefr_level": "A2",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "Инстинкт"
+              }
+            }
           }
-        ]
+        ],
+        "translations": {
+          "backend_m2m100": {
+            "source_lang": "en",
+            "target_lang": "ru",
+            "text": "Ее инстинкты"
+          }
+        }
       },
       {
         "type": "Phrase",
@@ -942,11 +958,6 @@
           "selection_mode": "rule_l1_exact"
         },
         "backoff_in_subtree": true,
-        "translation": {
-          "source_lang": "en",
-          "target_lang": "ru",
-          "text": "Перед принятием решения"
-        },
         "phonetic": {
           "uk": "bɪfˌɔː mˌe‍ɪkɪŋ ðə dɪsˈɪʒən",
           "us": "bᵻfˌɔː‍ɹ mˌe‍ɪkɪŋ ðə dᵻsˈɪʒən"
@@ -1016,18 +1027,20 @@
               "selection_mode": "rule_l1_exact"
             },
             "backoff_in_subtree": false,
-            "translation": {
-              "source_lang": "en",
-              "target_lang": "ru",
-              "text": "Прежде"
-            },
             "phonetic": {
               "uk": "bɪfˈɔː",
               "us": "bᵻfˈɔː‍ɹ"
             },
             "synonyms": [],
             "cefr_level": "A1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "Прежде"
+              }
+            }
           },
           {
             "type": "Word",
@@ -1091,11 +1104,6 @@
               "selection_mode": "rule_l1_exact"
             },
             "backoff_in_subtree": false,
-            "translation": {
-              "source_lang": "en",
-              "target_lang": "ru",
-              "text": "Сделать"
-            },
             "phonetic": {
               "uk": "mˈe‍ɪkɪŋ",
               "us": "mˈe‍ɪkɪŋ"
@@ -1108,7 +1116,14 @@
               "induce"
             ],
             "cefr_level": "A1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "Сделать"
+              }
+            }
           },
           {
             "type": "Word",
@@ -1173,18 +1188,20 @@
               "selection_mode": "rule_l2_drop_tam"
             },
             "backoff_in_subtree": false,
-            "translation": {
-              "source_lang": "en",
-              "target_lang": "ru",
-              "text": "В"
-            },
             "phonetic": {
               "uk": "ðˈə",
               "us": "ðˈə"
             },
             "synonyms": [],
             "cefr_level": "A1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "В"
+              }
+            }
           },
           {
             "type": "Word",
@@ -1249,11 +1266,6 @@
               "selection_mode": "rule_l2_drop_tam"
             },
             "backoff_in_subtree": false,
-            "translation": {
-              "source_lang": "en",
-              "target_lang": "ru",
-              "text": "Решение"
-            },
             "phonetic": {
               "uk": "dɪsˈɪʒən",
               "us": "dᵻsˈɪʒən"
@@ -1264,10 +1276,32 @@
               "decisiveness"
             ],
             "cefr_level": "B1",
-            "linguistic_elements": []
+            "linguistic_elements": [],
+            "translations": {
+              "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "Решение"
+              }
+            }
           }
-        ]
+        ],
+        "translations": {
+          "backend_m2m100": {
+            "source_lang": "en",
+            "target_lang": "ru",
+            "text": "Перед принятием решения"
+          }
+        }
       }
-    ]
+    ],
+    "translations": {
+      "backend_m2m100": {
+        "source_lang": "en",
+        "target_lang": "ru",
+        "model": "facebook/m2m100_418M",
+        "text": "Она должна была доверять своим инстинктам до принятия решения."
+      }
+    }
   }
 }

@@ -76,14 +76,8 @@ export type VisualizerNode = {
   linguistic_elements: VisualizerNode[]
   cefr_level?: string
   phonetic?: { uk?: string; us?: string }
-  translation?: {
-    source_lang?: string
-    target_lang?: string
-    text: string
-    model?: string
-  }
   active_translation_provider?: string
-  translations?: Record<
+  translations: Record<
     string,
     {
       text: string

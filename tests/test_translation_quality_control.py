@@ -9,23 +9,23 @@ class TranslationQualityControlTests(unittest.TestCase):
             "She trusted him.": {
                 "type": "Sentence",
                 "content": "She trusted him.",
-                "translation": {"source_lang": "en", "target_lang": "ru", "model": "m2m100", "text": "Она ему доверяла."},
+                "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "model": "m2m100", "text": "Она ему доверяла."}},
                 "linguistic_elements": [
                     {
                         "type": "Phrase",
                         "content": "trusted him",
-                        "translation": {"source_lang": "en", "target_lang": "ru", "text": "доверяла ему"},
+                        "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "доверяла ему"}},
                         "linguistic_elements": [
                             {
                                 "type": "Word",
                                 "content": "trusted",
-                                "translation": {"source_lang": "en", "target_lang": "ru", "text": "доверяла"},
+                                "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "доверяла"}},
                                 "linguistic_elements": [],
                             },
                             {
                                 "type": "Word",
                                 "content": "him",
-                                "translation": {"source_lang": "en", "target_lang": "ru", "text": ""},
+                                "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": ""}},
                                 "linguistic_elements": [],
                             },
                         ],
@@ -47,12 +47,12 @@ class TranslationQualityControlTests(unittest.TestCase):
             "She trusted him.": {
                 "type": "Sentence",
                 "content": "She trusted him.",
-                "translation": {"source_lang": "en", "target_lang": "ru", "model": "m2m100", "text": "Она ему доверяла."},
+                "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "model": "m2m100", "text": "Она ему доверяла."}},
                 "linguistic_elements": [
                     {
                         "type": "Phrase",
                         "content": "trusted him",
-                        "translation": {"source_lang": "en", "target_lang": "de", "text": "vertraute ihm"},
+                        "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "de", "text": "vertraute ihm"}},
                         "linguistic_elements": [
                             {"type": "Word", "content": "trusted", "linguistic_elements": []}
                         ],

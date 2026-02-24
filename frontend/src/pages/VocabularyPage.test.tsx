@@ -65,7 +65,6 @@ describe('VocabularyPage', () => {
               backend_m2m100: { text: 'Она' },
               gpt: { text: 'Она (GPT)' },
             },
-            translation: { text: 'Она' },
           },
         ],
       },

@@ -9,7 +9,7 @@ const BASIC_EDIT_FIELDS: Array<{ key: string; label: string }> = [
   { key: 'cefr_level', label: 'CEFR' },
   { key: 'tense', label: 'Tense' },
   { key: 'linguistic_notes', label: 'Linguistic Notes' },
-  { key: 'translation.text', label: 'Translation' },
+  { key: 'translations.backend_m2m100.text', label: 'Translation' },
   { key: 'phonetic.uk', label: 'Phonetic (UK)' },
   { key: 'phonetic.us', label: 'Phonetic (US)' },
 ]
@@ -23,8 +23,8 @@ const ADVANCED_EDIT_FIELDS: Array<{ key: string; label: string }> = [
   { key: 'finiteness', label: 'Finiteness' },
   { key: 'tam_construction', label: 'TAM Construction' },
   { key: 'dep_label', label: 'Dependency Label' },
-  { key: 'translation.source_lang', label: 'Translation Source Language' },
-  { key: 'translation.target_lang', label: 'Translation Target Language' },
+  { key: 'translations.backend_m2m100.source_lang', label: 'Translation Source Language' },
+  { key: 'translations.backend_m2m100.target_lang', label: 'Translation Target Language' },
 ]
 
 const NULL_SENTINEL = '__NULL__'
@@ -124,7 +124,7 @@ const ADVANCED_SELECT_OPTIONS: Record<string, Array<{ value: string; label: stri
     { value: 'cc', label: 'cc' },
     { value: 'conj', label: 'conj' },
   ],
-  'translation.source_lang': [
+  'translations.backend_m2m100.source_lang': [
     { value: 'en', label: 'en' },
     { value: 'ru', label: 'ru' },
     { value: 'uk', label: 'uk' },
@@ -140,7 +140,7 @@ const ADVANCED_SELECT_OPTIONS: Record<string, Array<{ value: string; label: stri
     { value: 'ko', label: 'ko' },
     { value: 'ar', label: 'ar' },
   ],
-  'translation.target_lang': [
+  'translations.backend_m2m100.target_lang': [
     { value: 'en', label: 'en' },
     { value: 'ru', label: 'ru' },
     { value: 'uk', label: 'uk' },

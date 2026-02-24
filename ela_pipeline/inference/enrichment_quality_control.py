@@ -14,15 +14,19 @@ def _walk_nodes(node: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
             yield from _walk_nodes(child)
 
 
-def _is_valid_translation(value: Any) -> bool:
+def _is_valid_translations(value: Any) -> bool:
     return (
         isinstance(value, dict)
-        and isinstance(value.get("source_lang"), str)
-        and value.get("source_lang", "").strip() != ""
-        and isinstance(value.get("target_lang"), str)
-        and value.get("target_lang", "").strip() != ""
-        and isinstance(value.get("text"), str)
-        and value.get("text", "").strip() != ""
+        and any(
+            isinstance(row, dict)
+            and isinstance(row.get("source_lang"), str)
+            and row.get("source_lang", "").strip() != ""
+            and isinstance(row.get("target_lang"), str)
+            and row.get("target_lang", "").strip() != ""
+            and isinstance(row.get("text"), str)
+            and row.get("text", "").strip() != ""
+            for row in value.values()
+        )
     )
 
 
@@ -91,13 +95,13 @@ def _extract_enrichment_probe_stats(result: Dict[str, Any]) -> Dict[str, Any]:
         "nodes": len(nodes),
         "non_sentence_nodes": len(non_sentence_nodes),
         "sentence": {
-            "translation_ok": _is_valid_translation(root.get("translation")),
+            "translations_ok": _is_valid_translations(root.get("translations")),
             "phonetic_ok": _is_valid_phonetic(root.get("phonetic")),
             "synonyms_ok": _is_valid_synonyms(root.get("synonyms"), root),
             "cefr_ok": _is_valid_cefr(root.get("cefr_level")),
         },
         "node_fields": {
-            "translation": _field_stats(non_sentence_nodes, "translation", _is_valid_translation),
+            "translations": _field_stats(non_sentence_nodes, "translations", _is_valid_translations),
             "phonetic": _field_stats(non_sentence_nodes, "phonetic", _is_valid_phonetic),
             "synonyms": _field_stats(non_sentence_nodes, "synonyms", _is_valid_synonyms),
             "cefr_level": _field_stats(non_sentence_nodes, "cefr_level", _is_valid_cefr),

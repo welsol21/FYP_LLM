@@ -154,6 +154,22 @@ def _attach_translation(
         translation_cache.set(cache_key, translated, ttl_seconds=translation_cache_ttl_seconds)
         return translated
 
+    def set_translation_map(
+        node: dict[str, Any],
+        *,
+        text: str,
+        include_model: bool,
+    ) -> None:
+        entry: dict[str, Any] = {
+            "source_lang": source_lang,
+            "target_lang": target_lang,
+            "text": text,
+        }
+        if include_model:
+            entry["model"] = getattr(translator, "model_name", "unknown")
+        node["translations"] = {"backend_m2m100": entry}
+        node["active_translation_provider"] = "backend_m2m100"
+
     for sentence_node in doc.values():
         if not isinstance(sentence_node, dict):
             continue
@@ -176,20 +192,17 @@ def _attach_translation(
                 "target_lang": target_lang,
                 "text": idiomatic,
             }
-            # Backward-compatible field remains available.
-            sentence_node["translation"] = {
-                "source_lang": source_lang,
-                "target_lang": target_lang,
-                "model": getattr(translator, "model_name", "unknown"),
-                "text": literary,
-            }
+            set_translation_map(
+                sentence_node,
+                text=literary,
+                include_model=True,
+            )
         else:
-            sentence_node["translation"] = {
-                "source_lang": source_lang,
-                "target_lang": target_lang,
-                "model": getattr(translator, "model_name", "unknown"),
-                "text": sentence_translation,
-            }
+            set_translation_map(
+                sentence_node,
+                text=sentence_translation,
+                include_model=True,
+            )
 
         if not include_node_translations:
             continue
@@ -227,17 +240,17 @@ def _attach_translation(
                     "target_lang": target_lang,
                     "text": idiomatic,
                 }
-                node["translation"] = {
-                    "source_lang": source_lang,
-                    "target_lang": target_lang,
-                    "text": literary,
-                }
+                set_translation_map(
+                    node,
+                    text=literary,
+                    include_model=False,
+                )
             else:
-                node["translation"] = {
-                    "source_lang": source_lang,
-                    "target_lang": target_lang,
-                    "text": translated,
-                }
+                set_translation_map(
+                    node,
+                    text=translated,
+                    include_model=False,
+                )
             if isinstance(node_id, str):
                 translated_by_node_id[node_id] = translated
 

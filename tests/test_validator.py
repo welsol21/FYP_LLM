@@ -80,6 +80,13 @@ class ValidatorTests(unittest.TestCase):
             "tense": "null",
             "linguistic_notes": [],
             "part_of_speech": "noun phrase",
+            "translations": {
+                "backend_m2m100": {
+                    "source_lang": "en",
+                    "target_lang": "ru",
+                    "text": "nested phrase",
+                }
+            },
             "linguistic_elements": [
                 {
                     "type": "Word",
@@ -87,6 +94,13 @@ class ValidatorTests(unittest.TestCase):
                     "tense": "null",
                     "linguistic_notes": [],
                     "part_of_speech": "adjective",
+                    "translations": {
+                        "backend_m2m100": {
+                            "source_lang": "en",
+                            "target_lang": "ru",
+                            "text": "nested",
+                        }
+                    },
                     "linguistic_elements": [],
                 },
                 {
@@ -95,6 +109,13 @@ class ValidatorTests(unittest.TestCase):
                     "tense": "null",
                     "linguistic_notes": [],
                     "part_of_speech": "noun",
+                    "translations": {
+                        "backend_m2m100": {
+                            "source_lang": "en",
+                            "target_lang": "ru",
+                            "text": "phrase",
+                        }
+                    },
                     "linguistic_elements": [],
                 },
             ],
@@ -267,38 +288,42 @@ class ValidatorTests(unittest.TestCase):
         result = validate_contract(data, validation_mode="v1")
         self.assertTrue(result.ok, msg=str(result.errors))
 
-    def test_accepts_valid_optional_translation_fields(self):
+    def test_accepts_valid_required_translations_fields(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)
         sentence_key = next(iter(data))
         sentence = data[sentence_key]
-        sentence["translation"] = {
-            "source_lang": "en",
-            "target_lang": "ru",
-            "model": "facebook/m2m100_418M",
-            "text": "Ей следовало довериться своей интуиции, прежде чем принять решение.",
+        sentence["translations"] = {
+            "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "model": "facebook/m2m100_418M",
+                "text": "Ей следовало довериться своей интуиции, прежде чем принять решение.",
+            }
         }
         first_word = sentence["linguistic_elements"][0]["linguistic_elements"][0]
-        first_word["translation"] = {
-            "source_lang": "en",
-            "target_lang": "ru",
-            "text": "следовало",
+        first_word["translations"] = {
+            "backend_m2m100": {
+                "source_lang": "en",
+                "target_lang": "ru",
+                "text": "следовало",
+            }
         }
 
         result = validate_contract(data, validation_mode="v1")
         self.assertTrue(result.ok, msg=str(result.errors))
 
-    def test_rejects_invalid_optional_translation_fields(self):
+    def test_rejects_invalid_required_translations_fields(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)
         sentence_key = next(iter(data))
         sentence = data[sentence_key]
-        sentence["translation"] = {"source_lang": "en", "target_lang": None, "text": 5}
+        sentence["translations"] = {"backend_m2m100": {"source_lang": "en", "target_lang": None, "text": 5}}
 
         result = validate_contract(data, validation_mode="v1")
         self.assertFalse(result.ok)
         self.assertTrue(
-            any(".translation" in err.path for err in result.errors),
+            any(".translations" in err.path for err in result.errors),
             msg=str(result.errors),
         )
 
@@ -411,7 +436,7 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
-    def test_rejects_missing_sentence_translation_model_in_v2_strict(self):
+    def test_rejects_missing_required_translations_in_v2_strict(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)
         sentence_key = next(iter(data))
@@ -419,16 +444,12 @@ class ValidatorTests(unittest.TestCase):
         self._inject_minimal_v2_fields(sentence, None, [1])
         self._normalize_strict_tam_nulls(sentence)
         self._normalize_strict_feature_nulls(sentence)
-        sentence["translation"] = {
-            "source_lang": "en",
-            "target_lang": "ru",
-            "text": "Ей следовало довериться своей интуиции, прежде чем принять решение.",
-        }
+        sentence.pop("translations", None)
 
         result = validate_contract(data, validation_mode="v2_strict")
         self.assertFalse(result.ok)
         self.assertTrue(
-            any(".translation.model" in err.path for err in result.errors),
+            any("Missing required fields" in err.message and "translations" in err.message for err in result.errors),
             msg=str(result.errors),
         )
 

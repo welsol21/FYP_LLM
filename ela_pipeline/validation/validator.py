@@ -216,38 +216,37 @@ def _validate_optional_notes(node: Dict[str, Any], path: str, errors: List[Valid
         _expect(note.get("source") in NOTE_SOURCES, errors, f"{item_path}.source", "source must be one of model|rule|fallback")
 
 
-def _validate_optional_translation(
+def _validate_required_translations(
     node: Dict[str, Any],
     path: str,
     errors: List[ValidationErrorItem],
-    validation_mode: str,
 ) -> None:
-    if "translation" not in node:
+    value = node.get("translations")
+    _expect(isinstance(value, dict), errors, f"{path}.translations", "translations must be object")
+    if not isinstance(value, dict):
         return
-    tr = node.get("translation")
-    _expect(isinstance(tr, dict), errors, f"{path}.translation", "translation must be object")
-    if not isinstance(tr, dict):
-        return
-
-    for key in ("source_lang", "target_lang", "text"):
-        value = tr.get(key)
-        _expect(isinstance(value, str), errors, f"{path}.translation.{key}", f"{key} must be string")
-        if isinstance(value, str):
-            _expect(value.strip() != "", errors, f"{path}.translation.{key}", f"{key} must be non-empty")
-
-    model = tr.get("model")
-    if model is not None:
-        _expect(isinstance(model, str), errors, f"{path}.translation.model", "model must be string")
-        if isinstance(model, str):
-            _expect(model.strip() != "", errors, f"{path}.translation.model", "model must be non-empty")
-
-    if validation_mode == "v2_strict" and str(node.get("type") or "") == "Sentence":
+    _expect(len(value) > 0, errors, f"{path}.translations", "translations must contain at least one provider entry")
+    for provider_key, row in value.items():
         _expect(
-            isinstance(model, str) and model.strip() != "",
+            isinstance(provider_key, str) and provider_key.strip() != "",
             errors,
-            f"{path}.translation.model",
-            "translation.model is required for Sentence in strict mode",
+            f"{path}.translations",
+            "translations provider keys must be non-empty strings",
         )
+        item_path = f"{path}.translations.{provider_key}"
+        _expect(isinstance(row, dict), errors, item_path, "provider translation entry must be object")
+        if not isinstance(row, dict):
+            continue
+        for key in ("source_lang", "target_lang", "text"):
+            field = row.get(key)
+            _expect(isinstance(field, str), errors, f"{item_path}.{key}", f"{key} must be string")
+            if isinstance(field, str):
+                _expect(field.strip() != "", errors, f"{item_path}.{key}", f"{key} must be non-empty")
+        model = row.get("model")
+        if model is not None:
+            _expect(isinstance(model, str), errors, f"{item_path}.model", "model must be string")
+            if isinstance(model, str):
+                _expect(model.strip() != "", errors, f"{item_path}.model", "model must be non-empty")
 
 
 def _validate_optional_phonetic(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
@@ -721,7 +720,7 @@ def _validate_node(
     _validate_modal_perfect_policy(node, path, errors, validation_mode)
     _validate_optional_features(node, path, errors, validation_mode)
     _validate_optional_notes(node, path, errors)
-    _validate_optional_translation(node, path, errors, validation_mode)
+    _validate_required_translations(node, path, errors)
     _validate_optional_phonetic(node, path, errors)
     _validate_optional_synonyms(node, path, errors)
     _validate_optional_cefr_level(node, path, errors)
