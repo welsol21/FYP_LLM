@@ -204,6 +204,20 @@ function decodeEditorValue(raw: string): string {
   return raw
 }
 
+function collectTranslationProviders(node: VisualizerNode, out: Set<string>): void {
+  const active = String(node.active_translation_provider || '').trim().toLowerCase()
+  if (active) out.add(active)
+  if (node.translations && typeof node.translations === 'object') {
+    for (const key of Object.keys(node.translations)) {
+      const normalized = String(key || '').trim().toLowerCase()
+      if (normalized) out.add(normalized)
+    }
+  }
+  for (const child of node.linguistic_elements || []) {
+    collectTranslationProviders(child, out)
+  }
+}
+
 export function VisualizerPage() {
   const api = useApi()
   const location = useLocation()
@@ -223,6 +237,7 @@ export function VisualizerPage() {
   const [advancedValueExpanded, setAdvancedValueExpanded] = useState(false)
   const [newValue, setNewValue] = useState('')
   const [editStatus, setEditStatus] = useState('')
+  const [selectedTranslationProvider, setSelectedTranslationProvider] = useState('backend_m2m100')
 
   async function refresh() {
     const payload = await api.getVisualizerPayload(documentId)
@@ -259,6 +274,26 @@ export function VisualizerPage() {
     setEditStatus('')
   }, [activeSentenceIndex])
 
+  const activeRow = rows[activeSentenceIndex]
+  const translationProviderOptions = (() => {
+    if (!activeRow?.tree) return ['backend_m2m100']
+    const out = new Set<string>()
+    collectTranslationProviders(activeRow.tree, out)
+    out.add('backend_m2m100')
+    return Array.from(out).sort()
+  })()
+
+  useEffect(() => {
+    const preferred = String(activeRow?.tree?.active_translation_provider || '').trim().toLowerCase()
+    if (preferred && translationProviderOptions.includes(preferred)) {
+      setSelectedTranslationProvider(preferred)
+      return
+    }
+    if (!translationProviderOptions.includes(selectedTranslationProvider)) {
+      setSelectedTranslationProvider('backend_m2m100')
+    }
+  }, [activeRow?.tree?.active_translation_provider, translationProviderOptions.join('|')])
+
   async function onApplyEdit(e: React.FormEvent) {
     e.preventDefault()
     const sentenceText = rows[activeSentenceIndex]?.sentence_text ?? ''
@@ -283,7 +318,6 @@ export function VisualizerPage() {
     await refresh()
   }
 
-  const activeRow = rows[activeSentenceIndex]
   const hasPrev = activeSentenceIndex > 0
   const hasNext = activeSentenceIndex < rows.length - 1
 
@@ -449,6 +483,20 @@ export function VisualizerPage() {
           ) : null}
         </form>
         <section className="card">
+          <div className="analyze-grid" style={{ marginBottom: 12 }}>
+            <label className="analyze-label" htmlFor="visualizer-translation-provider">Translation provider</label>
+            <select
+              id="visualizer-translation-provider"
+              value={selectedTranslationProvider}
+              onChange={(e) => setSelectedTranslationProvider(e.target.value)}
+            >
+              {translationProviderOptions.map((provider) => (
+                <option key={provider} value={provider}>
+                  {provider}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="sentence-nav">
             <button type="button" onClick={() => setActiveSentenceIndex((v) => Math.max(0, v - 1))} disabled={!hasPrev}>
               Prev
@@ -470,6 +518,7 @@ export function VisualizerPage() {
                 node={activeRow.tree}
                 isRoot
                 selectedNodeId={nodeId}
+                preferredTranslationProvider={selectedTranslationProvider}
                 onNodeSelect={onSelectNode}
               />
             </article>

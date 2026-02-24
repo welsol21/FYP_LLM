@@ -45,5 +45,18 @@ describe('resolveNodeTranslation', () => {
     }
     expect(resolveNodeTranslation(nodeLegacyOnly)).toBe('Legacy only')
   })
-})
 
+  it('respects explicit preferred provider parameter', () => {
+    const node: VisualizerNode = {
+      ...baseNode(),
+      active_translation_provider: 'gpt',
+      translations: {
+        backend_m2m100: { text: 'Backend translation' },
+        deepl: { text: 'DeepL translation' },
+        gpt: { text: 'GPT translation' },
+      },
+      translation: { text: 'Legacy translation' },
+    }
+    expect(resolveNodeTranslation(node, 'deepl')).toBe('DeepL translation')
+  })
+})

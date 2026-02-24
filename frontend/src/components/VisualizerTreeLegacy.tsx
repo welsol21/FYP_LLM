@@ -138,10 +138,18 @@ type Props = {
   isRoot?: boolean
   level?: number
   selectedNodeId?: string
+  preferredTranslationProvider?: string
   onNodeSelect?: (node: VisualizerNode) => void
 }
 
-export function VisualizerTreeLegacy({ node, isRoot = false, level = 0, selectedNodeId, onNodeSelect }: Props) {
+export function VisualizerTreeLegacy({
+  node,
+  isRoot = false,
+  level = 0,
+  selectedNodeId,
+  preferredTranslationProvider,
+  onNodeSelect,
+}: Props) {
   const [childrenOpen, setChildrenOpen] = useState(false)
   const label = labelOf(node)
   const tone = useMemo(() => {
@@ -156,7 +164,7 @@ export function VisualizerTreeLegacy({ node, isRoot = false, level = 0, selected
   const notesText = node.linguistic_notes.length
     ? node.linguistic_notes.join(' ')
     : (node.notes?.map((note) => note?.text?.trim()).filter(Boolean).join(' ') || '-')
-  const translationText = resolveNodeTranslation(node)
+  const translationText = resolveNodeTranslation(node, preferredTranslationProvider)
   const phoneticText =
     node.phonetic?.uk || node.phonetic?.us
       ? `${node.phonetic?.uk ? `UK /${node.phonetic.uk}/` : ''}${node.phonetic?.uk && node.phonetic?.us ? ' | ' : ''}${node.phonetic?.us ? `US /${node.phonetic.us}/` : ''}`
@@ -215,6 +223,7 @@ export function VisualizerTreeLegacy({ node, isRoot = false, level = 0, selected
                 node={child}
                 level={level + 1}
                 selectedNodeId={selectedNodeId}
+                preferredTranslationProvider={preferredTranslationProvider}
                 onNodeSelect={onNodeSelect}
               />
             </div>

@@ -130,4 +130,82 @@ describe('VisualizerPage', () => {
     })
     expect(screen.getByText('1 / 2')).toBeInTheDocument()
   })
+
+  it('switches translation provider with backend fallback', async () => {
+    const docPayload: VisualizerPayload = {
+      'Sentence one.': {
+        node_id: 's1',
+        type: 'Sentence',
+        content: 'Sentence one.',
+        tense: 'null',
+        linguistic_notes: [],
+        part_of_speech: 'sentence',
+        active_translation_provider: 'gpt',
+        translation: { text: 'Backend translation', source_lang: 'en', target_lang: 'ru' },
+        translations: {
+          backend_m2m100: { text: 'Backend translation', source_lang: 'en', target_lang: 'ru' },
+          gpt: { text: 'GPT translation', source_lang: 'en', target_lang: 'ru' },
+        },
+        linguistic_elements: [],
+      },
+    }
+    const api: RuntimeApi = {
+      getUiState: async () => ({
+        runtime_mode: 'online',
+        deployment_mode: 'local',
+        badges: {},
+        features: {
+          phonetic: { enabled: true, reason_if_disabled: '' },
+          db_persistence: { enabled: true, reason_if_disabled: '' },
+        },
+      }),
+      listProjects: async () => [],
+      createProject: async (name: string) => ({
+        id: 'proj-2',
+        name,
+        created_at: '2026-02-18T00:00:00Z',
+        updated_at: '2026-02-18T00:00:00Z',
+      }),
+      getSelectedProject: async () => ({ project_id: null }),
+      setSelectedProject: async () => ({ project_id: null }),
+      registerMediaFile: async () => ({
+        id: 'file-1',
+        project_id: 'proj-1',
+        name: 'demo.mp3',
+        path: '/tmp/demo.mp3',
+      }),
+      submitMedia: async () => ({
+        result: { route: 'local', message: '' },
+        ui_feedback: { severity: 'info', title: '', message: '' },
+      }),
+      listFiles: async () => [],
+      listDocumentArtifacts: async () => [],
+      getBackendJobStatus: async (jobId: string) => ({ job_id: jobId, status: 'completed_local', message: 'ok', stage_progress: [100, 100, 100, 100, 100] }),
+      uploadMedia: async () => ({ fileName: 'uploaded.txt', mediaPath: '/tmp/uploaded.txt', sizeBytes: 12 }),
+      getVisualizerPayload: async () => docPayload,
+      applyEdit: async () => ({ status: 'ok', message: 'Edit applied.' }),
+      getTranslationConfig: async () => ({
+        default_provider: 'm2m100',
+        providers: [{ id: 'm2m100', label: 'Our Translator (M2M100)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} }],
+      }),
+      saveTranslationConfig: async (config) => config,
+    }
+
+    render(
+      <ApiContext.Provider value={api}>
+        <MemoryRouter initialEntries={[{ pathname: '/visualizer', state: { documentId: 'doc-42' } }]}>
+          <VisualizerPage />
+        </MemoryRouter>
+      </ApiContext.Provider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('GPT translation')).toBeInTheDocument()
+    })
+    const providerSelect = screen.getByLabelText('Translation provider')
+    fireEvent.change(providerSelect, { target: { value: 'backend_m2m100' } })
+    await waitFor(() => {
+      expect(screen.getByText('Backend translation')).toBeInTheDocument()
+    })
+  })
 })

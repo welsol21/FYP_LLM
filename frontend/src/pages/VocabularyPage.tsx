@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
 import type { VisualizerNode, VisualizerPayload } from '../api/runtimeApi'
+import { resolveNodeTranslation } from '../lib/translationContract'
 
 type VocabRow = {
   id: string
@@ -11,6 +12,7 @@ type VocabRow = {
   created: string
   documentId: string | null
   payload: VisualizerPayload | null
+  translationProvider: string
 }
 
 type ExportRow = {
@@ -25,7 +27,9 @@ type ExportRow = {
   cefr_level: string
   tense: string
   linguistic_notes: string
+  translation_provider: string
   translation: string
+  translations_json: string
   phonetic_uk: string
   phonetic_us: string
 }
@@ -52,6 +56,11 @@ function countPayloadElements(payload: VisualizerPayload | null): number {
   return total
 }
 
+function parseTranslationProvider(settings: string): string {
+  const match = String(settings || '').match(/Transl:\s*([^/]+)/i)
+  return match?.[1]?.trim().toLowerCase() || 'backend_m2m100'
+}
+
 function toExportRows(row: VocabRow): ExportRow[] {
   if (!row.payload || !row.documentId) return []
   const out: ExportRow[] = []
@@ -70,7 +79,9 @@ function toExportRows(row: VocabRow): ExportRow[] {
         cefr_level: String(node.cefr_level || ''),
         tense: String(node.tense || ''),
         linguistic_notes: Array.isArray(node.linguistic_notes) ? node.linguistic_notes.join(' | ') : '',
-        translation: String(node.translation?.text || ''),
+        translation_provider: row.translationProvider,
+        translation: resolveNodeTranslation(node, row.translationProvider),
+        translations_json: JSON.stringify(node.translations || {}),
         phonetic_uk: String(node.phonetic?.uk || ''),
         phonetic_us: String(node.phonetic?.us || ''),
       })
@@ -105,6 +116,8 @@ function toCsv(rows: ExportRow[]): string {
     tense: '',
     linguistic_notes: '',
     translation: '',
+    translation_provider: '',
+    translations_json: '',
     phonetic_uk: '',
     phonetic_us: '',
   })
@@ -138,6 +151,7 @@ export function VocabularyPage() {
                 created: new Date(f.updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
                 documentId: f.document_id ?? null,
                 payload,
+                translationProvider: parseTranslationProvider(f.settings),
               }
             }),
           )
