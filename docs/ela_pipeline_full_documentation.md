@@ -50,9 +50,10 @@ Allowed types only:
 - `notes` typed objects: `{text, kind, confidence, source}`
 - note trace fields: `quality_flags`, `rejected_candidates`, `rejected_candidate_stats`, `reason_codes`
 - `schema_version`
-- `translation` object:
-  - sentence-level: `{source_lang, target_lang, model, text}`
-  - node-level: `{source_lang, target_lang, text}`
+- `translations` object (required):
+  - provider-keyed map: `{ [provider_key]: {source_lang, target_lang, text, ...} }`
+  - canonical backend provider key: `backend_m2m100`
+  - optional helper field: `active_translation_provider`
 - `phonetic` object: `{uk, us}`
 - `synonyms` list: `[string, ...]`
 - `cefr_level`: one of `A1|A2|B1|B2|C1|C2`
@@ -103,8 +104,12 @@ Only enrichment fields (notes/TAM-like metadata) may change.
 Default mode is `v2_strict`.
 
 Translation validation rules:
-- if `translation` exists, it must be an object with non-empty `source_lang`, `target_lang`, and `text`.
-- in `v2_strict`, `Sentence.translation.model` is required and must be non-empty.
+- `translations` is required and must be a non-empty object.
+- each provider row in `translations` must include non-empty:
+  - `source_lang`
+  - `target_lang`
+  - `text`
+- canonical backend row (`backend_m2m100`) is used as strict fallback in runtime/UI.
 
 CLI exposure:
 ```bash
@@ -147,12 +152,11 @@ If `--model-dir` is omitted:
   - if `--translation-model` is default (`facebook/m2m100_418M`) and local `artifacts/models/m2m100_418M` exists, local directory is used;
   - explicit custom `--translation-model` value always takes priority.
 - Current output fields:
-  - sentence-level `translation`: `{source_lang, target_lang, model, text}`
-  - node-level `translation`: `{source_lang, target_lang, text}` (when node translation is enabled)
+  - sentence-level `translations[backend_m2m100]`: `{source_lang, target_lang, text, ...}`
+  - node-level `translations[backend_m2m100]`: `{source_lang, target_lang, text, ...}` (when node translation is enabled)
 - Optional dual-channel mode (`--translation-dual-channels`):
-  - `translation_literary`: baseline model output
-  - `translation_idiomatic`: deterministic rule-layer rewrite with fallback to literary
-  - `translation` is still emitted for backward compatibility (same as literary text)
+  - kept as provider-specific metadata in runtime outputs;
+  - canonical contract field remains `translations` (provider-keyed).
 - Node translation strategy:
   - prefer `source_span` projection from sentence text over free node content translation,
   - reuse canonical translation via `ref_node_id`,
@@ -420,11 +424,11 @@ Simple usage pattern:
 - Module: `ela_pipeline/hil/review_schema.py`
 - Purpose: constrain manual edits to approved contract areas.
 - Allowed roots include:
-  - `notes`, `translation`, `phonetic`, `synonyms`, `cefr_level`
+  - `notes`, `translations`, `phonetic`, `synonyms`, `cefr_level`
   - critical grammar tags (`tense`, `aspect`, `mood`, `voice`, `finiteness`, `grammatical_role`, `tam_construction`, `part_of_speech`, `dep_label`, `features`)
 - Path examples accepted:
   - `notes[0].text`
-  - `translation.text`
+  - `translations.backend_m2m100.text`
   - `phonetic.uk`
   - `features.number`
 - Integrated in feedback export quality gates:

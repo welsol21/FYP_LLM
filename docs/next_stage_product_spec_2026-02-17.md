@@ -44,22 +44,20 @@ Mock + partial production UI from ELA should be refactored and reused, not redes
 ### 4.2 Backend (Secondary)
 
 - Shared sentence/corpus knowledge base.
-- Optional processing for large media jobs.
+- Sentence-contract API only (per-sentence contract generation).
 - Sync endpoint for user-submitted new content not present in shared corpus.
 - Feedback/event ingestion for future quality loops.
 
-Backend should not become a heavy monolith for all media operations.
+Backend must not process media files in current architecture.
 
 ## 5. Media Processing Policy
 
-- Client-side by default for media up to 15 minutes.
-- Media over 15 minutes may be delegated to backend async processing.
-- Add file-size limits for both paths:
+- Client-side only for media processing in current architecture.
+- Add file-size and duration limits for local path:
   - local/client path: only files within configured max size (`MEDIA_MAX_SIZE_LOCAL_MB`);
-  - backend async path: hard upper bound (`MEDIA_MAX_SIZE_BACKEND_MB`) with rejection above it.
+  - duration cap: configured runtime limit (current product policy: short media path only).
 - Duration and size limits must be checked before job start (fail-fast with clear user message).
-- Final processed media files are not stored permanently on backend.
-- Backend retention policy: temporary processing artifacts only, with TTL cleanup.
+- Final processed media files are not stored on backend.
 
 ## 6. Privacy and Data Policy
 
@@ -82,7 +80,8 @@ Backend should not become a heavy monolith for all media operations.
 
 ### Online mode
 
-- Enables optional backend jobs (large media, shared corpus sync, account-backed features).
+- Enables sentence-contract backend calls, shared corpus sync, and account-backed features.
+- Media processing remains local; only sentence-contract requests use backend.
 - Must degrade gracefully to offline behavior when network is absent.
 
 ## 8. Licensing Constraints
@@ -101,8 +100,8 @@ Backend should not become a heavy monolith for all media operations.
 
 1. Frontend foundation using reused ELA UX patterns.
 2. Client local persistence (SQLite) + project/workspace model.
-3. Media policy enforcement (<=15 min local, >15 min backend job path).
-4. Backend sync + large-media async API (minimal and stateless where possible).
+3. Media policy enforcement for local-only processing (duration/size fail-fast).
+4. Backend sync + sentence-contract API only (minimal and stateless).
 5. Offline/online capability flags and graceful degradation.
 6. License-gated feature switches (phonetics and other restricted components).
 7. Human-edit capture in local DB with export path to retraining dataset.

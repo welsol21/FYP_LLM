@@ -13,7 +13,7 @@
 - [x] Keep media pipeline enrichment stage for contract fields:
   - [x] `linguistic_notes` via template/rule annotator.
   - [x] `cefr_level` via rule predictor.
-  - [x] `translation` with runtime provider + safe fallback.
+  - [x] `translations` (provider-keyed map) with runtime provider + safe fallback.
   - [x] `phonetic` in runtime enrichment with graceful fallback if binary unavailable.
 - [x] Replace legacy ChatGPT sentence call in media flow with backend sentence-contract API adapter (client pipeline uses per-sentence backend contract requests via `ELA_SENTENCE_CONTRACT_BACKEND_URL`; no local fallback).
 - [x] Add backend sentence-contract API surface (`runtime service` + `client_api` + HTTP endpoint) for per-sentence contract generation.
@@ -26,7 +26,7 @@
 
 - [x] Introduce provider-keyed translation storage in contract:
   - [x] add `translations: { [provider_key]: { text, source_lang, target_lang, created_at, origin } }`
-  - [x] keep backward compatibility for legacy `translation` during migration window.
+  - [x] remove legacy `translation` field from strict contract surfaces after migration.
 - [x] Define canonical backend provider key (e.g. `backend_m2m100`) and enforce it in sentence-contract response handling.
 - [x] Save user-selected translator outputs in the same `translations` map (client-side), without overwriting backend canonical translation.
 - [x] Update visualizer rendering logic:
@@ -397,13 +397,13 @@
   - [x] `translation_literary` (baseline from `m2m100`)
   - [x] `translation_idiomatic` (rule-based rewrite layer with literary fallback)
   - [x] Keep both as top-level sibling fields per node (no nested alternatives array).
-  - [x] Backward-compatible `translation` field is retained.
+  - [x] Canonical contract field remains `translations` (provider-keyed).
 
 ## Human-in-the-Loop Corrections (Planned)
 
-- [x] Add editable-review schema for key fields in contract (`notes`, `translation`, `phonetic`, `synonyms`, `cefr_level`, critical grammar tags).
+- [x] Add editable-review schema for key fields in contract (`notes`, `translations`, `phonetic`, `synonyms`, `cefr_level`, critical grammar tags).
   - [x] Added schema module: `ela_pipeline/hil/review_schema.py`.
-  - [x] Added dynamic field-path validation by root (`notes[0].text`, `translation.text`, `phonetic.uk`, etc.).
+  - [x] Added dynamic field-path validation by root (`notes[0].text`, `translations.backend_m2m100.text`, `phonetic.uk`, etc.).
   - [x] Integrated schema checks in feedback quality gates (`ela_pipeline/hil/export_feedback.py`).
   - [x] Added tests: `tests/test_hil_review_schema.py` + updated `tests/test_hil_repository.py`.
   - [x] Persistence base added: `review_events` + `node_edits` tables for sentence/node-level corrections.
@@ -493,13 +493,14 @@
     - [x] `apply-edit`
   - [x] Render and bind these commands in concrete frontend screens/routes.
     - [x] Route shell created: `Projects -> Files -> Analyze -> Vocabulary -> Visualizer`.
+    - [x] Frontend first approximation completed (touch-first parity baseline with legacy `main_menu` flow).
     - [x] Visualizer screen renders tree payload structure (React recursive tree).
     - [x] Frontend API contract layer added for `ui-state`, `submit-media`, `backend-jobs`, `visualizer-payload`.
     - [x] Minimal editor interaction wired via `apply-edit`-compatible API method (`applyEdit`), with in-UI re-render after patch.
     - [x] Quick Node Edit touch-first UX refined:
       - [x] collapsed by default; explicit expand/collapse control
       - [x] node selection bound to node label tap/click (no manual node id input)
-      - [x] Basic mode edits only contract-facing fields (`content`, `cefr_level`, `tense`, `linguistic_notes`, `translation`, `phonetic`)
+      - [x] Basic mode edits only contract-facing fields (`content`, `cefr_level`, `tense`, `linguistic_notes`, `translations.*`, `phonetic`)
       - [x] Advanced mode edits only linguist-facing curated fields (internal/system-only fields hidden)
       - [x] advanced value picker shows first 4 rows by default with conditional `Expand/Collapse Values` for overflow
       - [x] selected advanced value shown as dedicated value box near overflow toggle

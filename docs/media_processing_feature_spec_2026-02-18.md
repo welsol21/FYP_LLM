@@ -1,7 +1,7 @@
 # Media Processing Feature Spec (Client-first + Contract Backend)
 
 Date: 2026-02-18
-Status: In progress
+Status: Implemented in first approximation (client-only pipeline + backend sentence-contract API)
 
 ## 1. Goal
 Implement end-to-end media ingestion and analysis for:
