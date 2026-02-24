@@ -1024,6 +1024,9 @@ class RuntimeMediaService:
             include_target = mode in target_modes or mode not in source_modes.union(target_modes)
 
             timeline_segments: list[dict[str, Any]] = []
+            source_subtitle_segments: list[dict[str, Any]] = []
+            target_subtitle_segments: list[dict[str, Any]] = []
+            sentence_windows: list[dict[str, Any]] = []
             segment_audio_files: list[Path] = []
             current_ms = 0
             gap_ms = 120
@@ -1033,6 +1036,14 @@ class RuntimeMediaService:
                 for idx, row in enumerate(media_sentences, start=1):
                     text_en = str(row.get("sentence_text") or row.get("text_eng") or "").strip()
                     text_ru = str(row.get("text_ru") or "").strip()
+                    window: dict[str, Any] = {
+                        "text_eng": text_en,
+                        "text_ru": text_ru,
+                        "source_start_ms": None,
+                        "source_end_ms": None,
+                        "target_start_ms": None,
+                        "target_end_ms": None,
+                    }
 
                     if include_source:
                         start_ms_raw = int(row.get("start_ms") or 0)
@@ -1061,6 +1072,16 @@ class RuntimeMediaService:
                                     "text_ru": "",
                                 }
                             )
+                            source_subtitle_segments.append(
+                                {
+                                    "start_ms": start_ms,
+                                    "end_ms": end_ms,
+                                    "text_eng": text_en,
+                                    "text_ru": "",
+                                }
+                            )
+                            window["source_start_ms"] = start_ms
+                            window["source_end_ms"] = end_ms
                             current_ms = end_ms + gap_ms
                             segment_audio_files.append(source_seg)
 
@@ -1089,8 +1110,19 @@ class RuntimeMediaService:
                                 "text_ru": text_for_tts,
                             }
                         )
+                        target_subtitle_segments.append(
+                            {
+                                "start_ms": start_ms,
+                                "end_ms": end_ms,
+                                "text_eng": "",
+                                "text_ru": text_for_tts,
+                            }
+                        )
+                        window["target_start_ms"] = start_ms
+                        window["target_end_ms"] = end_ms
                         current_ms = end_ms + gap_ms
                         segment_audio_files.append(target_seg)
+                    sentence_windows.append(window)
 
                 if not segment_audio_files:
                     return
@@ -1122,16 +1154,34 @@ class RuntimeMediaService:
                 )
 
             # Rebuild subtitle files using real rendered timeline.
+            bilingual_subtitle_segments: list[dict[str, Any]] = []
+            for row in sentence_windows:
+                starts = [x for x in (row.get("source_start_ms"), row.get("target_start_ms")) if isinstance(x, int)]
+                ends = [x for x in (row.get("source_end_ms"), row.get("target_end_ms")) if isinstance(x, int)]
+                if not starts or not ends:
+                    continue
+                bilingual_subtitle_segments.append(
+                    {
+                        "start_ms": min(starts),
+                        "end_ms": max(ends),
+                        "text_eng": str(row.get("text_eng") or ""),
+                        "text_ru": str(row.get("text_ru") or ""),
+                    }
+                )
+            if not bilingual_subtitle_segments:
+                bilingual_subtitle_segments = timeline_segments
+
             (doc_dir / "subtitles_en.srt").write_text(
-                _build_srt(timeline_segments, bilingual=False),
+                _build_srt(source_subtitle_segments if source_subtitle_segments else timeline_segments, bilingual=False),
                 encoding="utf-8",
             )
             (doc_dir / "subtitles_bilingual.srt").write_text(
-                _build_srt(timeline_segments, bilingual=True),
+                _build_srt(bilingual_subtitle_segments, bilingual=True),
                 encoding="utf-8",
             )
+            target_rows = target_subtitle_segments if target_subtitle_segments else [{**row, "text_eng": ""} for row in timeline_segments]
             (doc_dir / "subtitles_target.srt").write_text(
-                _build_srt([{**row, "text_eng": ""} for row in timeline_segments], bilingual=True),
+                _build_srt(target_rows, bilingual=True),
                 encoding="utf-8",
             )
 
