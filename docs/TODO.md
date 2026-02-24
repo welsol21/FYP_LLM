@@ -35,7 +35,7 @@
   - [x] keep other provider translations collapsed under "More translations".
 - [x] Update Vocabulary export JSON/CSV to include `translation_provider` + selected translation text (with optional full translations map in JSON export).
 - [x] Add migration/adapter layer (`translation` -> `translations`) at contract boundaries.
-- [ ] Add regression tests:
+- [x] Add regression tests:
   - [x] contract roundtrip with multiple providers
   - [x] visualizer provider switch + fallback behavior
   - [x] export correctness for selected provider.
@@ -504,7 +504,7 @@
       - [x] advanced value picker shows first 4 rows by default with conditional `Expand/Collapse Values` for overflow
       - [x] selected advanced value shown as dedicated value box near overflow toggle
     - [x] Visualizer sentence navigation bound to `Prev/Next` controls per loaded payload.
-  - [ ] Replace current mock API transport with production transport wired to runtime/backend endpoints.
+  - [x] Replace current mock API transport with production transport wired to runtime/backend endpoints.
   - [x] Restore legacy project-first UX flow parity (`Projects -> Files -> Analyze`):
     - [x] Runtime API/project service for list/create/select project.
     - [x] Frontend Projects screen wired to real API (create + double-click select/open files).
@@ -512,7 +512,7 @@
     - [x] Analyze submit requires selected project and sends `projectId`.
     - [x] New file upload/registration moved to `Files` screen (project-scoped).
     - [x] Tests added/updated for project create/select flow.
-  - [ ] Media processing feature rollout (spec: `docs/media_processing_feature_spec_2026-02-18.md`).
+  - [x] Media processing feature rollout (spec: `docs/media_processing_feature_spec_2026-02-18.md`).
   - [x] Create consolidated implementation spec for media processing + backend/frontend integration.
   - [x] Implement document persistence layer for analyzed media outputs:
     - [x] `documents`
@@ -541,21 +541,21 @@
     - [x] `subtitles_bilingual.srt`
     - [x] `translated_audio_ru.mp3` for `audio|video` sources
     - [x] `translated_video_ru.mp4` for `video` sources
-  - [ ] Add runtime API endpoints/services for document-scoped visualizer flow:
+  - [x] Add runtime API endpoints/services for document-scoped visualizer flow:
     - [x] `get_visualizer_payload(document_id)`
     - [x] `list_document_sentences(document_id)`
     - [x] `get_document_processing_status(document_id)`
-  - [ ] Frontend Files flow:
+  - [x] Frontend Files flow:
     - [x] show analyzed-state per file
     - [x] open visualizer by double-clicking analyzed file
     - [x] pass selected `document_id` into visualizer route/state
-  - [ ] Frontend Visualizer flow:
+  - [x] Frontend Visualizer flow:
     - [x] load payload by `document_id` (not global sample)
     - [x] keep `Prev/Next` traversal within selected document only
     - [x] keep visualizer/render/edit layer strictly contract-native
-  - [ ] Frontend translation provider UX (deferred):
-    - [ ] Reintroduce user-facing translator selection from legacy projects (as in early Kivy versions).
-    - [ ] Keep current default provider (`m2m100`) as active path until this feature is restored.
+  - [x] Frontend translation provider UX:
+    - [x] Reintroduce user-facing translator selection from legacy projects (as in early Kivy versions).
+    - [x] Keep current default provider (`m2m100`) as active path.
   - [x] Add TDD coverage for:
     - [x] local schema + CRUD for document tables
     - [x] sentence hash/link builder
