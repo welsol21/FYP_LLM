@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import inspect
 from typing import Any
 
 
@@ -96,27 +97,43 @@ def train_deberta_classifier(
         label2id=CEFR_TO_ID,
     ).to("cuda")
 
-    args = TrainingArguments(
-        output_dir=output_dir,
-        num_train_epochs=epochs,
-        per_device_train_batch_size=batch_size,
-        per_device_eval_batch_size=batch_size,
-        learning_rate=learning_rate,
-        seed=seed,
-        evaluation_strategy="epoch",
-        save_strategy="epoch",
-        logging_steps=50,
-        load_best_model_at_end=True,
-        metric_for_best_model="eval_loss",
-        greater_is_better=False,
-    )
+    # transformers<=4.x uses `evaluation_strategy`, transformers>=5.x uses `eval_strategy`.
+    ta_kwargs = {
+        "output_dir": output_dir,
+        "num_train_epochs": epochs,
+        "per_device_train_batch_size": batch_size,
+        "per_device_eval_batch_size": batch_size,
+        "learning_rate": learning_rate,
+        "seed": seed,
+        "save_strategy": "epoch",
+        "logging_steps": 50,
+        "load_best_model_at_end": True,
+        "metric_for_best_model": "eval_loss",
+        "greater_is_better": False,
+        "report_to": "none",
+    }
+    ta_params = inspect.signature(TrainingArguments.__init__).parameters
+    if "eval_strategy" in ta_params:
+        ta_kwargs["eval_strategy"] = "epoch"
+    else:
+        ta_kwargs["evaluation_strategy"] = "epoch"
+
+    args = TrainingArguments(**ta_kwargs)
     trainer = Trainer(
-        model=model,
-        args=args,
-        train_dataset=train_ds,
-        eval_dataset=dev_ds,
-        tokenizer=tokenizer,
-        data_collator=DataCollatorWithPadding(tokenizer=tokenizer),
+        **(
+            {
+                "model": model,
+                "args": args,
+                "train_dataset": train_ds,
+                "eval_dataset": dev_ds,
+                "data_collator": DataCollatorWithPadding(tokenizer=tokenizer),
+            }
+            | (
+                {"processing_class": tokenizer}
+                if "processing_class" in inspect.signature(Trainer.__init__).parameters
+                else {"tokenizer": tokenizer}
+            )
+        )
     )
     trainer.train()
     metrics = trainer.evaluate()
