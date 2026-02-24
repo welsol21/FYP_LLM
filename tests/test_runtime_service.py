@@ -282,7 +282,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             def _fake_run(cmd, **kwargs):
                 out_path = Path(cmd[-1])
                 out_path.parent.mkdir(parents=True, exist_ok=True)
-                out_path.write_bytes(b"ok")
+                out_path.write_bytes(b"x" * 2048)
                 return SimpleNamespace(returncode=0)
 
             class _FakeCommunicate:
@@ -309,6 +309,68 @@ class RuntimeMediaServiceTests(unittest.TestCase):
 
             self.assertTrue((doc_dir / "translated_audio_ru.mp3").exists())
             self.assertTrue((doc_dir / "translated_video_ru.mp4").exists())
+
+    def test_bilingual_subtitles_support_sequential_and_simultaneous_modes(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            src_audio = Path(tmpdir) / "sample.mp3"
+            src_audio.write_bytes(b"fake")
+
+            class _FakeCommunicate:
+                def __init__(self, text: str, voice: str):
+                    self.text = text
+                    self.voice = voice
+
+                async def save(self, path: str) -> None:
+                    Path(path).write_bytes(b"x" * 2048)
+
+            def _fake_run(cmd, **kwargs):
+                out_path = Path(cmd[-1])
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_bytes(b"x" * 2048)
+                return SimpleNamespace(returncode=0)
+
+            fake_edge_tts = SimpleNamespace(Communicate=_FakeCommunicate)
+            media_sentences = [
+                {
+                    "start_ms": 0,
+                    "end_ms": 1000,
+                    "text_ru": "Она доверяла ему.",
+                    "sentence_text": "She trusted him.",
+                }
+            ]
+
+            with patch.dict(sys.modules, {"edge_tts": fake_edge_tts}), patch(
+                "ela_pipeline.runtime.service.subprocess.run", side_effect=_fake_run
+            ), patch("ela_pipeline.runtime.service._probe_audio_duration_ms", return_value=800):
+                seq_dir = Path(tmpdir) / "contracts" / "seq"
+                seq_dir.mkdir(parents=True, exist_ok=True)
+                svc._export_final_media_artifacts(
+                    source_type="audio",
+                    source_path=str(src_audio),
+                    doc_dir=seq_dir,
+                    media_sentences=media_sentences,
+                    subtitles_mode="bilingual_sequential",
+                )
+
+                sim_dir = Path(tmpdir) / "contracts" / "sim"
+                sim_dir.mkdir(parents=True, exist_ok=True)
+                svc._export_final_media_artifacts(
+                    source_type="audio",
+                    source_path=str(src_audio),
+                    doc_dir=sim_dir,
+                    media_sentences=media_sentences,
+                    subtitles_mode="bilingual_simultaneous",
+                )
+
+            seq_srt = (seq_dir / "subtitles_bilingual.srt").read_text(encoding="utf-8")
+            sim_srt = (sim_dir / "subtitles_bilingual.srt").read_text(encoding="utf-8")
+            self.assertGreaterEqual(seq_srt.count("-->"), 2)
+            self.assertEqual(sim_srt.count("-->"), 1)
 
     def test_submit_media_reject_returns_error_feedback(self):
         with tempfile.TemporaryDirectory() as tmpdir:

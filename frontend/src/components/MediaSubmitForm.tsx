@@ -45,11 +45,16 @@ export function MediaSubmitForm({
   const [mediaFileId, setMediaFileId] = useState<string | undefined>(undefined)
   const [selectedFileName, setSelectedFileName] = useState('')
   const [translator, setTranslator] = useState(defaultTranslator || 'm2m100')
-  const [subtitles, setSubtitles] = useState('Bilingual')
+  const [subtitles, setSubtitles] = useState('Bilingual (sequential)')
   const [voice, setVoice] = useState('Male')
   const [submitting, setSubmitting] = useState(false)
   const enabledProviders = translatorOptions.filter((p) => p.enabled && hasRequiredCredentials(p))
-  const subtitleOptions = ['Bilingual', 'Target only', 'Source only']
+  const subtitleOptions: Array<{ label: string; value: string }> = [
+    { label: 'Bilingual (sequential)', value: 'bilingual_sequential' },
+    { label: 'Bilingual (simultaneous)', value: 'bilingual_simultaneous' },
+    { label: 'Target only', value: 'target only' },
+    { label: 'Source only', value: 'source only' },
+  ]
   const voiceOptions = ['Male', 'Female']
 
   useEffect(() => {
@@ -83,7 +88,7 @@ export function MediaSubmitForm({
         projectId: projectId ?? undefined,
         mediaFileId,
         translationProvider: translator,
-        subtitlesMode: subtitles.toLowerCase(),
+        subtitlesMode: subtitleOptions.find((option) => option.label === subtitles)?.value || 'bilingual_sequential',
         voiceChoice: voice.toLowerCase(),
       })
       onSubmitted(payload)
@@ -117,12 +122,12 @@ export function MediaSubmitForm({
         <div className="touch-options-grid">
           {subtitleOptions.map((option) => (
             <button
-              key={option}
+              key={option.value}
               type="button"
-              className={`touch-option-btn${subtitles === option ? ' active' : ''}`}
-              onClick={() => setSubtitles(option)}
+              className={`touch-option-btn${subtitles === option.label ? ' active' : ''}`}
+              onClick={() => setSubtitles(option.label)}
             >
-              {option}
+              {option.label}
             </button>
           ))}
         </div>

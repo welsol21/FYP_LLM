@@ -1017,11 +1017,13 @@ class RuntimeMediaService:
         try:
             import edge_tts  # type: ignore
 
-            mode = str(subtitles_mode or "bilingual").strip().lower()
+            mode = str(subtitles_mode or "bilingual_sequential").strip().lower()
             source_modes = {"source", "source_only", "source only", "en"}
             target_modes = {"target", "target_only", "target only", "ru"}
+            simultaneous_modes = {"bilingual_simultaneous", "bilingual simultaneous", "simultaneous"}
             include_source = mode in source_modes or mode not in source_modes.union(target_modes)
             include_target = mode in target_modes or mode not in source_modes.union(target_modes)
+            bilingual_simultaneous = mode in simultaneous_modes
 
             timeline_segments: list[dict[str, Any]] = []
             source_subtitle_segments: list[dict[str, Any]] = []
@@ -1155,19 +1157,22 @@ class RuntimeMediaService:
 
             # Rebuild subtitle files using real rendered timeline.
             bilingual_subtitle_segments: list[dict[str, Any]] = []
-            for row in sentence_windows:
-                starts = [x for x in (row.get("source_start_ms"), row.get("target_start_ms")) if isinstance(x, int)]
-                ends = [x for x in (row.get("source_end_ms"), row.get("target_end_ms")) if isinstance(x, int)]
-                if not starts or not ends:
-                    continue
-                bilingual_subtitle_segments.append(
-                    {
-                        "start_ms": min(starts),
-                        "end_ms": max(ends),
-                        "text_eng": str(row.get("text_eng") or ""),
-                        "text_ru": str(row.get("text_ru") or ""),
-                    }
-                )
+            if bilingual_simultaneous:
+                for row in sentence_windows:
+                    starts = [x for x in (row.get("source_start_ms"), row.get("target_start_ms")) if isinstance(x, int)]
+                    ends = [x for x in (row.get("source_end_ms"), row.get("target_end_ms")) if isinstance(x, int)]
+                    if not starts or not ends:
+                        continue
+                    bilingual_subtitle_segments.append(
+                        {
+                            "start_ms": min(starts),
+                            "end_ms": max(ends),
+                            "text_eng": str(row.get("text_eng") or ""),
+                            "text_ru": str(row.get("text_ru") or ""),
+                        }
+                    )
+            else:
+                bilingual_subtitle_segments = timeline_segments
             if not bilingual_subtitle_segments:
                 bilingual_subtitle_segments = timeline_segments
 
