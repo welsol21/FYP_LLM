@@ -134,6 +134,7 @@ export interface RuntimeApi {
     translationProvider?: string
     subtitlesMode?: string
     voiceChoice?: string
+    forceFullReprocess?: boolean
   }): Promise<MediaSubmissionPayload>
   getTranslationConfig(): Promise<TranslationConfig>
   saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig>

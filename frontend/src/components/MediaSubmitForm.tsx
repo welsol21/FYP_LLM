@@ -47,6 +47,7 @@ export function MediaSubmitForm({
   const [translator, setTranslator] = useState(defaultTranslator || 'm2m100')
   const [subtitles, setSubtitles] = useState('Bilingual (sequential)')
   const [voice, setVoice] = useState('Male')
+  const [processingMode, setProcessingMode] = useState<'incremental' | 'force'>('incremental')
   const [submitting, setSubmitting] = useState(false)
   const enabledProviders = translatorOptions.filter((p) => p.enabled && hasRequiredCredentials(p))
   const subtitleOptions: Array<{ label: string; value: string }> = [
@@ -90,6 +91,7 @@ export function MediaSubmitForm({
         translationProvider: translator,
         subtitlesMode: subtitleOptions.find((option) => option.label === subtitles)?.value || 'bilingual_sequential',
         voiceChoice: voice.toLowerCase(),
+        forceFullReprocess: processingMode === 'force',
       })
       onSubmitted(payload)
     } finally {
@@ -144,6 +146,24 @@ export function MediaSubmitForm({
               {option}
             </button>
           ))}
+        </div>
+
+        <label className="analyze-label">Processing:</label>
+        <div className="touch-options-grid">
+          <button
+            type="button"
+            className={`touch-option-btn${processingMode === 'incremental' ? ' active' : ''}`}
+            onClick={() => setProcessingMode('incremental')}
+          >
+            Incremental reuse
+          </button>
+          <button
+            type="button"
+            className={`touch-option-btn${processingMode === 'force' ? ' active' : ''}`}
+            onClick={() => setProcessingMode('force')}
+          >
+            Force full reprocess
+          </button>
         </div>
       </div>
 

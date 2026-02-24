@@ -32,31 +32,31 @@
 - [x] Update visualizer rendering logic:
   - [x] show active user-selected provider translation as primary
   - [x] fallback to `backend_m2m100` when selected provider translation is absent
-  - [ ] keep other provider translations collapsed under "More translations".
+  - [x] keep other provider translations collapsed under "More translations".
 - [x] Update Vocabulary export JSON/CSV to include `translation_provider` + selected translation text (with optional full translations map in JSON export).
 - [x] Add migration/adapter layer (`translation` -> `translations`) at contract boundaries.
 - [ ] Add regression tests:
   - [x] contract roundtrip with multiple providers
   - [x] visualizer provider switch + fallback behavior
-  - [ ] export correctness for selected provider.
+  - [x] export correctness for selected provider.
 
 ### B) Incremental Pipeline Reuse (no unnecessary Whisper rerun)
 
-- [ ] Introduce stage manifest persistence per processed media (`media_hash`, pipeline/version settings, artifact pointers).
-- [ ] Split pipeline into immutable and variant stages:
-  - [ ] immutable: load/transcribe/sentence-timestamps
-  - [ ] variant: translations/subtitles/voice/media render.
-- [ ] Reuse cached immutable stage outputs when `media_hash` and ASR settings are unchanged.
-- [ ] Recompute only variant stages when user changes translator/subtitle mode/voice.
-- [ ] Rebuild sentence contracts only when contract-provider/version settings change (without rerunning Whisper).
-- [ ] Add explicit `Force full reprocess` option in Analyze UI.
-- [ ] Stage logs/UI:
-  - [ ] show `Reusing cached transcription` when cache-hit path is used
-  - [ ] keep progress and elapsed/estimated coherent in mixed reuse/full runs.
-- [ ] Add TDD coverage for cache invalidation rules:
-  - [ ] same media + same ASR settings -> skip transcription
-  - [ ] same media + changed translation/subtitle/voice -> rerun only variant stages
-  - [ ] changed media hash or ASR settings -> full transcription rerun.
+- [x] Introduce stage manifest persistence per processed media (`media_hash`, pipeline/version settings, artifact pointers).
+- [x] Split pipeline into immutable and variant stages:
+  - [x] immutable: load/transcribe/sentence-timestamps
+  - [x] variant: translations/subtitles/voice/media render.
+- [x] Reuse cached immutable stage outputs when `media_hash` and ASR settings are unchanged.
+- [x] Recompute only variant stages when user changes translator/subtitle mode/voice.
+- [x] Rebuild sentence contracts only when contract-provider/version settings change (without rerunning Whisper).
+- [x] Add explicit `Force full reprocess` option in Analyze UI.
+- [x] Stage logs/UI:
+  - [x] show `Reusing cached transcription` when cache-hit path is used
+  - [x] keep progress and elapsed/estimated coherent in mixed reuse/full runs.
+- [x] Add TDD coverage for cache invalidation rules:
+  - [x] same media + same ASR settings -> skip transcription
+  - [x] same media + changed translation/subtitle/voice -> rerun only variant stages
+  - [x] changed media hash or ASR settings -> full transcription rerun.
 
 ## License Compliance Workflow
 

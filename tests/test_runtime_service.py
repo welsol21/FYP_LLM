@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 from ela_pipeline.runtime import MediaPolicyLimits, RuntimeMediaService
 from ela_pipeline.client_storage import build_sentence_hash
+from ela_pipeline.runtime.media_pipeline import MediaPipelineResult
 
 
 class RuntimeMediaServiceTests(unittest.TestCase):
@@ -186,6 +187,14 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                     limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
                 )
                 svc.repo.create_project("Project A", project_id="proj-1")
+                svc.repo.create_media_file(
+                    project_id="proj-1",
+                    media_file_id="file-1",
+                    name="short.txt",
+                    path=str(media_path),
+                    duration_seconds=1,
+                    size_bytes=media_path.stat().st_size,
+                )
                 with patch.object(
                     svc,
                     "_request_sentence_contract",
@@ -686,6 +695,343 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                 )
             with self.assertRaisesRegex(RuntimeError, "ELA_SENTENCE_CONTRACT_BACKEND_URL is required"):
                 svc._request_sentence_contract(sentence_text="She trusted him.", sentence_idx=0)
+
+    def test_incremental_cache_hit_skips_media_pipeline(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media_path = Path(tmpdir) / "short.txt"
+            media_path.write_text("She trusted him.", encoding="utf-8")
+            artifacts_dir = Path(tmpdir) / "contracts"
+            with patch.dict(
+                "os.environ",
+                {
+                    "MEDIA_CONTRACT_ARTIFACTS_DIR": str(artifacts_dir),
+                },
+                clear=False,
+            ):
+                svc = RuntimeMediaService(
+                    db_path=Path(tmpdir) / "client.sqlite3",
+                    runtime_mode="online",
+                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+                )
+                svc.repo.create_project("Project A", project_id="proj-1")
+                svc.repo.create_media_file(
+                    project_id="proj-1",
+                    media_file_id="file-1",
+                    name="short.txt",
+                    path=str(media_path),
+                    duration_seconds=1,
+                    size_bytes=media_path.stat().st_size,
+                )
+                with patch.object(
+                    svc,
+                    "_request_sentence_contract",
+                    return_value={
+                        "sentence_text": "She trusted him.",
+                        "sentence_hash": "h1",
+                        "sentence_node": {
+                            "type": "Sentence",
+                            "content": "She trusted him.",
+                            "node_id": "n1",
+                            "translation": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."},
+                            "linguistic_elements": [],
+                        },
+                    },
+                ):
+                    first = svc.process_media_now(
+                        media_path=str(media_path),
+                        project_id="proj-1",
+                        media_file_id="file-1",
+                    )
+                self.assertEqual(first["status"], "completed")
+
+                with patch("ela_pipeline.runtime.service.run_media_pipeline", side_effect=AssertionError("must not run on cache hit")):
+                    second = svc.process_media_now(
+                        media_path=str(media_path),
+                        project_id="proj-1",
+                        media_file_id="file-1",
+                    )
+                self.assertEqual(second["status"], "completed")
+
+                manifest = svc.repo.get_workspace_state("media_stage_manifest:file:file-1")
+                self.assertIsInstance(manifest, dict)
+                self.assertTrue(bool(manifest.get("reused_immutable_last_run")))
+
+    def test_force_full_reprocess_bypasses_incremental_cache(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media_path = Path(tmpdir) / "short.txt"
+            media_path.write_text("She trusted him.", encoding="utf-8")
+            artifacts_dir = Path(tmpdir) / "contracts"
+            with patch.dict(
+                "os.environ",
+                {
+                    "MEDIA_CONTRACT_ARTIFACTS_DIR": str(artifacts_dir),
+                },
+                clear=False,
+            ):
+                svc = RuntimeMediaService(
+                    db_path=Path(tmpdir) / "client.sqlite3",
+                    runtime_mode="online",
+                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+                )
+                svc.repo.create_project("Project A", project_id="proj-1")
+                svc.repo.create_media_file(
+                    project_id="proj-1",
+                    media_file_id="file-1",
+                    name="short.txt",
+                    path=str(media_path),
+                    duration_seconds=1,
+                    size_bytes=media_path.stat().st_size,
+                )
+                with patch.object(
+                    svc,
+                    "_request_sentence_contract",
+                    return_value={
+                        "sentence_text": "She trusted him.",
+                        "sentence_hash": "h1",
+                        "sentence_node": {
+                            "type": "Sentence",
+                            "content": "She trusted him.",
+                            "node_id": "n1",
+                            "translation": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."},
+                            "linguistic_elements": [],
+                        },
+                    },
+                ):
+                    first = svc.process_media_now(
+                        media_path=str(media_path),
+                        project_id="proj-1",
+                        media_file_id="file-1",
+                    )
+                self.assertEqual(first["status"], "completed")
+
+                mocked_pipeline = MediaPipelineResult(
+                    source_type="text",
+                    full_text="She trusted him.",
+                    text_hash="th2",
+                    media_sentences=[
+                        {
+                            "sentence_idx": 0,
+                            "sentence_text": "She trusted him.",
+                            "sentence_hash": "h2",
+                            "start_ms": 0,
+                            "end_ms": 1000,
+                            "id": 1,
+                            "text_eng": "She trusted him.",
+                            "text_ru": "Она доверяла ему.",
+                            "units": [],
+                            "units_ru": [],
+                            "start": 0.0,
+                            "end": 1.0,
+                        }
+                    ],
+                    contract_sentences=[
+                        {
+                            "sentence_idx": 0,
+                            "sentence_hash": "h2",
+                            "sentence_node": {
+                                "type": "Sentence",
+                                "content": "She trusted him.",
+                                "node_id": "n2",
+                                "translation": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."},
+                                "linguistic_elements": [],
+                            },
+                        }
+                    ],
+                )
+                with patch("ela_pipeline.runtime.service.run_media_pipeline", return_value=mocked_pipeline) as mocked:
+                    second = svc.process_media_now(
+                        media_path=str(media_path),
+                        project_id="proj-1",
+                        media_file_id="file-1",
+                        force_full_reprocess=True,
+                    )
+                self.assertEqual(second["status"], "completed")
+                self.assertEqual(mocked.call_count, 1)
+
+    def test_incremental_cache_invalidates_when_media_changes(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media_path = Path(tmpdir) / "short.txt"
+            media_path.write_text("She trusted him.", encoding="utf-8")
+            artifacts_dir = Path(tmpdir) / "contracts"
+            with patch.dict(
+                "os.environ",
+                {
+                    "MEDIA_CONTRACT_ARTIFACTS_DIR": str(artifacts_dir),
+                },
+                clear=False,
+            ):
+                svc = RuntimeMediaService(
+                    db_path=Path(tmpdir) / "client.sqlite3",
+                    runtime_mode="online",
+                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+                )
+                svc.repo.create_project("Project A", project_id="proj-1")
+                svc.repo.create_media_file(
+                    project_id="proj-1",
+                    media_file_id="file-1",
+                    name="short.txt",
+                    path=str(media_path),
+                    duration_seconds=1,
+                    size_bytes=media_path.stat().st_size,
+                )
+                with patch.object(
+                    svc,
+                    "_request_sentence_contract",
+                    return_value={
+                        "sentence_text": "She trusted him.",
+                        "sentence_hash": "h1",
+                        "sentence_node": {
+                            "type": "Sentence",
+                            "content": "She trusted him.",
+                            "node_id": "n1",
+                            "translation": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."},
+                            "linguistic_elements": [],
+                        },
+                    },
+                ):
+                    first = svc.process_media_now(
+                        media_path=str(media_path),
+                        project_id="proj-1",
+                        media_file_id="file-1",
+                    )
+                self.assertEqual(first["status"], "completed")
+
+                media_path.write_text("She trusted him. Again.", encoding="utf-8")
+                mocked_pipeline = MediaPipelineResult(
+                    source_type="text",
+                    full_text="She trusted him. Again.",
+                    text_hash="th-new",
+                    media_sentences=[
+                        {
+                            "sentence_idx": 0,
+                            "sentence_text": "She trusted him. Again.",
+                            "sentence_hash": "h-new",
+                            "start_ms": 0,
+                            "end_ms": 1200,
+                            "id": 1,
+                            "text_eng": "She trusted him. Again.",
+                            "text_ru": "Она снова доверяла ему.",
+                            "units": [],
+                            "units_ru": [],
+                            "start": 0.0,
+                            "end": 1.2,
+                        }
+                    ],
+                    contract_sentences=[
+                        {
+                            "sentence_idx": 0,
+                            "sentence_hash": "h-new",
+                            "sentence_node": {
+                                "type": "Sentence",
+                                "content": "She trusted him. Again.",
+                                "node_id": "n-new",
+                                "translation": {"source_lang": "en", "target_lang": "ru", "text": "Она снова доверяла ему."},
+                                "linguistic_elements": [],
+                            },
+                        }
+                    ],
+                )
+                with patch("ela_pipeline.runtime.service.run_media_pipeline", return_value=mocked_pipeline) as mocked:
+                    second = svc.process_media_now(
+                        media_path=str(media_path),
+                        project_id="proj-1",
+                        media_file_id="file-1",
+                    )
+                self.assertEqual(second["status"], "completed")
+                self.assertEqual(mocked.call_count, 1)
+
+    def test_incremental_cache_invalidates_when_asr_settings_change(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media_path = Path(tmpdir) / "short.txt"
+            media_path.write_text("She trusted him.", encoding="utf-8")
+            artifacts_dir = Path(tmpdir) / "contracts"
+            with patch.dict(
+                "os.environ",
+                {
+                    "MEDIA_CONTRACT_ARTIFACTS_DIR": str(artifacts_dir),
+                    "ELA_MEDIA_ASR_MODEL": "base",
+                },
+                clear=False,
+            ):
+                svc = RuntimeMediaService(
+                    db_path=Path(tmpdir) / "client.sqlite3",
+                    runtime_mode="online",
+                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+                )
+                svc.repo.create_project("Project A", project_id="proj-1")
+                svc.repo.create_media_file(
+                    project_id="proj-1",
+                    media_file_id="file-1",
+                    name="short.txt",
+                    path=str(media_path),
+                    duration_seconds=1,
+                    size_bytes=media_path.stat().st_size,
+                )
+                with patch.object(
+                    svc,
+                    "_request_sentence_contract",
+                    return_value={
+                        "sentence_text": "She trusted him.",
+                        "sentence_hash": "h1",
+                        "sentence_node": {
+                            "type": "Sentence",
+                            "content": "She trusted him.",
+                            "node_id": "n1",
+                            "translation": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."},
+                            "linguistic_elements": [],
+                        },
+                    },
+                ):
+                    first = svc.process_media_now(
+                        media_path=str(media_path),
+                        project_id="proj-1",
+                        media_file_id="file-1",
+                    )
+                self.assertEqual(first["status"], "completed")
+
+                mocked_pipeline = MediaPipelineResult(
+                    source_type="text",
+                    full_text="She trusted him.",
+                    text_hash="th-asr",
+                    media_sentences=[
+                        {
+                            "sentence_idx": 0,
+                            "sentence_text": "She trusted him.",
+                            "sentence_hash": "h-asr",
+                            "start_ms": 0,
+                            "end_ms": 1000,
+                            "id": 1,
+                            "text_eng": "She trusted him.",
+                            "text_ru": "Она доверяла ему.",
+                            "units": [],
+                            "units_ru": [],
+                            "start": 0.0,
+                            "end": 1.0,
+                        }
+                    ],
+                    contract_sentences=[
+                        {
+                            "sentence_idx": 0,
+                            "sentence_hash": "h-asr",
+                            "sentence_node": {
+                                "type": "Sentence",
+                                "content": "She trusted him.",
+                                "node_id": "n-asr",
+                                "translation": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."},
+                                "linguistic_elements": [],
+                            },
+                        }
+                    ],
+                )
+                with patch.dict("os.environ", {"ELA_MEDIA_ASR_MODEL": "small"}, clear=False):
+                    with patch("ela_pipeline.runtime.service.run_media_pipeline", return_value=mocked_pipeline) as mocked:
+                        second = svc.process_media_now(
+                            media_path=str(media_path),
+                            project_id="proj-1",
+                            media_file_id="file-1",
+                        )
+                self.assertEqual(second["status"], "completed")
+                self.assertEqual(mocked.call_count, 1)
 
 
 if __name__ == "__main__":

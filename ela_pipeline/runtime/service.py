@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass, field
 import datetime as dt
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -22,13 +23,14 @@ from ela_pipeline.client_storage import LocalSQLiteRepository, build_sentence_ha
 
 from .capabilities import build_runtime_capabilities, resolve_deployment_mode, resolve_runtime_mode
 from .media_policy import MediaPolicyLimits, load_media_policy_limits_from_env
-from .media_pipeline import run_media_pipeline, translate_text_with_provider
+from .media_pipeline import MediaPipelineResult, run_media_pipeline, translate_text_with_provider
 from .media_submission import submit_media_for_processing
 from .ui_state import build_runtime_ui_state, build_submission_ui_feedback
 
 TRANSLATION_CONFIG_STATE_KEY = "translation_config"
 MEDIA_FILE_SETTINGS_PREFIX = "media_file_settings:"
 BACKEND_TRANSLATION_PROVIDER_KEY = "backend_m2m100"
+MEDIA_STAGE_MANIFEST_PREFIX = "media_stage_manifest:"
 
 
 def _normalize_provider_key(value: str | None) -> str:
@@ -417,6 +419,7 @@ class RuntimeMediaService:
         translation_provider: str | None = None,
         subtitles_mode: str | None = None,
         voice_choice: str | None = None,
+        force_full_reprocess: bool = False,
         async_local_processing: bool = False,
     ) -> dict[str, Any]:
         translation_cfg = self.get_translation_config()
@@ -487,6 +490,7 @@ class RuntimeMediaService:
                     provider_credentials=provider_credentials,
                     subtitles_mode=str(subtitles_mode or "bilingual"),
                     voice_choice=str(voice_choice or "male"),
+                    force_full_reprocess=bool(force_full_reprocess),
                 )
                 raw["job_id"] = job_id
                 raw["status"] = "accepted_local"
@@ -500,6 +504,7 @@ class RuntimeMediaService:
                     provider_credentials=provider_credentials,
                     subtitles_mode=str(subtitles_mode or "bilingual"),
                     voice_choice=str(voice_choice or "male"),
+                    force_full_reprocess=bool(force_full_reprocess),
                 )
                 raw["document_id"] = synced.get("document_id")
                 raw["status"] = "completed_local" if synced.get("status") == "completed" else raw.get("status")
@@ -728,6 +733,7 @@ class RuntimeMediaService:
         provider_credentials: dict[str, str] | None = None,
         subtitles_mode: str = "bilingual",
         voice_choice: str = "male",
+        force_full_reprocess: bool = False,
         document_id: str | None = None,
         stage_callback: Callable[[str, float | None, str | None], None] | None = None,
     ) -> dict[str, Any]:
@@ -746,31 +752,64 @@ class RuntimeMediaService:
                     "voice_choice": str(voice_choice or current_settings.get("voice_choice") or "male"),
                 },
             )
-        if stage_callback is not None:
+        effective_translation_provider = str(translation_provider or "").strip().lower() or "m2m100"
+        manifest_key = self._manifest_state_key(media_file_id=media_file_id, media_path=media_path)
+        media_signature = self._build_media_signature(media_path=media_path)
+        immutable_signature = self._build_immutable_signature(media_signature=media_signature)
+        variant_signature = self._build_variant_signature(
+            translation_provider=effective_translation_provider,
+            subtitles_mode=subtitles_mode,
+            voice_choice=voice_choice,
+        )
+        manifest_state = self.repo.get_workspace_state(manifest_key)
+        cached_document_id = ""
+        reused_immutable = False
+        pipeline: MediaPipelineResult | None = None
+        if isinstance(manifest_state, dict):
+            cached_document_id = str(manifest_state.get("last_document_id") or "").strip()
+        if not force_full_reprocess and cached_document_id and isinstance(manifest_state, dict):
+            manifest_immutable = manifest_state.get("immutable")
+            manifest_immutable_signature = ""
+            if isinstance(manifest_immutable, dict):
+                manifest_immutable_signature = str(manifest_immutable.get("signature") or "").strip()
+            if not manifest_immutable_signature:
+                manifest_immutable_signature = str(manifest_state.get("media_signature") or "").strip()
+            if manifest_immutable_signature == immutable_signature:
+                cached = self._load_cached_pipeline(document_id=cached_document_id)
+                if cached is not None:
+                    pipeline = cached
+                    reused_immutable = True
+                    if stage_callback is not None:
+                        stage_callback("loading_file", 1.0, "Cache hit: reused extracted text.")
+                        if cached.source_type in {"audio", "video"}:
+                            stage_callback("transcribing_audio", 1.0, "Cache hit: skipped transcription.")
+                        stage_callback("translating_text", 0.02, "Cache hit: reused sentence contracts.")
+        if stage_callback is not None and not reused_immutable:
             stage_callback("loading_file", 0.25, "Loading source file")
-        source_type = self._detect_source_type(media_path)
-        if source_type in {"audio", "video"} and stage_callback is not None:
+        source_type = pipeline.source_type if pipeline is not None else self._detect_source_type(media_path)
+        if source_type in {"audio", "video"} and stage_callback is not None and not reused_immutable:
             stage_callback("transcribing_audio", 0.05, "Preparing ASR")
-        try:
-            pipeline = run_media_pipeline(
-                source_path=media_path,
-                sentence_contract_builder=lambda *, sentence_text, sentence_idx: self._build_sentence_contract_from_backend_and_local_translation(
-                    sentence_text=sentence_text,
-                    sentence_idx=sentence_idx,
-                ),
-                progress_callback=stage_callback,
-            )
-        except Exception as exc:
-            return {
-                "job_id": None,
-                "status": "error",
-                "message": str(exc),
-            }
+        if pipeline is None:
+            try:
+                pipeline = run_media_pipeline(
+                    source_path=media_path,
+                    sentence_contract_builder=lambda *, sentence_text, sentence_idx: self._build_sentence_contract_from_backend_and_local_translation(
+                        sentence_text=sentence_text,
+                        sentence_idx=sentence_idx,
+                    ),
+                    progress_callback=stage_callback,
+                )
+            except Exception as exc:
+                return {
+                    "job_id": None,
+                    "status": "error",
+                    "message": str(exc),
+                }
 
         if stage_callback is not None:
             stage_callback("translating_text", 1.0, "Sentence contract build completed")
 
-        selected_provider = str(translation_provider or "").strip().lower()
+        selected_provider = effective_translation_provider
         if selected_provider and selected_provider not in {"m2m100", "our", "backend", "default"}:
             total = max(len(pipeline.media_sentences), 1)
             for idx, row in enumerate(pipeline.media_sentences):
@@ -839,6 +878,29 @@ class RuntimeMediaService:
             stage_callback("exporting_files", 1.0, "Artifacts exported")
         duration_ms = int((time.monotonic() - started) * 1000)
         self.repo.update_document_status(document_id, "completed", processing_duration_ms=duration_ms)
+        manifest_payload = {
+            "schema_version": 1,
+            "media_signature": media_signature,
+            "last_document_id": document_id,
+            "immutable": {
+                "signature": immutable_signature,
+                "source_type": pipeline.source_type,
+                "text_hash": pipeline.text_hash,
+                "media_sentences_count": len(pipeline.media_sentences),
+                "contract_sentences_count": len(pipeline.contract_sentences),
+            },
+            "variant": {
+                "signature": variant_signature,
+                "translation_provider": selected_provider,
+                "subtitles_mode": str(subtitles_mode or "bilingual"),
+                "voice_choice": str(voice_choice or "male"),
+            },
+            "reused_immutable_last_run": reused_immutable,
+            "force_full_reprocess_last_run": bool(force_full_reprocess),
+            "last_completed_at": dt.datetime.utcnow().isoformat() + "Z",
+        }
+        self.repo.set_workspace_state(manifest_key, manifest_payload)
+        self._persist_stage_manifest_artifact(document_id=document_id, manifest=manifest_payload)
         return {
             "job_id": None,
             "status": "completed",
@@ -849,6 +911,14 @@ class RuntimeMediaService:
             "linked_sentences_count": len(pipeline.media_sentences),
             "message": "Local media processed and synced.",
         }
+
+    def _persist_stage_manifest_artifact(self, *, document_id: str, manifest: dict[str, Any]) -> None:
+        doc_dir = self._doc_artifacts_dir(document_id=document_id)
+        doc_dir.mkdir(parents=True, exist_ok=True)
+        (doc_dir / "stage_manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
 
     @staticmethod
     def _detect_source_type(media_path: str) -> str:
@@ -862,6 +932,77 @@ class RuntimeMediaService:
         if suffix in {".mp4", ".mkv", ".mov", ".avi", ".webm"}:
             return "video"
         return "text"
+
+    @staticmethod
+    def _manifest_state_key(*, media_file_id: str | None, media_path: str) -> str:
+        if media_file_id:
+            return f"{MEDIA_STAGE_MANIFEST_PREFIX}file:{media_file_id}"
+        digest = hashlib.sha256(str(media_path).encode("utf-8")).hexdigest()[:16]
+        return f"{MEDIA_STAGE_MANIFEST_PREFIX}path:{digest}"
+
+    @staticmethod
+    def _build_media_signature(*, media_path: str) -> str:
+        path = Path(media_path)
+        if not path.exists():
+            return f"missing:{media_path}"
+        stat = path.stat()
+        payload = f"{path.resolve()}|{stat.st_size}|{stat.st_mtime_ns}"
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _build_immutable_signature(*, media_signature: str) -> str:
+        asr_model = str(os.getenv("ELA_MEDIA_ASR_MODEL", "base")).strip().lower() or "base"
+        asr_lang = str(os.getenv("ELA_MEDIA_ASR_SOURCE_LANG", "en")).strip().lower() or "en"
+        backend_url = str(os.getenv("ELA_SENTENCE_CONTRACT_BACKEND_URL", "")).strip().lower()
+        payload = f"{media_signature}|{asr_model}|{asr_lang}|{backend_url}"
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _build_variant_signature(
+        *,
+        translation_provider: str | None,
+        subtitles_mode: str,
+        voice_choice: str,
+    ) -> str:
+        provider = str(translation_provider or "").strip().lower() or "m2m100"
+        subs = str(subtitles_mode or "bilingual").strip().lower()
+        voice = str(voice_choice or "male").strip().lower()
+        return f"{provider}|{subs}|{voice}"
+
+    @staticmethod
+    def _doc_artifacts_dir(*, document_id: str) -> Path:
+        base = Path(os.getenv("MEDIA_CONTRACT_ARTIFACTS_DIR", "artifacts/media_contracts"))
+        return base / document_id
+
+    def _load_cached_pipeline(self, *, document_id: str) -> MediaPipelineResult | None:
+        doc_dir = self._doc_artifacts_dir(document_id=document_id)
+        full_text_path = doc_dir / "full_text.txt"
+        media_contract_path = doc_dir / "media_contract.json"
+        contract_sentences_path = doc_dir / "contract_sentences.json"
+        if not (full_text_path.exists() and media_contract_path.exists() and contract_sentences_path.exists()):
+            return None
+        try:
+            full_text = full_text_path.read_text(encoding="utf-8")
+            media_contract = json.loads(media_contract_path.read_text(encoding="utf-8"))
+            contract_sentences = json.loads(contract_sentences_path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+        media_sentences = media_contract.get("media_sentences")
+        if not isinstance(media_sentences, list) or not isinstance(contract_sentences, list):
+            return None
+        source_type = str(media_contract.get("source_type") or "").strip() or self._detect_source_type(
+            str(media_contract.get("source_path") or "")
+        )
+        text_hash = str(media_contract.get("text_hash") or "").strip()
+        if not text_hash:
+            text_hash = hashlib.sha256(full_text.encode("utf-8")).hexdigest()
+        return MediaPipelineResult(
+            source_type=source_type,
+            full_text=full_text,
+            text_hash=text_hash,
+            media_sentences=media_sentences,
+            contract_sentences=contract_sentences,
+        )
 
     @staticmethod
     def _stage_progress(stage_name: str, ratio: float | None = None) -> list[int]:
@@ -946,6 +1087,7 @@ class RuntimeMediaService:
         provider_credentials: dict[str, str] | None,
         subtitles_mode: str,
         voice_choice: str,
+        force_full_reprocess: bool,
     ) -> str:
         job_id = f"local-{uuid.uuid4().hex[:12]}"
         self._set_local_job_state(
@@ -966,6 +1108,7 @@ class RuntimeMediaService:
                     provider_credentials=provider_credentials,
                     subtitles_mode=subtitles_mode,
                     voice_choice=voice_choice,
+                    force_full_reprocess=force_full_reprocess,
                     document_id=document_id,
                     stage_callback=lambda stage, ratio, log_line: self._set_local_job_state(
                         job_id=job_id,

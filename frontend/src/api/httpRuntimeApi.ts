@@ -89,6 +89,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     translationProvider?: string
     subtitlesMode?: string
     voiceChoice?: string
+    forceFullReprocess?: boolean
   }): Promise<MediaSubmissionPayload> {
     return requestJson<MediaSubmissionPayload>('/api/submit-media', {
       method: 'POST',

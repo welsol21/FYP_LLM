@@ -250,6 +250,7 @@ export class MockRuntimeApi implements RuntimeApi {
     translationProvider?: string
     subtitlesMode?: string
     voiceChoice?: string
+    forceFullReprocess?: boolean
   }): Promise<MediaSubmissionPayload> {
     if (!input.projectId) {
       return {

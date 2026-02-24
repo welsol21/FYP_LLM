@@ -177,6 +177,7 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                     translation_provider=body.get("translationProvider"),
                     subtitles_mode=body.get("subtitlesMode"),
                     voice_choice=body.get("voiceChoice"),
+                    force_full_reprocess=bool(body.get("forceFullReprocess")),
                     async_local_processing=True,
                 )
             except ValueError as exc:
