@@ -548,6 +548,27 @@ button {
   margin-bottom: 8px;
 }
 
+.lv-more-translations {
+  display: grid;
+  gap: 6px;
+}
+
+.lv-more-translations-toggle {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  background: #101723;
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 6px 10px;
+  width: fit-content;
+}
+
+.lv-more-translations-list {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+}
+
 .lv-children-col {
   margin-left: 12px;
   padding-left: 12px;

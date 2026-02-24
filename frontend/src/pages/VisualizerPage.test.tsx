@@ -207,5 +207,9 @@ describe('VisualizerPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Backend translation')).toBeInTheDocument()
     })
+    expect(screen.getByRole('button', { name: 'More translations (1)' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'More translations (1)' }))
+    expect(screen.getByText('gpt:')).toBeInTheDocument()
+    expect(screen.getByText('GPT translation')).toBeInTheDocument()
   })
 })

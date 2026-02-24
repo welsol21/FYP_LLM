@@ -4,7 +4,7 @@ import { useApi } from '../api/apiContext'
 import type { VisualizerNode, VisualizerPayload } from '../api/runtimeApi'
 import { resolveNodeTranslation } from '../lib/translationContract'
 
-type VocabRow = {
+export type VocabRow = {
   id: string
   project: string
   file: string
@@ -15,7 +15,7 @@ type VocabRow = {
   translationProvider: string
 }
 
-type ExportRow = {
+export type ExportRow = {
   project: string
   file: string
   created: string
@@ -61,7 +61,7 @@ function parseTranslationProvider(settings: string): string {
   return match?.[1]?.trim().toLowerCase() || 'backend_m2m100'
 }
 
-function toExportRows(row: VocabRow): ExportRow[] {
+export function toExportRows(row: VocabRow): ExportRow[] {
   if (!row.payload || !row.documentId) return []
   const out: ExportRow[] = []
   for (const [sentence, root] of Object.entries(row.payload)) {

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { VisualizerNode } from '../api/runtimeApi'
-import { resolveNodeTranslation } from '../lib/translationContract'
+import { listAlternativeTranslations, resolveNodeTranslation } from '../lib/translationContract'
 
 const colorMap: Record<string, string> = {
   sentence: '#fdf6e3',
@@ -165,6 +165,11 @@ export function VisualizerTreeLegacy({
     ? node.linguistic_notes.join(' ')
     : (node.notes?.map((note) => note?.text?.trim()).filter(Boolean).join(' ') || '-')
   const translationText = resolveNodeTranslation(node, preferredTranslationProvider)
+  const alternativeTranslations = useMemo(
+    () => listAlternativeTranslations(node, preferredTranslationProvider),
+    [node, preferredTranslationProvider],
+  )
+  const [showMoreTranslations, setShowMoreTranslations] = useState(false)
   const phoneticText =
     node.phonetic?.uk || node.phonetic?.us
       ? `${node.phonetic?.uk ? `UK /${node.phonetic.uk}/` : ''}${node.phonetic?.uk && node.phonetic?.us ? ' | ' : ''}${node.phonetic?.us ? `US /${node.phonetic.us}/` : ''}`
@@ -212,6 +217,26 @@ export function VisualizerTreeLegacy({
         <div><strong>Tense:</strong> {tenseText}</div>
         <div><strong>Linguistic Notes:</strong> {notesText}</div>
         <div><strong>Translation:</strong> {translationText}</div>
+        {alternativeTranslations.length > 0 ? (
+          <div className="lv-more-translations">
+            <button
+              type="button"
+              className="lv-more-translations-toggle"
+              onClick={() => setShowMoreTranslations((prev) => !prev)}
+            >
+              {showMoreTranslations ? 'Hide more translations' : `More translations (${alternativeTranslations.length})`}
+            </button>
+            {showMoreTranslations ? (
+              <div className="lv-more-translations-list">
+                {alternativeTranslations.map((item) => (
+                  <div key={`${node.node_id}-${item.provider}`}>
+                    <strong>{item.provider}:</strong> {item.text}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div><strong>Phonetic:</strong> {phoneticText}</div>
       </div>
 

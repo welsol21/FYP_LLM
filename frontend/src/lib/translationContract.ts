@@ -30,3 +30,32 @@ export function resolveNodeTranslation(
   const legacy = String(node.translation?.text || '').trim()
   return legacy || '-'
 }
+
+export type TranslationVariant = {
+  provider: string
+  text: string
+}
+
+export function listAlternativeTranslations(
+  node: VisualizerNode,
+  preferredProvider?: string,
+  canonicalProvider: string = DEFAULT_CANONICAL_PROVIDER,
+): TranslationVariant[] {
+  const translations = node.translations
+  if (!translations || typeof translations !== 'object') return []
+  const preferredKey = normalizeProviderKey(preferredProvider || node.active_translation_provider)
+  const canonicalKey = normalizeProviderKey(canonicalProvider)
+  let selectedKey = preferredKey
+  if (!selectedKey || !translations[selectedKey] || !String(translations[selectedKey]?.text || '').trim()) {
+    selectedKey = canonicalKey
+  }
+  const out: TranslationVariant[] = []
+  for (const [provider, row] of Object.entries(translations)) {
+    const key = normalizeProviderKey(provider)
+    const text = String(row?.text || '').trim()
+    if (!text) continue
+    if (key === selectedKey) continue
+    out.push({ provider: key || provider, text })
+  }
+  return out
+}

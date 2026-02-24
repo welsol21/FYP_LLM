@@ -1,4 +1,4 @@
-import { resolveNodeTranslation } from './translationContract'
+import { listAlternativeTranslations, resolveNodeTranslation } from './translationContract'
 import type { VisualizerNode } from '../api/runtimeApi'
 
 function baseNode(): VisualizerNode {
@@ -58,5 +58,21 @@ describe('resolveNodeTranslation', () => {
       translation: { text: 'Legacy translation' },
     }
     expect(resolveNodeTranslation(node, 'deepl')).toBe('DeepL translation')
+  })
+
+  it('lists alternative translations except active one', () => {
+    const node: VisualizerNode = {
+      ...baseNode(),
+      active_translation_provider: 'gpt',
+      translations: {
+        backend_m2m100: { text: 'Backend translation' },
+        gpt: { text: 'GPT translation' },
+        deepl: { text: 'DeepL translation' },
+      },
+    }
+    expect(listAlternativeTranslations(node)).toEqual([
+      { provider: 'backend_m2m100', text: 'Backend translation' },
+      { provider: 'deepl', text: 'DeepL translation' },
+    ])
   })
 })
