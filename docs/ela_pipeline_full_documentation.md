@@ -577,3 +577,25 @@ Main tested areas:
 - `docs/implementation_proposal.md`
 - `docs/sample.json`
 - `docs/TZ_ELA_Linguistic_Notes_Pipeline.docx`
+
+## 9. Backend Rebuild Roadmap (Grammar Curriculum Classifier)
+
+Current quality direction for linguistic notes:
+- switch from free-form note generation to `classification -> controlled generation`.
+- use tense-table curriculum as core and phase rollout by CEFR ladder.
+
+Phases:
+1. `A1 -> A2 -> B1`
+2. `B2`
+3. `C1 -> C2`
+
+Gate policy:
+- next phase starts only after repeated-pass quality runs for previous phase.
+
+Desktop-capacity time estimates:
+- Phase 1 (`A1-A2-B1`):
+  - MVP: `1.5-2.5 weeks`
+  - stable quality: `3-4 weeks`
+- Phase 2 (`B2`): `1-2.5 weeks`
+- Phase 3 (`C1-C2`): `2-4 weeks`
+- Full ladder target (`A1-C2`): typically `6-10 weeks` depending on gate failures and repair loops.

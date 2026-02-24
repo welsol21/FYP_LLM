@@ -4,6 +4,41 @@
 
 - [x] Use project virtualenv for all commands: prefer `.venv/bin/python -m ...` (or `.venv/bin/pip ...`), avoid plain `python`.
 
+## Backend Rebuild: Grammar Curriculum Classifier (New)
+
+- [ ] Adopt classifier-first note pipeline (`classification -> controlled generation`) as backend default.
+- [ ] Use English tense table as curriculum core for initial grammar classes.
+- [ ] Enforce per-class CEFR ladder: `A1 -> A2 -> B1 -> B2 -> C1 -> C2`.
+- [ ] Implement phased rollout:
+  - [ ] Phase 1: `A1 -> A2 -> B1`
+  - [ ] Phase 2: `B2`
+  - [ ] Phase 3: `C1 -> C2`
+  - [ ] Gate rule: start next phase only after repeated-pass quality runs in previous phase.
+  - [ ] Track and publish phase time estimates in summary:
+    - [ ] Phase 1: MVP `1.5-2.5 weeks`, stable `3-4 weeks`
+    - [ ] Phase 2: `1-2.5 weeks`
+    - [ ] Phase 3: `2-4 weeks`
+    - [ ] Full ladder target: `6-10 weeks`
+- [ ] Implement many-to-many grammar classes in contract for `Sentence`/`Phrase` nodes (`grammar_classes[]`).
+- [ ] Build grammar KB in three pedagogical bands:
+  - [ ] Elementary (`A1-A2`)
+  - [ ] Intermediate (`B1-B2`)
+  - [ ] Advanced (`C1-C2`)
+- [ ] Add scalable spaCy enrichment stage for KB examples (token/lemma/POS/morph/dep/head + derived TAM features).
+- [ ] Add stage quality gates with retry policy:
+  - [ ] KB generation gate
+  - [ ] spaCy enrichment gate
+  - [ ] classifier gate
+  - [ ] contract gate
+  - [ ] NLG gate
+- [ ] Add quality loop telemetry storage:
+  - [ ] `quality_events`
+  - [ ] `repair_actions`
+- [ ] Add TDD suite for each stage and gate failure/retry behavior.
+- [ ] Keep T5 in constrained role: generate note text only, never overwrite classifier truth fields.
+- [ ] Track note generator provenance in contract (`note_generator_version`).
+- [ ] Document and run iterative improvement loop until all gates pass for repeated runs.
+
 ## Media Pipeline Integration (ELA Bridge, Current)
 
 - [x] Switch architecture to **client-only media analysis** (no backend media processing queue).
