@@ -385,7 +385,8 @@
 
 - [x] Fix and document next-stage product scope in `docs/next_stage_product_spec_2026-02-17.md`.
 - [x] Fix legacy feature source mapping (`feature -> source project -> source files`) in `docs/legacy_feature_source_map_2026-02-17.md`.
-- [ ] Reuse ELA `main_menu` UX as canonical navigation baseline (no full redesign from scratch).
+- [x] Reuse ELA `main_menu` UX as canonical navigation baseline (no full redesign from scratch).
+  - [x] Marked as **obsolete**: baseline has already been adopted in current React flow (`Projects -> Files -> Analyze -> Vocabulary -> Visualizer`) and further work is tracked as incremental UX polish, not a separate migration epic.
 - [x] Build frontend migration map screen-by-screen (`Projects -> Files -> Analyze -> Vocabulary`) and bind to current backend contracts.
   - [x] Documented in `docs/ui_migration_map_2026-02-17.md`.
 - [x] Implement local client persistence (SQLite) for projects/files/local edits/workspace state.
@@ -402,23 +403,20 @@
   - [x] Visual UI components to render this payload in frontend screens.
     - [x] React component `RuntimeStatusCard` added (badges + disabled reasons).
     - [x] React page `AnalyzePage` renders runtime payload + feedback block.
-- [ ] Enforce media routing policy:
+- [ ] Enforce **client-only** media routing policy (no backend media queue):
   - [x] Runtime policy engine added (`ela_pipeline/runtime/media_policy.py`) with decision routes: `local|backend|reject`.
-  - [x] local processing for files <= 15 minutes (policy decision path implemented).
-  - [x] backend async job path for files > 15 minutes (policy decision path implemented, requires backend_jobs capability).
-  - [x] Backend orchestration base added:
-    - [x] `ela_pipeline/runtime/media_orchestrator.py` (execution plan: `run_local|enqueue_backend|reject`)
-    - [x] local SQLite backend job queue in `ela_pipeline/client_storage/sqlite_repository.py` (`backend_jobs` table + CRUD methods)
-    - [x] submission helper added: `ela_pipeline/runtime/media_submission.py` (single entrypoint for Start action)
+  - [x] local processing for files <= policy limits (duration/size).
+  - [x] reject path for files above limits with explicit reason in UI.
+  - [x] Legacy backend media queue plan marked **replaced** by client-only processing model.
   - [x] UI payload adapters added for route/status and user-facing messages (`ela_pipeline/runtime/ui_state.py`).
   - [x] Service-level wiring for Start action added (`RuntimeMediaService.submit_media`).
-  - [x] Visual UI wiring to consume orchestration payload and show route/status in interface.
+  - [x] Visual UI wiring to consume routing payload and show route/status in interface.
     - [x] React `MediaSubmitForm` wired to API submit.
     - [x] UI feedback severity/title/message rendered from `ui_feedback`.
-    - [x] Backend job list rendered in `BackendJobsTable`.
-- [ ] Add media file size limits for both paths (configurable env/runtime thresholds):
-  - [x] reject local jobs above `MEDIA_MAX_SIZE_LOCAL_MB` (policy routes to backend/reject).
-  - [x] reject backend jobs above `MEDIA_MAX_SIZE_BACKEND_MB`.
+    - [x] Legacy `BackendJobsTable` requirement marked **obsolete** and removed from active UI.
+- [x] Add media file size limits for both paths (configurable env/runtime thresholds):
+  - [x] Marked as **obsolete wording** (“both paths”): current architecture has one processing path (client-local) + reject policy.
+  - [x] reject local jobs above `MEDIA_MAX_SIZE_LOCAL_MB`.
   - [x] fail-fast validation message includes actual duration/size and active limits.
   - [x] CLI validation hook added in inference runner (`--media-duration-sec` + `--media-size-bytes`).
 - [x] Implement backend temporary media retention policy (TTL cleanup, no permanent storage of user final media).
@@ -445,7 +443,7 @@
     - [x] `"null" -> null` TAM normalization
     - [x] missing `linguistic_elements` normalization
   - [x] Added tests: `tests/test_legacy_contract_adapter.py`.
-- [ ] Integrate legacy visualizer and editor features into the new app flow (without model duplication).
+- [x] Integrate legacy visualizer and editor features into the new app flow (without model duplication).
   - [x] Added bridge module: `ela_pipeline/legacy_bridge/visualizer_editor.py`.
   - [x] Added visualizer payload builders:
     - [x] `build_visualizer_payload(...)`
