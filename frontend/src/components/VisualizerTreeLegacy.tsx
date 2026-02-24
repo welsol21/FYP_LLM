@@ -139,6 +139,7 @@ type Props = {
   level?: number
   selectedNodeId?: string
   preferredTranslationProvider?: string
+  showAllTranslations?: boolean
   onNodeSelect?: (node: VisualizerNode) => void
 }
 
@@ -148,6 +149,7 @@ export function VisualizerTreeLegacy({
   level = 0,
   selectedNodeId,
   preferredTranslationProvider,
+  showAllTranslations = false,
   onNodeSelect,
 }: Props) {
   const [childrenOpen, setChildrenOpen] = useState(false)
@@ -170,6 +172,7 @@ export function VisualizerTreeLegacy({
     [node, preferredTranslationProvider],
   )
   const [showMoreTranslations, setShowMoreTranslations] = useState(false)
+  const showAlternativeTranslations = showAllTranslations || showMoreTranslations
   const phoneticText =
     node.phonetic?.uk || node.phonetic?.us
       ? `${node.phonetic?.uk ? `UK /${node.phonetic.uk}/` : ''}${node.phonetic?.uk && node.phonetic?.us ? ' | ' : ''}${node.phonetic?.us ? `US /${node.phonetic.us}/` : ''}`
@@ -219,14 +222,16 @@ export function VisualizerTreeLegacy({
         <div><strong>Translation:</strong> {translationText}</div>
         {alternativeTranslations.length > 0 ? (
           <div className="lv-more-translations">
-            <button
-              type="button"
-              className="lv-more-translations-toggle"
-              onClick={() => setShowMoreTranslations((prev) => !prev)}
-            >
-              {showMoreTranslations ? 'Hide more translations' : `More translations (${alternativeTranslations.length})`}
-            </button>
-            {showMoreTranslations ? (
+            {!showAllTranslations ? (
+              <button
+                type="button"
+                className="lv-more-translations-toggle"
+                onClick={() => setShowMoreTranslations((prev) => !prev)}
+              >
+                {showMoreTranslations ? 'Hide more translations' : `More translations (${alternativeTranslations.length})`}
+              </button>
+            ) : null}
+            {showAlternativeTranslations ? (
               <div className="lv-more-translations-list">
                 {alternativeTranslations.map((item) => (
                   <div key={`${node.node_id}-${item.provider}`}>
@@ -249,6 +254,7 @@ export function VisualizerTreeLegacy({
                 level={level + 1}
                 selectedNodeId={selectedNodeId}
                 preferredTranslationProvider={preferredTranslationProvider}
+                showAllTranslations={showAllTranslations}
                 onNodeSelect={onNodeSelect}
               />
             </div>

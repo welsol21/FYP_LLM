@@ -238,6 +238,7 @@ export function VisualizerPage() {
   const [newValue, setNewValue] = useState('')
   const [editStatus, setEditStatus] = useState('')
   const [selectedTranslationProvider, setSelectedTranslationProvider] = useState('backend_m2m100')
+  const [showAllTranslations, setShowAllTranslations] = useState(false)
 
   async function refresh() {
     const payload = await api.getVisualizerPayload(documentId)
@@ -484,18 +485,36 @@ export function VisualizerPage() {
         </form>
         <section className="card">
           <div className="analyze-grid" style={{ marginBottom: 12 }}>
-            <label className="analyze-label" htmlFor="visualizer-translation-provider">Translation provider</label>
-            <select
-              id="visualizer-translation-provider"
-              value={selectedTranslationProvider}
-              onChange={(e) => setSelectedTranslationProvider(e.target.value)}
-            >
+            <label className="analyze-label">Translation provider</label>
+            <div className="touch-options-grid translation-provider-options">
               {translationProviderOptions.map((provider) => (
-                <option key={provider} value={provider}>
+                <button
+                  key={provider}
+                  type="button"
+                  className={`touch-option-btn ${selectedTranslationProvider === provider ? 'active' : ''}`}
+                  onClick={() => setSelectedTranslationProvider(provider)}
+                >
                   {provider}
-                </option>
+                </button>
               ))}
-            </select>
+            </div>
+            <label className="analyze-label">Translations view</label>
+            <div className="touch-options-grid translation-view-options">
+              <button
+                type="button"
+                className={`touch-option-btn ${!showAllTranslations ? 'active' : ''}`}
+                onClick={() => setShowAllTranslations(false)}
+              >
+                Active only
+              </button>
+              <button
+                type="button"
+                className={`touch-option-btn ${showAllTranslations ? 'active' : ''}`}
+                onClick={() => setShowAllTranslations(true)}
+              >
+                All translations
+              </button>
+            </div>
           </div>
           <div className="sentence-nav">
             <button type="button" onClick={() => setActiveSentenceIndex((v) => Math.max(0, v - 1))} disabled={!hasPrev}>
@@ -519,6 +538,7 @@ export function VisualizerPage() {
                 isRoot
                 selectedNodeId={nodeId}
                 preferredTranslationProvider={selectedTranslationProvider}
+                showAllTranslations={showAllTranslations}
                 onNodeSelect={onSelectNode}
               />
             </article>

@@ -46,6 +46,9 @@ describe('VisualizerPage', () => {
         tense: 'null',
         linguistic_notes: [],
         part_of_speech: 'sentence',
+        translations: {
+          backend_m2m100: { text: 'Sentence one.' },
+        },
         linguistic_elements: [],
       },
       'Sentence two.': {
@@ -55,6 +58,9 @@ describe('VisualizerPage', () => {
         tense: 'null',
         linguistic_notes: [],
         part_of_speech: 'sentence',
+        translations: {
+          backend_m2m100: { text: 'Sentence two.' },
+        },
         linguistic_elements: [],
       },
     }
@@ -113,20 +119,20 @@ describe('VisualizerPage', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Sentence one.')).toBeInTheDocument()
+      expect(screen.getAllByText('Sentence one.').length).toBeGreaterThan(0)
     })
     expect(getVisualizerPayload).toHaveBeenCalledWith('doc-42')
     expect(screen.getByText('1 / 2')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     await waitFor(() => {
-      expect(screen.getByText('Sentence two.')).toBeInTheDocument()
+      expect(screen.getAllByText('Sentence two.').length).toBeGreaterThan(0)
     })
     expect(screen.getByText('2 / 2')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Prev' }))
     await waitFor(() => {
-      expect(screen.getByText('Sentence one.')).toBeInTheDocument()
+      expect(screen.getAllByText('Sentence one.').length).toBeGreaterThan(0)
     })
     expect(screen.getByText('1 / 2')).toBeInTheDocument()
   })
@@ -201,8 +207,7 @@ describe('VisualizerPage', () => {
     await waitFor(() => {
       expect(screen.getByText('GPT translation')).toBeInTheDocument()
     })
-    const providerSelect = screen.getByLabelText('Translation provider')
-    fireEvent.change(providerSelect, { target: { value: 'backend_m2m100' } })
+    fireEvent.click(screen.getByRole('button', { name: 'backend_m2m100' }))
     await waitFor(() => {
       expect(screen.getByText('Backend translation')).toBeInTheDocument()
     })

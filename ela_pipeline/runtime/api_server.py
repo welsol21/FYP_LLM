@@ -23,11 +23,62 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    value = str(raw).strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
 SERVICE = RuntimeMediaService(
     db_path=os.getenv("ELA_CLIENT_DB_PATH", "artifacts/client_state.sqlite3"),
     runtime_mode=os.getenv("ELA_RUNTIME_MODE", "auto"),
     deployment_mode=os.getenv("ELA_DEPLOYMENT_MODE", "auto"),
 )
+
+
+def _build_sentence_contract_payload(sentence_text: str, sentence_idx: int) -> dict:
+    return SERVICE.build_sentence_contract(
+        sentence_text=sentence_text,
+        sentence_idx=sentence_idx,
+        note_mode="template_only",
+        validation_mode="v2_strict",
+        enable_translation=True,
+        translation_model="artifacts/models/m2m100_418M",
+        translation_source_lang="en",
+        translation_target_lang="ru",
+        translation_device="cpu",
+        enable_phonetic=True,
+        phonetic_binary="auto",
+        enable_synonyms=False,
+        synonyms_top_k=5,
+        enable_cefr=True,
+        cefr_provider="rule",
+        cefr_model_path="artifacts/models/t5_cefr/best_model",
+    )
+
+
+def _run_sentence_contract_warmup() -> None:
+    if not _env_bool("ELA_SENTENCE_CONTRACT_WARMUP", True):
+        print("[runtime-api] sentence-contract warmup disabled", flush=True)
+        return
+    warmup_text = str(
+        os.getenv(
+            "ELA_SENTENCE_CONTRACT_WARMUP_TEXT",
+            "She should have trusted her instincts before making the decision.",
+        )
+    ).strip()
+    if not warmup_text:
+        print("[runtime-api] sentence-contract warmup skipped: empty warmup text", flush=True)
+        return
+    print("[runtime-api] sentence-contract warmup started", flush=True)
+    try:
+        _build_sentence_contract_payload(warmup_text, 0)
+        print("[runtime-api] sentence-contract warmup completed", flush=True)
+    except Exception as exc:
+        # Keep API boot alive even if warmup failed; requests will return runtime error details.
+        print(f"[runtime-api] sentence-contract warmup failed: {exc}", flush=True)
 
 
 class RuntimeApiHandler(BaseHTTPRequestHandler):
@@ -269,24 +320,7 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": "sentenceIdx must be an integer"}, status=400)
                 return
             try:
-                payload = SERVICE.build_sentence_contract(
-                    sentence_text=sentence_text,
-                    sentence_idx=sentence_idx,
-                    note_mode="template_only",
-                    validation_mode="v2_strict",
-                    enable_translation=True,
-                    translation_model="artifacts/models/m2m100_418M",
-                    translation_source_lang="en",
-                    translation_target_lang="ru",
-                    translation_device="cpu",
-                    enable_phonetic=True,
-                    phonetic_binary="auto",
-                    enable_synonyms=False,
-                    synonyms_top_k=5,
-                    enable_cefr=True,
-                    cefr_provider="rule",
-                    cefr_model_path="artifacts/models/t5_cefr/best_model",
-                )
+                payload = _build_sentence_contract_payload(sentence_text, sentence_idx)
             except Exception as exc:
                 self._send_json({"error": str(exc)}, status=400)
                 return
@@ -299,6 +333,7 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
 def main() -> None:
     host = os.getenv("ELA_RUNTIME_HTTP_HOST", "0.0.0.0")
     port = _env_int("ELA_RUNTIME_HTTP_PORT", 8000)
+    _run_sentence_contract_warmup()
     server = ThreadingHTTPServer((host, port), RuntimeApiHandler)
     print(f"[runtime-api] serving on http://{host}:{port}", flush=True)
     server.serve_forever()

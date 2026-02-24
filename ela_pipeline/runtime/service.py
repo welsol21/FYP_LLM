@@ -15,7 +15,7 @@ import tempfile
 import threading
 import time
 import uuid
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 from urllib import error as urlerror
 from urllib import request as urlrequest
 
@@ -314,6 +314,12 @@ class RuntimeMediaService:
         self.caps = build_runtime_capabilities(self.effective_mode, deployment_mode=self.effective_deployment_mode)
         self.limits = self.limits or load_media_policy_limits_from_env()
         self.sentence_contract_backend_url = os.getenv("ELA_SENTENCE_CONTRACT_BACKEND_URL", "").strip()
+        raw_timeout = str(os.getenv("ELA_SENTENCE_CONTRACT_TIMEOUT_SEC", "300")).strip()
+        try:
+            timeout_sec = int(raw_timeout)
+        except ValueError:
+            timeout_sec = 300
+        self.sentence_contract_timeout_sec = max(5, timeout_sec)
 
     def get_ui_state(self) -> dict[str, Any]:
         return build_runtime_ui_state(self.caps)
@@ -793,7 +799,8 @@ class RuntimeMediaService:
 
         selected_provider = effective_translation_provider
         if selected_provider and selected_provider not in {"m2m100", "our", "backend", "default"}:
-            total = max(len(pipeline.media_sentences), 1)
+            normalized_selected_provider = _normalize_provider_key(selected_provider) or "overlay_provider"
+            sentence_total = max(len(pipeline.media_sentences), 1)
             for idx, row in enumerate(pipeline.media_sentences):
                 source_text = str(row.get("sentence_text") or "").strip()
                 translated = translate_text_with_provider(
@@ -805,9 +812,37 @@ class RuntimeMediaService:
                 if stage_callback is not None:
                     stage_callback(
                         "translating_text",
-                        (idx + 1) / total,
-                        f"Overlay translation {idx + 1}/{total} via {selected_provider}",
+                        (idx + 1) / sentence_total,
+                        f"Overlay sentence translation {idx + 1}/{sentence_total} via {selected_provider}",
                     )
+
+            node_total = sum(
+                self._count_nodes_recursive(row.get("sentence_node"))
+                for row in pipeline.contract_sentences
+                if isinstance(row.get("sentence_node"), dict)
+            )
+            node_total = max(node_total, 1)
+            node_done = 0
+            node_cache: dict[str, str] = {}
+            for row in pipeline.contract_sentences:
+                root = row.get("sentence_node")
+                if not isinstance(root, dict):
+                    continue
+                for node in self._iter_nodes_recursive(root):
+                    node_done += 1
+                    self._overlay_translation_on_node(
+                        node=node,
+                        provider_key=normalized_selected_provider,
+                        provider_name=selected_provider,
+                        provider_credentials=provider_credentials,
+                        cache=node_cache,
+                    )
+                    if stage_callback is not None:
+                        stage_callback(
+                            "translating_text",
+                            min(1.0, node_done / node_total),
+                            f"Overlay node translation {node_done}/{node_total} via {selected_provider}",
+                        )
 
         document_id = document_id or f"doc-{uuid.uuid4().hex[:12]}"
         existing_doc = self.repo.get_document(document_id)
@@ -901,6 +936,60 @@ class RuntimeMediaService:
             json.dumps(manifest, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
+
+    @staticmethod
+    def _iter_nodes_recursive(root: dict[str, Any]) -> Iterable[dict[str, Any]]:
+        stack: list[dict[str, Any]] = [root]
+        while stack:
+            node = stack.pop()
+            if not isinstance(node, dict):
+                continue
+            yield node
+            children = node.get("linguistic_elements")
+            if isinstance(children, list):
+                for child in reversed(children):
+                    if isinstance(child, dict):
+                        stack.append(child)
+
+    @classmethod
+    def _count_nodes_recursive(cls, root: Any) -> int:
+        if not isinstance(root, dict):
+            return 0
+        return sum(1 for _ in cls._iter_nodes_recursive(root))
+
+    def _overlay_translation_on_node(
+        self,
+        *,
+        node: dict[str, Any],
+        provider_key: str,
+        provider_name: str,
+        provider_credentials: dict[str, str] | None,
+        cache: dict[str, str],
+    ) -> None:
+        content = str(node.get("content") or "").strip()
+        if not content:
+            return
+        cache_key = content.casefold()
+        translated = cache.get(cache_key)
+        if translated is None:
+            translated = translate_text_with_provider(
+                text=content,
+                translation_provider=provider_name,
+                provider_credentials=provider_credentials,
+            )
+            cache[cache_key] = translated
+        _ensure_node_translations_map(node, canonical_provider=BACKEND_TRANSLATION_PROVIDER_KEY)
+        translations = node.get("translations")
+        if not isinstance(translations, dict):
+            translations = {}
+            node["translations"] = translations
+        translations[provider_key] = {
+            "text": translated,
+            "source_lang": "en",
+            "target_lang": "ru",
+            "origin": "client_overlay",
+        }
+        node["active_translation_provider"] = provider_key
 
     @staticmethod
     def _detect_source_type(media_path: str) -> str:
@@ -1568,8 +1657,12 @@ class RuntimeMediaService:
         req = urlrequest.Request(endpoint, data=payload, method="POST")
         req.add_header("Content-Type", "application/json")
         try:
-            with urlrequest.urlopen(req, timeout=30) as resp:  # nosec B310
+            with urlrequest.urlopen(req, timeout=self.sentence_contract_timeout_sec) as resp:  # nosec B310
                 raw = resp.read().decode("utf-8")
+        except TimeoutError as exc:
+            raise RuntimeError(
+                f"Backend sentence-contract API timeout after {self.sentence_contract_timeout_sec}s: {endpoint}"
+            ) from exc
         except urlerror.HTTPError as exc:
             body = ""
             try:
@@ -1580,7 +1673,7 @@ class RuntimeMediaService:
             if body:
                 message = f"{message}; body={body}"
             raise RuntimeError(message) from exc
-        except (urlerror.URLError, TimeoutError, OSError) as exc:
+        except (urlerror.URLError, OSError) as exc:
             raise RuntimeError(f"Backend sentence-contract API unavailable: {endpoint}") from exc
         try:
             parsed = json.loads(raw)

@@ -52,6 +52,9 @@ describe('VocabularyPage', () => {
         tense: '',
         linguistic_notes: [],
         part_of_speech: 'sentence',
+        translations: {
+          backend_m2m100: { text: 'Sentence one.' },
+        },
         linguistic_elements: [
           {
             node_id: 'w1',

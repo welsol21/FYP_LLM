@@ -595,6 +595,14 @@ button {
   padding: 4px 10px;
 }
 
+.translation-view-options {
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+}
+
+.translation-provider-options {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
 .quick-edit-grid {
   display: grid;
   grid-template-columns: 1fr;

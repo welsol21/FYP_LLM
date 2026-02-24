@@ -9,6 +9,9 @@ function baseNode(): VisualizerNode {
     tense: '',
     linguistic_notes: [],
     part_of_speech: 'sentence',
+    translations: {
+      backend_m2m100: { text: 'Она доверяла ему.' },
+    },
     linguistic_elements: [],
   }
 }
@@ -39,6 +42,9 @@ describe('resolveNodeTranslation', () => {
     const nodeWithoutTranslations: VisualizerNode = {
       ...baseNode(),
       active_translation_provider: 'deepl',
+      translations: {
+        backend_m2m100: { text: '' },
+      },
     }
     expect(resolveNodeTranslation(nodeWithoutTranslations)).toBe('-')
   })
