@@ -586,6 +586,12 @@ button {
   padding: 0;
 }
 
+.visualizer-source-meta {
+  margin: 6px 0 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .tree-toggle {
   min-height: 34px;
   border: 1px solid var(--line);
@@ -616,15 +622,50 @@ button {
   gap: 10px;
 }
 
-.quick-edit-header h2 {
-  margin: 0;
+.quick-edit-title-btn {
+  min-height: var(--touch-min);
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #151b28 0%, #101521 100%);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 1;
 }
 
 .quick-edit-header-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-left: auto;
+}
+
+.translation-control-btn {
+  min-height: var(--touch-min);
+  min-width: 220px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #151b28 0%, #101521 100%);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 800;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.quick-edit-translate-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.quick-edit-translate-label {
+  justify-self: start;
+  text-align: left;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.2;
 }
 
 .quick-edit-toggle {
@@ -661,6 +702,14 @@ button {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+.quick-edit-actions-right {
+  justify-content: flex-end;
+}
+
+.quick-edit-advanced-right {
+  margin-left: auto;
 }
 
 .touch-choice-grid {
@@ -727,6 +776,16 @@ button {
 .quick-edit-status {
   color: var(--ok);
   margin: 0;
+}
+
+.quick-edit-close-btn {
+  min-height: var(--touch-min);
+  border: 1px solid var(--line);
+  background: #101723;
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-weight: 700;
 }
 
 .sentence-nav {

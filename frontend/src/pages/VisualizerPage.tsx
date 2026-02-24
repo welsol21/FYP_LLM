@@ -221,13 +221,21 @@ function collectTranslationProviders(node: VisualizerNode, out: Set<string>): vo
 export function VisualizerPage() {
   const api = useApi()
   const location = useLocation()
-  const documentId = (location.state as { documentId?: string } | null)?.documentId
-  const [rows, setRows] = useState<Array<{ sentence_text: string; tree: VisualizerNode }>>([])
+  const state = (location.state as {
+    documentId?: string
+    documentIds?: string[]
+    documentMeta?: Record<string, { project?: string; file?: string }>
+  } | null) || null
+  const documentId = state?.documentId
+  const documentIds = Array.isArray(state?.documentIds) ? state?.documentIds.filter(Boolean) : []
+  const documentMeta = state?.documentMeta || {}
+  const effectiveDocumentIds = documentIds.length > 0 ? documentIds : (documentId ? [documentId] : [])
+  const [rows, setRows] = useState<Array<{ sentence_text: string; tree: VisualizerNode; document_id: string }>>([])
   const [activeSentenceIndex, setActiveSentenceIndex] = useState(0)
   const [isNarrowScreen, setIsNarrowScreen] = useState(
     typeof window !== 'undefined' ? window.innerWidth <= 860 : false,
   )
-  const [quickEditOpen, setQuickEditOpen] = useState(false)
+  const [editorMode, setEditorMode] = useState<'quick' | 'translate' | 'none'>('quick')
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [nodeId, setNodeId] = useState('')
   const [selectedNodeLabel, setSelectedNodeLabel] = useState('')
@@ -241,11 +249,28 @@ export function VisualizerPage() {
   const [showAllTranslations, setShowAllTranslations] = useState(false)
 
   async function refresh() {
-    const payload = await api.getVisualizerPayload(documentId)
-    const normalized = Object.entries(payload as VisualizerPayload).map(([sentence_text, tree]) => ({
-      sentence_text,
-      tree,
-    }))
+    const normalized: Array<{ sentence_text: string; tree: VisualizerNode; document_id: string }> = []
+    if (effectiveDocumentIds.length === 0) {
+      const payload = await api.getVisualizerPayload(documentId)
+      for (const [sentence_text, tree] of Object.entries(payload as VisualizerPayload)) {
+        normalized.push({
+          sentence_text,
+          tree,
+          document_id: String(documentId || ''),
+        })
+      }
+    } else {
+      for (const docId of effectiveDocumentIds) {
+        const payload = await api.getVisualizerPayload(docId)
+        for (const [sentence_text, tree] of Object.entries(payload as VisualizerPayload)) {
+          normalized.push({
+            sentence_text,
+            tree,
+            document_id: docId,
+          })
+        }
+      }
+    }
     setRows(normalized)
     setActiveSentenceIndex((prev) => {
       if (normalized.length === 0) return 0
@@ -255,7 +280,7 @@ export function VisualizerPage() {
 
   useEffect(() => {
     refresh()
-  }, [api, documentId])
+  }, [api, documentId, effectiveDocumentIds.join('|')])
 
   useEffect(() => {
     const onResize = () => setIsNarrowScreen(window.innerWidth <= 860)
@@ -276,6 +301,7 @@ export function VisualizerPage() {
   }, [activeSentenceIndex])
 
   const activeRow = rows[activeSentenceIndex]
+  const activeMeta = activeRow ? documentMeta[activeRow.document_id] : undefined
   const translationProviderOptions = (() => {
     if (!activeRow?.tree) return ['backend_m2m100']
     const out = new Set<string>()
@@ -297,7 +323,9 @@ export function VisualizerPage() {
 
   async function onApplyEdit(e: React.FormEvent) {
     e.preventDefault()
-    const sentenceText = rows[activeSentenceIndex]?.sentence_text ?? ''
+    const active = rows[activeSentenceIndex]
+    const sentenceText = active?.sentence_text ?? ''
+    const activeDocumentId = active?.document_id ?? documentId
     const fieldPath = advancedOpen ? advancedField : basicField
     if (!sentenceText || !nodeId) {
       setEditStatus('Select a node first by tapping/clicking its label.')
@@ -313,7 +341,7 @@ export function VisualizerPage() {
       nodeId,
       fieldPath,
       newValue: valueForSubmit,
-      documentId,
+      documentId: activeDocumentId || undefined,
     })
     setEditStatus(result.message)
     await refresh()
@@ -334,7 +362,7 @@ export function VisualizerPage() {
       setNewValue(serialized)
     }
     setEditStatus('')
-    setQuickEditOpen(true)
+    setEditorMode('quick')
   }
 
   function onChangeBasicField(path: string) {
@@ -352,6 +380,8 @@ export function VisualizerPage() {
   }
 
   const activeFieldPath = advancedOpen ? advancedField : basicField
+  const quickEditOpen = editorMode === 'quick'
+  const translateOpen = editorMode === 'translate'
   const advancedOptions = ADVANCED_SELECT_OPTIONS[advancedField] || []
   const useAdvancedSelect = advancedOpen && advancedOptions.length > 0
   const valueGridColumns = isNarrowScreen ? 1 : 2
@@ -371,27 +401,68 @@ export function VisualizerPage() {
       <section className="visualizer-row">
         <form onSubmit={onApplyEdit} className="card quick-edit-grid" aria-label="edit-form">
           <div className="quick-edit-header">
-            <h2>Quick Node Edit</h2>
+            <button
+              type="button"
+              className="quick-edit-title-btn"
+              onClick={() => setEditorMode('quick')}
+              aria-label="toggle-quick-edit"
+            >
+              Quick Node Edit
+            </button>
             <div className="quick-edit-header-actions">
-              {quickEditOpen ? (
-                <button
-                  type="button"
-                  className="quick-edit-advanced-toggle"
-                  onClick={() => setAdvancedOpen((prev) => !prev)}
-                >
-                  {advancedOpen ? 'Basic' : 'Advanced'}
-                </button>
-              ) : null}
               <button
                 type="button"
-                className="quick-edit-toggle"
-                onClick={() => setQuickEditOpen((prev) => !prev)}
-                aria-label="toggle-quick-edit"
+                className="translation-control-btn"
+                onClick={() => setEditorMode('translate')}
+                aria-label="toggle-translate-controls"
               >
-                {quickEditOpen ? 'Collapse' : 'Expand'}
+                Translate
               </button>
             </div>
           </div>
+          {translateOpen ? (
+            <div className="quick-edit-translate-panel">
+              <label className="quick-edit-translate-label">Translation provider</label>
+              <div className="touch-options-grid translation-provider-options">
+                {translationProviderOptions.map((provider) => (
+                  <button
+                    key={provider}
+                    type="button"
+                    className={`touch-option-btn ${selectedTranslationProvider === provider ? 'active' : ''}`}
+                    onClick={() => setSelectedTranslationProvider(provider)}
+                  >
+                    {provider}
+                  </button>
+                ))}
+              </div>
+              <label className="quick-edit-translate-label">Translations view</label>
+              <div className="touch-options-grid translation-view-options">
+                <button
+                  type="button"
+                  className={`touch-option-btn ${!showAllTranslations ? 'active' : ''}`}
+                  onClick={() => setShowAllTranslations(false)}
+                >
+                  Active only
+                </button>
+                <button
+                  type="button"
+                  className={`touch-option-btn ${showAllTranslations ? 'active' : ''}`}
+                  onClick={() => setShowAllTranslations(true)}
+                >
+                  All translations
+                </button>
+              </div>
+              <div className="quick-edit-actions quick-edit-actions-right">
+                <button
+                  type="button"
+                  className="quick-edit-close-btn"
+                  onClick={() => setEditorMode('none')}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          ) : null}
           {quickEditOpen ? (
             <>
               <p className="quick-edit-help">
@@ -478,44 +549,26 @@ export function VisualizerPage() {
               </label>
               <div className="quick-edit-actions">
                 <button type="submit">Apply Edit</button>
+                <button
+                  type="button"
+                  className="quick-edit-advanced-toggle quick-edit-advanced-right"
+                  onClick={() => setAdvancedOpen((prev) => !prev)}
+                >
+                  {advancedOpen ? 'Basic' : 'Advanced'}
+                </button>
+                <button
+                  type="button"
+                  className="quick-edit-close-btn"
+                  onClick={() => setEditorMode('none')}
+                >
+                  Close
+                </button>
                 {editStatus ? <p className="quick-edit-status">{editStatus}</p> : null}
               </div>
             </>
           ) : null}
         </form>
         <section className="card">
-          <div className="analyze-grid" style={{ marginBottom: 12 }}>
-            <label className="analyze-label">Translation provider</label>
-            <div className="touch-options-grid translation-provider-options">
-              {translationProviderOptions.map((provider) => (
-                <button
-                  key={provider}
-                  type="button"
-                  className={`touch-option-btn ${selectedTranslationProvider === provider ? 'active' : ''}`}
-                  onClick={() => setSelectedTranslationProvider(provider)}
-                >
-                  {provider}
-                </button>
-              ))}
-            </div>
-            <label className="analyze-label">Translations view</label>
-            <div className="touch-options-grid translation-view-options">
-              <button
-                type="button"
-                className={`touch-option-btn ${!showAllTranslations ? 'active' : ''}`}
-                onClick={() => setShowAllTranslations(false)}
-              >
-                Active only
-              </button>
-              <button
-                type="button"
-                className={`touch-option-btn ${showAllTranslations ? 'active' : ''}`}
-                onClick={() => setShowAllTranslations(true)}
-              >
-                All translations
-              </button>
-            </div>
-          </div>
           <div className="sentence-nav">
             <button type="button" onClick={() => setActiveSentenceIndex((v) => Math.max(0, v - 1))} disabled={!hasPrev}>
               Prev
@@ -531,6 +584,12 @@ export function VisualizerPage() {
               Next
             </button>
           </div>
+          {activeRow ? (
+            <div className="visualizer-source-meta">
+              <strong>Project:</strong> {activeMeta?.project || '-'}{' '}
+              <strong>File:</strong> {activeMeta?.file || '-'}
+            </div>
+          ) : null}
           {activeRow ? (
             <article key={activeRow.sentence_text} className="visualizer-article">
               <VisualizerTreeLegacy

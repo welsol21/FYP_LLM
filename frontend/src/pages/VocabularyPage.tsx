@@ -191,6 +191,10 @@ export function VocabularyPage() {
   const selectedRows = useMemo(() => rows.filter((row) => checked[row.id]), [rows, checked])
   const exportRows = useMemo(() => selectedRows.flatMap((row) => toExportRows(row)), [selectedRows])
   const selectedDocumentId = selectedRows.find((row) => row.documentId)?.documentId ?? null
+  const selectedDocumentIds = useMemo(
+    () => Array.from(new Set(selectedRows.map((row) => row.documentId).filter((v): v is string => Boolean(v)))),
+    [selectedRows],
+  )
 
   return (
     <section className="screen-block">
@@ -203,7 +207,20 @@ export function VocabularyPage() {
             disabled={!selectedDocumentId}
             onClick={() => {
               if (!selectedDocumentId) return
-              navigate('/visualizer', { state: { documentId: selectedDocumentId } })
+              navigate('/visualizer', {
+                state: {
+                  documentId: selectedDocumentId,
+                  documentIds: selectedDocumentIds,
+                  documentMeta: Object.fromEntries(
+                    selectedRows
+                      .filter((row) => row.documentId)
+                      .map((row) => [
+                        row.documentId as string,
+                        { project: row.project, file: row.file },
+                      ]),
+                  ),
+                },
+              })
             }}
           >
             Visualizer

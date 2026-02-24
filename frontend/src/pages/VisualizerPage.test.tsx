@@ -207,6 +207,7 @@ describe('VisualizerPage', () => {
     await waitFor(() => {
       expect(screen.getByText('GPT translation')).toBeInTheDocument()
     })
+    fireEvent.click(screen.getByRole('button', { name: 'toggle-translate-controls' }))
     fireEvent.click(screen.getByRole('button', { name: 'backend_m2m100' }))
     await waitFor(() => {
       expect(screen.getByText('Backend translation')).toBeInTheDocument()
@@ -215,5 +216,105 @@ describe('VisualizerPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'More translations (1)' }))
     expect(screen.getByText('gpt:')).toBeInTheDocument()
     expect(screen.getByText('GPT translation')).toBeInTheDocument()
+  })
+
+  it('builds a single Prev/Next stream for multiple selected documents', async () => {
+    const payloadDocA: VisualizerPayload = {
+      'Doc A sentence.': {
+        node_id: 'a1',
+        type: 'Sentence',
+        content: 'Doc A sentence.',
+        tense: 'null',
+        linguistic_notes: [],
+        part_of_speech: 'sentence',
+        translations: { backend_m2m100: { text: 'A' } },
+        linguistic_elements: [],
+      },
+    }
+    const payloadDocB: VisualizerPayload = {
+      'Doc B sentence.': {
+        node_id: 'b1',
+        type: 'Sentence',
+        content: 'Doc B sentence.',
+        tense: 'null',
+        linguistic_notes: [],
+        part_of_speech: 'sentence',
+        translations: { backend_m2m100: { text: 'B' } },
+        linguistic_elements: [],
+      },
+    }
+    const getVisualizerPayload = vi.fn(async (documentId?: string) => {
+      if (documentId === 'doc-a') return payloadDocA
+      if (documentId === 'doc-b') return payloadDocB
+      return {}
+    })
+    const api: RuntimeApi = {
+      getUiState: async () => ({
+        runtime_mode: 'online',
+        deployment_mode: 'local',
+        badges: {},
+        features: {
+          phonetic: { enabled: true, reason_if_disabled: '' },
+          db_persistence: { enabled: true, reason_if_disabled: '' },
+        },
+      }),
+      listProjects: async () => [],
+      createProject: async (name: string) => ({ id: 'proj', name, created_at: '', updated_at: '' }),
+      getSelectedProject: async () => ({ project_id: null }),
+      setSelectedProject: async () => ({ project_id: null }),
+      registerMediaFile: async () => ({ id: 'f', project_id: 'p', name: 'x', path: '/tmp/x' }),
+      submitMedia: async () => ({ result: { route: 'local', message: '' }, ui_feedback: { severity: 'info', title: '', message: '' } }),
+      listFiles: async () => [],
+      listDocumentArtifacts: async () => [],
+      getBackendJobStatus: async (jobId: string) => ({ job_id: jobId, status: 'completed_local', message: 'ok', stage_progress: [100, 100, 100, 100, 100] }),
+      uploadMedia: async () => ({ fileName: 'u.txt', mediaPath: '/tmp/u.txt', sizeBytes: 10 }),
+      getVisualizerPayload,
+      applyEdit: async () => ({ status: 'ok', message: 'Edit applied.' }),
+      getTranslationConfig: async () => ({
+        default_provider: 'm2m100',
+        providers: [{ id: 'm2m100', label: 'Our Translator (M2M100)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} }],
+      }),
+      saveTranslationConfig: async (config) => config,
+    }
+
+    render(
+      <ApiContext.Provider value={api}>
+        <MemoryRouter
+          initialEntries={[
+            {
+              pathname: '/visualizer',
+              state: {
+                documentIds: ['doc-a', 'doc-b'],
+                documentMeta: {
+                  'doc-a': { project: 'Project A', file: 'a.txt' },
+                  'doc-b': { project: 'Project B', file: 'b.txt' },
+                },
+              },
+            },
+          ]}
+        >
+          <VisualizerPage />
+        </MemoryRouter>
+      </ApiContext.Provider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Doc A sentence.').length).toBeGreaterThan(0)
+    })
+    expect(getVisualizerPayload).toHaveBeenCalledWith('doc-a')
+    expect(getVisualizerPayload).toHaveBeenCalledWith('doc-b')
+    expect(screen.getByText('1 / 2')).toBeInTheDocument()
+    expect(screen.getByText(/Project:/)).toBeInTheDocument()
+    expect(screen.getByText(/Project A/)).toBeInTheDocument()
+    expect(screen.getByText(/File:/)).toBeInTheDocument()
+    expect(screen.getByText(/a\.txt/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => {
+      expect(screen.getAllByText('Doc B sentence.').length).toBeGreaterThan(0)
+    })
+    expect(screen.getByText('2 / 2')).toBeInTheDocument()
+    expect(screen.getByText(/Project B/)).toBeInTheDocument()
+    expect(screen.getByText(/b\.txt/)).toBeInTheDocument()
   })
 })
