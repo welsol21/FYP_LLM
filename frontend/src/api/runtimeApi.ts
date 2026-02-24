@@ -82,6 +82,17 @@ export type VisualizerNode = {
     text: string
     model?: string
   }
+  active_translation_provider?: string
+  translations?: Record<
+    string,
+    {
+      text: string
+      source_lang?: string
+      target_lang?: string
+      created_at?: string
+      origin?: string
+    }
+  >
 }
 
 export type VisualizerPayload = Record<string, VisualizerNode>

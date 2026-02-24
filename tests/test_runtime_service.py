@@ -262,10 +262,82 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                 "Она доверяла ему.",
             )
             payload = svc.get_visualizer_payload(document_id=result["document_id"])
+            sentence_node = payload["She trusted him."]
             self.assertEqual(
-                payload["She trusted him."]["translation"]["text"],
+                sentence_node["translation"]["text"],
                 "Клиентский перевод",
             )
+            self.assertEqual(
+                sentence_node["translations"]["backend_m2m100"]["text"],
+                "Она доверяла ему.",
+            )
+            overlay_values = [
+                str(entry.get("text") or "")
+                for key, entry in sentence_node["translations"].items()
+                if key != "backend_m2m100" and isinstance(entry, dict)
+            ]
+            self.assertIn("Клиентский перевод", overlay_values)
+
+    def test_visualizer_payload_falls_back_to_backend_translation_when_selected_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            svc.repo.create_project("Project A", project_id="proj-1")
+            svc.repo.create_media_file(
+                project_id="proj-1",
+                media_file_id="file-1",
+                name="sample.txt",
+                path="/tmp/sample.txt",
+                duration_seconds=10,
+                size_bytes=1024,
+            )
+            svc.repo.set_workspace_state(
+                "media_file_settings:file-1",
+                {"translation_provider": "deepl", "subtitles_mode": "bilingual", "voice_choice": "male"},
+            )
+            svc.repo.create_document(
+                document_id="doc-1",
+                project_id="proj-1",
+                media_file_id="file-1",
+                source_type="text",
+                source_path="/tmp/sample.txt",
+                media_hash="h",
+                status="completed",
+            )
+            svc.repo.replace_media_sentences(
+                document_id="doc-1",
+                sentences=[
+                    {
+                        "sentence_idx": 0,
+                        "sentence_text": "She trusted him.",
+                        "sentence_hash": "h1",
+                        "text_ru": "",
+                    }
+                ],
+            )
+            svc.repo.upsert_contract_sentence(
+                document_id="doc-1",
+                sentence_hash="h1",
+                sentence_node={
+                    "type": "Sentence",
+                    "content": "She trusted him.",
+                    "node_id": "n1",
+                    "translation": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."},
+                    "linguistic_elements": [],
+                },
+            )
+            svc.repo.replace_sentence_links(
+                document_id="doc-1",
+                links=[{"sentence_idx": 0, "sentence_hash": "h1"}],
+            )
+
+            payload = svc.get_visualizer_payload(document_id="doc-1")
+            sentence_node = payload["She trusted him."]
+            self.assertEqual(sentence_node["translation"]["text"], "Она доверяла ему.")
+            self.assertEqual(sentence_node["translations"]["backend_m2m100"]["text"], "Она доверяла ему.")
 
     def test_export_final_media_artifacts_creates_audio_for_audio_source(self):
         with tempfile.TemporaryDirectory() as tmpdir:

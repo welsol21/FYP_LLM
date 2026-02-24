@@ -28,6 +28,87 @@ from .ui_state import build_runtime_ui_state, build_submission_ui_feedback
 
 TRANSLATION_CONFIG_STATE_KEY = "translation_config"
 MEDIA_FILE_SETTINGS_PREFIX = "media_file_settings:"
+BACKEND_TRANSLATION_PROVIDER_KEY = "backend_m2m100"
+
+
+def _normalize_provider_key(value: str | None) -> str:
+    raw = str(value or "").strip().lower()
+    if not raw:
+        return ""
+    return raw.replace(" ", "_").replace("-", "_")
+
+
+def _ensure_node_translations_map(
+    node: dict[str, Any],
+    *,
+    canonical_provider: str = BACKEND_TRANSLATION_PROVIDER_KEY,
+) -> None:
+    if not isinstance(node, dict):
+        return
+    existing = node.get("translations")
+    translations: dict[str, dict[str, Any]] = {}
+    if isinstance(existing, dict):
+        for key, entry in existing.items():
+            provider_key = _normalize_provider_key(str(key))
+            if not provider_key or not isinstance(entry, dict):
+                continue
+            text = str(entry.get("text") or "").strip()
+            if not text:
+                continue
+            translations[provider_key] = {
+                "text": text,
+                "source_lang": str(entry.get("source_lang") or "en").strip() or "en",
+                "target_lang": str(entry.get("target_lang") or "ru").strip() or "ru",
+                "origin": str(entry.get("origin") or "").strip() or "provider",
+            }
+            created_at = str(entry.get("created_at") or "").strip()
+            if created_at:
+                translations[provider_key]["created_at"] = created_at
+
+    legacy = node.get("translation")
+    if isinstance(legacy, dict):
+        text = str(legacy.get("text") or "").strip()
+        if text and canonical_provider not in translations:
+            translations[canonical_provider] = {
+                "text": text,
+                "source_lang": str(legacy.get("source_lang") or "en").strip() or "en",
+                "target_lang": str(legacy.get("target_lang") or "ru").strip() or "ru",
+                "origin": "backend_contract",
+            }
+
+    if translations:
+        node["translations"] = translations
+
+    children = node.get("linguistic_elements")
+    if isinstance(children, list):
+        for child in children:
+            if isinstance(child, dict):
+                _ensure_node_translations_map(child, canonical_provider=canonical_provider)
+
+
+def _pick_translation_entry(
+    *,
+    node: dict[str, Any],
+    preferred_provider: str | None,
+    canonical_provider: str = BACKEND_TRANSLATION_PROVIDER_KEY,
+) -> dict[str, Any] | None:
+    translations = node.get("translations")
+    if isinstance(translations, dict):
+        preferred_key = _normalize_provider_key(preferred_provider)
+        if preferred_key:
+            row = translations.get(preferred_key)
+            if isinstance(row, dict) and str(row.get("text") or "").strip():
+                return row
+        canonical_row = translations.get(canonical_provider)
+        if isinstance(canonical_row, dict) and str(canonical_row.get("text") or "").strip():
+            return canonical_row
+        for row in translations.values():
+            if isinstance(row, dict) and str(row.get("text") or "").strip():
+                return row
+    legacy = node.get("translation")
+    if isinstance(legacy, dict) and str(legacy.get("text") or "").strip():
+        return legacy
+    return None
 
 
 def _builtin_translation_providers() -> list[dict[str, Any]]:
@@ -480,6 +561,13 @@ class RuntimeMediaService:
 
     def get_visualizer_payload(self, *, document_id: str) -> dict[str, Any]:
         rows = self.repo.list_document_visualizer_rows(document_id=document_id)
+        document = self.repo.get_document(document_id)
+        selected_provider = None
+        if isinstance(document, dict):
+            media_file_id = str(document.get("media_file_id") or "").strip()
+            if media_file_id:
+                settings = self.repo.get_workspace_state(f"{MEDIA_FILE_SETTINGS_PREFIX}{media_file_id}") or {}
+                selected_provider = str(settings.get("translation_provider") or "").strip().lower() or None
         payload: dict[str, Any] = {}
         duplicates: dict[str, int] = {}
         for row in rows:
@@ -489,12 +577,35 @@ class RuntimeMediaService:
             key = base if seen == 0 else f"{base} #{seen + 1}"
             node = row["sentence_node"]
             text_ru = str(row.get("text_ru") or "").strip()
-            if text_ru and isinstance(node, dict):
-                tr = node.get("translation")
-                if not isinstance(tr, dict):
-                    node["translation"] = {"source_lang": "en", "target_lang": "ru", "text": text_ru}
-                else:
-                    tr["text"] = text_ru
+            if isinstance(node, dict):
+                _ensure_node_translations_map(node, canonical_provider=BACKEND_TRANSLATION_PROVIDER_KEY)
+                normalized_selected_provider = _normalize_provider_key(selected_provider)
+                effective_provider = normalized_selected_provider
+                if normalized_selected_provider:
+                    node["active_translation_provider"] = normalized_selected_provider
+                if text_ru:
+                    if not isinstance(node.get("translations"), dict):
+                        node["translations"] = {}
+                    provider_key = normalized_selected_provider or "overlay_provider"
+                    node["translations"][provider_key] = {
+                        "text": text_ru,
+                        "source_lang": "en",
+                        "target_lang": "ru",
+                        "origin": "client_overlay",
+                    }
+                    if not effective_provider:
+                        effective_provider = provider_key
+                active = _pick_translation_entry(
+                    node=node,
+                    preferred_provider=effective_provider,
+                    canonical_provider=BACKEND_TRANSLATION_PROVIDER_KEY,
+                )
+                if active is not None:
+                    node["translation"] = {
+                        "source_lang": str(active.get("source_lang") or "en").strip() or "en",
+                        "target_lang": str(active.get("target_lang") or "ru").strip() or "ru",
+                        "text": str(active.get("text") or "").strip(),
+                    }
             payload[key] = node
         return payload
 
@@ -621,6 +732,20 @@ class RuntimeMediaService:
         stage_callback: Callable[[str, float | None, str | None], None] | None = None,
     ) -> dict[str, Any]:
         started = time.monotonic()
+        if media_file_id is not None:
+            current_settings = self.repo.get_workspace_state(f"{MEDIA_FILE_SETTINGS_PREFIX}{media_file_id}") or {}
+            self.repo.set_workspace_state(
+                f"{MEDIA_FILE_SETTINGS_PREFIX}{media_file_id}",
+                {
+                    "translation_provider": str(
+                        translation_provider
+                        or current_settings.get("translation_provider")
+                        or "m2m100"
+                    ).strip().lower(),
+                    "subtitles_mode": str(subtitles_mode or current_settings.get("subtitles_mode") or "bilingual"),
+                    "voice_choice": str(voice_choice or current_settings.get("voice_choice") or "male"),
+                },
+            )
         if stage_callback is not None:
             stage_callback("loading_file", 0.25, "Loading source file")
         source_type = self._detect_source_type(media_path)

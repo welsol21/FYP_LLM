@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { VisualizerNode } from '../api/runtimeApi'
+import { resolveNodeTranslation } from '../lib/translationContract'
 
 type Props = {
   node: VisualizerNode
@@ -46,7 +47,7 @@ export function VisualizerTree({ node, depth = 0 }: Props) {
   const notesText = node.linguistic_notes.length
     ? node.linguistic_notes.join(' ')
     : (node.notes?.map((note) => note?.text?.trim()).filter(Boolean).join(' ') || '-')
-  const translationText = node.translation?.text?.trim() ? node.translation.text : '-'
+  const translationText = resolveNodeTranslation(node)
   const phoneticText =
     node.phonetic?.uk || node.phonetic?.us
       ? `${node.phonetic?.uk ? `UK /${node.phonetic.uk}/` : ''}${node.phonetic?.uk && node.phonetic?.us ? ' | ' : ''}${node.phonetic?.us ? `US /${node.phonetic.us}/` : ''}`
