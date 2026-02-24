@@ -114,6 +114,18 @@ Implementation note:
 - iterative loop runner is implemented in `ela_pipeline/classifier/iterative_loop.py`
 - stopping criterion: required consecutive full-pass runs (`required_consecutive_passes`, default `3`)
 - gate-level retry execution/telemetry is implemented in `ela_pipeline/classifier/quality_loop.py`
+- executable quality-cycle CLI:
+  - `python -m ela_pipeline.classifier.run_quality_cycle --output-dir artifacts/classifier_quality --run-id <run_id>`
+  - outputs:
+    - `quality_events.jsonl`
+    - `repair_actions.jsonl`
+    - `quality_summary.json`
+- executable one-button orchestrator CLI:
+  - `python -m ela_pipeline.classifier.run_full_orchestrator --run-id <run_id> --device cuda`
+  - stage chain:
+    - `build_kb -> build_train_dataset -> train_deberta -> run_quality_cycle`
+  - output:
+    - `artifacts/classifier_orchestrator/orchestrator_summary.json`
 
 ## 6. Stage Gates
 

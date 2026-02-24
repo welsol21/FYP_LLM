@@ -207,6 +207,37 @@ If CUDA is unavailable, use `--cefr-provider rule` for a structural sanity pass.
   --db-url "postgresql://user:pass@localhost:5432/ela"
 ```
 
+### 14) Classifier pipeline (DeBERTa, GPU-only)
+Step-by-step:
+```bash
+.venv/bin/python -m ela_pipeline.classifier.build_kb \
+  --output-dir artifacts/classifier_kb \
+  --spacy-model en_core_web_sm
+
+.venv/bin/python -m ela_pipeline.classifier.build_train_dataset \
+  --input-path artifacts/classifier_kb/kb_spacy_enriched.jsonl \
+  --output-dir data/processed_classifier
+
+.venv/bin/python -m ela_pipeline.classifier.train_deberta_classifier \
+  --train-path data/processed_classifier/train_classifier.jsonl \
+  --dev-path data/processed_classifier/dev_classifier.jsonl \
+  --output-dir artifacts/models/deberta_classifier_cefr \
+  --device cuda
+
+.venv/bin/python -m ela_pipeline.classifier.run_quality_cycle \
+  --output-dir artifacts/classifier_quality \
+  --run-id qc-$(date +%Y%m%d_%H%M%S)
+```
+
+One-button orchestrator:
+```bash
+.venv/bin/python -m ela_pipeline.classifier.run_full_orchestrator \
+  --run-id orch-$(date +%Y%m%d_%H%M%S) \
+  --device cuda
+```
+Unified report is written to:
+- `artifacts/classifier_orchestrator/orchestrator_summary.json`
+
 ## Main Commands
 
 ### Build dataset splits

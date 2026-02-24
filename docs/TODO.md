@@ -44,6 +44,7 @@
 - [x] Keep T5 in constrained role: generate note text only, never overwrite classifier truth fields.
 - [x] Track note generator provenance in contract (`note_generator_version`).
 - [x] Document and run iterative improvement loop until all gates pass for repeated runs.
+- [x] Add one-button orchestrator (`build_kb -> build_train_dataset -> train_deberta -> run_quality_cycle`) with unified summary report.
 
 ## Media Pipeline Integration (ELA Bridge, Current)
 

@@ -218,6 +218,63 @@ If `--model-dir` is omitted:
   - classifier inference latency: ~`50-75%` faster,
   - full backend rebuild schedule: ~`20-35%` faster (assuming same gate quality thresholds).
 
+### 4.8.2 Quality-Cycle CLI (Curriculum Gates)
+- Runtime utility:
+  - `python -m ela_pipeline.classifier.run_quality_cycle --output-dir artifacts/classifier_quality --run-id qc-<date>`
+- What it does:
+  - runs 5 gates (`kb_generation`, `spacy_enrichment`, `classifier`, `contract`, `nlg`)
+  - applies retry policy per gate
+  - records repair actions when gate attempt fails
+  - evaluates iterative full-pass completion criterion
+- Artifacts:
+  - `quality_events.jsonl` (metrics/thresholds/pass-fail per attempt)
+  - `repair_actions.jsonl` (applied fix actions)
+  - `quality_summary.json` (final gate status + loop completion)
+
+### 4.8.3 KB Build CLI (Seed + spaCy Enrichment)
+- Runtime utility:
+  - `python -m ela_pipeline.classifier.build_kb --output-dir artifacts/classifier_kb --spacy-model en_core_web_sm`
+- What it does:
+  - builds seed grammar KB rows (tense-table core, all pedagogical bands)
+  - runs spaCy enrichment on KB examples
+- Artifacts:
+  - `kb_raw.jsonl`
+  - `kb_spacy_enriched.jsonl`
+
+### 4.8.4 Classifier Dataset Build CLI (Train/Dev)
+- Runtime utility:
+  - `python -m ela_pipeline.classifier.build_train_dataset --input-path artifacts/classifier_kb/kb_spacy_enriched.jsonl --output-dir data/processed_classifier`
+- What it does:
+  - builds train/dev JSONL for DeBERTa classifier stage
+  - composes deterministic model input text from enriched KB rows
+  - saves dataset stats summary
+- Artifacts:
+  - `train_classifier.jsonl`
+  - `dev_classifier.jsonl`
+  - `classifier_dataset_stats.json`
+
+### 4.8.5 DeBERTa Training CLI (GPU-only)
+- Runtime utility:
+  - `python -m ela_pipeline.classifier.train_deberta_classifier --train-path data/processed_classifier/train_classifier.jsonl --dev-path data/processed_classifier/dev_classifier.jsonl --output-dir artifacts/models/deberta_classifier_cefr --device cuda`
+- Policy:
+  - GPU-only (`--device cuda` only)
+  - fail-fast if CUDA is unavailable
+- Artifacts:
+  - trained model directory (Hugging Face format)
+  - `train_summary.json` (train/dev sizes + eval metrics)
+
+### 4.8.6 Full Orchestrator CLI ("One Button")
+- Runtime utility:
+  - `python -m ela_pipeline.classifier.run_full_orchestrator --run-id orch-<date> --device cuda`
+- Stage chain:
+  - `build_kb -> build_train_dataset -> train_deberta -> run_quality_cycle`
+- What it does:
+  - runs all 4 stages in order
+  - stops on first failed stage
+  - writes a unified summary with stage durations and artifact paths
+- Artifact:
+  - `artifacts/classifier_orchestrator/orchestrator_summary.json`
+
 ### 4.9 PostgreSQL Persistence (`ela_pipeline/db/*`)
 - Optional runtime stage behind CLI flag `--persist-db`.
 - Driver: `psycopg` (PostgreSQL).
