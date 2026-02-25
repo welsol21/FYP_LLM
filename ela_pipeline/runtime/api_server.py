@@ -38,6 +38,27 @@ def _env_str(name: str, default: str = "") -> str:
     return str(raw).strip()
 
 
+def _resolve_classifier_settings() -> tuple[str, str | None]:
+    provider_raw = _env_str("ELA_CLASSIFIER_PROVIDER", "").lower()
+    model_path = _env_str("ELA_CLASSIFIER_MODEL_PATH", "")
+
+    if provider_raw:
+        provider = provider_raw
+    else:
+        default_model_dir = "artifacts/models/deberta_classifier_cefr"
+        provider = "deberta" if os.path.isdir(default_model_dir) else "rule"
+        if not model_path and provider == "deberta":
+            model_path = default_model_dir
+
+    if provider == "deberta" and not model_path:
+        model_path = "artifacts/models/deberta_classifier_cefr"
+
+    if provider not in {"rule", "deberta"}:
+        raise ValueError("ELA_CLASSIFIER_PROVIDER must be one of: rule | deberta")
+
+    return provider, (model_path or None)
+
+
 SERVICE = RuntimeMediaService(
     db_path=os.getenv("ELA_CLIENT_DB_PATH", "artifacts/client_state.sqlite3"),
     runtime_mode=os.getenv("ELA_RUNTIME_MODE", "auto"),
@@ -47,10 +68,7 @@ SERVICE = RuntimeMediaService(
 
 def _build_sentence_contract_payload(sentence_text: str, sentence_idx: int) -> dict:
     controlled_model_dir = _env_str("ELA_CONTROLLED_T5_MODEL_DIR", "")
-    classifier_provider = _env_str("ELA_CLASSIFIER_PROVIDER", "rule") or "rule"
-    classifier_model_path = _env_str("ELA_CLASSIFIER_MODEL_PATH", "")
-    if classifier_provider == "deberta" and not classifier_model_path:
-        classifier_model_path = "artifacts/models/deberta_classifier_cefr"
+    classifier_provider, classifier_model_path = _resolve_classifier_settings()
     return SERVICE.build_sentence_contract(
         sentence_text=sentence_text,
         sentence_idx=sentence_idx,
@@ -70,7 +88,7 @@ def _build_sentence_contract_payload(sentence_text: str, sentence_idx: int) -> d
         cefr_provider="rule",
         cefr_model_path="artifacts/models/t5_cefr/best_model",
         classifier_provider=classifier_provider,
-        classifier_model_path=classifier_model_path or None,
+        classifier_model_path=classifier_model_path,
         classifier_device="cuda",
         enable_grammar_classes=True,
     )
