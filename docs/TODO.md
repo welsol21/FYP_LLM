@@ -46,6 +46,14 @@
 - [x] Document and run iterative improvement loop until all gates pass for repeated runs.
 - [x] Add one-button orchestrator (`build_kb -> build_train_dataset -> train_deberta -> run_quality_cycle`) with unified summary report.
 
+## Backend Rebuild: Production Execution (Phase 1)
+
+- [x] Run full orchestrator for Phase 1 (`A1 -> A2 -> B1`) on GPU and persist artifacts under dedicated run-id.
+- [x] Publish Phase 1 run summary in docs (paths to model + quality summary + gate outcomes).
+- [x] Validate runtime sentence-contract end-to-end with produced DeBERTa classifier metadata.
+- [x] Validate controlled T5 rewrite on top of classifier blueprints with produced artifacts.
+- [x] Capture baseline quality snapshot (contract + NLG gates) for “pre-Phase-2” freeze.
+
 ## Media Pipeline Integration (ELA Bridge, Current)
 
 - [x] Switch architecture to **client-only media analysis** (no backend media processing queue).

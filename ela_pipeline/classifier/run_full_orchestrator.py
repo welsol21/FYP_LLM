@@ -10,6 +10,7 @@ from typing import Any
 
 from .build_kb import build_kb_artifacts
 from .build_train_dataset import build_train_dev_from_enriched_kb
+from .metadata import build_classifier_metadata_from_kb
 from .run_quality_cycle import run_quality_cycle
 from .train_deberta_classifier import train_deberta_classifier
 
@@ -92,6 +93,16 @@ def run_full_orchestrator(
             ),
         )
         artifacts["train_deberta"] = tr
+
+        current_stage = "build_classifier_metadata"
+        meta = _run_stage(
+            "build_classifier_metadata",
+            lambda: build_classifier_metadata_from_kb(
+                kb_raw_path=kb["kb_raw"],
+                output_dir=model_output_dir,
+            ),
+        )
+        artifacts["build_classifier_metadata"] = meta
 
         current_stage = "run_quality_cycle"
         qc = _run_stage(
