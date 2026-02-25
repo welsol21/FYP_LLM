@@ -639,6 +639,11 @@ Main tested areas:
 1. Use `.venv` to avoid dependency mismatch.
 2. If `--model-dir` path does not exist, inference raises a clear `FileNotFoundError`.
 3. Use `docs/sample.json` as the canonical compatibility target.
+4. Runtime sentence-contract API uses `note_mode=controlled`.
+5. Runtime classifier default is:
+   - `deberta` when `artifacts/models/deberta_classifier_cefr` exists,
+   - otherwise `rule`.
+6. Local sentence-contract fallback in media pipeline is disabled; media flow requires external sentence-contract builder (backend path).
 
 ## 8. Related Documents
 - `docs/pipeline_cli.md`

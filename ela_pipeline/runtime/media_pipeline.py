@@ -12,13 +12,8 @@ import threading
 import time
 from typing import Any, Callable
 
-from ela_pipeline.client_storage import build_sentence_hash
-from ela_pipeline.cefr import RuleBasedCEFRPredictor
-from ela_pipeline.annotate.local_generator import LocalT5Annotator
 from ela_pipeline.parse.spacy_parser import load_nlp
-from ela_pipeline.phonetic import EspeakPhoneticTranscriber
 from ela_pipeline.skeleton.builder import build_skeleton
-from ela_pipeline.tam.rules import apply_tam
 from ela_pipeline.translate import M2M100Translator
 
 DEFAULT_LOCAL_TRANSLATION_MODEL_DIR = "artifacts/models/m2m100_418M"
@@ -222,39 +217,6 @@ def _extract_text_and_sentence_chunks(
         return " ".join(texts).strip(), segments
 
     return source_path.read_text(encoding="utf-8", errors="ignore").strip(), []
-
-
-def _ensure_visualizer_fields(node: dict[str, Any]) -> None:
-    if "cefr_level" not in node:
-        node["cefr_level"] = "B1"
-    if "linguistic_notes" not in node:
-        node["linguistic_notes"] = []
-    translations = node.get("translations")
-    if not isinstance(translations, dict):
-        translations = {}
-    backend = translations.get("backend_m2m100")
-    if not isinstance(backend, dict):
-        backend = {
-            "source_lang": "en",
-            "target_lang": "ru",
-            "text": str(node.get("content") or ""),
-        }
-    else:
-        backend.setdefault("source_lang", "en")
-        backend.setdefault("target_lang", "ru")
-        backend.setdefault("text", str(node.get("content") or ""))
-    translations["backend_m2m100"] = backend
-    node["translations"] = translations
-    node["active_translation_provider"] = "backend_m2m100"
-    if "phonetic" not in node or not isinstance(node.get("phonetic"), dict):
-        node["phonetic"] = {"uk": "", "us": ""}
-    else:
-        node["phonetic"].setdefault("uk", "")
-        node["phonetic"].setdefault("us", "")
-
-    for child in node.get("linguistic_elements", []) or []:
-        if isinstance(child, dict):
-            _ensure_visualizer_fields(child)
 
 
 class _EchoTranslator:
@@ -512,64 +474,6 @@ def translate_text_with_provider(
     ).strip()
 
 
-def _attach_phonetic_runtime(analyzed: dict[str, Any], *, transcriber: Any) -> None:
-    for sentence_node in analyzed.values():
-        if not isinstance(sentence_node, dict):
-            continue
-        for node in _walk_nodes(sentence_node):
-            source_text = str(node.get("content") or "").strip()
-            node["phonetic"] = {
-                "uk": transcriber.transcribe_text(source_text, accent="uk"),
-                "us": transcriber.transcribe_text(source_text, accent="us"),
-            }
-
-
-def _attach_cefr_runtime(analyzed: dict[str, Any], *, predictor: Any) -> None:
-    for sentence_node in analyzed.values():
-        if not isinstance(sentence_node, dict):
-            continue
-        sentence_text = str(sentence_node.get("content") or "")
-        for node in _walk_nodes(sentence_node):
-            source_text = str(node.get("content") or "")
-            node["cefr_level"] = str(predictor.predict_level(node, source_text, sentence_text)).strip().upper() or "B1"
-
-
-def _enrich_analyzed_contract(
-    analyzed: dict[str, Any],
-    *,
-    translation_provider: str | None = None,
-    provider_credentials: dict[str, str] | None = None,
-) -> None:
-    # Notes: deterministic template/rule mode, no model dependency required.
-    annotator = LocalT5Annotator(model_dir=".", note_mode="template_only")
-    annotator.annotate(analyzed)
-
-    # CEFR: deterministic rule predictor for stable runtime behavior.
-    _attach_cefr_runtime(analyzed, predictor=RuleBasedCEFRPredictor())
-
-    # Translation: backend provider if configured, with safe echo fallback.
-    translator = _resolve_media_translator(
-        provider_override=translation_provider,
-        provider_credentials=provider_credentials,
-    )
-    _attach_translation_runtime(
-        analyzed,
-        translator=translator,
-        source_lang=os.getenv("ELA_MEDIA_TRANSLATION_SOURCE_LANG", "en"),
-        target_lang=os.getenv("ELA_MEDIA_TRANSLATION_TARGET_LANG", "ru"),
-    )
-
-    # Phonetic: backend only; if binary unavailable, keep empty values.
-    try:
-        transcriber = EspeakPhoneticTranscriber(binary=os.getenv("ELA_MEDIA_PHONETIC_BINARY", "auto"))
-        _attach_phonetic_runtime(
-            analyzed,
-            transcriber=transcriber,
-        )
-    except Exception:
-        pass
-
-
 def run_media_pipeline(
     *,
     source_path: str,
@@ -693,56 +597,3 @@ def run_media_pipeline(
         media_sentences=media_sentences,
         contract_sentences=contract_sentences,
     )
-
-
-def build_sentence_contract(
-    *,
-    sentence_text: str,
-    sentence_idx: int = 0,
-    spacy_model: str = "en_core_web_sm",
-    translation_provider: str | None = None,
-    provider_credentials: dict[str, str] | None = None,
-) -> dict[str, Any]:
-    nlp = load_nlp(spacy_model)
-    return _build_sentence_contract_with_nlp(
-        sentence_text=sentence_text,
-        sentence_idx=sentence_idx,
-        nlp=nlp,
-        translation_provider=translation_provider,
-        provider_credentials=provider_credentials,
-    )
-
-
-def _build_sentence_contract_with_nlp(
-    *,
-    sentence_text: str,
-    sentence_idx: int,
-    nlp: Any,
-    translation_provider: str | None = None,
-    provider_credentials: dict[str, str] | None = None,
-) -> dict[str, Any]:
-    text = (sentence_text or "").strip()
-    if not text:
-        raise ValueError("sentence_text must be non-empty")
-    skeleton = build_skeleton(text, nlp)
-    if not skeleton:
-        raise RuntimeError("Unable to build sentence skeleton.")
-    analyzed = apply_tam(skeleton, nlp)
-    _enrich_analyzed_contract(
-        analyzed,
-        translation_provider=translation_provider,
-        provider_credentials=provider_credentials,
-    )
-
-    if text in analyzed:
-        node = analyzed[text]
-    else:
-        node = next(iter(analyzed.values()))
-        text = str(node.get("content") or text)
-
-    _ensure_visualizer_fields(node)
-    return {
-        "sentence_text": text,
-        "sentence_hash": build_sentence_hash(text, int(sentence_idx)),
-        "sentence_node": node,
-    }
