@@ -57,6 +57,10 @@ Allowed types only:
 - `phonetic` object: `{uk, us}`
 - `synonyms` list: `[string, ...]`
 - `cefr_level`: one of `A1|A2|B1|B2|C1|C2`
+- `grammar_classes`: classifier output (`[{class_id, confidence, ...}]`)
+- `generated_notes`: current user-facing level texts (`elementary|intermediate|advanced`)
+- `note_blueprints`: immutable classifier blueprint source for controlled note generation
+- `note_generator_version`: rendering mode/version marker (`controlled::...`, `controlled_t5::...`, or legacy `local_t5::...`)
 
 ### 2.5 Nesting Rules
 - `Sentence` can contain `Phrase` and `Word`

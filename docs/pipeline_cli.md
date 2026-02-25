@@ -322,7 +322,10 @@ Legacy compatibility mode (`v1`) is still available only when explicitly request
 python -m ela_pipeline.inference.run --text "She should have trusted her instincts before making the decision." --model-dir results_llm_notes_v3_t5-small_phrase/best_model --validation-mode v1
 ```
 
-If `--model-dir` is omitted, the pipeline still returns contract-valid JSON with deterministic fields and TAM labels but empty `linguistic_notes`.
+Default note mode is now `controlled`:
+- without `--model-dir`, notes are populated from classifier blueprints (no T5 rewrite),
+- with `--model-dir`, controlled T5 rewrites blueprint notes into user-facing text.
+Legacy T5 note modes are still available explicitly via `--note-mode template_only|llm|hybrid|two_stage`.
 In `v2_strict`, each node must include `node_id`, `source_span`, `grammatical_role`, and `schema_version`, and uses real JSON `null` (not string `"null"`) in nullable TAM fields.
 
 Note: the path `artifacts/models/t5_notes/best_model` is valid only if you trained a model into `artifacts/models/t5_notes` in this workspace. If that directory does not exist, pass an existing local model directory (for example `results_llm_notes_v3_t5-small_phrase/best_model`).
