@@ -661,6 +661,10 @@ class RuntimeMediaService:
         enable_cefr: bool = False,
         cefr_provider: str = "rule",
         cefr_model_path: str = "artifacts/models/t5_cefr/best_model",
+        classifier_provider: str = "rule",
+        classifier_model_path: str | None = None,
+        classifier_device: str = "cuda",
+        enable_grammar_classes: bool = True,
     ) -> dict[str, Any]:
         from ela_pipeline.inference.run import run_pipeline
 
@@ -686,6 +690,10 @@ class RuntimeMediaService:
             enable_cefr=enable_cefr,
             cefr_provider=cefr_provider,
             cefr_model_path=cefr_model_path,
+            classifier_provider=classifier_provider,
+            classifier_model_path=classifier_model_path,
+            classifier_device=classifier_device,
+            enable_grammar_classes=enable_grammar_classes,
         )
         sentence_node = self._select_sentence_node_from_contract(contract=contract, sentence_text=text)
         sentence_text_resolved = str(sentence_node.get("content") or text).strip() or text

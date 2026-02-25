@@ -665,6 +665,39 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertEqual(node["type"], "Sentence")
             self.assertIsInstance(node.get("linguistic_notes"), list)
 
+    @patch("ela_pipeline.inference.run.run_pipeline")
+    def test_build_sentence_contract_forwards_controlled_classifier_params(self, mock_run_pipeline):
+        mock_run_pipeline.return_value = {
+            "She trusted him.": {
+                "type": "Sentence",
+                "node_id": "s1",
+                "content": "She trusted him.",
+                "linguistic_elements": [],
+                "linguistic_notes": [],
+            }
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            _ = svc.build_sentence_contract(
+                sentence_text="She trusted him.",
+                sentence_idx=1,
+                note_mode="controlled",
+                model_dir="artifacts/models/t5_notes_controlled",
+                classifier_provider="deberta",
+                classifier_model_path="artifacts/models/deberta_classifier_cefr",
+                classifier_device="cuda",
+            )
+            kwargs = mock_run_pipeline.call_args.kwargs
+            self.assertEqual(kwargs["note_mode"], "controlled")
+            self.assertEqual(kwargs["model_dir"], "artifacts/models/t5_notes_controlled")
+            self.assertEqual(kwargs["classifier_provider"], "deberta")
+            self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/deberta_classifier_cefr")
+            self.assertEqual(kwargs["classifier_device"], "cuda")
+
     def test_request_sentence_contract_uses_backend_endpoint_when_configured(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.dict("os.environ", {"ELA_SENTENCE_CONTRACT_BACKEND_URL": "http://backend.local"}, clear=False):

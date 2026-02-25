@@ -31,6 +31,13 @@ def _env_bool(name: str, default: bool) -> bool:
     return value in {"1", "true", "yes", "on"}
 
 
+def _env_str(name: str, default: str = "") -> str:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return str(raw).strip()
+
+
 SERVICE = RuntimeMediaService(
     db_path=os.getenv("ELA_CLIENT_DB_PATH", "artifacts/client_state.sqlite3"),
     runtime_mode=os.getenv("ELA_RUNTIME_MODE", "auto"),
@@ -39,10 +46,16 @@ SERVICE = RuntimeMediaService(
 
 
 def _build_sentence_contract_payload(sentence_text: str, sentence_idx: int) -> dict:
+    controlled_model_dir = _env_str("ELA_CONTROLLED_T5_MODEL_DIR", "")
+    classifier_provider = _env_str("ELA_CLASSIFIER_PROVIDER", "rule") or "rule"
+    classifier_model_path = _env_str("ELA_CLASSIFIER_MODEL_PATH", "")
+    if classifier_provider == "deberta" and not classifier_model_path:
+        classifier_model_path = "artifacts/models/deberta_classifier_cefr"
     return SERVICE.build_sentence_contract(
         sentence_text=sentence_text,
         sentence_idx=sentence_idx,
         note_mode="controlled",
+        model_dir=controlled_model_dir or None,
         validation_mode="v2_strict",
         enable_translation=True,
         translation_model="artifacts/models/m2m100_418M",
@@ -53,9 +66,13 @@ def _build_sentence_contract_payload(sentence_text: str, sentence_idx: int) -> d
         phonetic_binary="auto",
         enable_synonyms=False,
         synonyms_top_k=5,
-        enable_cefr=True,
+        enable_cefr=(classifier_provider == "rule"),
         cefr_provider="rule",
         cefr_model_path="artifacts/models/t5_cefr/best_model",
+        classifier_provider=classifier_provider,
+        classifier_model_path=classifier_model_path or None,
+        classifier_device="cuda",
+        enable_grammar_classes=True,
     )
 
 
