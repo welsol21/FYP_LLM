@@ -107,7 +107,7 @@ def main() -> None:
     parser.add_argument("--validation-mode", default="v2_strict", choices=["v1", "v2_strict"])
     parser.add_argument(
         "--note-mode",
-        default="template_only",
+        default="controlled",
         choices=["controlled", "template_only", "llm", "hybrid", "two_stage"],
     )
     parser.add_argument("--output", default=None)

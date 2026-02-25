@@ -685,6 +685,7 @@ class PipelineTests(unittest.TestCase):
         out = run_pipeline(
             "She trusted him.",
             model_dir="artifacts/models/fake_notes_model",
+            note_mode="template_only",
             classifier_provider="rule",
             enable_cefr=True,
             cefr_provider="rule",

@@ -808,7 +808,7 @@ def run_pipeline(
     model_dir: str | None = None,
     spacy_model: str = "en_core_web_sm",
     validation_mode: str = "v2_strict",
-    note_mode: str = "template_only",
+    note_mode: str = "controlled",
     backoff_debug_summary: bool = False,
     enable_translation: bool = False,
     translation_provider: str = "m2m100",
@@ -969,7 +969,7 @@ def main() -> None:
     parser.add_argument("--validation-mode", default="v2_strict", choices=["v1", "v2_strict"])
     parser.add_argument(
         "--note-mode",
-        default="template_only",
+        default="controlled",
         choices=NOTE_MODE_CHOICES,
         help=(
             "Inference mode: controlled (classifier blueprints -> user notes) "
