@@ -655,6 +655,7 @@ def _attach_generated_notes(doc: dict) -> None:
 
     def walk(node: dict) -> None:
         generated = build_notes(node)
+        node["note_blueprints"] = dict(generated)
         node["generated_notes"] = generated
         existing_notes = node.get("linguistic_notes")
         if isinstance(existing_notes, list) and len(existing_notes) == 0:
@@ -678,6 +679,13 @@ def _apply_controlled_notes(doc: dict) -> None:
             fallback = str(generated.get("elementary_text") or "").strip()
             note = preferred or fallback
             node["linguistic_notes"] = [note] if note else []
+        else:
+            blueprints = node.get("note_blueprints")
+            if isinstance(blueprints, dict):
+                preferred = str(blueprints.get("intermediate_text") or "").strip()
+                fallback = str(blueprints.get("elementary_text") or "").strip()
+                note = preferred or fallback
+                node["linguistic_notes"] = [note] if note else []
         for child in node.get("linguistic_elements", []) or []:
             if isinstance(child, dict):
                 walk(child)
@@ -697,6 +705,7 @@ def _rewrite_controlled_notes_with_t5(doc: dict, renderer: Any) -> None:
     def walk(node: dict, sentence_text: str) -> None:
         generated = node.get("generated_notes")
         if isinstance(generated, dict):
+            node.setdefault("note_blueprints", dict(generated))
             for key, level in key_to_level.items():
                 blueprint = str(generated.get(key) or "").strip()
                 if not blueprint:
@@ -735,6 +744,7 @@ def _attach_classifier_profiles(doc: dict, classifier: Any) -> None:
         node["grammar_classes"] = grammar_classes if isinstance(grammar_classes, list) else []
         generated_notes = profile.get("generated_notes")
         if isinstance(generated_notes, dict):
+            node["note_blueprints"] = dict(generated_notes)
             node["generated_notes"] = generated_notes
             existing_notes = node.get("linguistic_notes")
             if isinstance(existing_notes, list) and len(existing_notes) == 0:

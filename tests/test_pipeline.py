@@ -580,10 +580,13 @@ class PipelineTests(unittest.TestCase):
         out = run_pipeline("She trusted him.", model_dir=None)
         sentence = out[next(iter(out))]
         generated = sentence.get("generated_notes")
+        blueprints = sentence.get("note_blueprints")
         self.assertIsInstance(generated, dict)
+        self.assertIsInstance(blueprints, dict)
         self.assertTrue(generated.get("elementary_text"))
         self.assertTrue(generated.get("intermediate_text"))
         self.assertTrue(generated.get("advanced_text"))
+        self.assertEqual(blueprints, generated)
         notes = sentence.get("linguistic_notes")
         self.assertIsInstance(notes, list)
         self.assertGreater(len(notes), 0)
@@ -596,7 +599,9 @@ class PipelineTests(unittest.TestCase):
         )
         sentence = out[next(iter(out))]
         generated = sentence.get("generated_notes")
+        blueprints = sentence.get("note_blueprints")
         self.assertIsInstance(generated, dict)
+        self.assertIsInstance(blueprints, dict)
         self.assertEqual(
             sentence.get("linguistic_notes"),
             [generated.get("intermediate_text")],
@@ -644,9 +649,11 @@ class PipelineTests(unittest.TestCase):
         )
         sentence = out[next(iter(out))]
         generated = sentence.get("generated_notes", {})
+        blueprints = sentence.get("note_blueprints", {})
         self.assertTrue(str(generated.get("elementary_text")).startswith("rendered::elementary::"))
         self.assertTrue(str(generated.get("intermediate_text")).startswith("rendered::intermediate::"))
         self.assertTrue(str(generated.get("advanced_text")).startswith("rendered::advanced::"))
+        self.assertFalse(str(blueprints.get("intermediate_text")).startswith("rendered::"))
         self.assertEqual(sentence.get("linguistic_notes"), [generated.get("intermediate_text")])
 
     @patch("ela_pipeline.classifier.deberta.DebertaProfileClassifier")

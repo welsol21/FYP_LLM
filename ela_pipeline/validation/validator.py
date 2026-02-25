@@ -739,6 +739,25 @@ def _validate_optional_generated_notes(node: Dict[str, Any], path: str, errors: 
             _expect(value.strip() != "", errors, f"{path}.generated_notes.{key}", f"{key} must be non-empty")
 
 
+def _validate_optional_note_blueprints(node: Dict[str, Any], path: str, errors: List[ValidationErrorItem]) -> None:
+    if "note_blueprints" not in node:
+        return
+    generated = node.get("note_blueprints")
+    _expect(
+        isinstance(generated, dict),
+        errors,
+        f"{path}.note_blueprints",
+        "note_blueprints must be object",
+    )
+    if not isinstance(generated, dict):
+        return
+    for key in ("elementary_text", "intermediate_text", "advanced_text"):
+        value = generated.get(key)
+        _expect(isinstance(value, str), errors, f"{path}.note_blueprints.{key}", f"{key} must be string")
+        if isinstance(value, str):
+            _expect(value.strip() != "", errors, f"{path}.note_blueprints.{key}", f"{key} must be non-empty")
+
+
 def _validate_required_fields(
     node: Dict[str, Any],
     path: str,
@@ -819,6 +838,7 @@ def _validate_node(
     _validate_optional_note_generator_version(node, path, errors)
     _validate_optional_grammar_classes(node, path, errors)
     _validate_optional_generated_notes(node, path, errors)
+    _validate_optional_note_blueprints(node, path, errors)
     if validation_mode == "v2_strict":
         _expect(node.get("schema_version") == "v2", errors, f"{path}.schema_version", "schema_version must be 'v2' in strict mode")
     _validate_optional_ids(node, path, errors, seen_ids, expected_parent_id)

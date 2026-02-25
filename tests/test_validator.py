@@ -298,6 +298,40 @@ class ValidatorTests(unittest.TestCase):
             msg=str(result.errors),
         )
 
+    def test_accepts_optional_note_blueprints(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["note_blueprints"] = {
+            "elementary_text": "Simple blueprint.",
+            "intermediate_text": "Intermediate blueprint.",
+            "advanced_text": "Advanced blueprint.",
+        }
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertTrue(result.ok, msg=str(result.errors))
+
+    def test_rejects_invalid_optional_note_blueprints(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        sentence["note_blueprints"] = {
+            "elementary_text": "ok",
+            "intermediate_text": "",
+            "advanced_text": "ok",
+        }
+
+        result = validate_contract(data, validation_mode="v1")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any("note_blueprints.intermediate_text" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
     def test_accepts_arbitrary_tam_construction_value(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)
