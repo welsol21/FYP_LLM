@@ -603,6 +603,16 @@ class PipelineTests(unittest.TestCase):
         )
         self.assertEqual(sentence.get("note_generator_version"), "controlled::classifier_blueprints")
 
+    def test_pipeline_default_note_mode_is_controlled(self):
+        out = run_pipeline("She trusted him.", model_dir=None)
+        sentence = out[next(iter(out))]
+        generated = sentence.get("generated_notes")
+        self.assertIsInstance(generated, dict)
+        self.assertEqual(
+            sentence.get("linguistic_notes"),
+            [generated.get("intermediate_text")],
+        )
+
     @patch("ela_pipeline.annotate.controlled_renderer.ControlledT5NoteRenderer")
     @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.__init__", side_effect=AssertionError("must not be called"))
     def test_pipeline_controlled_mode_skips_legacy_t5_annotator(self, _mock_init, mock_renderer_cls):
