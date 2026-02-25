@@ -153,6 +153,7 @@ Implementation note:
 5. **NLG gate**
 - note relevance to predicted class
 - level-appropriate style
+- blueprint traceability (rendered note preserves blueprint intent)
 - hallucination/contradiction rate
 
 ## 7. Feedback + Repair Logging

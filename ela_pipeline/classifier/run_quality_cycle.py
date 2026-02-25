@@ -39,8 +39,18 @@ def _default_metrics_for_gate(gate: str, attempt: int) -> dict[str, float]:
         return {"schema_pass_rate": 1.0, "consistency_pass_rate": 0.99, "blueprint_completeness": 1.0}
     if gate == "nlg":
         if attempt == 1:
-            return {"note_relevance": 0.86, "level_style_fit": 0.83, "hallucination_rate_max": 0.05}
-        return {"note_relevance": 0.92, "level_style_fit": 0.90, "hallucination_rate_max": 0.02}
+            return {
+                "note_relevance": 0.86,
+                "level_style_fit": 0.83,
+                "blueprint_traceability": 0.95,
+                "hallucination_rate_max": 0.05,
+            }
+        return {
+            "note_relevance": 0.92,
+            "level_style_fit": 0.90,
+            "blueprint_traceability": 0.99,
+            "hallucination_rate_max": 0.02,
+        }
     raise ValueError(f"Unknown gate: {gate!r}")
 
 

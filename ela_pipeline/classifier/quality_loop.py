@@ -62,6 +62,7 @@ DEFAULT_GATE_THRESHOLDS: dict[str, dict[str, float]] = {
     "nlg": {
         "note_relevance": 0.90,
         "level_style_fit": 0.88,
+        "blueprint_traceability": 0.98,
         "hallucination_rate_max": 0.03,
     },
 }

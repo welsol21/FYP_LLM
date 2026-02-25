@@ -36,6 +36,7 @@ class ClassifierQualityLoopTests(unittest.TestCase):
             "nlg": {
                 "note_relevance": 0.95,
                 "level_style_fit": 0.9,
+                "blueprint_traceability": 0.99,
                 "hallucination_rate_max": 0.01,
             },
         }
