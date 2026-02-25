@@ -1,4 +1,8 @@
 import unittest
+import json
+import threading
+from http.server import ThreadingHTTPServer
+from urllib import request as urlrequest
 from unittest.mock import patch
 
 from ela_pipeline.runtime import api_server
@@ -40,7 +44,51 @@ class RuntimeApiServerTests(unittest.TestCase):
         self.assertEqual(kwargs["classifier_provider"], "deberta")
         self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/deberta_classifier_cefr")
 
+    @patch("ela_pipeline.runtime.api_server.SERVICE.build_sentence_contract")
+    @patch("ela_pipeline.runtime.api_server.os.path.isdir", return_value=True)
+    def test_sentence_contract_http_e2e_smoke(self, _mock_isdir, mock_build_sentence_contract):
+        mock_build_sentence_contract.return_value = {
+            "sentence_text": "She trusted him.",
+            "sentence_hash": "h-1",
+            "sentence_node": {
+                "type": "Sentence",
+                "node_id": "n1",
+                "content": "She trusted him.",
+                "linguistic_elements": [],
+                "linguistic_notes": ["Note"],
+            },
+        }
+
+        with patch.dict("os.environ", {}, clear=False):
+            try:
+                server = ThreadingHTTPServer(("127.0.0.1", 0), api_server.RuntimeApiHandler)
+            except PermissionError:
+                self.skipTest("Socket bind is not permitted in current sandbox environment.")
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            host, port = server.server_address
+            req = urlrequest.Request(
+                f"http://{host}:{port}/api/sentence-contract",
+                method="POST",
+                data=json.dumps({"sentenceText": "She trusted him.", "sentenceIdx": 1}).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+            )
+            with urlrequest.urlopen(req, timeout=5) as resp:  # nosec B310
+                body = json.loads(resp.read().decode("utf-8"))
+
+            self.assertEqual(body["sentence_hash"], "h-1")
+            self.assertEqual(body["sentence_node"]["type"], "Sentence")
+            kwargs = mock_build_sentence_contract.call_args.kwargs
+            self.assertEqual(kwargs["sentence_text"], "She trusted him.")
+            self.assertEqual(kwargs["sentence_idx"], 1)
+            self.assertEqual(kwargs["note_mode"], "controlled")
+            self.assertEqual(kwargs["classifier_provider"], "deberta")
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
 
 if __name__ == "__main__":
     unittest.main()
-
