@@ -33,6 +33,8 @@ DEFAULT_CEFR_MODEL_PATH = "artifacts/models/t5_cefr/best_model"
 CEFR_ALLOWED_LEVELS = {"A1", "A2", "B1", "B2", "C1", "C2"}
 CEFR_LEVEL_ORDER = ("A1", "A2", "B1", "B2", "C1", "C2")
 CEFR_LEVEL_TO_INDEX = {level: idx for idx, level in enumerate(CEFR_LEVEL_ORDER)}
+LEGACY_NOTE_MODES = {"template_only", "llm", "hybrid", "two_stage"}
+NOTE_MODE_CHOICES = tuple(sorted(LEGACY_NOTE_MODES | {"controlled"}))
 
 WORD_POS_CEILING = {
     "article": "A1",
@@ -666,6 +668,25 @@ def _attach_generated_notes(doc: dict) -> None:
             walk(sentence_node)
 
 
+def _apply_controlled_notes(doc: dict) -> None:
+    """Populate user-facing linguistic_notes from classifier-owned note blueprints."""
+
+    def walk(node: dict) -> None:
+        generated = node.get("generated_notes")
+        if isinstance(generated, dict):
+            preferred = str(generated.get("intermediate_text") or "").strip()
+            fallback = str(generated.get("elementary_text") or "").strip()
+            note = preferred or fallback
+            node["linguistic_notes"] = [note] if note else []
+        for child in node.get("linguistic_elements", []) or []:
+            if isinstance(child, dict):
+                walk(child)
+
+    for sentence_node in doc.values():
+        if isinstance(sentence_node, dict):
+            walk(sentence_node)
+
+
 def _attach_classifier_profiles(doc: dict, classifier: Any) -> None:
     def walk(node: dict, sentence_text: str) -> None:
         source_text = _node_source_text(node, sentence_text)
@@ -785,7 +806,7 @@ def run_pipeline(
     apply_tam(enriched, nlp)
     _apply_strict_null_normalization(enriched, validation_mode)
 
-    if model_dir:
+    if model_dir and note_mode in LEGACY_NOTE_MODES:
         from ela_pipeline.annotate.local_generator import LocalT5Annotator
 
         annotator = LocalT5Annotator(
@@ -880,6 +901,13 @@ def run_pipeline(
     else:
         raise ValueError("classifier_provider must be one of: rule | deberta")
 
+    if note_mode == "controlled":
+        _apply_controlled_notes(enriched)
+        _attach_note_generator_version(
+            enriched,
+            version="controlled::classifier_blueprints",
+        )
+
     raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
     raise_if_invalid(validate_frozen_structure(skeleton, enriched))
     _enforce_linguistic_elements_last(enriched)
@@ -895,8 +923,11 @@ def main() -> None:
     parser.add_argument(
         "--note-mode",
         default="template_only",
-        choices=["template_only", "llm", "hybrid", "two_stage"],
-        help="Inference mode: template_only, llm, hybrid, or two_stage (model template_id -> rule note render).",
+        choices=NOTE_MODE_CHOICES,
+        help=(
+            "Inference mode: controlled (classifier blueprints -> user notes) "
+            "or legacy T5 modes (template_only, llm, hybrid, two_stage)."
+        ),
     )
     parser.add_argument(
         "--backoff-debug-summary",

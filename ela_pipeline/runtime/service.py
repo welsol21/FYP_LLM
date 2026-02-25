@@ -647,7 +647,7 @@ class RuntimeMediaService:
         sentence_text: str,
         sentence_idx: int = 0,
         model_dir: str | None = None,
-        note_mode: str = "template_only",
+        note_mode: str = "controlled",
         validation_mode: str = "v2_strict",
         enable_translation: bool = False,
         translation_model: str = "facebook/m2m100_418M",

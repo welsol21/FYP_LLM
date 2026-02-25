@@ -108,7 +108,7 @@ def main() -> None:
     parser.add_argument(
         "--note-mode",
         default="template_only",
-        choices=["template_only", "llm", "hybrid", "two_stage"],
+        choices=["controlled", "template_only", "llm", "hybrid", "two_stage"],
     )
     parser.add_argument("--output", default=None)
     args = parser.parse_args()

@@ -588,6 +588,31 @@ class PipelineTests(unittest.TestCase):
         self.assertIsInstance(notes, list)
         self.assertGreater(len(notes), 0)
 
+    def test_pipeline_controlled_mode_uses_classifier_blueprints_for_notes(self):
+        out = run_pipeline(
+            "She trusted him.",
+            model_dir=None,
+            note_mode="controlled",
+        )
+        sentence = out[next(iter(out))]
+        generated = sentence.get("generated_notes")
+        self.assertIsInstance(generated, dict)
+        self.assertEqual(
+            sentence.get("linguistic_notes"),
+            [generated.get("intermediate_text")],
+        )
+        self.assertEqual(sentence.get("note_generator_version"), "controlled::classifier_blueprints")
+
+    @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.__init__", side_effect=AssertionError("must not be called"))
+    def test_pipeline_controlled_mode_skips_legacy_t5_annotator(self, _mock_init):
+        out = run_pipeline(
+            "She trusted him.",
+            model_dir="artifacts/models/fake_notes_model",
+            note_mode="controlled",
+        )
+        sentence = out[next(iter(out))]
+        self.assertEqual(sentence.get("note_generator_version"), "controlled::classifier_blueprints")
+
     @patch("ela_pipeline.classifier.deberta.DebertaProfileClassifier")
     def test_pipeline_uses_deberta_classifier_provider(self, mock_classifier_cls):
         fake_classifier = MagicMock()
@@ -605,6 +630,7 @@ class PipelineTests(unittest.TestCase):
         out = run_pipeline(
             "She trusted him.",
             model_dir=None,
+            note_mode="controlled",
             classifier_provider="deberta",
             classifier_model_path="/tmp/fake-deberta",
             classifier_device="cuda",
@@ -613,6 +639,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(sentence.get("cefr_level"), "B2")
         self.assertEqual(sentence.get("grammar_classes")[0]["class_id"], "tam::modal_perfect")
         self.assertEqual(sentence.get("generated_notes", {}).get("intermediate_text"), "Intermediate note.")
+        self.assertEqual(sentence.get("linguistic_notes"), ["Intermediate note."])
         self.assertGreaterEqual(fake_classifier.classify_node.call_count, 1)
 
     @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.annotate")

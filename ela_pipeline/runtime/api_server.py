@@ -42,7 +42,7 @@ def _build_sentence_contract_payload(sentence_text: str, sentence_idx: int) -> d
     return SERVICE.build_sentence_contract(
         sentence_text=sentence_text,
         sentence_idx=sentence_idx,
-        note_mode="template_only",
+        note_mode="controlled",
         validation_mode="v2_strict",
         enable_translation=True,
         translation_model="artifacts/models/m2m100_418M",
