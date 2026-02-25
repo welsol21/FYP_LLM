@@ -9,15 +9,17 @@ from ela_pipeline.runtime import api_server
 
 
 class RuntimeApiServerTests(unittest.TestCase):
+    @patch("ela_pipeline.runtime.api_server.os.path.isfile", return_value=True)
     @patch("ela_pipeline.runtime.api_server.os.path.isdir", return_value=True)
-    def test_resolve_classifier_settings_defaults_to_deberta_when_model_dir_exists(self, _mock_isdir):
+    def test_resolve_classifier_settings_defaults_to_deberta_when_model_dir_exists(self, _mock_isdir, _mock_isfile):
         with patch.dict("os.environ", {}, clear=False):
             provider, model_path = api_server._resolve_classifier_settings()
         self.assertEqual(provider, "deberta")
         self.assertEqual(model_path, "artifacts/models/deberta_classifier_cefr")
 
+    @patch("ela_pipeline.runtime.api_server.os.path.isfile", return_value=False)
     @patch("ela_pipeline.runtime.api_server.os.path.isdir", return_value=False)
-    def test_resolve_classifier_settings_defaults_to_rule_when_no_deberta_dir(self, _mock_isdir):
+    def test_resolve_classifier_settings_defaults_to_rule_when_no_deberta_dir(self, _mock_isdir, _mock_isfile):
         with patch.dict("os.environ", {}, clear=False):
             provider, model_path = api_server._resolve_classifier_settings()
         self.assertEqual(provider, "rule")
@@ -29,10 +31,12 @@ class RuntimeApiServerTests(unittest.TestCase):
                 api_server._resolve_classifier_settings()
 
     @patch("ela_pipeline.runtime.api_server.SERVICE.build_sentence_contract")
+    @patch("ela_pipeline.runtime.api_server.os.path.isfile", return_value=True)
     @patch("ela_pipeline.runtime.api_server.os.path.isdir", return_value=True)
     def test_build_sentence_contract_payload_uses_controlled_and_resolved_classifier(
         self,
         _mock_isdir,
+        _mock_isfile,
         mock_build_sentence_contract,
     ):
         mock_build_sentence_contract.return_value = {"ok": True}
@@ -45,8 +49,9 @@ class RuntimeApiServerTests(unittest.TestCase):
         self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/deberta_classifier_cefr")
 
     @patch("ela_pipeline.runtime.api_server.SERVICE.build_sentence_contract")
+    @patch("ela_pipeline.runtime.api_server.os.path.isfile", return_value=True)
     @patch("ela_pipeline.runtime.api_server.os.path.isdir", return_value=True)
-    def test_sentence_contract_http_e2e_smoke(self, _mock_isdir, mock_build_sentence_contract):
+    def test_sentence_contract_http_e2e_smoke(self, _mock_isdir, _mock_isfile, mock_build_sentence_contract):
         mock_build_sentence_contract.return_value = {
             "sentence_text": "She trusted him.",
             "sentence_hash": "h-1",

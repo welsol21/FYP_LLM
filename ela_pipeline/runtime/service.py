@@ -641,6 +641,37 @@ class RuntimeMediaService:
             )
         return out
 
+    @staticmethod
+    def _resolve_classifier_defaults(
+        *,
+        classifier_provider: str,
+        classifier_model_path: str | None,
+    ) -> tuple[str, str | None]:
+        explicit_provider = str(classifier_provider or "").strip().lower()
+        explicit_model_path = str(classifier_model_path or "").strip()
+
+        env_provider = str(os.getenv("ELA_CLASSIFIER_PROVIDER", "")).strip().lower()
+        env_model_path = str(os.getenv("ELA_CLASSIFIER_MODEL_PATH", "")).strip()
+
+        model_dir = explicit_model_path or env_model_path or "artifacts/models/deberta_classifier_cefr"
+        has_local_deberta = (
+            os.path.isdir(model_dir)
+            and os.path.isfile(os.path.join(model_dir, "classifier_metadata.json"))
+        )
+
+        if explicit_provider and explicit_provider != "rule":
+            provider = explicit_provider
+        elif env_provider:
+            provider = env_provider
+        else:
+            provider = "deberta" if has_local_deberta else "rule"
+
+        if provider not in {"rule", "deberta"}:
+            raise ValueError("classifier_provider must be one of: rule | deberta")
+        if provider == "deberta":
+            return provider, model_dir
+        return provider, None
+
     def build_sentence_contract(
         self,
         *,
@@ -672,6 +703,11 @@ class RuntimeMediaService:
         if not text:
             raise ValueError("sentence_text must be non-empty")
 
+        resolved_classifier_provider, resolved_classifier_model_path = self._resolve_classifier_defaults(
+            classifier_provider=classifier_provider,
+            classifier_model_path=classifier_model_path,
+        )
+
         contract = run_pipeline(
             text=text,
             model_dir=model_dir,
@@ -690,8 +726,8 @@ class RuntimeMediaService:
             enable_cefr=enable_cefr,
             cefr_provider=cefr_provider,
             cefr_model_path=cefr_model_path,
-            classifier_provider=classifier_provider,
-            classifier_model_path=classifier_model_path,
+            classifier_provider=resolved_classifier_provider,
+            classifier_model_path=resolved_classifier_model_path,
             classifier_device=classifier_device,
             enable_grammar_classes=enable_grammar_classes,
         )

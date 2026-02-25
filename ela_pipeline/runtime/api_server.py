@@ -46,7 +46,11 @@ def _resolve_classifier_settings() -> tuple[str, str | None]:
         provider = provider_raw
     else:
         default_model_dir = "artifacts/models/deberta_classifier_cefr"
-        provider = "deberta" if os.path.isdir(default_model_dir) else "rule"
+        has_deberta = (
+            os.path.isdir(default_model_dir)
+            and os.path.isfile(os.path.join(default_model_dir, "classifier_metadata.json"))
+        )
+        provider = "deberta" if has_deberta else "rule"
         if not model_path and provider == "deberta":
             model_path = default_model_dir
 

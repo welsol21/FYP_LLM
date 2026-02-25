@@ -698,6 +698,39 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/deberta_classifier_cefr")
             self.assertEqual(kwargs["classifier_device"], "cuda")
 
+    @patch("ela_pipeline.inference.run.run_pipeline")
+    @patch("ela_pipeline.runtime.service.os.path.isfile", return_value=True)
+    @patch("ela_pipeline.runtime.service.os.path.isdir", return_value=True)
+    def test_build_sentence_contract_auto_defaults_to_deberta_when_model_exists(
+        self,
+        _mock_isdir,
+        _mock_isfile,
+        mock_run_pipeline,
+    ):
+        mock_run_pipeline.return_value = {
+            "She trusted him.": {
+                "type": "Sentence",
+                "node_id": "s1",
+                "content": "She trusted him.",
+                "linguistic_elements": [],
+                "linguistic_notes": [],
+            }
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            _ = svc.build_sentence_contract(
+                sentence_text="She trusted him.",
+                sentence_idx=1,
+                note_mode="controlled",
+            )
+            kwargs = mock_run_pipeline.call_args.kwargs
+            self.assertEqual(kwargs["classifier_provider"], "deberta")
+            self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/deberta_classifier_cefr")
+
     def test_request_sentence_contract_uses_backend_endpoint_when_configured(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             with patch.dict("os.environ", {"ELA_SENTENCE_CONTRACT_BACKEND_URL": "http://backend.local"}, clear=False):
