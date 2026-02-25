@@ -687,6 +687,45 @@ def _apply_controlled_notes(doc: dict) -> None:
             walk(sentence_node)
 
 
+def _rewrite_controlled_notes_with_t5(doc: dict, renderer: Any) -> None:
+    key_to_level = {
+        "elementary_text": "elementary",
+        "intermediate_text": "intermediate",
+        "advanced_text": "advanced",
+    }
+
+    def walk(node: dict, sentence_text: str) -> None:
+        generated = node.get("generated_notes")
+        if isinstance(generated, dict):
+            for key, level in key_to_level.items():
+                blueprint = str(generated.get(key) or "").strip()
+                if not blueprint:
+                    continue
+                rendered = str(
+                    renderer.render_note(
+                        blueprint_text=blueprint,
+                        level=level,
+                        sentence_text=sentence_text,
+                        node_text=str(node.get("content") or "").strip(),
+                        node_type=str(node.get("type") or "").strip(),
+                        part_of_speech=str(node.get("part_of_speech") or "").strip(),
+                        cefr_level=str(node.get("cefr_level") or "").strip(),
+                    )
+                    or ""
+                ).strip()
+                if rendered:
+                    generated[key] = rendered
+        for child in node.get("linguistic_elements", []) or []:
+            if isinstance(child, dict):
+                walk(child, sentence_text)
+
+    for sentence_node in doc.values():
+        if not isinstance(sentence_node, dict):
+            continue
+        sentence_text = str(sentence_node.get("content") or "")
+        walk(sentence_node, sentence_text)
+
+
 def _attach_classifier_profiles(doc: dict, classifier: Any) -> None:
     def walk(node: dict, sentence_text: str) -> None:
         source_text = _node_source_text(node, sentence_text)
@@ -903,9 +942,17 @@ def run_pipeline(
 
     if note_mode == "controlled":
         _apply_controlled_notes(enriched)
+        note_version = "controlled::classifier_blueprints"
+        if model_dir:
+            from ela_pipeline.annotate.controlled_renderer import ControlledT5NoteRenderer
+
+            renderer = ControlledT5NoteRenderer(model_dir=model_dir)
+            _rewrite_controlled_notes_with_t5(enriched, renderer=renderer)
+            _apply_controlled_notes(enriched)
+            note_version = "controlled_t5::blueprint_rewrite"
         _attach_note_generator_version(
             enriched,
-            version="controlled::classifier_blueprints",
+            version=note_version,
         )
 
     raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))

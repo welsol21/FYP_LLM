@@ -603,15 +603,41 @@ class PipelineTests(unittest.TestCase):
         )
         self.assertEqual(sentence.get("note_generator_version"), "controlled::classifier_blueprints")
 
+    @patch("ela_pipeline.annotate.controlled_renderer.ControlledT5NoteRenderer")
     @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.__init__", side_effect=AssertionError("must not be called"))
-    def test_pipeline_controlled_mode_skips_legacy_t5_annotator(self, _mock_init):
+    def test_pipeline_controlled_mode_skips_legacy_t5_annotator(self, _mock_init, mock_renderer_cls):
+        mock_renderer = MagicMock()
+        mock_renderer.render_note.side_effect = lambda **kwargs: kwargs["blueprint_text"]
+        mock_renderer_cls.return_value = mock_renderer
         out = run_pipeline(
             "She trusted him.",
             model_dir="artifacts/models/fake_notes_model",
             note_mode="controlled",
         )
         sentence = out[next(iter(out))]
-        self.assertEqual(sentence.get("note_generator_version"), "controlled::classifier_blueprints")
+        self.assertEqual(sentence.get("note_generator_version"), "controlled_t5::blueprint_rewrite")
+
+    @patch("ela_pipeline.annotate.controlled_renderer.ControlledT5NoteRenderer")
+    def test_pipeline_controlled_mode_rewrites_blueprints_with_t5(self, mock_renderer_cls):
+        mock_renderer = MagicMock()
+
+        def _render(**kwargs):
+            return f"rendered::{kwargs['level']}::{kwargs['blueprint_text']}"
+
+        mock_renderer.render_note.side_effect = _render
+        mock_renderer_cls.return_value = mock_renderer
+
+        out = run_pipeline(
+            "She trusted him.",
+            model_dir="artifacts/models/fake_notes_model",
+            note_mode="controlled",
+        )
+        sentence = out[next(iter(out))]
+        generated = sentence.get("generated_notes", {})
+        self.assertTrue(str(generated.get("elementary_text")).startswith("rendered::elementary::"))
+        self.assertTrue(str(generated.get("intermediate_text")).startswith("rendered::intermediate::"))
+        self.assertTrue(str(generated.get("advanced_text")).startswith("rendered::advanced::"))
+        self.assertEqual(sentence.get("linguistic_notes"), [generated.get("intermediate_text")])
 
     @patch("ela_pipeline.classifier.deberta.DebertaProfileClassifier")
     def test_pipeline_uses_deberta_classifier_provider(self, mock_classifier_cls):
