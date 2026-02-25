@@ -591,6 +591,11 @@ def run_media_pipeline(
     if not full_text:
         raise RuntimeError("Extracted text is empty.")
 
+    if sentence_contract_builder is None:
+        raise RuntimeError(
+            "sentence_contract_builder is required. Local sentence-contract fallback is disabled."
+        )
+
     nlp = load_nlp(spacy_model)
     sentence_stream: list[str] = []
     sentence_timeline: list[dict[str, float] | None] = []
@@ -622,17 +627,10 @@ def run_media_pipeline(
                 idx / total_sentences,
                 f"Building sentence contract {idx + 1}/{total_sentences}",
             )
-        if sentence_contract_builder is None:
-            sentence_payload = _build_sentence_contract_with_nlp(
-                sentence_text=sentence_text,
-                sentence_idx=idx,
-                nlp=nlp,
-            )
-        else:
-            sentence_payload = sentence_contract_builder(
-                sentence_text=sentence_text,
-                sentence_idx=idx,
-            )
+        sentence_payload = sentence_contract_builder(
+            sentence_text=sentence_text,
+            sentence_idx=idx,
+        )
         sentence_node = sentence_payload["sentence_node"]
         sentence_text_resolved = str(sentence_payload.get("sentence_text") or sentence_text).strip()
         sent_hash = sentence_payload["sentence_hash"]

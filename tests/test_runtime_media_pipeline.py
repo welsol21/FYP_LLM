@@ -7,12 +7,35 @@ from ela_pipeline.runtime.media_pipeline import _extract_text_and_sentence_chunk
 
 
 class RuntimeMediaPipelineTests(unittest.TestCase):
+    @staticmethod
+    def _builder(*, sentence_text: str, sentence_idx: int):
+        return {
+            "sentence_text": sentence_text,
+            "sentence_hash": f"h-{sentence_idx}",
+            "sentence_node": {
+                "type": "Sentence",
+                "node_id": f"n-{sentence_idx}",
+                "content": sentence_text,
+                "linguistic_elements": [],
+                "linguistic_notes": [],
+                "translations": {"backend_m2m100": {"text": sentence_text}},
+                "phonetic": {"uk": "", "us": ""},
+            },
+        }
+
+    def test_pipeline_requires_external_sentence_contract_builder(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "sample.txt"
+            source.write_text("She trusted him.", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "sentence_contract_builder is required"):
+                run_media_pipeline(source_path=str(source))
+
     def test_text_pipeline_builds_sentences_and_contract_nodes(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             source = Path(tmpdir) / "sample.txt"
             source.write_text("She trusted him. Before making the decision.", encoding="utf-8")
 
-            result = run_media_pipeline(source_path=str(source))
+            result = run_media_pipeline(source_path=str(source), sentence_contract_builder=self._builder)
             self.assertEqual(result.source_type, "text")
             self.assertIn("She trusted him.", result.full_text)
             self.assertEqual(len(result.media_sentences), 2)
@@ -43,7 +66,7 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
                     ],
                 ),
             ):
-                result = run_media_pipeline(source_path=str(media))
+                result = run_media_pipeline(source_path=str(media), sentence_contract_builder=self._builder)
             self.assertEqual(result.source_type, "audio")
             self.assertEqual(len(result.media_sentences), 2)
             self.assertEqual(result.media_sentences[0]["start_ms"], 0)
