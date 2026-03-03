@@ -7,10 +7,10 @@ import json
 from pathlib import Path
 import inspect
 from typing import Any
+import numpy as np
 
 
-CEFR_TO_ID = {"A1": 0, "A2": 1, "B1": 2, "B2": 3, "C1": 4, "C2": 5}
-ID_TO_CEFR = {v: k for k, v in CEFR_TO_ID.items()}
+CEFR_ORDER = ("A1", "A2", "B1", "B2", "C1", "C2")
 
 
 def _load_jsonl(path: str) -> list[dict[str, Any]]:
@@ -34,6 +34,8 @@ def train_deberta_classifier(
     epochs: int = 3,
     batch_size: int = 8,
     learning_rate: float = 2e-5,
+    warmup_ratio: float = 0.06,
+    max_grad_norm: float = 1.0,
     seed: int = 42,
     max_length: int = 256,
     device: str = "cuda",
@@ -72,15 +74,26 @@ def train_deberta_classifier(
             label = str(row.get("cefr_label") or "").strip().upper()
             if not text:
                 continue
-            if label not in CEFR_TO_ID:
+            if label not in CEFR_ORDER:
                 continue
-            out.append({"text": text, "label": CEFR_TO_ID[label]})
+            out.append({"text": text, "label": label})
         if not out:
             raise ValueError("No valid samples after normalization")
         return out
 
     train_norm = normalize(train_rows)
     dev_norm = normalize(dev_rows)
+
+    label_space = [cefr for cefr in CEFR_ORDER if any(r["label"] == cefr for r in train_norm + dev_norm)]
+    if len(label_space) < 2:
+        raise ValueError(f"Need at least 2 CEFR labels in dataset, got: {label_space}")
+    cefr_to_id = {label: idx for idx, label in enumerate(label_space)}
+    id_to_cefr = {idx: label for label, idx in cefr_to_id.items()}
+
+    for row in train_norm:
+        row["label"] = cefr_to_id[row["label"]]
+    for row in dev_norm:
+        row["label"] = cefr_to_id[row["label"]]
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
@@ -92,9 +105,9 @@ def train_deberta_classifier(
 
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
-        num_labels=len(CEFR_TO_ID),
-        id2label=ID_TO_CEFR,
-        label2id=CEFR_TO_ID,
+        num_labels=len(cefr_to_id),
+        id2label=id_to_cefr,
+        label2id=cefr_to_id,
     ).to("cuda")
 
     # transformers<=4.x uses `evaluation_strategy`, transformers>=5.x uses `eval_strategy`.
@@ -104,6 +117,8 @@ def train_deberta_classifier(
         "per_device_train_batch_size": batch_size,
         "per_device_eval_batch_size": batch_size,
         "learning_rate": learning_rate,
+        "warmup_ratio": warmup_ratio,
+        "max_grad_norm": max_grad_norm,
         "seed": seed,
         "save_strategy": "epoch",
         "logging_steps": 50,
@@ -119,6 +134,26 @@ def train_deberta_classifier(
         ta_kwargs["evaluation_strategy"] = "epoch"
 
     args = TrainingArguments(**ta_kwargs)
+
+    def compute_metrics(eval_pred: Any) -> dict[str, float]:
+        logits, labels = eval_pred
+        preds = np.argmax(logits, axis=-1)
+        labels = np.asarray(labels)
+        preds = np.asarray(preds)
+        accuracy = float((preds == labels).mean()) if len(labels) else 0.0
+
+        f1_scores: list[float] = []
+        for class_id in sorted(set(labels.tolist()) | set(preds.tolist())):
+            tp = int(((preds == class_id) & (labels == class_id)).sum())
+            fp = int(((preds == class_id) & (labels != class_id)).sum())
+            fn = int(((preds != class_id) & (labels == class_id)).sum())
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+            f1 = 0.0 if precision + recall == 0 else (2 * precision * recall / (precision + recall))
+            f1_scores.append(f1)
+        macro_f1 = float(sum(f1_scores) / len(f1_scores)) if f1_scores else 0.0
+        return {"accuracy": accuracy, "macro_f1": macro_f1}
+
     trainer = Trainer(
         **(
             {
@@ -127,6 +162,7 @@ def train_deberta_classifier(
                 "train_dataset": train_ds,
                 "eval_dataset": dev_ds,
                 "data_collator": DataCollatorWithPadding(tokenizer=tokenizer),
+                "compute_metrics": compute_metrics,
             }
             | (
                 {"processing_class": tokenizer}
@@ -143,6 +179,7 @@ def train_deberta_classifier(
     summary = {
         "output_dir": output_dir,
         "model_name": model_name,
+        "label_space": label_space,
         "train_samples": len(train_norm),
         "dev_samples": len(dev_norm),
         "metrics": metrics,
@@ -163,6 +200,8 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--learning-rate", type=float, default=2e-5)
+    parser.add_argument("--warmup-ratio", type=float, default=0.06)
+    parser.add_argument("--max-grad-norm", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-length", type=int, default=256)
     parser.add_argument("--device", default="cuda", choices=["cuda"])
@@ -176,6 +215,8 @@ def main() -> None:
         epochs=args.epochs,
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
+        warmup_ratio=args.warmup_ratio,
+        max_grad_norm=args.max_grad_norm,
         seed=args.seed,
         max_length=args.max_length,
         device=args.device,

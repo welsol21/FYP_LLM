@@ -85,3 +85,63 @@ def build_classifier_metadata_from_kb(*, kb_raw_path: str, output_dir: str) -> d
         "cefr_levels": list(CEFR_LADDER),
     }
 
+
+def build_classifier_metadata_from_dataset(*, classifier_jsonl_path: str, output_dir: str) -> dict[str, Any]:
+    rows = _load_jsonl(classifier_jsonl_path)
+    if not rows:
+        raise ValueError("classifier dataset rows are empty")
+
+    grammar_classes_by_cefr: dict[str, list[str]] = {lvl: [] for lvl in CEFR_LADDER}
+    note_blueprints_by_cefr: dict[str, dict[str, str]] = {}
+    per_class_cefr_ladder: dict[str, list[str]] = {}
+
+    for row in rows:
+        cefr = str(row.get("cefr_label") or row.get("cefr_level") or "").strip().upper()
+        if cefr not in grammar_classes_by_cefr:
+            continue
+
+        grammar_classes = row.get("grammar_classes")
+        if isinstance(grammar_classes, list):
+            for item in grammar_classes:
+                class_id = str(item).strip().lower()
+                if not class_id:
+                    continue
+                if class_id not in grammar_classes_by_cefr[cefr]:
+                    grammar_classes_by_cefr[cefr].append(class_id)
+                per_class_cefr_ladder.setdefault(class_id, list(CEFR_LADDER))
+
+        if cefr not in note_blueprints_by_cefr:
+            blueprints = row.get("note_blueprints") if isinstance(row.get("note_blueprints"), dict) else {}
+            note_blueprints_by_cefr[cefr] = {
+                "elementary_text": str(blueprints.get("elementary_text") or f"[{cefr}] elementary note").strip(),
+                "intermediate_text": str(blueprints.get("intermediate_text") or f"[{cefr}] intermediate note").strip(),
+                "advanced_text": str(blueprints.get("advanced_text") or f"[{cefr}] advanced note").strip(),
+            }
+
+    for cefr in CEFR_LADDER:
+        note_blueprints_by_cefr.setdefault(
+            cefr,
+            {
+                "elementary_text": f"[{cefr}] elementary note",
+                "intermediate_text": f"[{cefr}] intermediate note",
+                "advanced_text": f"[{cefr}] advanced note",
+            },
+        )
+
+    metadata = {
+        "per_class_cefr_ladder": per_class_cefr_ladder,
+        "grammar_classes_by_cefr": grammar_classes_by_cefr,
+        "note_blueprints_by_cefr": note_blueprints_by_cefr,
+    }
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    metadata_path = out_dir / "classifier_metadata.json"
+    with metadata_path.open("w", encoding="utf-8") as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=2)
+
+    return {
+        "metadata_path": str(metadata_path),
+        "class_count": len(per_class_cefr_ladder),
+        "cefr_levels": list(CEFR_LADDER),
+    }

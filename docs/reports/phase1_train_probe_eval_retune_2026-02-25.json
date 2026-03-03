@@ -1,0 +1,32 @@
+{
+  "dataset_path": "/tmp/phase1_train_probe_1500.jsonl",
+  "model_path": "artifacts/models/deberta_classifier_cefr_phase1_retune_smoke",
+  "device": "cuda",
+  "metrics": {
+    "samples": 1500,
+    "labels": [
+      "A1",
+      "A2",
+      "B1"
+    ],
+    "accuracy": 0.3333333333333333,
+    "macro_f1": 0.16666666666666666,
+    "confusion": {
+      "A1": {
+        "A1": 0,
+        "A2": 500,
+        "B1": 0
+      },
+      "A2": {
+        "A1": 0,
+        "A2": 500,
+        "B1": 0
+      },
+      "B1": {
+        "A1": 0,
+        "A2": 500,
+        "B1": 0
+      }
+    }
+  }
+}

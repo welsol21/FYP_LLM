@@ -1,0 +1,310 @@
+{
+  "dataset_path": "data/processed_classifier/phase1/train_classifier.jsonl",
+  "samples": 72000,
+  "unique_grammar_combos": 44,
+  "ambiguous_grammar_combo_count": 37,
+  "ambiguous_grammar_combo_ratio": 0.8409090909090909,
+  "exact_text_cross_level_count": 0,
+  "top_ambiguous_grammar_combos": [
+    {
+      "grammar_combo": [
+        "comparative_adjectives"
+      ],
+      "counts_by_cefr": {
+        "A2": 3070,
+        "B1": 2574
+      },
+      "sample_count": 5644
+    },
+    {
+      "grammar_combo": [
+        "coordinating_conjunctions"
+      ],
+      "counts_by_cefr": {
+        "A1": 2181,
+        "B1": 903,
+        "A2": 1085
+      },
+      "sample_count": 4169
+    },
+    {
+      "grammar_combo": [
+        "articles_a_an_the",
+        "frequency_adverbs",
+        "prepositions_place",
+        "present_simple_affirmative"
+      ],
+      "counts_by_cefr": {
+        "A2": 914,
+        "B1": 649,
+        "A1": 2347
+      },
+      "sample_count": 3910
+    },
+    {
+      "grammar_combo": [
+        "articles_a_an_the",
+        "prepositions_place",
+        "present_continuous"
+      ],
+      "counts_by_cefr": {
+        "A2": 880,
+        "A1": 2324,
+        "B1": 686
+      },
+      "sample_count": 3890
+    },
+    {
+      "grammar_combo": [
+        "articles_a_an_the",
+        "prepositions_time",
+        "present_simple_question"
+      ],
+      "counts_by_cefr": {
+        "A1": 2259,
+        "A2": 827,
+        "B1": 671
+      },
+      "sample_count": 3757
+    },
+    {
+      "grammar_combo": [
+        "articles_a_an_the",
+        "prepositions_time",
+        "present_simple_negative"
+      ],
+      "counts_by_cefr": {
+        "B1": 658,
+        "A1": 2228,
+        "A2": 856
+      },
+      "sample_count": 3742
+    },
+    {
+      "grammar_combo": [
+        "subordinating_conjunctions"
+      ],
+      "counts_by_cefr": {
+        "A2": 1648,
+        "B1": 1492
+      },
+      "sample_count": 3140
+    },
+    {
+      "grammar_combo": [
+        "modal_can_ability",
+        "prepositions_place"
+      ],
+      "counts_by_cefr": {
+        "A1": 1697,
+        "B1": 500,
+        "A2": 694
+      },
+      "sample_count": 2891
+    },
+    {
+      "grammar_combo": [
+        "articles_a_an_the",
+        "prepositions_place",
+        "prepositions_time",
+        "there_is_are"
+      ],
+      "counts_by_cefr": {
+        "B1": 500,
+        "A1": 1577,
+        "A2": 610
+      },
+      "sample_count": 2687
+    },
+    {
+      "grammar_combo": [
+        "prepositions_place",
+        "present_simple_affirmative"
+      ],
+      "counts_by_cefr": {
+        "A1": 1451,
+        "B1": 351,
+        "A2": 561
+      },
+      "sample_count": 2363
+    },
+    {
+      "grammar_combo": [
+        "frequency_adverbs"
+      ],
+      "counts_by_cefr": {
+        "A1": 1196,
+        "A2": 443,
+        "B1": 318
+      },
+      "sample_count": 1957
+    },
+    {
+      "grammar_combo": [
+        "present_simple_question"
+      ],
+      "counts_by_cefr": {
+        "A1": 1138,
+        "A2": 454,
+        "B1": 321
+      },
+      "sample_count": 1913
+    },
+    {
+      "grammar_combo": [
+        "present_continuous"
+      ],
+      "counts_by_cefr": {
+        "A1": 1117,
+        "B1": 309,
+        "A2": 434
+      },
+      "sample_count": 1860
+    },
+    {
+      "grammar_combo": [
+        "present_simple_negative"
+      ],
+      "counts_by_cefr": {
+        "B1": 324,
+        "A1": 1079,
+        "A2": 443
+      },
+      "sample_count": 1846
+    },
+    {
+      "grammar_combo": [
+        "articles_a_an_the",
+        "future_going_to",
+        "prepositions_time"
+      ],
+      "counts_by_cefr": {
+        "A2": 961,
+        "B1": 713
+      },
+      "sample_count": 1674
+    },
+    {
+      "grammar_combo": [
+        "articles_a_an_the",
+        "modal_must_obligation",
+        "prepositions_time",
+        "subordinating_conjunctions"
+      ],
+      "counts_by_cefr": {
+        "A2": 915,
+        "B1": 717
+      },
+      "sample_count": 1632
+    },
+    {
+      "grammar_combo": [
+        "articles_a_an_the",
+        "future_will",
+        "prepositions_time"
+      ],
+      "counts_by_cefr": {
+        "A2": 916,
+        "B1": 646
+      },
+      "sample_count": 1562
+    },
+    {
+      "grammar_combo": [
+        "articles_a_an_the",
+        "coordinating_conjunctions",
+        "prepositions_time",
+        "present_simple_affirmative"
+      ],
+      "counts_by_cefr": {
+        "A2": 818,
+        "B1": 706
+      },
+      "sample_count": 1524
+    },
+    {
+      "grammar_combo": [
+        "articles_a_an_the",
+        "past_simple",
+        "prepositions_place",
+        "prepositions_time"
+      ],
+      "counts_by_cefr": {
+        "A2": 846,
+        "B1": 626
+      },
+      "sample_count": 1472
+    },
+    {
+      "grammar_combo": [
+        "articles_a_an_the",
+        "coordinating_conjunctions",
+        "past_simple",
+        "prepositions_place",
+        "prepositions_time"
+      ],
+      "counts_by_cefr": {
+        "A2": 846,
+        "B1": 610
+      },
+      "sample_count": 1456
+    },
+    {
+      "grammar_combo": [
+        "past_simple"
+      ],
+      "counts_by_cefr": {
+        "A2": 832,
+        "B1": 604
+      },
+      "sample_count": 1436
+    },
+    {
+      "grammar_combo": [
+        "modal_should_advice",
+        "subordinating_conjunctions"
+      ],
+      "counts_by_cefr": {
+        "B1": 603,
+        "A2": 830
+      },
+      "sample_count": 1433
+    },
+    {
+      "grammar_combo": [
+        "modal_can_ability"
+      ],
+      "counts_by_cefr": {
+        "A1": 783,
+        "B1": 263,
+        "A2": 320
+      },
+      "sample_count": 1366
+    },
+    {
+      "grammar_combo": [
+        "there_is_are"
+      ],
+      "counts_by_cefr": {
+        "A2": 325,
+        "B1": 221,
+        "A1": 806
+      },
+      "sample_count": 1352
+    },
+    {
+      "grammar_combo": [
+        "articles_a_an_the",
+        "coordinating_conjunctions",
+        "countable_uncountable_nouns"
+      ],
+      "counts_by_cefr": {
+        "A2": 331,
+        "A1": 682,
+        "B1": 238
+      },
+      "sample_count": 1251
+    }
+  ],
+  "exact_text_cross_level_examples": []
+}

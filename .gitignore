@@ -59,6 +59,10 @@ results_*/
 *.tsv
 *.jsonl
 *.parquet
+data/external_datasets/
+data/processed_classifier/
+data/phase1_a1_a2_b1_training_dataset_only_v6.zip
+data/phase1_a1_a2_b1_validation_dataset_part01_v2.zip
 
 # Your large dataset file
 linguistic_hierarchical_3000_v3.json
