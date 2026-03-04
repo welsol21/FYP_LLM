@@ -96,7 +96,7 @@
 - [x] Replace temporary regex OANC sentence splitting with corpus sentence-boundary annotations (`*-s.xml`) and parser fallback.
 - [x] Add modern local dependency-generation stage for `OANC` during ingestion and persist parser/model provenance.
 - [x] Build train-ready advanced rows from parsed `OANC` sentences and run advanced support/ambiguity gates.
-- [ ] Increase `C2` coverage for `future_perfect` and other rare advanced patterns; after `Project Gutenberg` expansion the merged report is up to `36/50`, so the remaining gap is `14`.
+- [x] Increase `C2` coverage for `future_perfect` and other rare advanced patterns; merged report now exceeds threshold via `Project Gutenberg`.
 - [x] Increase `C1` coverage for `modal_perfect`; merged report now exceeds threshold via `Project Gutenberg`.
 - [x] Implement `MASC` ingest path for validation/calibration slices.
 - [ ] Add richer `MASC-3.0.0` XML-based ingest path (`txt + s.xml + provenance-rich annotations`) if `masc-conll` control slice proves too narrow.
@@ -117,7 +117,7 @@
 - [x] Add hard support thresholds for `B2/C1/C2` so advanced levels cannot pass on only a handful of examples.
 - [x] Publish merged coverage report for `A1 -> A2 -> B1 -> B2 -> C1 -> C2` before any full-ladder retrain.
 - [x] Raise `modal_perfect / C1` train support from `30` to at least `50` (`docs/reports/advanced_coverage_report_2026-03-04.json`).
-- [ ] Raise `future_perfect / C2` train support from `7` to at least `50` (`docs/reports/advanced_coverage_report_2026-03-04.json`). Current merged support: `36/50`.
+- [x] Raise `future_perfect / C2` train support from `7` to at least `50` (`docs/reports/advanced_coverage_report_2026-03-04.json`).
 
 ## Media Pipeline Integration (ELA Bridge, Current)
 

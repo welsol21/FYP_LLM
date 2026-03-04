@@ -6,7 +6,7 @@
     "oanc_mapped_total": 642,
     "masc_mapped_total": 25,
     "pmc_mapped_total": 108,
-    "gutenberg_mapped_total": 1496
+    "gutenberg_mapped_total": 2094
   },
   "source_cefr_counts": {
     "ud_train": {
@@ -45,9 +45,9 @@
       "B2": 108
     },
     "gutenberg_pre_gate": {
-      "B2": 7,
-      "C1": 1460,
-      "C2": 29
+      "B2": 11,
+      "C1": 2031,
+      "C2": 52
     }
   },
   "advanced_thresholds": [
@@ -55,7 +55,7 @@
       "cefr_level": "B2",
       "class_id": "past_perfect",
       "required_train_support": 100,
-      "observed_train_support": 818,
+      "observed_train_support": 822,
       "observed_control_support": 44,
       "ready": true
     },
@@ -71,7 +71,7 @@
       "cefr_level": "C1",
       "class_id": "modal_perfect",
       "required_train_support": 50,
-      "observed_train_support": 1490,
+      "observed_train_support": 2061,
       "observed_control_support": 3,
       "ready": true
     },
@@ -79,10 +79,10 @@
       "cefr_level": "C2",
       "class_id": "future_perfect",
       "required_train_support": 50,
-      "observed_train_support": 36,
+      "observed_train_support": 59,
       "observed_control_support": 2,
-      "ready": false
+      "ready": true
     }
   ],
-  "overall_advanced_readiness": false
+  "overall_advanced_readiness": true
 }

@@ -231,16 +231,16 @@ Current project state:
   - because these genres are a much better natural habitat for `should have`, `could have`, `would have`, and `will have` constructions than scientific prose.
 - current `Project Gutenberg` conclusion from real bounded parser-backed runs:
   - `modal_perfect / C1` is now strongly covered and exceeds readiness threshold,
-  - `future_perfect / C2` improved materially but is still below threshold,
+  - `future_perfect / C2` is now also above readiness threshold,
   - latest merged readiness report shows:
-    - `C1 / modal_perfect`: `1490` train support, ready
-    - `C2 / future_perfect`: `36 / 50` train support, not ready yet
+    - `C1 / modal_perfect`: `2061` train support, ready
+    - `C2 / future_perfect`: `59 / 50` train support, ready
 - current project-level conclusion:
-  - the advanced ladder is **not** ready for full-ladder retrain,
+  - the advanced ladder is now structurally ready for full-ladder retrain,
   - `B2` can already be trusted structurally,
   - `C1` can now be trusted structurally,
-  - `C2` still requires targeted corpus expansion before DeBERTa full-ladder training is allowed.
-- next required step: increase rare advanced-pattern coverage for `future_perfect / C2` by at least `14` more train examples, then rerun advanced support gates before full-ladder retrain.
+  - `C2` can now also be trusted structurally at the current support threshold.
+- next required step: freeze this corpus snapshot, rebuild the merged classifier dataset, and move to full-ladder DeBERTa retraining/evaluation before wiring it into runtime truth fields.
 
 As with UD, both `OANC` and `MASC` still require:
 - grammar extraction,
