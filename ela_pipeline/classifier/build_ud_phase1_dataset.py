@@ -184,6 +184,7 @@ def build_phase1_dataset_from_ud(
     output_dir: str,
     treebank: str,
     split: str,
+    allowed_genres: list[str] | None = None,
     prebuilt_rows: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir)
@@ -194,14 +195,27 @@ def build_phase1_dataset_from_ud(
 
     rows: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
+    filtered_out_rows = 0
+    allowed_genre_set = {str(value).strip().lower() for value in (allowed_genres or []) if str(value).strip()}
 
     if prebuilt_rows is not None:
-        rows = list(prebuilt_rows)
+        for row in prebuilt_rows:
+            provenance = row.get("provenance") if isinstance(row.get("provenance"), dict) else {}
+            genre = str(provenance.get("genre") or "").strip().lower()
+            if allowed_genre_set and genre not in allowed_genre_set:
+                filtered_out_rows += 1
+                continue
+            rows.append(row)
     else:
         idx = 0
         for input_path in input_paths:
             sentences = load_ud_conllu(input_path=input_path, treebank=treebank, split=split)
             for sentence in sentences:
+                provenance = sentence.get("provenance") if isinstance(sentence.get("provenance"), dict) else {}
+                genre = str(provenance.get("genre") or "").strip().lower()
+                if allowed_genre_set and genre not in allowed_genre_set:
+                    filtered_out_rows += 1
+                    continue
                 idx += 1
                 built = _row_from_ud_sentence(sentence, row_id=f"{split}-{idx}")
                 if built is None:
@@ -249,6 +263,8 @@ def build_phase1_dataset_from_ud(
         "gate_report": gate_report,
         "accepted_rows": len(accepted_rows),
         "rejected_rows": len(rejected),
+        "filtered_out_rows": filtered_out_rows,
+        "allowed_genres": sorted(allowed_genre_set),
     }
 
 

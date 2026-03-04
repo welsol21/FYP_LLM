@@ -1,0 +1,61 @@
+{
+  "archive": "data/external_datasets/PMC_OA/oa_comm_xml.incr.2026-02-10.tar.gz",
+  "sample_count": 5,
+  "articles": [
+    {
+      "member": "PMC008xxxxxx/PMC8774754.xml",
+      "article_id": "PMC8774754",
+      "journal_title": "Diagnostics",
+      "title": "Axonemal Symmetry Break, a New Ultrastructural Diagnostic Tool for Primary Ciliary Dyskinesia?",
+      "license_text": "Licensee MDPI, Basel, Switzerland. This article is an open access article distributed under the terms and conditions of the Creative Commons Attribution (CC BY) license (https://creativecommons.org/li",
+      "abstract_paragraphs": 1,
+      "body_paragraphs": 30,
+      "candidate_rows": 97,
+      "sample_text": "Diagnosis testing for primary ciliary dyskinesia (PCD) requires a combination of investigations that includes study of ciliary beat pattern by high-speed video-microscopy, genetic testing and assessment of the ciliary ul"
+    },
+    {
+      "member": "PMC008xxxxxx/PMC8947183.xml",
+      "article_id": "PMC8947183",
+      "journal_title": "Diagnostics",
+      "title": "Diffusion Weighted Imaging in the Assessment of Tumor Grade in Endometrial Cancer Based on Intravoxel Incoherent Motion MRI",
+      "license_text": "Licensee MDPI, Basel, Switzerland. This article is an open access article distributed under the terms and conditions of the Creative Commons Attribution (CC BY) license (https://creativecommons.org/li",
+      "abstract_paragraphs": 1,
+      "body_paragraphs": 13,
+      "candidate_rows": 118,
+      "sample_text": "The aim of this study is to investigate the possibility of predicting histological grade in patients with endometrial cancer on the basis of intravoxel incoherent motion (IVIM)-related histogram analysis parameters."
+    },
+    {
+      "member": "PMC009xxxxxx/PMC9962823.xml",
+      "article_id": "PMC9962823",
+      "journal_title": "Life",
+      "title": "Robotic Bronchoscopy: Review of Three Systems",
+      "license_text": "Licensee MDPI, Basel, Switzerland. This article is an open access article distributed under the terms and conditions of the Creative Commons Attribution (CC BY) license (https://creativecommons.org/li",
+      "abstract_paragraphs": 1,
+      "body_paragraphs": 30,
+      "candidate_rows": 182,
+      "sample_text": "Robotic bronchoscopy (RB) has been shown to improve access to smaller and more peripheral lung lesions, while simultaneously staging the mediastinum."
+    },
+    {
+      "member": "PMC010xxxxxx/PMC10512598.xml",
+      "article_id": "PMC10512598",
+      "journal_title": "BMC Veterinary Research",
+      "title": "Isolation and characterization of a novel parvovirus from a red-crowned crane, China, 2021",
+      "license_text": "Open Access This article is licensed under a Creative Commons Attribution 4.0 International License, which permits use, sharing, adaptation, distribution and reproduction in any medium or format, as l",
+      "abstract_paragraphs": 4,
+      "body_paragraphs": 33,
+      "candidate_rows": 130,
+      "sample_text": "Parvoviruses are icosahedral, nonenveloped viruses with single-stranded DNA genomes of approximately 5 kb in length."
+    },
+    {
+      "member": "PMC010xxxxxx/PMC10560736.xml",
+      "article_id": "PMC10560736",
+      "journal_title": "Frontiers in Nutrition",
+      "title": "Effectiveness of orange almond potato cookie vs. orange potato cookie supplementation on nutritional wellbeing of the Indonesian stunted preschool-aged children",
+      "license_text": "This is an open-access article distributed under the terms of the Creative Commons Attribution License (CC BY). The use, distribution or reproduction in other forums is permitted, provided the origina",
+      "abstract_paragraphs": 4,
+      "body_paragraphs": 57,
+      "candidate_rows": 274,
+      "sample_text": "Preschool-aged children who experience stunting due to insufficient consumption of macro- and micronutrients exhibit weakened immune systems, rendering them susceptible to contracting COVID-19 during the ongoing epidemic"
+    }
+  ]
+}

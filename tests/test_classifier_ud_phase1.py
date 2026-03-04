@@ -14,6 +14,8 @@ class UDPhase1Tests(unittest.TestCase):
     def test_load_ud_conllu_extracts_sentence_tokens_and_provenance(self):
         sample = textwrap.dedent(
             """
+            # newdoc id = GUM_academic_art
+            # meta::genre = academic
             # sent_id = ewt-train-1
             # text = She walks home.
             1\tShe\tshe\tPRON\tPRP\tCase=Nom|Number=Sing|Person=3\t2\tnsubj\t_\t_
@@ -39,10 +41,48 @@ class UDPhase1Tests(unittest.TestCase):
         self.assertEqual(row["provenance"]["treebank"], "UD_English-EWT")
         self.assertEqual(row["provenance"]["split"], "train")
         self.assertEqual(row["provenance"]["sent_id"], "ewt-train-1")
+        self.assertEqual(row["provenance"]["doc_id"], "GUM_academic_art")
+        self.assertEqual(row["provenance"]["genre"], "academic")
         self.assertEqual(len(row["tokens"]), 4)
         self.assertEqual(row["tokens"][1]["lemma"], "walk")
         self.assertEqual(row["tokens"][1]["dep"], "root")
         self.assertEqual(row["tokens"][1]["morph"]["Tense"], "Pres")
+
+    def test_load_ud_conllu_propagates_doc_level_genre_to_following_sentences(self):
+        sample = textwrap.dedent(
+            """
+            # newdoc id = GUM_academic_demo
+            # meta::genre = academic
+            # sent_id = gum-1
+            # text = She walks home.
+            1\tShe\tshe\tPRON\tPRP\tCase=Nom|Number=Sing|Person=3\t2\tnsubj\t_\t_
+            2\twalks\twalk\tVERB\tVBZ\tMood=Ind|Number=Sing|Person=3|Tense=Pres|VerbForm=Fin\t0\troot\t_\t_
+            3\thome\thome\tADV\tRB\t_\t2\tadvmod\t_\tSpaceAfter=No
+            4\t.\t.\tPUNCT\t.\t_\t2\tpunct\t_\t_
+
+            # sent_id = gum-2
+            # text = It was written carefully.
+            1\tIt\tit\tPRON\tPRP\tCase=Nom|Number=Sing|Person=3\t3\tnsubj:pass\t_\t_
+            2\twas\tbe\tAUX\tVBD\tTense=Past|VerbForm=Fin\t3\taux:pass\t_\t_
+            3\twritten\twrite\tVERB\tVBN\tVerbForm=Part\t0\troot\t_\t_
+            4\tcarefully\tcarefully\tADV\tRB\t_\t3\tadvmod\t_\tSpaceAfter=No
+            5\t.\t.\tPUNCT\t.\t_\t3\tpunct\t_\t_
+            """
+        ).strip()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "en_gum-ud-train.conllu"
+            path.write_text(sample + "\n", encoding="utf-8")
+            rows = load_ud_conllu(
+                input_path=str(path),
+                treebank="UD_English-GUM",
+                split="train",
+            )
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["provenance"]["genre"], "academic")
+        self.assertEqual(rows[1]["provenance"]["genre"], "academic")
+        self.assertEqual(rows[1]["provenance"]["doc_id"], "GUM_academic_demo")
 
     def test_validate_phase1_dataset_gates_rejects_cross_level_ambiguity(self):
         rows = [

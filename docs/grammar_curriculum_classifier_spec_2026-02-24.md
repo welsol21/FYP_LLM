@@ -150,6 +150,8 @@ Practical policy:
 - `UD` remains the baseline structural backbone for broad grammar coverage.
 - `OANC` strengthens advanced register coverage.
 - `MASC` is treated as a quality-oriented validation/control source, not bulk training by default.
+- `UD_English-GUM` must also be evaluated in a genre-aware way, not only as a generic merged treebank, because its higher-register genres are more informative for advanced coverage than its conversational and informal slices.
+- `PMC OA` is the next bounded scientific-text expansion path for `C1/C2`; ingest should preserve article/license provenance from source XML before any parsing/enrichment step.
 
 Operational note:
 - the legacy `ANC-parses` download is treated as unavailable/dead and is not a project dependency,
@@ -202,6 +204,16 @@ Current project state:
   - `B2 / passive_voice`: ready
   - `C1 / modal_perfect`: not ready (`30 < 50` required train support)
   - `C2 / future_perfect`: not ready (`7 < 50` required train support)
+- a dedicated `UD_English-GUM` genre-aware report is now published in `docs/reports/gum_genre_advanced_report_2026-03-04.json`,
+- current GUM genre-aware result for targeted higher-register genres (`academic`, `court`, `essay`, `news`, `speech`, `textbook`):
+  - `B2 / passive_voice`: `346`
+  - `B2 / past_perfect`: `16`
+  - `C1 / modal_perfect`: `1`
+  - `C2 / future_perfect`: `0`
+- interpretation:
+  - genre-aware `GUM` materially strengthens `B2`,
+  - but it does **not** solve the remaining `C1/C2` scarcity problem,
+  - therefore the next required corpus-expansion path is bounded `PMC OA` scientific ingest rather than more generic `GUM` slicing.
 - current project-level conclusion:
   - the advanced ladder is **not** ready for full-ladder retrain,
   - `B2` can already be trusted structurally,

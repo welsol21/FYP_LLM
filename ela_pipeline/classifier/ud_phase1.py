@@ -32,15 +32,20 @@ def load_ud_conllu(*, input_path: str, treebank: str, split: str) -> list[dict[s
 
     rows: list[dict[str, Any]] = []
     metadata: dict[str, str] = {}
+    document_metadata: dict[str, str] = {}
     tokens: list[dict[str, Any]] = []
+    doc_level_keys = {"newdoc id", "newdoc_id", "meta::genre"}
 
     def flush() -> None:
         nonlocal metadata, tokens
         if not tokens:
             metadata = {}
             return
-        text = str(metadata.get("text") or "").strip()
-        sent_id = str(metadata.get("sent_id") or "").strip()
+        merged_metadata = {**document_metadata, **metadata}
+        text = str(merged_metadata.get("text") or "").strip()
+        sent_id = str(merged_metadata.get("sent_id") or "").strip()
+        doc_id = str(merged_metadata.get("newdoc id") or merged_metadata.get("newdoc_id") or "").strip()
+        genre = str(merged_metadata.get("meta::genre") or "").strip().lower()
         rows.append(
             {
                 "text": text,
@@ -49,6 +54,8 @@ def load_ud_conllu(*, input_path: str, treebank: str, split: str) -> list[dict[s
                     "treebank": treebank,
                     "split": split,
                     "sent_id": sent_id,
+                    "doc_id": doc_id,
+                    "genre": genre,
                     "source_path": str(src),
                 },
             }
@@ -65,7 +72,11 @@ def load_ud_conllu(*, input_path: str, treebank: str, split: str) -> list[dict[s
             if line.startswith("#"):
                 if "=" in line:
                     key, value = line[1:].split("=", 1)
-                    metadata[key.strip()] = value.strip()
+                    key = key.strip()
+                    value = value.strip()
+                    metadata[key] = value
+                    if key in doc_level_keys:
+                        document_metadata[key] = value
                 continue
             parts = line.split("\t")
             if len(parts) != 10:

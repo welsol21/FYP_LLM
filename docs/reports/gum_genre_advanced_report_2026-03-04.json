@@ -1,0 +1,163 @@
+{
+  "treebank": "UD_English-GUM",
+  "treebank_dir": "data/external_datasets/UD_English-GUM",
+  "selected_genres": [
+    "academic",
+    "court",
+    "essay",
+    "news",
+    "speech",
+    "textbook"
+  ],
+  "genres": [
+    {
+      "genre": "academic",
+      "total_sentences": 633,
+      "advanced_sentences": 91,
+      "split_counts": {
+        "dev": 7,
+        "test": 23,
+        "train": 61
+      },
+      "class_support": [
+        {
+          "cefr_level": "B2",
+          "class_id": "passive_voice",
+          "count": 90
+        },
+        {
+          "cefr_level": "B2",
+          "class_id": "past_perfect",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "genre": "court",
+      "total_sentences": 573,
+      "advanced_sentences": 36,
+      "split_counts": {
+        "dev": 3,
+        "test": 12,
+        "train": 21
+      },
+      "class_support": [
+        {
+          "cefr_level": "B2",
+          "class_id": "passive_voice",
+          "count": 34
+        },
+        {
+          "cefr_level": "B2",
+          "class_id": "past_perfect",
+          "count": 1
+        },
+        {
+          "cefr_level": "C1",
+          "class_id": "modal_perfect",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "genre": "essay",
+      "total_sentences": 502,
+      "advanced_sentences": 28,
+      "split_counts": {
+        "dev": 4,
+        "test": 7,
+        "train": 17
+      },
+      "class_support": [
+        {
+          "cefr_level": "B2",
+          "class_id": "passive_voice",
+          "count": 25
+        },
+        {
+          "cefr_level": "B2",
+          "class_id": "past_perfect",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "genre": "news",
+      "total_sentences": 765,
+      "advanced_sentences": 114,
+      "split_counts": {
+        "dev": 5,
+        "test": 14,
+        "train": 95
+      },
+      "class_support": [
+        {
+          "cefr_level": "B2",
+          "class_id": "passive_voice",
+          "count": 108
+        },
+        {
+          "cefr_level": "B2",
+          "class_id": "past_perfect",
+          "count": 6
+        }
+      ]
+    },
+    {
+      "genre": "speech",
+      "total_sentences": 752,
+      "advanced_sentences": 31,
+      "split_counts": {
+        "dev": 6,
+        "test": 5,
+        "train": 20
+      },
+      "class_support": [
+        {
+          "cefr_level": "B2",
+          "class_id": "passive_voice",
+          "count": 31
+        }
+      ]
+    },
+    {
+      "genre": "textbook",
+      "total_sentences": 796,
+      "advanced_sentences": 63,
+      "split_counts": {
+        "dev": 8,
+        "test": 8,
+        "train": 47
+      },
+      "class_support": [
+        {
+          "cefr_level": "B2",
+          "class_id": "passive_voice",
+          "count": 58
+        },
+        {
+          "cefr_level": "B2",
+          "class_id": "past_perfect",
+          "count": 5
+        }
+      ]
+    }
+  ],
+  "aggregate_class_support": [
+    {
+      "cefr_level": "B2",
+      "class_id": "passive_voice",
+      "count": 346
+    },
+    {
+      "cefr_level": "B2",
+      "class_id": "past_perfect",
+      "count": 16
+    },
+    {
+      "cefr_level": "C1",
+      "class_id": "modal_perfect",
+      "count": 1
+    }
+  ]
+}

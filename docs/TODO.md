@@ -100,6 +100,9 @@
 - [ ] Increase `C1` coverage for `modal_perfect`; targeted `OANC` probe still yields only one accepted `modal_perfect` example.
 - [x] Implement `MASC` ingest path for validation/calibration slices.
 - [ ] Add richer `MASC-3.0.0` XML-based ingest path (`txt + s.xml + provenance-rich annotations`) if `masc-conll` control slice proves too narrow.
+- [x] Add `UD_English-GUM` genre-aware advanced coverage reporting.
+- [ ] Use `UD_English-GUM` targeted genres (`academic`, `court`, `essay`, `news`, `speech`, `textbook`) as explicit advanced-readiness evidence source.
+- [x] Add bounded `PMC OA` ingest scaffold with license/provenance extraction for scientific `C1/C2` expansion.
 - [ ] Build merged advanced dataset source:
   - [ ] `UD_English-EWT`
   - [ ] `UD_English-GUM`

@@ -1,0 +1,48 @@
+{
+  "archive": "data/external_datasets/PMC_OA/oa_comm_xml.incr.2026-02-10.tar.gz",
+  "sample_articles": 5,
+  "total_candidate_rows": 801,
+  "total_enriched_rows": 400,
+  "advanced_class_counts": {
+    "past_perfect": 1
+  },
+  "articles": [
+    {
+      "article_id": "PMC8774754",
+      "journal_title": "Diagnostics",
+      "candidate_rows": 97,
+      "enriched_rows": 80,
+      "advanced_class_counts": {}
+    },
+    {
+      "article_id": "PMC8947183",
+      "journal_title": "Diagnostics",
+      "candidate_rows": 118,
+      "enriched_rows": 80,
+      "advanced_class_counts": {}
+    },
+    {
+      "article_id": "PMC9962823",
+      "journal_title": "Life",
+      "candidate_rows": 182,
+      "enriched_rows": 80,
+      "advanced_class_counts": {
+        "past_perfect": 1
+      }
+    },
+    {
+      "article_id": "PMC10512598",
+      "journal_title": "BMC Veterinary Research",
+      "candidate_rows": 130,
+      "enriched_rows": 80,
+      "advanced_class_counts": {}
+    },
+    {
+      "article_id": "PMC10560736",
+      "journal_title": "Frontiers in Nutrition",
+      "candidate_rows": 274,
+      "enriched_rows": 80,
+      "advanced_class_counts": {}
+    }
+  ]
+}
