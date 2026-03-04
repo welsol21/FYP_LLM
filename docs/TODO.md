@@ -96,28 +96,28 @@
 - [x] Replace temporary regex OANC sentence splitting with corpus sentence-boundary annotations (`*-s.xml`) and parser fallback.
 - [x] Add modern local dependency-generation stage for `OANC` during ingestion and persist parser/model provenance.
 - [x] Build train-ready advanced rows from parsed `OANC` sentences and run advanced support/ambiguity gates.
-- [ ] Increase `C2` coverage for `future_perfect` and other rare advanced patterns; current `OANC` probe still fails `per_class_support` because `future_perfect` has only one accepted example in the bounded sample.
-- [ ] Increase `C1` coverage for `modal_perfect`; targeted `OANC` probe still yields only one accepted `modal_perfect` example.
+- [ ] Increase `C2` coverage for `future_perfect` and other rare advanced patterns; after `Project Gutenberg` expansion the merged report is up to `36/50`, so the remaining gap is `14`.
+- [x] Increase `C1` coverage for `modal_perfect`; merged report now exceeds threshold via `Project Gutenberg`.
 - [x] Implement `MASC` ingest path for validation/calibration slices.
 - [ ] Add richer `MASC-3.0.0` XML-based ingest path (`txt + s.xml + provenance-rich annotations`) if `masc-conll` control slice proves too narrow.
 - [x] Add `UD_English-GUM` genre-aware advanced coverage reporting.
 - [ ] Use `UD_English-GUM` targeted genres (`academic`, `court`, `essay`, `news`, `speech`, `textbook`) as explicit advanced-readiness evidence source.
 - [x] Add bounded `PMC OA` ingest scaffold with license/provenance extraction for scientific `C1/C2` expansion.
 - [x] Confirm from real bounded `PMC OA` probes that scientific prose strengthens `B2` but does not materially close `C1/C2`.
-- [ ] Add `Project Gutenberg` as the primary next corpus source for `C1/C2` (`Essays` + `Fiction`, public-domain path).
-- [ ] Add bounded `Project Gutenberg` catalog ingest/filtering scaffold.
-- [ ] Add `Project Gutenberg` text ingest path with source/license/provenance capture.
-- [ ] Add targeted `Project Gutenberg` harvest for `modal_perfect` / `future_perfect`.
+- [x] Add `Project Gutenberg` as the primary next corpus source for `C1/C2` (`Essays` + `Fiction`, public-domain path).
+- [x] Add bounded `Project Gutenberg` catalog ingest/filtering scaffold.
+- [x] Add `Project Gutenberg` text ingest path with source/license/provenance capture.
+- [x] Add targeted `Project Gutenberg` harvest for `modal_perfect` / `future_perfect`.
 - [ ] Build merged advanced dataset source:
   - [ ] `UD_English-EWT`
   - [ ] `UD_English-GUM`
   - [ ] `OANC`
-  - [ ] `Project Gutenberg`
+  - [x] `Project Gutenberg`
   - [ ] optional `MASC` validation slice
 - [x] Add hard support thresholds for `B2/C1/C2` so advanced levels cannot pass on only a handful of examples.
 - [x] Publish merged coverage report for `A1 -> A2 -> B1 -> B2 -> C1 -> C2` before any full-ladder retrain.
-- [ ] Raise `modal_perfect / C1` train support from `30` to at least `50` (`docs/reports/advanced_coverage_report_2026-03-04.json`).
-- [ ] Raise `future_perfect / C2` train support from `7` to at least `50` (`docs/reports/advanced_coverage_report_2026-03-04.json`).
+- [x] Raise `modal_perfect / C1` train support from `30` to at least `50` (`docs/reports/advanced_coverage_report_2026-03-04.json`).
+- [ ] Raise `future_perfect / C2` train support from `7` to at least `50` (`docs/reports/advanced_coverage_report_2026-03-04.json`). Current merged support: `36/50`.
 
 ## Media Pipeline Integration (ELA Bridge, Current)
 

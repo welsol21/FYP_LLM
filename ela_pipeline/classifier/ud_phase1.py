@@ -129,17 +129,50 @@ def extract_phase1_grammar_signal(row: dict[str, Any]) -> dict[str, Any]:
 
     grammar_classes: list[str] = []
     tam_profile = "unknown"
+
+    def _child_auxiliaries(head_id: int) -> list[dict[str, Any]]:
+        return [
+            tok
+            for tok in token_rows
+            if str(tok.get("upos") or "").strip() == "AUX" and int(tok.get("head") or 0) == head_id
+        ]
+
+    def _detect_priority_pattern() -> tuple[str | None, str | None]:
+        priority_candidates: list[tuple[int, str, str]] = []
+        for token in token_rows:
+            upos = str(token.get("upos") or "").strip()
+            xpos = str(token.get("xpos") or "").strip().upper()
+            if upos not in {"VERB", "AUX"} or xpos != "VBN":
+                continue
+            head_id = int(token.get("id") or 0)
+            auxiliaries = _child_auxiliaries(head_id)
+            aux_lemmas = {str(tok.get("lemma") or "").strip().lower() for tok in auxiliaries}
+            modal_perfect_lemmas = {"should", "could", "would", "might", "may", "must", "can"}
+            has_have_aux = "have" in aux_lemmas
+            has_future_modal = bool({"will", "shall"}.intersection(aux_lemmas))
+            has_modal_perfect = bool(modal_perfect_lemmas.intersection(aux_lemmas)) and has_have_aux
+            if has_future_modal and has_have_aux:
+                priority_candidates.append((head_id, "future_perfect", "future_perfect"))
+            elif has_modal_perfect:
+                priority_candidates.append((head_id, "modal_perfect", "modal_perfect"))
+        if not priority_candidates:
+            return None, None
+        priority_candidates.sort(key=lambda item: item[0])
+        _, cls, profile = priority_candidates[0]
+        return cls, profile
+
+    priority_class, priority_profile = _detect_priority_pattern()
+    if priority_class:
+        grammar_classes.append(priority_class)
+        tam_profile = str(priority_profile)
+
     if finite_root:
         morph = finite_root.get("morph") if isinstance(finite_root.get("morph"), dict) else {}
         tense = str(morph.get("Tense") or "").strip()
         lemma = str(finite_root.get("lemma") or "").strip().lower()
         xpos = str(finite_root.get("xpos") or "").strip().upper()
         root_id = int(finite_root.get("id") or 0)
-        auxiliaries = [
-            tok
-            for tok in token_rows
-            if str(tok.get("upos") or "").strip() == "AUX" and int(tok.get("head") or 0) == root_id
-        ]
+        auxiliaries = _child_auxiliaries(root_id)
         aux_lemmas = {str(tok.get("lemma") or "").strip().lower() for tok in auxiliaries}
         aux_forms = {str(tok.get("xpos") or "").strip().upper() for tok in auxiliaries}
         has_neg = any(
@@ -158,7 +191,10 @@ def extract_phase1_grammar_signal(row: dict[str, Any]) -> dict[str, Any]:
         has_relative_clause = any(str(tok.get("dep") or "").strip() == "acl:relcl" for tok in token_rows)
         has_question_punct = any(str(tok.get("text") or "").strip() == "?" for tok in token_rows)
         has_do_aux = "do" in aux_lemmas
-        has_modal_will = "will" in aux_lemmas or "MD" in aux_forms and any(str(tok.get("lemma") or "").strip().lower() == "will" for tok in auxiliaries)
+        has_modal_will = bool({"will", "shall"}.intersection(aux_lemmas)) or (
+            "MD" in aux_forms
+            and any(str(tok.get("lemma") or "").strip().lower() in {"will", "shall"} for tok in auxiliaries)
+        )
         has_modal_can = "can" in aux_lemmas
         has_modal_should = "should" in aux_lemmas
         modal_perfect_lemmas = {"should", "could", "would", "might", "may", "must", "can"}
@@ -170,7 +206,9 @@ def extract_phase1_grammar_signal(row: dict[str, Any]) -> dict[str, Any]:
             for tok in token_rows
         ) and any(str(tok.get("lemma") or "").strip().lower() == "to" for tok in token_rows)
 
-        if has_relative_clause:
+        if priority_class:
+            pass
+        elif has_relative_clause:
             tam_profile = "relative_clause"
             grammar_classes.append("relative_clause")
         elif has_modal_will and has_have_aux and xpos == "VBN":

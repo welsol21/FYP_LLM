@@ -5,7 +5,8 @@
     "ud_test_total": 1642,
     "oanc_mapped_total": 642,
     "masc_mapped_total": 25,
-    "pmc_mapped_total": 5
+    "pmc_mapped_total": 108,
+    "gutenberg_mapped_total": 1496
   },
   "source_cefr_counts": {
     "ud_train": {
@@ -41,7 +42,12 @@
       "C1": 1
     },
     "pmc_pre_gate": {
-      "B2": 5
+      "B2": 108
+    },
+    "gutenberg_pre_gate": {
+      "B2": 7,
+      "C1": 1460,
+      "C2": 29
     }
   },
   "advanced_thresholds": [
@@ -49,7 +55,7 @@
       "cefr_level": "B2",
       "class_id": "past_perfect",
       "required_train_support": 100,
-      "observed_train_support": 708,
+      "observed_train_support": 818,
       "observed_control_support": 44,
       "ready": true
     },
@@ -65,15 +71,15 @@
       "cefr_level": "C1",
       "class_id": "modal_perfect",
       "required_train_support": 50,
-      "observed_train_support": 30,
+      "observed_train_support": 1490,
       "observed_control_support": 3,
-      "ready": false
+      "ready": true
     },
     {
       "cefr_level": "C2",
       "class_id": "future_perfect",
       "required_train_support": 50,
-      "observed_train_support": 7,
+      "observed_train_support": 36,
       "observed_control_support": 2,
       "ready": false
     }

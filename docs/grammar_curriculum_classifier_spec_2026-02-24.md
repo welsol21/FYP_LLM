@@ -229,11 +229,18 @@ Current project state:
   - the primary next corpus source for `C1/C2` is `Project Gutenberg`,
   - specifically bounded `Essays` + `Fiction` slices with full source/provenance capture,
   - because these genres are a much better natural habitat for `should have`, `could have`, `would have`, and `will have` constructions than scientific prose.
+- current `Project Gutenberg` conclusion from real bounded parser-backed runs:
+  - `modal_perfect / C1` is now strongly covered and exceeds readiness threshold,
+  - `future_perfect / C2` improved materially but is still below threshold,
+  - latest merged readiness report shows:
+    - `C1 / modal_perfect`: `1490` train support, ready
+    - `C2 / future_perfect`: `36 / 50` train support, not ready yet
 - current project-level conclusion:
   - the advanced ladder is **not** ready for full-ladder retrain,
   - `B2` can already be trusted structurally,
-  - `C1/C2` still require targeted corpus expansion before DeBERTa full-ladder training is allowed.
-- next required step: increase rare advanced-pattern coverage (especially `C2`) and then rerun advanced support gates before merging `OANC` rows into the classifier dataset.
+  - `C1` can now be trusted structurally,
+  - `C2` still requires targeted corpus expansion before DeBERTa full-ladder training is allowed.
+- next required step: increase rare advanced-pattern coverage for `future_perfect / C2` by at least `14` more train examples, then rerun advanced support gates before full-ladder retrain.
 
 As with UD, both `OANC` and `MASC` still require:
 - grammar extraction,

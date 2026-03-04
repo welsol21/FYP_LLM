@@ -313,6 +313,44 @@ class UDPhase1Tests(unittest.TestCase):
         self.assertIn("future_perfect", signal["grammar_classes"])
         self.assertEqual(signal["tam_profile"], "future_perfect")
 
+    def test_extract_phase1_grammar_signal_detects_embedded_future_perfect(self):
+        row = {
+            "text": "They know where to look for it when it shall have ascended again.",
+            "tokens": [
+                {"id": 1, "text": "They", "lemma": "they", "upos": "PRON", "xpos": "PRP", "morph": {}, "head": 2, "dep": "nsubj"},
+                {"id": 2, "text": "know", "lemma": "know", "upos": "VERB", "xpos": "VBP", "morph": {"Tense": "Pres", "VerbForm": "Fin"}, "head": 0, "dep": "root"},
+                {"id": 3, "text": "where", "lemma": "where", "upos": "SCONJ", "xpos": "WRB", "morph": {}, "head": 5, "dep": "advmod"},
+                {"id": 4, "text": "to", "lemma": "to", "upos": "PART", "xpos": "TO", "morph": {}, "head": 5, "dep": "aux"},
+                {"id": 5, "text": "look", "lemma": "look", "upos": "VERB", "xpos": "VB", "morph": {"VerbForm": "Inf"}, "head": 2, "dep": "xcomp"},
+                {"id": 6, "text": "for", "lemma": "for", "upos": "ADP", "xpos": "IN", "morph": {}, "head": 5, "dep": "prep"},
+                {"id": 7, "text": "it", "lemma": "it", "upos": "PRON", "xpos": "PRP", "morph": {}, "head": 6, "dep": "pobj"},
+                {"id": 8, "text": "when", "lemma": "when", "upos": "SCONJ", "xpos": "WRB", "morph": {}, "head": 12, "dep": "advmod"},
+                {"id": 9, "text": "it", "lemma": "it", "upos": "PRON", "xpos": "PRP", "morph": {}, "head": 12, "dep": "nsubj"},
+                {"id": 10, "text": "shall", "lemma": "shall", "upos": "AUX", "xpos": "MD", "morph": {"VerbForm": "Fin"}, "head": 12, "dep": "aux"},
+                {"id": 11, "text": "have", "lemma": "have", "upos": "AUX", "xpos": "VB", "morph": {"VerbForm": "Inf"}, "head": 12, "dep": "aux"},
+                {"id": 12, "text": "ascended", "lemma": "ascend", "upos": "VERB", "xpos": "VBN", "morph": {"VerbForm": "Part"}, "head": 5, "dep": "advcl"},
+                {"id": 13, "text": "again", "lemma": "again", "upos": "ADV", "xpos": "RB", "morph": {}, "head": 12, "dep": "advmod"},
+            ],
+        }
+        signal = extract_phase1_grammar_signal(row)
+        self.assertIn("future_perfect", signal["grammar_classes"])
+        self.assertEqual(signal["tam_profile"], "future_perfect")
+
+    def test_extract_phase1_grammar_signal_detects_shall_future_perfect(self):
+        row = {
+            "text": "It shall have been completed by then.",
+            "tokens": [
+                {"id": 1, "text": "It", "lemma": "it", "upos": "PRON", "xpos": "PRP", "morph": {}, "head": 5, "dep": "nsubj"},
+                {"id": 2, "text": "shall", "lemma": "shall", "upos": "AUX", "xpos": "MD", "morph": {"VerbForm": "Fin"}, "head": 5, "dep": "aux"},
+                {"id": 3, "text": "have", "lemma": "have", "upos": "AUX", "xpos": "VB", "morph": {"VerbForm": "Inf"}, "head": 5, "dep": "aux"},
+                {"id": 4, "text": "been", "lemma": "be", "upos": "AUX", "xpos": "VBN", "morph": {"VerbForm": "Part"}, "head": 5, "dep": "aux"},
+                {"id": 5, "text": "completed", "lemma": "complete", "upos": "VERB", "xpos": "VBN", "morph": {"VerbForm": "Part"}, "head": 0, "dep": "root"},
+            ],
+        }
+        signal = extract_phase1_grammar_signal(row)
+        self.assertIn("future_perfect", signal["grammar_classes"])
+        self.assertEqual(signal["tam_profile"], "future_perfect")
+
 
 if __name__ == "__main__":
     unittest.main()

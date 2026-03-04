@@ -1,0 +1,111 @@
+{
+  "patterns": [
+    "\\bshould have\\b",
+    "\\bcould have\\b",
+    "\\bwould have\\b",
+    "\\bmight have\\b",
+    "\\bmust have\\b",
+    "\\bmay have\\b",
+    "\\bwill have\\b",
+    "\\bshall have\\b",
+    "'ll have"
+  ],
+  "summary": {
+    "dataset_path": "artifacts/classifier_gutenberg_advanced_probe_full/gutenberg_advanced_classifier.jsonl",
+    "rejected_path": "artifacts/classifier_gutenberg_advanced_probe_full/gutenberg_advanced_rejected.jsonl",
+    "manifest_path": "artifacts/classifier_gutenberg_advanced_probe_full/gutenberg_advanced_manifest.json",
+    "gate_report_path": "artifacts/classifier_gutenberg_advanced_probe_full/gutenberg_advanced_gate_report.json",
+    "accepted_rows": 1496,
+    "rejected_rows": 436,
+    "candidates": 1932,
+    "mapped_rows_before_gates": 1496,
+    "mapped_cefr_counts": {
+      "B2": 7,
+      "C1": 1460,
+      "C2": 29
+    },
+    "mapped_class_support": [
+      {
+        "cefr_level": "B2",
+        "class_id": "past_perfect",
+        "count": 7
+      },
+      {
+        "cefr_level": "C1",
+        "class_id": "modal_perfect",
+        "count": 1460
+      },
+      {
+        "cefr_level": "C2",
+        "class_id": "future_perfect",
+        "count": 29
+      }
+    ],
+    "gate_report": {
+      "passed": true,
+      "failed_gates": [],
+      "samples": 1496,
+      "unique_grammar_combos": 3,
+      "ambiguous_grammar_combo_count": 0,
+      "ambiguous_grammar_combo_ratio": 0.0,
+      "exact_text_cross_level_count": 0,
+      "exact_text_cross_level_ratio": 0.0,
+      "evidence_missing_count": 0,
+      "blueprint_missing_count": 0,
+      "insufficient_support": []
+    }
+  },
+  "text_paths": [
+    "data/external_datasets/ProjectGutenberg/texts/pg1013.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg12163.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg13289.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg15.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg1607.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg18460.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg19145.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg1951.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg23942.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg24121.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg24247.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg24395.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg24750.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg25439.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg25550.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg27.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg28062.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg28645.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg28892.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg29418.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg30255.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg30267.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg31215.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg31357.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg31585.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg31588.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg32150.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg32688.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg32711.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg32739.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg32853.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg33.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg33790.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg33872.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg35.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg40953.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg42.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg49767.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg50948.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg50989.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg51009.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg51046.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg51092.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg624.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg65053.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg66005.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg66409.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg71857.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg73231.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg7401.txt",
+    "data/external_datasets/ProjectGutenberg/texts/pg775.txt"
+  ]
+}

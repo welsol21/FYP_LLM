@@ -73,6 +73,7 @@ def build_advanced_coverage_report(
     oanc_targeted_report_path: str,
     masc_probe_report_path: str,
     pmc_probe_report_path: str = "",
+    gutenberg_probe_report_path: str = "",
 ) -> dict[str, Any]:
     ud_train_cefr, ud_train_support, ud_train_total = _read_jsonl_counts(ud_train_path)
     ud_dev_cefr, ud_dev_support, ud_dev_total = _read_jsonl_counts(ud_dev_path)
@@ -97,10 +98,19 @@ def build_advanced_coverage_report(
         pmc_support = _counter_from_rows(pmc_probe.get("mapped_class_support", []))
         pmc_cefr = _cefr_counter_from_map(pmc_probe.get("mapped_cefr_counts", {}))
         pmc_total = int(pmc_probe.get("mapped_rows_before_gates", 0))
+    gutenberg_support: Counter[tuple[str, str]] = Counter()
+    gutenberg_cefr: Counter[str] = Counter()
+    gutenberg_total = 0
+    if str(gutenberg_probe_report_path or "").strip():
+        gutenberg_probe = _summary_block(json.loads(Path(gutenberg_probe_report_path).read_text(encoding="utf-8")))
+        gutenberg_support = _counter_from_rows(gutenberg_probe.get("mapped_class_support", []))
+        gutenberg_cefr = _cefr_counter_from_map(gutenberg_probe.get("mapped_cefr_counts", {}))
+        gutenberg_total = int(gutenberg_probe.get("mapped_rows_before_gates", 0))
 
     train_support = Counter(ud_train_support)
     train_support.update(oanc_support)
     train_support.update(pmc_support)
+    train_support.update(gutenberg_support)
     control_support = Counter(ud_dev_support)
     control_support.update(ud_test_support)
     control_support.update(masc_support)
@@ -133,6 +143,7 @@ def build_advanced_coverage_report(
             + int(oanc_targeted.get("mapped_rows_before_gates", 0)),
             "masc_mapped_total": int(masc_probe.get("mapped_rows_before_gates", 0)),
             "pmc_mapped_total": pmc_total,
+            "gutenberg_mapped_total": gutenberg_total,
         },
         "source_cefr_counts": {
             "ud_train": dict(sorted(ud_train_cefr.items())),
@@ -141,6 +152,7 @@ def build_advanced_coverage_report(
             "oanc_pre_gate": dict(sorted(oanc_cefr.items())),
             "masc_pre_gate": dict(sorted(masc_cefr.items())),
             "pmc_pre_gate": dict(sorted(pmc_cefr.items())),
+            "gutenberg_pre_gate": dict(sorted(gutenberg_cefr.items())),
         },
         "advanced_thresholds": threshold_results,
         "overall_advanced_readiness": overall_ready,
