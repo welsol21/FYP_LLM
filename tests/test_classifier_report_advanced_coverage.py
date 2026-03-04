@@ -16,6 +16,7 @@ class ReportAdvancedCoverageTests(unittest.TestCase):
             oanc_probe = base / "oanc_probe.json"
             oanc_targeted = base / "oanc_targeted.json"
             masc_probe = base / "masc_probe.json"
+            pmc_probe = base / "pmc_probe.json"
 
             ud_train.write_text(
                 "\n".join(
@@ -65,6 +66,21 @@ class ReportAdvancedCoverageTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            pmc_probe.write_text(
+                json.dumps(
+                    {
+                        "summary": {
+                            "mapped_rows_before_gates": 2,
+                            "mapped_cefr_counts": {"C1": 1, "C2": 1},
+                            "mapped_class_support": [
+                                {"cefr_level": "C1", "class_id": "modal_perfect", "count": 1},
+                                {"cefr_level": "C2", "class_id": "future_perfect", "count": 1},
+                            ],
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
 
             report = build_advanced_coverage_report(
                 ud_train_path=str(ud_train),
@@ -73,9 +89,11 @@ class ReportAdvancedCoverageTests(unittest.TestCase):
                 oanc_probe_report_path=str(oanc_probe),
                 oanc_targeted_report_path=str(oanc_targeted),
                 masc_probe_report_path=str(masc_probe),
+                pmc_probe_report_path=str(pmc_probe),
             )
 
         self.assertFalse(report["overall_advanced_readiness"])
         thresholds = {(row["cefr_level"], row["class_id"]): row for row in report["advanced_thresholds"]}
-        self.assertEqual(thresholds[("C1", "modal_perfect")]["observed_train_support"], 1)
+        self.assertEqual(thresholds[("C1", "modal_perfect")]["observed_train_support"], 2)
         self.assertEqual(thresholds[("C1", "modal_perfect")]["observed_control_support"], 2)
+        self.assertEqual(report["sources"]["pmc_mapped_total"], 2)

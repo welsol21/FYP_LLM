@@ -1,0 +1,36 @@
+{
+  "xml_members": 284,
+  "summary": {
+    "dataset_path": "artifacts/classifier_pmc_advanced_full_small_incr/pmc_advanced_classifier.jsonl",
+    "rejected_path": "artifacts/classifier_pmc_advanced_full_small_incr/pmc_advanced_rejected.jsonl",
+    "manifest_path": "artifacts/classifier_pmc_advanced_full_small_incr/pmc_advanced_manifest.json",
+    "gate_report_path": "artifacts/classifier_pmc_advanced_full_small_incr/pmc_advanced_gate_report.json",
+    "accepted_rows": 108,
+    "rejected_rows": 58582,
+    "candidates": 58690,
+    "mapped_rows_before_gates": 108,
+    "mapped_cefr_counts": {
+      "B2": 108
+    },
+    "mapped_class_support": [
+      {
+        "cefr_level": "B2",
+        "class_id": "past_perfect",
+        "count": 108
+      }
+    ],
+    "gate_report": {
+      "passed": true,
+      "failed_gates": [],
+      "samples": 108,
+      "unique_grammar_combos": 1,
+      "ambiguous_grammar_combo_count": 0,
+      "ambiguous_grammar_combo_ratio": 0.0,
+      "exact_text_cross_level_count": 0,
+      "exact_text_cross_level_ratio": 0.0,
+      "evidence_missing_count": 0,
+      "blueprint_missing_count": 0,
+      "insufficient_support": []
+    }
+  }
+}
