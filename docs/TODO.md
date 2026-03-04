@@ -103,10 +103,16 @@
 - [x] Add `UD_English-GUM` genre-aware advanced coverage reporting.
 - [ ] Use `UD_English-GUM` targeted genres (`academic`, `court`, `essay`, `news`, `speech`, `textbook`) as explicit advanced-readiness evidence source.
 - [x] Add bounded `PMC OA` ingest scaffold with license/provenance extraction for scientific `C1/C2` expansion.
+- [x] Confirm from real bounded `PMC OA` probes that scientific prose strengthens `B2` but does not materially close `C1/C2`.
+- [ ] Add `Project Gutenberg` as the primary next corpus source for `C1/C2` (`Essays` + `Fiction`, public-domain path).
+- [ ] Add bounded `Project Gutenberg` catalog ingest/filtering scaffold.
+- [ ] Add `Project Gutenberg` text ingest path with source/license/provenance capture.
+- [ ] Add targeted `Project Gutenberg` harvest for `modal_perfect` / `future_perfect`.
 - [ ] Build merged advanced dataset source:
   - [ ] `UD_English-EWT`
   - [ ] `UD_English-GUM`
   - [ ] `OANC`
+  - [ ] `Project Gutenberg`
   - [ ] optional `MASC` validation slice
 - [x] Add hard support thresholds for `B2/C1/C2` so advanced levels cannot pass on only a handful of examples.
 - [x] Publish merged coverage report for `A1 -> A2 -> B1 -> B2 -> C1 -> C2` before any full-ladder retrain.

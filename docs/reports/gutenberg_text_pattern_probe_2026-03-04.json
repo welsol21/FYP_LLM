@@ -1,0 +1,64 @@
+{
+  "files": [
+    {
+      "file": "pg15.txt",
+      "size_chars": 1257704,
+      "counts": {
+        "modal_perfect_should": 10,
+        "modal_perfect_could": 8,
+        "modal_perfect_would": 55,
+        "modal_perfect_might": 36,
+        "modal_perfect_must": 55,
+        "future_perfect": 10
+      }
+    },
+    {
+      "file": "pg27.txt",
+      "size_chars": 793110,
+      "counts": {
+        "modal_perfect_should": 26,
+        "modal_perfect_could": 14,
+        "modal_perfect_would": 81,
+        "modal_perfect_might": 35,
+        "modal_perfect_must": 28,
+        "future_perfect": 9
+      }
+    },
+    {
+      "file": "pg33.txt",
+      "size_chars": 499589,
+      "counts": {
+        "modal_perfect_should": 15,
+        "modal_perfect_could": 16,
+        "modal_perfect_would": 55,
+        "modal_perfect_might": 30,
+        "modal_perfect_must": 11,
+        "future_perfect": 4
+      }
+    },
+    {
+      "file": "pg35.txt",
+      "size_chars": 198940,
+      "counts": {
+        "modal_perfect_should": 8,
+        "modal_perfect_could": 3,
+        "modal_perfect_would": 7,
+        "modal_perfect_might": 6,
+        "modal_perfect_must": 20,
+        "future_perfect": 2
+      }
+    },
+    {
+      "file": "pg42.txt",
+      "size_chars": 158614,
+      "counts": {
+        "modal_perfect_should": 1,
+        "modal_perfect_could": 7,
+        "modal_perfect_would": 8,
+        "modal_perfect_might": 8,
+        "modal_perfect_must": 9,
+        "future_perfect": 5
+      }
+    }
+  ]
+}

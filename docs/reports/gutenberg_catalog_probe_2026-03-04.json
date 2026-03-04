@@ -1,0 +1,260 @@
+{
+  "catalog_path": "data/external_datasets/ProjectGutenberg/pg_catalog.csv",
+  "selected_count": 200,
+  "top_locc": {
+    "PS": 111,
+    "PR": 74,
+    "PZ": 10,
+    "PQ": 10,
+    "PT": 2,
+    "NC": 1,
+    "PG": 1,
+    "PC": 1
+  },
+  "top_bookshelves": {
+    "Category: Novels": 154,
+    "Category: American Literature": 89,
+    "Category: British Literature": 79,
+    "Category: Adventure": 43,
+    "Category: Classics of Literature": 35,
+    "Category: Science-Fiction & Fantasy": 30,
+    "Category: Short Stories": 30,
+    "Movie Books": 21,
+    "Category: Crime, Thrillers and Mystery": 21,
+    "Science Fiction": 17,
+    "Category: Romance": 17,
+    "Best Books Ever Listings": 16,
+    "Category: Historical Novels": 16,
+    "Category: Humour": 15,
+    "Adventure": 10,
+    "Banned Books from Anne Haight's list": 10,
+    "Bestsellers, American, 1895-1923": 10,
+    "Category: French Literature": 8,
+    "Detective Fiction": 8,
+    "Gothic Fiction": 7
+  },
+  "top_subjects": {
+    "Love stories": 26,
+    "Adventure stories": 25,
+    "Psychological fiction": 24,
+    "Fantasy fiction": 19,
+    "Science fiction": 18,
+    "Man-woman relationships -- Fiction": 18,
+    "England -- Fiction": 17,
+    "Short stories": 16,
+    "Domestic fiction": 15,
+    "Didactic fiction": 14,
+    "Historical fiction": 13,
+    "Young women -- Fiction": 13,
+    "Bildungsromans": 11,
+    "Triangles (Interpersonal relations) -- Fiction": 8,
+    "Humorous stories": 8,
+    "Fiction": 8,
+    "Wessex (England) -- Fiction": 7,
+    "Horror tales": 7,
+    "Pastoral fiction": 6,
+    "Tarzan (Fictitious character) -- Fiction": 6
+  },
+  "examples": [
+    {
+      "title": "Moby-Dick; or, The Whale",
+      "author": "Melville, Herman, 1819-1891",
+      "language": "en",
+      "subjects": "Whaling -- Fiction; Sea stories; Psychological fiction; Ship captains -- Fiction; Adventure stories; Mentally ill -- Fiction; Ahab, Captain (Fictitious character) -- Fiction; Whales -- Fiction; Whaling ships -- Fiction",
+      "bookshelves": "Adventure; Best Books Ever Listings; Category: Adventure; Category: Novels; Category: Classics of Literature; Category: American Literature",
+      "locc": "PS",
+      "text_url": "https://www.gutenberg.org/cache/epub/15/pg15.txt",
+      "gutenberg_id": "15"
+    },
+    {
+      "title": "O Pioneers!",
+      "author": "Cather, Willa, 1873-1947",
+      "language": "en",
+      "subjects": "Nebraska -- Fiction; Historical fiction; Frontier and pioneer life -- Nebraska -- Fiction; Domestic fiction; Siblings -- Fiction; Farm life -- Fiction; Women pioneers -- Fiction; Women farmers -- Fiction; Women immigrants -- Fiction; Swedish Americans -- Fiction",
+      "bookshelves": "Category: Novels; Category: American Literature",
+      "locc": "PS",
+      "text_url": "https://www.gutenberg.org/cache/epub/24/pg24.txt",
+      "gutenberg_id": "24"
+    },
+    {
+      "title": "Far from the Madding Crowd",
+      "author": "Hardy, Thomas, 1840-1928",
+      "language": "en",
+      "subjects": "Didactic fiction; Love stories; Triangles (Interpersonal relations) -- Fiction; Pastoral fiction; Farm life -- Fiction; Women farmers -- Fiction; Wessex (England) -- Fiction",
+      "bookshelves": "Category: Novels; Category: British Literature",
+      "locc": "PR",
+      "text_url": "https://www.gutenberg.org/cache/epub/27/pg27.txt",
+      "gutenberg_id": "27"
+    },
+    {
+      "title": "Herland",
+      "author": "Gilman, Charlotte Perkins, 1860-1935",
+      "language": "en",
+      "subjects": "Utopias -- Fiction; Women -- Fiction; Utopian fiction; Black humor",
+      "bookshelves": "Best Books Ever Listings; Category: Science-Fiction & Fantasy; Category: Novels; Category: American Literature; Category: Gender & Sexuality Studies",
+      "locc": "PS",
+      "text_url": "https://www.gutenberg.org/cache/epub/32/pg32.txt",
+      "gutenberg_id": "32"
+    },
+    {
+      "title": "The Scarlet Letter",
+      "author": "Hawthorne, Nathaniel, 1804-1864",
+      "language": "en",
+      "subjects": "Adultery -- Fiction; Historical fiction; Revenge -- Fiction; Psychological fiction; Married women -- Fiction; Clergy -- Fiction; Triangles (Interpersonal relations) -- Fiction; Illegitimate children -- Fiction; Women immigrants -- Fiction; Puritans -- Fiction; Boston (Mass.) -- History -- Colonial period, ca. 1600-1775 -- Fiction",
+      "bookshelves": "Harvard Classics; Movie Books; Category: Novels; Category: Classics of Literature; Category: American Literature",
+      "locc": "PS",
+      "text_url": "https://www.gutenberg.org/cache/epub/33/pg33.txt",
+      "gutenberg_id": "33"
+    },
+    {
+      "title": "The Time Machine",
+      "author": "Wells, H. G. (Herbert George), 1866-1946",
+      "language": "en",
+      "subjects": "Science fiction; Time travel -- Fiction; Dystopias -- Fiction",
+      "bookshelves": "Science Fiction; Movie Books; Category: Science-Fiction & Fantasy; Category: Novels; Category: British Literature",
+      "locc": "PR",
+      "text_url": "https://www.gutenberg.org/cache/epub/35/pg35.txt",
+      "gutenberg_id": "35"
+    },
+    {
+      "title": "The war of the worlds",
+      "author": "Wells, H. G. (Herbert George), 1866-1946",
+      "language": "en",
+      "subjects": "Science fiction; War stories; Martians -- Fiction; Mars (Planet) -- Fiction; Space warfare -- Fiction; Imaginary wars and battles -- Fiction; Life on other planets -- Fiction",
+      "bookshelves": "Science Fiction; Movie Books; Category: Science-Fiction & Fantasy; Category: Novels; Category: Classics of Literature; Category: British Literature",
+      "locc": "PR",
+      "text_url": "https://www.gutenberg.org/cache/epub/36/pg36.txt",
+      "gutenberg_id": "36"
+    },
+    {
+      "title": "The strange case of Dr. Jekyll and Mr. Hyde",
+      "author": "Stevenson, Robert Louis, 1850-1894",
+      "language": "en",
+      "subjects": "Science fiction; Horror tales; London (England) -- Fiction; Physicians -- Fiction; Psychological fiction; Self-experimentation in medicine -- Fiction; Multiple personality -- Fiction",
+      "bookshelves": "Precursors of Science Fiction; Horror; Gothic Fiction; Movie Books; Category: Crime, Thrillers and Mystery; Category: Novels; Category: Classics of Literature; Category: British Literature",
+      "locc": "PR",
+      "text_url": "https://www.gutenberg.org/cache/epub/42/pg42.txt",
+      "gutenberg_id": "42"
+    },
+    {
+      "title": "The strange case of Dr. Jekyll and Mr. Hyde",
+      "author": "Stevenson, Robert Louis, 1850-1894",
+      "language": "en",
+      "subjects": "Science fiction; Horror tales; London (England) -- Fiction; Physicians -- Fiction; Psychological fiction; Self-experimentation in medicine -- Fiction; Multiple personality -- Fiction",
+      "bookshelves": "Precursors of Science Fiction; Horror; Movie Books; Category: Crime, Thrillers and Mystery; Category: Novels; Category: Classics of Literature; Category: British Literature",
+      "locc": "PR",
+      "text_url": "https://www.gutenberg.org/cache/epub/43/pg43.txt",
+      "gutenberg_id": "43"
+    },
+    {
+      "title": "The Song of the Lark",
+      "author": "Cather, Willa, 1873-1947",
+      "language": "en",
+      "subjects": "Musical fiction; Young women -- Fiction; Bildungsromans; Chicago (Ill.) -- Fiction; Swedish Americans -- Fiction; Colorado -- Fiction; Opera -- Fiction; Children of clergy -- Fiction; Women singers -- Fiction",
+      "bookshelves": "Opera; Category: Novels; Category: American Literature",
+      "locc": "PS",
+      "text_url": "https://www.gutenberg.org/cache/epub/44/pg44.txt",
+      "gutenberg_id": "44"
+    },
+    {
+      "title": "Aladdin and the Magic Lamp",
+      "author": "Unknown",
+      "language": "en",
+      "subjects": "Fairy tales; Children's stories; Arabs -- Folklore; Folklore -- Arab countries",
+      "bookshelves": "Category: Historical Novels; Category: Adventure; Category: Mythology, Legends & Folklore",
+      "locc": "PZ",
+      "text_url": "https://www.gutenberg.org/cache/epub/57/pg57.txt",
+      "gutenberg_id": "57"
+    },
+    {
+      "title": "The Scarlet Pimpernel",
+      "author": "Orczy, Emmuska Orczy, Baroness, 1865-1947",
+      "language": "en",
+      "subjects": "Historical fiction; France -- History -- Revolution, 1789-1799 -- Fiction; Adventure stories; British -- France -- Fiction; Nobility -- Fiction; Blakeney, Percy, Sir (Fictitious character) -- Fiction",
+      "bookshelves": "Adventure; Best Books Ever Listings; Movie Books; Category: Historical Novels; Category: Adventure; Category: British Literature",
+      "locc": "PR",
+      "text_url": "https://www.gutenberg.org/cache/epub/60/pg60.txt",
+      "gutenberg_id": "60"
+    },
+    {
+      "title": "A princess of Mars",
+      "author": "Burroughs, Edgar Rice, 1875-1950",
+      "language": "en",
+      "subjects": "Science fiction; Mars (Planet) -- Fiction; Princesses -- Fiction; Carter, John (Fictitious character) -- Fiction; Dejah Thoris (Fictitious character) -- Fiction",
+      "bookshelves": "Science Fiction; Best Books Ever Listings; Category: Science-Fiction & Fantasy; Category: Adventure",
+      "locc": "PS",
+      "text_url": "https://www.gutenberg.org/cache/epub/62/pg62.txt",
+      "gutenberg_id": "62"
+    },
+    {
+      "title": "The gods of Mars",
+      "author": "Burroughs, Edgar Rice, 1875-1950",
+      "language": "en",
+      "subjects": "Science fiction; Mars (Planet) -- Fiction; Life on other planets -- Fiction; Carter, John (Fictitious character) -- Fiction; Dejah Thoris (Fictitious character) -- Fiction",
+      "bookshelves": "Science Fiction; Category: Science-Fiction & Fantasy; Category: Adventure; Category: Novels; Category: American Literature",
+      "locc": "PS",
+      "text_url": "https://www.gutenberg.org/cache/epub/64/pg64.txt",
+      "gutenberg_id": "64"
+    },
+    {
+      "title": "The warlord of Mars",
+      "author": "Burroughs, Edgar Rice, 1875-1950",
+      "language": "en",
+      "subjects": "Science fiction; Mars (Planet) -- Fiction; Carter, John (Fictitious character) -- Fiction; Dejah Thoris (Fictitious character) -- Fiction",
+      "bookshelves": "Science Fiction; Category: Science-Fiction & Fantasy; Category: Adventure",
+      "locc": "PS",
+      "text_url": "https://www.gutenberg.org/cache/epub/68/pg68.txt",
+      "gutenberg_id": "68"
+    },
+    {
+      "title": "Thuvia, maid of Mars",
+      "author": "Burroughs, Edgar Rice, 1875-1950",
+      "language": "en",
+      "subjects": "Science fiction; Martians -- Fiction; Mars (Planet) -- Fiction",
+      "bookshelves": "Science Fiction; Category: Science-Fiction & Fantasy; Category: Romance; Category: Adventure; Category: American Literature",
+      "locc": "PS",
+      "text_url": "https://www.gutenberg.org/cache/epub/72/pg72.txt",
+      "gutenberg_id": "72"
+    },
+    {
+      "title": "The Adventures of Tom Sawyer, Complete",
+      "author": "Twain, Mark, 1835-1910",
+      "language": "en",
+      "subjects": "Humorous stories; Bildungsromans; Boys -- Fiction; Male friendship -- Fiction; Adventure stories; Missouri -- Fiction; Sawyer, Tom (Fictitious character) -- Fiction; Child witnesses -- Fiction; Runaway children -- Fiction; Mississippi River Valley -- Fiction",
+      "bookshelves": "Banned Books from Anne Haight's list; Banned Books List from the American Library Association; Category: Adventure; Category: Novels; Category: Classics of Literature; Category: American Literature",
+      "locc": "PS",
+      "text_url": "https://www.gutenberg.org/cache/epub/74/pg74.txt",
+      "gutenberg_id": "74"
+    },
+    {
+      "title": "Adventures of Huckleberry Finn",
+      "author": "Twain, Mark, 1835-1910; Kemble, E. W. (Edward Windsor), 1861-1933 [Illustrator]",
+      "language": "en",
+      "subjects": "Humorous stories; Bildungsromans; Boys -- Fiction; Male friendship -- Fiction; Adventure stories; Missouri -- Fiction; Race relations -- Fiction; Runaway children -- Fiction; Finn, Huckleberry (Fictitious character) -- Fiction; Fugitive slaves -- Fiction; Mississippi River -- Fiction",
+      "bookshelves": "Best Books Ever Listings; Banned Books from Anne Haight's list; Banned Books List from the American Library Association; Category: Adventure; Category: Novels; Category: Classics of Literature; Category: American Literature",
+      "locc": "PS",
+      "text_url": "https://www.gutenberg.org/cache/epub/76/pg76.txt",
+      "gutenberg_id": "76"
+    },
+    {
+      "title": "The House of the Seven Gables",
+      "author": "Hawthorne, Nathaniel, 1804-1864",
+      "language": "en",
+      "subjects": "Historical fiction; Domestic fiction; Paranormal fiction; Haunted houses -- Fiction; Salem (Mass.) -- Fiction",
+      "bookshelves": "Best Books Ever Listings; Category: Novels; Category: Classics of Literature; Category: American Literature",
+      "locc": "PS",
+      "text_url": "https://www.gutenberg.org/cache/epub/77/pg77.txt",
+      "gutenberg_id": "77"
+    },
+    {
+      "title": "Tarzan of the Apes",
+      "author": "Burroughs, Edgar Rice, 1875-1950",
+      "language": "en",
+      "subjects": "Tarzan (Fictitious character) -- Fiction; Africa -- Fiction; Fantasy fiction; Adventure stories; British -- Africa -- Fiction; Wild men -- Fiction",
+      "bookshelves": "Adventure; Movie Books; Category: Adventure; Category: Novels; Category: American Literature",
+      "locc": "PS",
+      "text_url": "https://www.gutenberg.org/cache/epub/78/pg78.txt",
+      "gutenberg_id": "78"
+    }
+  ]
+}

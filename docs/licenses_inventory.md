@@ -63,6 +63,7 @@ Tracked corpus sources currently approved/planned for classifier-dataset work:
 | `OANC` | advanced-register source for `B2/C1/C2` coverage | official site states unrestricted usage/redistribution including commercial use; record exact source package used |
 | `MASC` | validation/control source with richer annotation | `CC BY 3.0 US` |
 | `PMC OA` | bounded scientific-text source for `C1/C2` expansion | preserve per-article license/provenance from source XML; only ingest articles whose downloaded package/license is compatible with project use |
+| `Project Gutenberg` | primary bounded essays/fiction source for `C1/C2` expansion | use public-domain texts only; persist exact catalog metadata and source URL per text |
 
 Notes:
 - For `OANC`, use the official wording from the source package/site documentation rather than paraphrasing it as `CC0` unless the downloaded package explicitly says so.

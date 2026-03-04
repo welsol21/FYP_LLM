@@ -152,6 +152,7 @@ Practical policy:
 - `MASC` is treated as a quality-oriented validation/control source, not bulk training by default.
 - `UD_English-GUM` must also be evaluated in a genre-aware way, not only as a generic merged treebank, because its higher-register genres are more informative for advanced coverage than its conversational and informal slices.
 - `PMC OA` is the next bounded scientific-text expansion path for `C1/C2`; ingest should preserve article/license provenance from source XML before any parsing/enrichment step.
+- `Project Gutenberg` is now the primary next expansion path for `C1/C2`, because essays and literary prose are a better genre match for `modal_perfect` and `future_perfect` than scientific articles.
 
 Operational note:
 - the legacy `ANC-parses` download is treated as unavailable/dead and is not a project dependency,
@@ -213,7 +214,21 @@ Current project state:
 - interpretation:
   - genre-aware `GUM` materially strengthens `B2`,
   - but it does **not** solve the remaining `C1/C2` scarcity problem,
-  - therefore the next required corpus-expansion path is bounded `PMC OA` scientific ingest rather than more generic `GUM` slicing.
+  - therefore more generic `GUM` slicing is not the right next lever for `C1/C2`.
+- bounded `PMC OA` probes are now implemented and recorded in:
+  - `docs/reports/pmc_oa_sample_probe_2026-03-04.json`
+  - `docs/reports/pmc_oa_advanced_probe_2026-03-04.json`
+  - `docs/reports/pmc_oa_advanced_dataset_probe_2026-03-04.json`
+  - `docs/reports/pmc_oa_advanced_full_small_incr_2026-03-04.json`
+  - `docs/reports/pmc_oa_advanced_targeted_small_incr_2026-03-04.json`
+- current `PMC OA` conclusion from real bounded runs:
+  - scientific prose does contribute additional `B2 / past_perfect`,
+  - but it does **not** materially improve `C1 / modal_perfect` or `C2 / future_perfect`,
+  - so `PMC OA` remains useful as a formal-prose support source, not as the primary path for closing `C1/C2`.
+- updated next-step decision:
+  - the primary next corpus source for `C1/C2` is `Project Gutenberg`,
+  - specifically bounded `Essays` + `Fiction` slices with full source/provenance capture,
+  - because these genres are a much better natural habitat for `should have`, `could have`, `would have`, and `will have` constructions than scientific prose.
 - current project-level conclusion:
   - the advanced ladder is **not** ready for full-ladder retrain,
   - `B2` can already be trusted structurally,
