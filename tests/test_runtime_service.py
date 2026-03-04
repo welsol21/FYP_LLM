@@ -700,9 +700,9 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertEqual(kwargs["classifier_device"], "cuda")
 
     @patch("ela_pipeline.inference.run.run_pipeline")
-    @patch("ela_pipeline.runtime.service.os.path.isfile", return_value=True)
+    @patch("ela_pipeline.runtime.service.os.path.isfile", side_effect=lambda path: str(path).endswith("classifier_metadata.json") or str(path).endswith("best_tabular_cefr_baseline.joblib"))
     @patch("ela_pipeline.runtime.service.os.path.isdir", return_value=True)
-    def test_build_sentence_contract_auto_defaults_to_deberta_when_model_exists(
+    def test_build_sentence_contract_auto_defaults_to_tabular_when_model_exists(
         self,
         _mock_isdir,
         _mock_isfile,
@@ -729,8 +729,8 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                 note_mode="controlled",
             )
             kwargs = mock_run_pipeline.call_args.kwargs
-            self.assertEqual(kwargs["classifier_provider"], "deberta")
-            self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/deberta_classifier_cefr")
+            self.assertEqual(kwargs["classifier_provider"], "tabular")
+            self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_cefr_baseline_full_ladder_logreg")
 
     @patch("ela_pipeline.inference.run.run_pipeline")
     @patch("ela_pipeline.runtime.service.os.path.isfile", return_value=False)

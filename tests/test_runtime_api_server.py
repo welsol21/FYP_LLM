@@ -9,13 +9,13 @@ from ela_pipeline.runtime import api_server
 
 
 class RuntimeApiServerTests(unittest.TestCase):
-    @patch("ela_pipeline.runtime.api_server.os.path.isfile", return_value=True)
+    @patch("ela_pipeline.runtime.api_server.os.path.isfile", side_effect=lambda path: str(path).endswith("classifier_metadata.json") or str(path).endswith("best_tabular_cefr_baseline.joblib"))
     @patch("ela_pipeline.runtime.api_server.os.path.isdir", return_value=True)
-    def test_resolve_classifier_settings_defaults_to_deberta_when_model_dir_exists(self, _mock_isdir, _mock_isfile):
+    def test_resolve_classifier_settings_defaults_to_tabular_when_model_dir_exists(self, _mock_isdir, _mock_isfile):
         with patch.dict("os.environ", {}, clear=False):
             provider, model_path = api_server._resolve_classifier_settings()
-        self.assertEqual(provider, "deberta")
-        self.assertEqual(model_path, "artifacts/models/deberta_classifier_cefr")
+        self.assertEqual(provider, "tabular")
+        self.assertEqual(model_path, "artifacts/models/tabular_cefr_baseline_full_ladder_logreg")
 
     @patch("ela_pipeline.runtime.api_server.os.path.isfile", return_value=False)
     @patch("ela_pipeline.runtime.api_server.os.path.isdir", return_value=False)
@@ -37,7 +37,7 @@ class RuntimeApiServerTests(unittest.TestCase):
                 api_server._resolve_classifier_settings()
 
     @patch("ela_pipeline.runtime.api_server.SERVICE.build_sentence_contract")
-    @patch("ela_pipeline.runtime.api_server.os.path.isfile", return_value=True)
+    @patch("ela_pipeline.runtime.api_server.os.path.isfile", side_effect=lambda path: str(path).endswith("classifier_metadata.json") or str(path).endswith("best_tabular_cefr_baseline.joblib"))
     @patch("ela_pipeline.runtime.api_server.os.path.isdir", return_value=True)
     def test_build_sentence_contract_payload_uses_controlled_and_resolved_classifier(
         self,
@@ -51,11 +51,11 @@ class RuntimeApiServerTests(unittest.TestCase):
         self.assertEqual(payload, {"ok": True})
         kwargs = mock_build_sentence_contract.call_args.kwargs
         self.assertEqual(kwargs["note_mode"], "controlled")
-        self.assertEqual(kwargs["classifier_provider"], "deberta")
-        self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/deberta_classifier_cefr")
+        self.assertEqual(kwargs["classifier_provider"], "tabular")
+        self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_cefr_baseline_full_ladder_logreg")
 
     @patch("ela_pipeline.runtime.api_server.SERVICE.build_sentence_contract")
-    @patch("ela_pipeline.runtime.api_server.os.path.isfile", return_value=True)
+    @patch("ela_pipeline.runtime.api_server.os.path.isfile", side_effect=lambda path: str(path).endswith("classifier_metadata.json") or str(path).endswith("best_tabular_cefr_baseline.joblib"))
     @patch("ela_pipeline.runtime.api_server.os.path.isdir", return_value=True)
     def test_sentence_contract_http_e2e_smoke(self, _mock_isdir, _mock_isfile, mock_build_sentence_contract):
         mock_build_sentence_contract.return_value = {
@@ -94,7 +94,7 @@ class RuntimeApiServerTests(unittest.TestCase):
             self.assertEqual(kwargs["sentence_text"], "She trusted him.")
             self.assertEqual(kwargs["sentence_idx"], 1)
             self.assertEqual(kwargs["note_mode"], "controlled")
-            self.assertEqual(kwargs["classifier_provider"], "deberta")
+            self.assertEqual(kwargs["classifier_provider"], "tabular")
         finally:
             server.shutdown()
             server.server_close()

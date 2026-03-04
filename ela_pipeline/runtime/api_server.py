@@ -48,13 +48,20 @@ def _resolve_classifier_settings() -> tuple[str, str | None]:
         provider = provider_raw
     else:
         default_model_dir = "artifacts/models/deberta_classifier_cefr"
+        has_tabular = (
+            os.path.isdir(default_tabular_dir)
+            and os.path.isfile(os.path.join(default_tabular_dir, "classifier_metadata.json"))
+            and os.path.isfile(os.path.join(default_tabular_dir, "best_tabular_cefr_baseline.joblib"))
+        )
         has_deberta = (
             os.path.isdir(default_model_dir)
             and os.path.isfile(os.path.join(default_model_dir, "classifier_metadata.json"))
         )
-        provider = "deberta" if has_deberta else "rule"
+        provider = "tabular" if has_tabular else ("deberta" if has_deberta else "rule")
         if not model_path and provider == "deberta":
             model_path = default_model_dir
+        if not model_path and provider == "tabular":
+            model_path = default_tabular_dir
 
     if provider == "deberta" and not model_path:
         model_path = "artifacts/models/deberta_classifier_cefr"

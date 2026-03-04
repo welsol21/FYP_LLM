@@ -653,24 +653,31 @@ class RuntimeMediaService:
         env_provider = str(os.getenv("ELA_CLASSIFIER_PROVIDER", "")).strip().lower()
         env_model_path = str(os.getenv("ELA_CLASSIFIER_MODEL_PATH", "")).strip()
 
-        model_dir = explicit_model_path or env_model_path or "artifacts/models/deberta_classifier_cefr"
+        default_deberta_dir = "artifacts/models/deberta_classifier_cefr"
+        default_tabular_dir = "artifacts/models/tabular_cefr_baseline_full_ladder_logreg"
+        deberta_dir = explicit_model_path or env_model_path or default_deberta_dir
         has_local_deberta = (
-            os.path.isdir(model_dir)
-            and os.path.isfile(os.path.join(model_dir, "classifier_metadata.json"))
+            os.path.isdir(deberta_dir)
+            and os.path.isfile(os.path.join(deberta_dir, "classifier_metadata.json"))
+        )
+        has_local_tabular = (
+            os.path.isdir(default_tabular_dir)
+            and os.path.isfile(os.path.join(default_tabular_dir, "classifier_metadata.json"))
+            and os.path.isfile(os.path.join(default_tabular_dir, "best_tabular_cefr_baseline.joblib"))
         )
         if explicit_provider and explicit_provider != "rule":
             provider = explicit_provider
         elif env_provider:
             provider = env_provider
         else:
-            provider = "deberta" if has_local_deberta else "rule"
+            provider = "tabular" if has_local_tabular else ("deberta" if has_local_deberta else "rule")
 
         if provider not in {"rule", "deberta", "tabular"}:
             raise ValueError("classifier_provider must be one of: rule | deberta | tabular")
         if provider == "deberta":
-            return provider, model_dir
+            return provider, deberta_dir
         if provider == "tabular":
-            return provider, explicit_model_path or env_model_path or "artifacts/models/tabular_cefr_baseline_full_ladder_logreg"
+            return provider, explicit_model_path or env_model_path or default_tabular_dir
         return provider, None
 
     def build_sentence_contract(
