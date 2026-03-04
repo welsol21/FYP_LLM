@@ -821,7 +821,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             )
             kwargs = mock_run_pipeline.call_args.kwargs
             self.assertEqual(kwargs["classifier_provider"], "tabular")
-            self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest")
+            self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_cefr_baseline_full_ladder_xgboost_gpu_v1")
 
     @patch("ela_pipeline.inference.run.run_pipeline")
     @patch("ela_pipeline.runtime.service.os.path.isfile", return_value=False)
@@ -884,7 +884,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             )
             kwargs = mock_run_pipeline.call_args.kwargs
             self.assertEqual(kwargs["classifier_provider"], "tabular")
-            self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest")
+            self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_cefr_baseline_full_ladder_xgboost_gpu_v1")
 
     def test_request_sentence_contract_uses_backend_endpoint_when_configured(self):
         with tempfile.TemporaryDirectory() as tmpdir:

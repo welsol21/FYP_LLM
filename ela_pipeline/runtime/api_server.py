@@ -43,6 +43,8 @@ def _resolve_classifier_settings() -> tuple[str, str | None]:
     model_path = _env_str("ELA_CLASSIFIER_MODEL_PATH", "")
 
     default_tabular_dirs = [
+        "artifacts/models/tabular_cefr_baseline_full_ladder_xgboost_gpu_v1",
+        "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest_v2",
         "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest",
         "artifacts/models/tabular_cefr_baseline_full_ladder_logreg",
     ]

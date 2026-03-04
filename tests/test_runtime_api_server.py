@@ -15,7 +15,7 @@ class RuntimeApiServerTests(unittest.TestCase):
         with patch.dict("os.environ", {}, clear=False):
             provider, model_path = api_server._resolve_classifier_settings()
         self.assertEqual(provider, "tabular")
-        self.assertEqual(model_path, "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest")
+        self.assertEqual(model_path, "artifacts/models/tabular_cefr_baseline_full_ladder_xgboost_gpu_v1")
 
     @patch("ela_pipeline.runtime.api_server.os.path.isfile", return_value=False)
     @patch("ela_pipeline.runtime.api_server.os.path.isdir", return_value=False)
@@ -29,7 +29,7 @@ class RuntimeApiServerTests(unittest.TestCase):
         with patch.dict("os.environ", {"ELA_CLASSIFIER_PROVIDER": "tabular"}, clear=False):
             provider, model_path = api_server._resolve_classifier_settings()
         self.assertEqual(provider, "tabular")
-        self.assertEqual(model_path, "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest")
+        self.assertEqual(model_path, "artifacts/models/tabular_cefr_baseline_full_ladder_xgboost_gpu_v1")
 
     def test_resolve_classifier_settings_rejects_invalid_provider(self):
         with patch.dict("os.environ", {"ELA_CLASSIFIER_PROVIDER": "invalid"}, clear=False):
@@ -52,7 +52,7 @@ class RuntimeApiServerTests(unittest.TestCase):
         kwargs = mock_build_sentence_contract.call_args.kwargs
         self.assertEqual(kwargs["note_mode"], "controlled")
         self.assertEqual(kwargs["classifier_provider"], "tabular")
-        self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest")
+        self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_cefr_baseline_full_ladder_xgboost_gpu_v1")
 
     @patch("ela_pipeline.runtime.api_server.SERVICE.build_sentence_contract")
     @patch("ela_pipeline.runtime.api_server.os.path.isfile", side_effect=lambda path: str(path).endswith("classifier_metadata.json") or str(path).endswith("best_tabular_cefr_baseline.joblib"))

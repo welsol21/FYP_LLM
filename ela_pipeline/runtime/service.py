@@ -694,6 +694,8 @@ class RuntimeMediaService:
 
         default_deberta_dir = "artifacts/models/deberta_classifier_cefr"
         default_tabular_dirs = [
+            "artifacts/models/tabular_cefr_baseline_full_ladder_xgboost_gpu_v1",
+            "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest_v2",
             "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest",
             "artifacts/models/tabular_cefr_baseline_full_ladder_logreg",
         ]

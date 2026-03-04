@@ -1,4 +1,4 @@
-"""Train tabular baselines on the merged full-ladder dataset."""
+"""Train GPU-only XGBoost tabular CEFR baseline on the merged full-ladder dataset."""
 
 from __future__ import annotations
 
@@ -10,13 +10,9 @@ from typing import Any
 
 import joblib
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction import DictVectorizer
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, precision_score, recall_score
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.svm import LinearSVC
 
 from .metadata import build_classifier_metadata_from_dataset
 
@@ -157,42 +153,64 @@ def evaluate_predictions(y_true: list[str], y_pred: list[str], *, label_order: l
     }
 
 
-def _make_models(seed: int) -> dict[str, Pipeline]:
+def _assert_gpu_training_available() -> None:
+    try:
+        import xgboost as xgb
+    except Exception as exc:
+        raise ImportError("xgboost is required for GPU tabular training") from exc
+    build_info = xgb.build_info()
+    if not bool(build_info.get("USE_CUDA")):
+        raise RuntimeError("GPU-only policy: installed xgboost was built without CUDA support.")
+
+
+def _assert_model_trained_on_gpu(model: Any, model_name: str) -> None:
+    """Fail hard if XGBoost silently fell back to CPU."""
+    classifier = model
+    if hasattr(model, "named_steps") and isinstance(model.named_steps, dict):
+        classifier = model.named_steps.get("classifier", model)
+    if not hasattr(classifier, "get_booster"):
+        return
+    try:
+        booster_cfg = json.loads(classifier.get_booster().save_config())
+    except Exception:
+        return
+    device = (
+        booster_cfg.get("learner", {})
+        .get("generic_param", {})
+        .get("device", "")
+        .lower()
+    )
+    if device != "cuda":
+        raise RuntimeError(
+            f"GPU-only policy violated: model '{model_name}' trained on device='{device or 'unknown'}'."
+        )
+
+
+def _make_models(seed: int, *, num_classes: int) -> dict[str, Pipeline]:
+    try:
+        from xgboost import XGBClassifier
+    except Exception as exc:
+        raise ImportError("xgboost is required for GPU tabular training") from exc
+
     return {
-        "logreg": Pipeline(
-            steps=[
-                ("vectorizer", DictVectorizer(sparse=False)),
-                ("scaler", StandardScaler()),
-                (
-                    "classifier",
-                    LogisticRegression(
-                        max_iter=4000,
-                        class_weight="balanced",
-                        multi_class="multinomial",
-                        random_state=seed,
-                    ),
-                ),
-            ]
-        ),
-        "linear_svc": Pipeline(
-            steps=[
-                ("vectorizer", DictVectorizer(sparse=False)),
-                ("scaler", StandardScaler()),
-                ("classifier", LinearSVC(class_weight="balanced", random_state=seed)),
-            ]
-        ),
-        "random_forest": Pipeline(
+        "xgboost_gpu": Pipeline(
             steps=[
                 ("vectorizer", DictVectorizer(sparse=False)),
                 (
                     "classifier",
-                    RandomForestClassifier(
-                        n_estimators=120,
-                        max_depth=24,
-                        min_samples_leaf=2,
-                        class_weight="balanced_subsample",
+                    XGBClassifier(
+                        objective="multi:softmax",
+                        num_class=int(num_classes),
+                        n_estimators=600,
+                        max_depth=8,
+                        learning_rate=0.05,
+                        subsample=0.9,
+                        colsample_bytree=0.9,
+                        reg_lambda=1.0,
                         random_state=seed,
-                        n_jobs=-1,
+                        tree_method="hist",
+                        device="cuda",
+                        eval_metric="mlogloss",
                     ),
                 ),
             ]
@@ -219,8 +237,16 @@ def train_tabular_cefr_baseline(
     x_dev, y_dev = build_feature_rows(dev_rows, label_field=label_field, feature_profile=feature_profile)
     x_test, y_test = build_feature_rows(test_rows, label_field=label_field, feature_profile=feature_profile)
 
-    models = _make_models(seed)
-    selected_names = list(model_names or models.keys())
+    _assert_gpu_training_available()
+    label_order = list(CEFR_ORDER) if label_field == "cefr_label" else sorted(set(y_train) | set(y_dev) | set(y_test))
+    label_to_id = {label: idx for idx, label in enumerate(label_order)}
+    id_to_label = {idx: label for label, idx in label_to_id.items()}
+    y_train_ids = [label_to_id[label] for label in y_train]
+    y_dev_ids = [label_to_id[label] for label in y_dev]
+    y_test_ids = [label_to_id[label] for label in y_test]
+
+    models = _make_models(seed, num_classes=len(label_order))
+    selected_names = list(model_names or ["xgboost_gpu"])
     unknown = sorted(set(selected_names) - set(models.keys()))
     if unknown:
         raise ValueError(f"Unknown baseline model(s): {unknown}")
@@ -230,20 +256,21 @@ def train_tabular_cefr_baseline(
     best_score = -1.0
     best_model: Any = None
 
-    label_order = list(CEFR_ORDER) if label_field == "cefr_label" else sorted(set(y_train) | set(y_dev) | set(y_test))
-
     for name, model in models.items():
-        model.fit(x_train, y_train)
-        dev_pred = model.predict(x_dev)
-        test_pred = model.predict(x_test)
+        model.fit(x_train, y_train_ids)
+        _assert_model_trained_on_gpu(model, name)
+        dev_pred_ids = model.predict(x_dev)
+        test_pred_ids = model.predict(x_test)
+        dev_pred = [id_to_label[int(x)] for x in (dev_pred_ids.tolist() if isinstance(dev_pred_ids, np.ndarray) else list(dev_pred_ids))]
+        test_pred = [id_to_label[int(x)] for x in (test_pred_ids.tolist() if isinstance(test_pred_ids, np.ndarray) else list(test_pred_ids))]
         dev_metrics = evaluate_predictions(
             y_dev,
-            dev_pred.tolist() if isinstance(dev_pred, np.ndarray) else list(dev_pred),
+            dev_pred,
             label_order=label_order,
         )
         test_metrics = evaluate_predictions(
             y_test,
-            test_pred.tolist() if isinstance(test_pred, np.ndarray) else list(test_pred),
+            test_pred,
             label_order=label_order,
         )
         results[name] = {
@@ -293,12 +320,18 @@ def train_tabular_cefr_baseline(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train tabular baselines on full-ladder dataset.")
+    parser = argparse.ArgumentParser(description="Train GPU-only XGBoost tabular CEFR baseline on full-ladder dataset.")
     parser.add_argument("--train-path", default="artifacts/classifier_full_ladder_dataset/train_classifier.jsonl")
     parser.add_argument("--dev-path", default="artifacts/classifier_full_ladder_dataset/dev_classifier.jsonl")
     parser.add_argument("--test-path", default="artifacts/classifier_full_ladder_dataset/test_classifier.jsonl")
     parser.add_argument("--output-dir", default="artifacts/models/tabular_cefr_baseline")
-    parser.add_argument("--model", action="append", default=[], help="Model name to run. Can be passed multiple times.")
+    parser.add_argument(
+        "--model",
+        action="append",
+        default=[],
+        choices=["xgboost_gpu"],
+        help="Model name to run. Only GPU model is allowed.",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--label-field", default="cefr_label")
     parser.add_argument("--feature-profile", default="runtime_stable", choices=list(FEATURE_PROFILES))

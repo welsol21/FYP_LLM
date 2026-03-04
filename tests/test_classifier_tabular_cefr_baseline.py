@@ -1,7 +1,10 @@
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from ela_pipeline.classifier.train_tabular_cefr_baseline import (
     build_feature_rows,
@@ -10,6 +13,27 @@ from ela_pipeline.classifier.train_tabular_cefr_baseline import (
     project_feature_profile,
     train_tabular_cefr_baseline,
 )
+
+
+class _FakeXGBClassifier:
+    def __init__(self, **kwargs):
+        self._kwargs = kwargs
+
+    def fit(self, x, y):
+        self._labels = list(sorted(set(y)))
+        return self
+
+    def predict(self, x):
+        # deterministic single-class prediction is enough for IO/metadata test
+        label = self._labels[0] if self._labels else 0
+        return [label for _ in x]
+
+    def get_params(self, deep=True):
+        return dict(self._kwargs)
+
+    def set_params(self, **params):
+        self._kwargs.update(params)
+        return self
 
 
 class TabularCefrBaselineTests(unittest.TestCase):
@@ -111,13 +135,19 @@ class TabularCefrBaselineTests(unittest.TestCase):
                 with path.open("w", encoding="utf-8") as f:
                     for row in rows:
                         f.write(json.dumps(row, ensure_ascii=False) + "\n")
-            summary = train_tabular_cefr_baseline(
-                train_path=str(train_path),
-                dev_path=str(dev_path),
-                test_path=str(test_path),
-                output_dir=str(out_dir),
-                model_names=["logreg"],
-            )
+            fake_xgb = SimpleNamespace(XGBClassifier=_FakeXGBClassifier)
+            with patch.dict(sys.modules, {"xgboost": fake_xgb}):
+                with patch(
+                    "ela_pipeline.classifier.train_tabular_cefr_baseline._assert_gpu_training_available",
+                    return_value=None,
+                ):
+                    summary = train_tabular_cefr_baseline(
+                        train_path=str(train_path),
+                        dev_path=str(dev_path),
+                        test_path=str(test_path),
+                        output_dir=str(out_dir),
+                        model_names=["xgboost_gpu"],
+                    )
             metadata_path = Path(summary["classifier_metadata_path"])
             self.assertTrue(metadata_path.is_file())
             payload = json.loads(metadata_path.read_text(encoding="utf-8"))
