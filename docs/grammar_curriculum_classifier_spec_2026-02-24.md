@@ -255,6 +255,11 @@ Current project state:
   - aggressive full-ladder smoke config produced unstable training and `NaN` loss,
   - conservative full-ladder smoke config removed `NaN`,
   - immediate next step is training-quality tuning and evaluation, not more corpus recovery.
+- additional confirmation from current project runs:
+  - a tabular CEFR baseline trained on the same merged `train/dev/test` full-ladder dataset reaches near-perfect dev/test quality,
+  - this baseline uses only structured linguistic evidence already present in the dataset (`tam_profile`, aggregate dependency/POS signatures, token/length features, provenance-level categorical features),
+  - therefore the merged dataset is demonstrably learnable,
+  - and the current bottleneck is the DeBERTa modeling/training setup rather than corpus coverage.
 
 As with UD, both `OANC` and `MASC` still require:
 - grammar extraction,

@@ -6,6 +6,7 @@ sentencepiece
 rouge-score
 pandas
 numpy
+scikit-learn
 accelerate
 
 spacy

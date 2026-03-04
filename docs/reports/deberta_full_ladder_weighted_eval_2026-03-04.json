@@ -1,0 +1,133 @@
+{
+  "dataset_path": "artifacts/classifier_full_ladder_dataset/dev_classifier.jsonl",
+  "model_path": "artifacts/models/deberta_classifier_full_ladder_weighted_smoke",
+  "device": "cuda",
+  "metrics": {
+    "samples": 1892,
+    "labels": [
+      "A1",
+      "A2",
+      "B1",
+      "B2",
+      "C1",
+      "C2"
+    ],
+    "accuracy": 0.3128964059196617,
+    "macro_f1": 0.0794417606011809,
+    "per_label": {
+      "A1": {
+        "support": 493.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "A2": {
+        "support": 592.0,
+        "precision": 0.3128964059196617,
+        "recall": 1.0,
+        "f1": 0.47665056360708535
+      },
+      "B1": {
+        "support": 407.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "B2": {
+        "support": 207.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "C1": {
+        "support": 191.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "C2": {
+        "support": 2.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      }
+    },
+    "top_confusions": [
+      {
+        "true_label": "A1",
+        "pred_label": "A2",
+        "count": 493
+      },
+      {
+        "true_label": "B1",
+        "pred_label": "A2",
+        "count": 407
+      },
+      {
+        "true_label": "B2",
+        "pred_label": "A2",
+        "count": 207
+      },
+      {
+        "true_label": "C1",
+        "pred_label": "A2",
+        "count": 191
+      },
+      {
+        "true_label": "C2",
+        "pred_label": "A2",
+        "count": 2
+      }
+    ],
+    "confusion": {
+      "A1": {
+        "A1": 0,
+        "A2": 493,
+        "B1": 0,
+        "B2": 0,
+        "C1": 0,
+        "C2": 0
+      },
+      "A2": {
+        "A1": 0,
+        "A2": 592,
+        "B1": 0,
+        "B2": 0,
+        "C1": 0,
+        "C2": 0
+      },
+      "B1": {
+        "A1": 0,
+        "A2": 407,
+        "B1": 0,
+        "B2": 0,
+        "C1": 0,
+        "C2": 0
+      },
+      "B2": {
+        "A1": 0,
+        "A2": 207,
+        "B1": 0,
+        "B2": 0,
+        "C1": 0,
+        "C2": 0
+      },
+      "C1": {
+        "A1": 0,
+        "A2": 191,
+        "B1": 0,
+        "B2": 0,
+        "C1": 0,
+        "C2": 0
+      },
+      "C2": {
+        "A1": 0,
+        "A2": 2,
+        "B1": 0,
+        "B2": 0,
+        "C1": 0,
+        "C2": 0
+      }
+    }
+  }
+}

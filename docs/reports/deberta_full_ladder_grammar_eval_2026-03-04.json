@@ -1,0 +1,511 @@
+{
+  "dataset_path": "artifacts/classifier_full_ladder_dataset/dev_classifier.jsonl",
+  "model_path": "artifacts/models/deberta_classifier_full_ladder_grammar_smoke",
+  "label_field": "grammar_label",
+  "device": "cuda",
+  "metrics": {
+    "samples": 1185,
+    "labels": [
+      "future_going_to",
+      "future_perfect",
+      "future_will",
+      "modal_can_ability",
+      "modal_perfect",
+      "modal_should_advice",
+      "passive_voice",
+      "past_perfect",
+      "past_simple_affirmative",
+      "past_simple_negative",
+      "present_continuous",
+      "present_perfect_affirmative",
+      "present_perfect_negative",
+      "present_simple_affirmative",
+      "present_simple_negative",
+      "present_simple_question",
+      "relative_clause"
+    ],
+    "accuracy": 0.1940928270042194,
+    "macro_f1": 0.019122843483683226,
+    "per_label": {
+      "future_going_to": {
+        "support": 8.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "future_perfect": {
+        "support": 2.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "future_will": {
+        "support": 56.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "modal_can_ability": {
+        "support": 32.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "modal_perfect": {
+        "support": 191.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "modal_should_advice": {
+        "support": 12.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "passive_voice": {
+        "support": 139.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "past_perfect": {
+        "support": 68.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "past_simple_affirmative": {
+        "support": 161.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "past_simple_negative": {
+        "support": 5.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "present_continuous": {
+        "support": 59.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "present_perfect_affirmative": {
+        "support": 60.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "present_perfect_negative": {
+        "support": 12.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "present_simple_affirmative": {
+        "support": 127.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "present_simple_negative": {
+        "support": 2.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "present_simple_question": {
+        "support": 21.0,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0
+      },
+      "relative_clause": {
+        "support": 230.0,
+        "precision": 0.1940928270042194,
+        "recall": 1.0,
+        "f1": 0.3250883392226148
+      }
+    },
+    "top_confusions": [
+      {
+        "true_label": "modal_perfect",
+        "pred_label": "relative_clause",
+        "count": 191
+      },
+      {
+        "true_label": "past_simple_affirmative",
+        "pred_label": "relative_clause",
+        "count": 161
+      },
+      {
+        "true_label": "passive_voice",
+        "pred_label": "relative_clause",
+        "count": 139
+      },
+      {
+        "true_label": "present_simple_affirmative",
+        "pred_label": "relative_clause",
+        "count": 127
+      },
+      {
+        "true_label": "past_perfect",
+        "pred_label": "relative_clause",
+        "count": 68
+      },
+      {
+        "true_label": "present_perfect_affirmative",
+        "pred_label": "relative_clause",
+        "count": 60
+      },
+      {
+        "true_label": "present_continuous",
+        "pred_label": "relative_clause",
+        "count": 59
+      },
+      {
+        "true_label": "future_will",
+        "pred_label": "relative_clause",
+        "count": 56
+      },
+      {
+        "true_label": "modal_can_ability",
+        "pred_label": "relative_clause",
+        "count": 32
+      },
+      {
+        "true_label": "present_simple_question",
+        "pred_label": "relative_clause",
+        "count": 21
+      }
+    ],
+    "confusion": {
+      "future_going_to": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 8
+      },
+      "future_perfect": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 2
+      },
+      "future_will": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 56
+      },
+      "modal_can_ability": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 32
+      },
+      "modal_perfect": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 191
+      },
+      "modal_should_advice": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 12
+      },
+      "passive_voice": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 139
+      },
+      "past_perfect": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 68
+      },
+      "past_simple_affirmative": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 161
+      },
+      "past_simple_negative": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 5
+      },
+      "present_continuous": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 59
+      },
+      "present_perfect_affirmative": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 60
+      },
+      "present_perfect_negative": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 12
+      },
+      "present_simple_affirmative": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 127
+      },
+      "present_simple_negative": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 2
+      },
+      "present_simple_question": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 21
+      },
+      "relative_clause": {
+        "future_going_to": 0,
+        "future_perfect": 0,
+        "future_will": 0,
+        "modal_can_ability": 0,
+        "modal_perfect": 0,
+        "modal_should_advice": 0,
+        "passive_voice": 0,
+        "past_perfect": 0,
+        "past_simple_affirmative": 0,
+        "past_simple_negative": 0,
+        "present_continuous": 0,
+        "present_perfect_affirmative": 0,
+        "present_perfect_negative": 0,
+        "present_simple_affirmative": 0,
+        "present_simple_negative": 0,
+        "present_simple_question": 0,
+        "relative_clause": 230
+      }
+    }
+  }
+}

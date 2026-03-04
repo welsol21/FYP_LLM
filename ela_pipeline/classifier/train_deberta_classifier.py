@@ -1,4 +1,4 @@
-"""GPU-only training entrypoint for DeBERTa classifier (CEFR labels)."""
+"""GPU-only training entrypoint for DeBERTa classifier."""
 
 from __future__ import annotations
 
@@ -50,6 +50,36 @@ def _compute_class_weights(
     return weights
 
 
+def _normalize_label_value(value: Any, *, label_field: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if label_field == "cefr_label":
+        upper = raw.upper()
+        return upper if upper in CEFR_ORDER else ""
+    return raw
+
+
+def _build_label_space(values: list[str], *, label_field: str) -> list[str]:
+    unique = sorted({value for value in values if value})
+    if label_field == "cefr_label":
+        return [label for label in CEFR_ORDER if label in unique]
+    return unique
+
+
+def _normalize_rows(rows: list[dict[str, Any]], *, label_field: str) -> list[dict[str, Any]]:
+    out = []
+    for row in rows:
+        text = str(row.get("input") or "").strip()
+        label = _normalize_label_value(row.get(label_field), label_field=label_field)
+        if not text or not label:
+            continue
+        out.append({"text": text, "label": label})
+    if not out:
+        raise ValueError(f"No valid samples after normalization for label_field={label_field}")
+    return out
+
+
 def train_deberta_classifier(
     *,
     train_path: str,
@@ -63,6 +93,7 @@ def train_deberta_classifier(
     max_grad_norm: float = 1.0,
     weight_decay: float = 0.01,
     loss_weighting: str = "balanced",
+    label_field: str = "cefr_label",
     seed: int = 42,
     max_length: int = 256,
     device: str = "cuda",
@@ -94,33 +125,19 @@ def train_deberta_classifier(
     if len(train_rows) == 0 or len(dev_rows) == 0:
         raise ValueError("train/dev datasets must be non-empty")
 
-    def normalize(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        out = []
-        for row in rows:
-            text = str(row.get("input") or "").strip()
-            label = str(row.get("cefr_label") or "").strip().upper()
-            if not text:
-                continue
-            if label not in CEFR_ORDER:
-                continue
-            out.append({"text": text, "label": label})
-        if not out:
-            raise ValueError("No valid samples after normalization")
-        return out
+    train_norm = _normalize_rows(train_rows, label_field=label_field)
+    dev_norm = _normalize_rows(dev_rows, label_field=label_field)
 
-    train_norm = normalize(train_rows)
-    dev_norm = normalize(dev_rows)
-
-    label_space = [cefr for cefr in CEFR_ORDER if any(r["label"] == cefr for r in train_norm + dev_norm)]
+    label_space = _build_label_space([r["label"] for r in train_norm + dev_norm], label_field=label_field)
     if len(label_space) < 2:
-        raise ValueError(f"Need at least 2 CEFR labels in dataset, got: {label_space}")
-    cefr_to_id = {label: idx for idx, label in enumerate(label_space)}
-    id_to_cefr = {idx: label for label, idx in cefr_to_id.items()}
+        raise ValueError(f"Need at least 2 labels in dataset for {label_field}, got: {label_space}")
+    label_to_id = {label: idx for idx, label in enumerate(label_space)}
+    id_to_label = {idx: label for label, idx in label_to_id.items()}
 
     for row in train_norm:
-        row["label"] = cefr_to_id[row["label"]]
+        row["label"] = label_to_id[row["label"]]
     for row in dev_norm:
-        row["label"] = cefr_to_id[row["label"]]
+        row["label"] = label_to_id[row["label"]]
 
     class_weights = _compute_class_weights(
         [int(row["label"]) for row in train_norm],
@@ -138,9 +155,9 @@ def train_deberta_classifier(
 
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
-        num_labels=len(cefr_to_id),
-        id2label=id_to_cefr,
-        label2id=cefr_to_id,
+        num_labels=len(label_to_id),
+        id2label=id_to_label,
+        label2id=label_to_id,
     ).to("cuda")
 
     # transformers<=4.x uses `evaluation_strategy`, transformers>=5.x uses `eval_strategy`.
@@ -232,6 +249,7 @@ def train_deberta_classifier(
     summary = {
         "output_dir": output_dir,
         "model_name": model_name,
+        "label_field": label_field,
         "label_space": label_space,
         "class_weights": class_weights,
         "loss_weighting": loss_weighting,
@@ -247,7 +265,7 @@ def train_deberta_classifier(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train DeBERTa classifier for CEFR labels (GPU-only).")
+    parser = argparse.ArgumentParser(description="Train DeBERTa classifier (GPU-only).")
     parser.add_argument("--train-path", default="data/processed_classifier/train_classifier.jsonl")
     parser.add_argument("--dev-path", default="data/processed_classifier/dev_classifier.jsonl")
     parser.add_argument("--output-dir", default="artifacts/models/deberta_classifier_cefr")
@@ -259,6 +277,7 @@ def main() -> None:
     parser.add_argument("--max-grad-norm", type=float, default=1.0)
     parser.add_argument("--weight-decay", type=float, default=0.01)
     parser.add_argument("--loss-weighting", choices=["none", "balanced"], default="balanced")
+    parser.add_argument("--label-field", default="cefr_label")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-length", type=int, default=256)
     parser.add_argument("--device", default="cuda", choices=["cuda"])
@@ -276,6 +295,7 @@ def main() -> None:
         max_grad_norm=args.max_grad_norm,
         weight_decay=args.weight_decay,
         loss_weighting=args.loss_weighting,
+        label_field=args.label_field,
         seed=args.seed,
         max_length=args.max_length,
         device=args.device,

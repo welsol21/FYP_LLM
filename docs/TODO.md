@@ -127,10 +127,12 @@
 - [x] Eliminate `NaN`/loss explosion in conservative smoke configuration.
 - [x] Add balanced class-weighting option to DeBERTa training.
 - [ ] Compare `loss_weighting=none` vs `balanced` on the merged dataset and keep the better default.
-- [ ] Add full-ladder evaluation report with:
-  - [ ] confusion matrix
-  - [ ] per-CEFR precision/recall/F1
-  - [ ] hardest confusion pairs
+- [x] Add full-ladder evaluation report with:
+  - [x] confusion matrix
+  - [x] per-CEFR precision/recall/F1
+  - [x] hardest confusion pairs
+- [x] Add tabular CEFR baseline on the same merged full-ladder train/dev/test splits.
+- [x] Confirm whether the current blocker is corpus coverage or DeBERTa training regime.
 - [ ] Decide whether runtime truth-layer can switch to full-ladder classifier, or whether another training-quality pass is required first.
 
 ## Media Pipeline Integration (ELA Bridge, Current)

@@ -106,6 +106,8 @@ class BuildFullLadderClassifierDatasetTests(unittest.TestCase):
 
             train_rows = [json.loads(line) for line in (out_dir / "train_classifier.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual({row["source_text"] for row in train_rows}, {"Alpha.", "Epsilon."})
+            epsilon_row = next(row for row in train_rows if row["source_text"] == "Epsilon.")
+            self.assertEqual(epsilon_row.get("grammar_label", ""), "")
 
             rejected_conflicts = [json.loads(line) for line in (out_dir / "rejected_advanced_conflicts.jsonl").read_text(encoding="utf-8").splitlines()]
             self.assertEqual({row["source_text"] for row in rejected_conflicts}, {"Delta."})
@@ -231,6 +233,54 @@ class BuildFullLadderClassifierDatasetTests(unittest.TestCase):
             self.assertEqual(summary["advanced_rows_added"]["train"], 50)
             self.assertEqual(summary["advanced_rows_added"]["dev"], 1)
             self.assertEqual(summary["advanced_rows_added"]["test"], 1)
+
+    def test_build_full_ladder_dataset_emits_grammar_label(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            out_dir = root / "out"
+            ud_train = root / "ud_train.jsonl"
+            ud_dev = root / "ud_dev.jsonl"
+            ud_test = root / "ud_test.jsonl"
+            adv = root / "adv.jsonl"
+            adv_report = root / "adv_report.json"
+            ud_summary = root / "ud_summary.json"
+
+            _write_jsonl(
+                ud_train,
+                [
+                    {
+                        "input": "task text: alpha",
+                        "cefr_label": "A2",
+                        "source_text": "Alpha.",
+                        "grammar_classes": ["future_will", "modal_can_ability"],
+                    }
+                ],
+            )
+            _write_jsonl(ud_dev, [])
+            _write_jsonl(ud_test, [])
+            _write_jsonl(adv, [])
+            adv_report.write_text(json.dumps({"dataset_path": str(adv)}), encoding="utf-8")
+            ud_summary.write_text(
+                json.dumps(
+                    {
+                        "splits": {
+                            "train": {"dataset_path": str(ud_train)},
+                            "dev": {"dataset_path": str(ud_dev)},
+                            "test": {"dataset_path": str(ud_test)},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            build_full_ladder_classifier_dataset(
+                ud_summary_paths=[str(ud_summary)],
+                advanced_report_paths=[str(adv_report)],
+                output_dir=str(out_dir),
+            )
+
+            train_rows = [json.loads(line) for line in (out_dir / "train_classifier.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(train_rows[0]["grammar_label"], "future_will|modal_can_ability")
 
 
 if __name__ == "__main__":

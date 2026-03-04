@@ -1,4 +1,4 @@
-"""Evaluate DeBERTa CEFR classifier on JSONL datasets."""
+"""Evaluate DeBERTa classifier on JSONL datasets."""
 
 from __future__ import annotations
 
@@ -36,6 +36,12 @@ def _normalize_label(value: str) -> str:
             if 0 <= i < len(CEFR_ORDER):
                 return CEFR_ORDER[i]
     return ""
+
+
+def _normalize_label_generic(value: Any, *, label_field: str) -> str:
+    if label_field == "cefr_label":
+        return _normalize_label(str(value or ""))
+    return str(value or "").strip()
 
 
 def _macro_f1(confusion: dict[str, dict[str, int]], labels: list[str]) -> float:
@@ -101,21 +107,29 @@ def _top_confusions(
 def evaluate_rows(
     rows: list[dict[str, Any]],
     predict_fn: Callable[[str], str],
+    *,
+    label_field: str = "cefr_label",
 ) -> dict[str, Any]:
     y_true: list[str] = []
     y_pred: list[str] = []
     for row in rows:
         text = str(row.get("input") or row.get("text") or "").strip()
-        true_label = _normalize_label(str(row.get("cefr_label") or row.get("cefr_level") or ""))
+        source_value = row.get(label_field)
+        if label_field == "cefr_label" and source_value in (None, ""):
+            source_value = row.get("cefr_level")
+        true_label = _normalize_label_generic(source_value, label_field=label_field)
         if not text or not true_label:
             continue
-        pred_label = _normalize_label(predict_fn(text))
+        pred_label = _normalize_label_generic(predict_fn(text), label_field=label_field)
         if not pred_label:
             continue
         y_true.append(true_label)
         y_pred.append(pred_label)
 
-    labels = [x for x in CEFR_ORDER if x in set(y_true + y_pred)]
+    if label_field == "cefr_label":
+        labels = [x for x in CEFR_ORDER if x in set(y_true + y_pred)]
+    else:
+        labels = sorted(set(y_true + y_pred))
     confusion: dict[str, dict[str, int]] = {x: {y: 0 for y in labels} for x in labels}
     correct = 0
     for t, p in zip(y_true, y_pred):
@@ -140,7 +154,7 @@ def evaluate_rows(
     }
 
 
-def evaluate_deberta(*, dataset_path: str, model_path: str, device: str = "cuda") -> dict[str, Any]:
+def evaluate_deberta(*, dataset_path: str, model_path: str, label_field: str = "cefr_label", device: str = "cuda") -> dict[str, Any]:
     try:
         from transformers import pipeline
     except Exception as exc:  # pragma: no cover
@@ -164,24 +178,31 @@ def evaluate_deberta(*, dataset_path: str, model_path: str, device: str = "cuda"
             return str(out[0].get("label") or "")
         return ""
 
-    metrics = evaluate_rows(rows, predict)
+    metrics = evaluate_rows(rows, predict, label_field=label_field)
     return {
         "dataset_path": dataset_path,
         "model_path": model_path,
+        "label_field": label_field,
         "device": "cuda",
         "metrics": metrics,
     }
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Evaluate CEFR DeBERTa classifier on JSONL dataset.")
+    parser = argparse.ArgumentParser(description="Evaluate DeBERTa classifier on JSONL dataset.")
     parser.add_argument("--dataset-path", required=True)
     parser.add_argument("--model-path", required=True)
+    parser.add_argument("--label-field", default="cefr_label")
     parser.add_argument("--output-path", default="")
     parser.add_argument("--device", default="cuda", choices=["cuda"])
     args = parser.parse_args()
 
-    result = evaluate_deberta(dataset_path=args.dataset_path, model_path=args.model_path, device=args.device)
+    result = evaluate_deberta(
+        dataset_path=args.dataset_path,
+        model_path=args.model_path,
+        label_field=args.label_field,
+        device=args.device,
+    )
     output_path = str(args.output_path or "").strip()
     if output_path:
         out = Path(output_path)

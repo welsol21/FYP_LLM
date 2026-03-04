@@ -104,6 +104,10 @@ def _prepare_row(row: dict[str, Any], *, source_name: str) -> dict[str, Any]:
     payload = dict(row)
     payload["source_text"] = text
     payload["cefr_label"] = label
+    grammar_classes = payload.get("grammar_classes") if isinstance(payload.get("grammar_classes"), list) else []
+    grammar_label = "|".join(sorted(str(item).strip().lower() for item in grammar_classes if str(item).strip()))
+    if grammar_label:
+        payload["grammar_label"] = grammar_label
     provenance = payload.get("provenance") if isinstance(payload.get("provenance"), dict) else {}
     payload["provenance"] = {**provenance, "dataset_source": source_name}
     return payload
@@ -330,6 +334,10 @@ def build_full_ladder_classifier_dataset(
         split: dict(sorted(Counter(str(row.get("cefr_label") or "").upper() for row in rows).items()))
         for split, rows in split_rows.items()
     }
+    split_grammar_counts = {
+        split: dict(sorted(Counter(str(row.get("grammar_label") or "") for row in rows if str(row.get("grammar_label") or "")).items()))
+        for split, rows in split_rows.items()
+    }
     split_source_counts = {
         split: dict(sorted(Counter(str((row.get("provenance") or {}).get("dataset_source") or "unknown") for row in rows).items()))
         for split, rows in split_rows.items()
@@ -341,6 +349,7 @@ def build_full_ladder_classifier_dataset(
         "rejected_conflicts_path": str(rejected_conflicts_path),
         "splits": {split: len(rows) for split, rows in split_rows.items()},
         "split_cefr_counts": split_cefr_counts,
+        "split_grammar_counts": split_grammar_counts,
         "split_source_counts": split_source_counts,
         "advanced_rows_added": {split: len(advanced_splits[split]) for split in ("train", "dev", "test")},
         "advanced_ud_collision_rejections": advanced_ud_collision_rejections,

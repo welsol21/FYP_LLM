@@ -23,6 +23,23 @@ class EvaluateDebertaTests(unittest.TestCase):
         self.assertEqual(metrics["top_confusions"][0]["pred_label"], "A2")
         self.assertEqual(metrics["top_confusions"][0]["count"], 1)
 
+    def test_evaluate_rows_supports_generic_label_field(self):
+        rows = [
+            {"input": "x1", "grammar_label": "present_simple_affirmative"},
+            {"input": "x2", "grammar_label": "past_simple_affirmative"},
+            {"input": "x3", "grammar_label": "future_perfect"},
+        ]
+        mapping = {
+            "x1": "present_simple_affirmative",
+            "x2": "past_simple_affirmative",
+            "x3": "past_simple_affirmative",
+        }
+        metrics = evaluate_rows(rows, lambda text: mapping[text], label_field="grammar_label")
+        self.assertEqual(metrics["samples"], 3)
+        self.assertAlmostEqual(metrics["accuracy"], 2 / 3, places=6)
+        self.assertIn("future_perfect", metrics["labels"])
+        self.assertEqual(metrics["confusion"]["future_perfect"]["past_simple_affirmative"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
