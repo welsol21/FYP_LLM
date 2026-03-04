@@ -7,6 +7,7 @@ from ela_pipeline.classifier.train_tabular_cefr_baseline import (
     build_feature_rows,
     evaluate_predictions,
     extract_tabular_features,
+    project_feature_profile,
     train_tabular_cefr_baseline,
 )
 
@@ -48,6 +49,31 @@ class TabularCefrBaselineTests(unittest.TestCase):
         features, labels = build_feature_rows(rows, label_field="grammar_label")
         self.assertEqual(len(features), 1)
         self.assertEqual(labels, ["past_perfect"])
+
+    def test_project_feature_profile_drops_source_fields_for_runtime_stable(self):
+        features = {
+            "word_count": 4,
+            "char_count": 20,
+            "token_count": 4,
+            "dep_count": 4,
+            "dep_unique_count": 3,
+            "pos_count": 4,
+            "pos_unique_count": 3,
+            "grammar_class_count": 1,
+            "tam_profile": "present_simple",
+            "dataset_source": "ud_ewt",
+            "treebank": "UD_English-EWT",
+            "dep_signature_join": "nsubj|root",
+            "pos_signature_join": "PRON|VERB",
+            "has_relative_clause_marker": 0,
+            "has_clause_embedding": 0,
+            "has_passive_signal": 0,
+        }
+        projected = project_feature_profile(features, profile="runtime_stable")
+        self.assertNotIn("dataset_source", projected)
+        self.assertNotIn("treebank", projected)
+        self.assertIn("tam_profile", projected)
+        self.assertIn("dep_signature_join", projected)
 
     def test_evaluate_predictions_returns_macro_metrics(self):
         y_true = ["A1", "A2", "B1", "B1"]

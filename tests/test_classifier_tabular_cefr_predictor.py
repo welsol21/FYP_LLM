@@ -9,7 +9,11 @@ from ela_pipeline.classifier.tabular_cefr_predictor import TabularCefrPredictor,
 
 
 class _FakeModel:
+    def __init__(self):
+        self.last_rows = None
+
     def predict(self, rows):
+        self.last_rows = rows
         out = []
         for row in rows:
             if int(row.get("token_count", 0)) <= 6:
@@ -21,12 +25,15 @@ class _FakeModel:
 
 class TabularCefrPredictorTests(unittest.TestCase):
     def test_predict_row_uses_extracted_features(self):
-        predictor = TabularCefrPredictor(_FakeModel())
+        model = _FakeModel()
+        predictor = TabularCefrPredictor(model)
         row = {
             "source_text": "She smiled.",
             "grammar_evidence": {"token_count": 2, "dep_signature": ["nsubj", "root"], "pos_signature": ["PRON", "VERB"]},
         }
         self.assertEqual(predictor.predict_row(row), "A1")
+        self.assertNotIn("dataset_source", model.last_rows[0])
+        self.assertNotIn("treebank", model.last_rows[0])
 
     def test_predict_rows_handles_multiple_rows(self):
         predictor = TabularCefrPredictor(_FakeModel())
@@ -53,6 +60,10 @@ class TabularCefrPredictorTests(unittest.TestCase):
                 },
             }
             (model_dir / "classifier_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+            (model_dir / "tabular_cefr_baseline_summary.json").write_text(
+                json.dumps({"feature_profile": "runtime_stable"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
             classifier = TabularProfileClassifier(str(model_dir))
             profile = classifier.classify_node(
                 node={"tam_construction": "present_simple", "grammar_evidence": {"token_count": 2}},
@@ -62,6 +73,7 @@ class TabularCefrPredictorTests(unittest.TestCase):
             self.assertEqual(profile["cefr_level"], "A1")
             self.assertNotIn("grammar_classes", profile)
             self.assertNotIn("generated_notes", profile)
+            self.assertEqual(classifier.feature_profile, "runtime_stable")
 
     def test_tabular_profile_classifier_uses_node_features_when_runtime_evidence_missing(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -73,6 +85,10 @@ class TabularCefrPredictorTests(unittest.TestCase):
                 "note_blueprints_by_cefr": {level: {"elementary_text": f"{level} e", "intermediate_text": f"{level} i", "advanced_text": f"{level} a"} for level in ["A1","A2","B1","B2","C1","C2"]},
             }
             (model_dir / "classifier_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+            (model_dir / "tabular_cefr_baseline_summary.json").write_text(
+                json.dumps({"feature_profile": "runtime_stable"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
             classifier = TabularProfileClassifier(str(model_dir))
             profile = classifier.classify_node(
                 node={"features": {"dep": ["nsubj", "aux", "root", "obj", "punct", "punct", "punct"], "pos": ["PRON", "AUX", "VERB"]}},

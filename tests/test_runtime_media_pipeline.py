@@ -52,6 +52,49 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
             self.assertIn("text_eng", media_row)
             self.assertIn("text_ru", media_row)
 
+    def test_text_pipeline_skips_metadata_and_heading_lines(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "sample.txt"
+            source.write_text(
+                (
+                    "The Voice of Reason One.\n"
+                    "The Last Wish, written by Andrei Sapkowski, translated from the Polish by Danusia Stock and read by Peter Kenny.\n"
+                    "She trusted him.\n"
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_media_pipeline(source_path=str(source), sentence_contract_builder=self._builder)
+            self.assertEqual(len(result.media_sentences), 1)
+            self.assertEqual(result.media_sentences[0]["sentence_text"], "She trusted him.")
+
+    def test_audio_pipeline_skips_metadata_like_asr_segments(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media = Path(tmpdir) / "sample.mp3"
+            media.write_bytes(b"fake-audio")
+            with patch(
+                "ela_pipeline.runtime.media_pipeline._extract_text_and_sentence_chunks",
+                return_value=(
+                    (
+                        "The Voice of Reason One. "
+                        "The Last Wish, written by Andrei Sapkowski, translated from the Polish by Danusia Stock and read by Peter Kenny. "
+                        "She trusted him."
+                    ),
+                    [
+                        {"sentence_text": "The Voice of Reason One.", "start_sec": 0.0, "end_sec": 0.6},
+                        {
+                            "sentence_text": "The Last Wish, written by Andrei Sapkowski, translated from the Polish by Danusia Stock and read by Peter Kenny.",
+                            "start_sec": 0.7,
+                            "end_sec": 2.2,
+                        },
+                        {"sentence_text": "She trusted him.", "start_sec": 2.3, "end_sec": 3.2},
+                    ],
+                ),
+            ):
+                result = run_media_pipeline(source_path=str(media), sentence_contract_builder=self._builder)
+            self.assertEqual(len(result.media_sentences), 1)
+            self.assertEqual(result.media_sentences[0]["sentence_text"], "She trusted him.")
+
     def test_audio_pipeline_uses_asr_extraction_chunks(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             media = Path(tmpdir) / "sample.mp3"

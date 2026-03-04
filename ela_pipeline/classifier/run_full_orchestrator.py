@@ -35,6 +35,15 @@ def run_full_orchestrator(
     max_attempts_per_gate: int = 3,
     required_consecutive_passes: int = 3,
 ) -> dict[str, Any]:
+    if str(device).strip().lower() != "cuda":
+        raise RuntimeError("GPU-only policy: orchestrator training supports only device='cuda'")
+    try:
+        import torch
+    except Exception as exc:  # pragma: no cover
+        raise ImportError("torch is required for orchestrator training") from exc
+    if not torch.cuda.is_available():
+        raise RuntimeError("GPU-only policy: CUDA is required for orchestrator training")
+
     started_at = time.time()
     stage_results: list[dict[str, Any]] = []
     artifacts: dict[str, Any] = {}

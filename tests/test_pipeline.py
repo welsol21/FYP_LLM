@@ -32,6 +32,14 @@ class PipelineTests(unittest.TestCase):
             if item.get("type") == expected_type:
                 yield item
 
+    @staticmethod
+    def _iter_parent_child_pairs(node):
+        for child in node.get("linguistic_elements", []):
+            if not isinstance(child, dict):
+                continue
+            yield node, child
+            yield from PipelineTests._iter_parent_child_pairs(child)
+
     def test_translation_model_prefers_local_project_copy_for_default_hf_id(self):
         with patch("ela_pipeline.inference.run.os.path.isdir", return_value=True):
             resolved = _resolve_translation_model_name("facebook/m2m100_418M")
@@ -519,7 +527,11 @@ class PipelineTests(unittest.TestCase):
         self.assertIsInstance(summary.get("reasons"), list)
 
         leaf_backoff_node = next(
-            (word for word in self._iter_by_type(sentence, "Word") if word.get("node_id") == "n9"),
+            (
+                word
+                for word in self._iter_by_type(sentence, "Word")
+                if "backoff_used" in (word.get("quality_flags") or [])
+            ),
             None,
         )
         self.assertIsNotNone(leaf_backoff_node)
@@ -559,17 +571,23 @@ class PipelineTests(unittest.TestCase):
             self.assertIn("confidence", cls)
             self.assertFalse(str(cls["class_id"]).startswith(("type::", "pos::", "role::", "tense_table::", "tam::")))
 
-        phrases = list(self._iter_by_type(sentence, "Phrase"))
-        self.assertGreaterEqual(len(phrases), 1)
-        non_empty_phrase_count = 0
-        for phrase in phrases:
-            phrase_classes = phrase.get("grammar_classes")
-            self.assertIsInstance(phrase_classes, list)
-            if phrase_classes:
-                non_empty_phrase_count += 1
-                for cls in phrase_classes:
-                    self.assertFalse(str(cls["class_id"]).startswith(("type::", "pos::", "role::", "tense_table::", "tam::")))
-        self.assertGreaterEqual(non_empty_phrase_count, 1)
+    def test_skeleton_nests_inner_phrase_in_prepositional_phrase_instead_of_duplicate_siblings(self):
+        out = run_pipeline("written by Andrei Sapkowski", model_dir=None)
+        sentence = out[next(iter(out))]
+
+        top_level_contents = [str(node.get("content") or "") for node in sentence.get("linguistic_elements", [])]
+        self.assertIn("by Andrei Sapkowski", top_level_contents)
+        self.assertNotIn("Andrei Sapkowski", top_level_contents)
+
+        pp = next(
+            node
+            for node in sentence.get("linguistic_elements", [])
+            if str(node.get("content") or "") == "by Andrei Sapkowski"
+        )
+        class_ids = {str(item.get("class_id")) for item in pp.get("grammar_classes", []) if isinstance(item, dict)}
+        self.assertIn("prepositional_relation_phrase", class_ids)
+        child_phrase_contents = [str(node.get("content") or "") for node in pp.get("linguistic_elements", []) if node.get("type") == "Phrase"]
+        self.assertIn("Andrei Sapkowski", child_phrase_contents)
 
     def test_pipeline_attaches_pedagogical_modal_perfect_grammar_class(self):
         out = run_pipeline(
@@ -631,6 +649,35 @@ class PipelineTests(unittest.TestCase):
             sentence.get("linguistic_notes"),
             [generated.get("intermediate_text")],
         )
+
+    def test_pipeline_skips_weak_phrase_candidates_and_generic_phrase_notes(self):
+        out = run_pipeline("She came to him towards morning.", model_dir=None)
+        sentence = out[next(iter(out))]
+        top_level_phrases = [node for node in sentence.get("linguistic_elements", []) if node.get("type") == "Phrase"]
+        self.assertEqual(len(top_level_phrases), 1)
+        phrase_text = str(top_level_phrases[0].get("content") or "")
+        self.assertTrue(phrase_text.startswith("came to him towards"))
+        top_level_contents = [str(node.get("content") or "") for node in sentence.get("linguistic_elements", [])]
+        self.assertNotIn("She", top_level_contents)
+        self.assertNotIn("came", top_level_contents)
+        self.assertNotIn("to him", top_level_contents)
+        self.assertNotIn("towards morning", top_level_contents)
+
+    def test_pipeline_leaves_unknown_phrase_without_generic_notes(self):
+        out = run_pipeline("She entered through the chamber like a phantom.", model_dir=None)
+        sentence = out[next(iter(out))]
+        phrases = [
+            node
+            for node in sentence.get("linguistic_elements", [])
+            if node.get("type") == "Phrase" and str(node.get("content") or "") in {"through the chamber", "like a phantom"}
+        ]
+        self.assertGreaterEqual(len(phrases), 1)
+        for phrase in phrases:
+            class_ids = {str(item.get("class_id")) for item in phrase.get("grammar_classes", []) if isinstance(item, dict)}
+            self.assertIn("prepositional_relation_phrase", class_ids)
+            notes = " ".join(phrase.get("linguistic_notes") or [])
+            self.assertNotIn("Main grammar focus: phrase structure", notes)
+            self.assertNotIn("This phrase is used as modifier", notes)
 
     @patch("ela_pipeline.annotate.controlled_renderer.ControlledT5NoteRenderer")
     @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.__init__", side_effect=AssertionError("must not be called"))
@@ -744,13 +791,35 @@ class PipelineTests(unittest.TestCase):
         self.assertNotIn("tampered::from_t5", class_ids)
         self.assertNotEqual(sentence.get("generated_notes", {}).get("intermediate_text"), "tampered")
 
-    def test_pipeline_allows_one_word_phrases(self):
+    def test_pipeline_replaces_weak_one_word_phrases_with_sentence_words_fallback(self):
         out = run_pipeline("I run.", model_dir=None)
         key = next(iter(out))
         sentence = out[key]
         phrases = list(self._iter_by_type(sentence, "Phrase"))
-        self.assertGreaterEqual(len(phrases), 1)
-        self.assertTrue(any(len(p.get("linguistic_elements", [])) == 1 for p in phrases))
+        words = list(self._iter_by_type(sentence, "Word"))
+        self.assertEqual(len(phrases), 0)
+        self.assertGreaterEqual(len(words), 2)
+        self.assertTrue(any(str(w.get("content") or "") == "I" for w in words))
+        self.assertTrue(any(str(w.get("content") or "") == "run" for w in words))
+
+    def test_pipeline_keeps_only_phrase_nodes_with_pedagogical_grammar_class(self):
+        out = run_pipeline("She came to him towards morning.", model_dir=None)
+        sentence = out[next(iter(out))]
+        for phrase in self._iter_by_type(sentence, "Phrase"):
+            self.assertGreater(len(phrase.get("grammar_classes") or []), 0)
+            self.assertGreater(len(phrase.get("linguistic_notes") or []), 0)
+
+    def test_pipeline_attaches_word_level_notes_for_pronouns(self):
+        out = run_pipeline("She trusted him.", model_dir=None)
+        sentence = out[next(iter(out))]
+        pronoun = next(
+            word
+            for word in self._iter_by_type(sentence, "Word")
+            if str(word.get("content") or "") == "him"
+        )
+        class_ids = {str(item.get("class_id")) for item in pronoun.get("grammar_classes", []) if isinstance(item, dict)}
+        self.assertIn("pronoun_reference", class_ids)
+        self.assertGreater(len(pronoun.get("linguistic_notes") or []), 0)
 
     def test_pipeline_adds_node_metadata(self):
         text = "She should have trusted her instincts before making the decision."
@@ -770,31 +839,25 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(sentence["source_span"]["start"], 0)
         self.assertEqual(sentence["source_span"]["end"], len(text))
 
-        for phrase in self._iter_by_type(sentence, "Phrase"):
-            self.assertEqual(phrase.get("parent_id"), sentence.get("node_id"))
-            self.assertIn("source_span", phrase)
-            self.assertIn("grammatical_role", phrase)
-            self.assertIsInstance(phrase["grammatical_role"], str)
+        for parent, child in self._iter_parent_child_pairs(sentence):
+            self.assertEqual(child.get("parent_id"), parent.get("node_id"))
+            self.assertIn("source_span", child)
+            self.assertIn("grammatical_role", child)
+            self.assertIsInstance(child["grammatical_role"], str)
             for field in ("aspect", "mood", "voice", "finiteness"):
-                self.assertIn(field, phrase)
-                self.assertIsInstance(phrase[field], str)
-            self.assertIn("tam_construction", phrase)
-            self.assertIsInstance(phrase["tam_construction"], str)
-            for word in self._iter_by_type(phrase, "Word"):
-                self.assertEqual(word.get("parent_id"), phrase.get("node_id"))
-                self.assertIn("source_span", word)
-                self.assertIn("grammatical_role", word)
-                self.assertIsInstance(word["grammatical_role"], str)
-                for field in ("aspect", "mood", "voice", "finiteness"):
-                    self.assertIn(field, word)
-                    self.assertTrue(word[field] is None or isinstance(word[field], str))
-                self.assertIn("dep_label", word)
-                self.assertIsInstance(word["dep_label"], str)
-                self.assertIn("head_id", word)
-                self.assertTrue(word["head_id"] is None or isinstance(word["head_id"], str))
-                self.assertIn("features", word)
-                self.assertIsInstance(word["features"], dict)
-                self.assertGreaterEqual(word["source_span"]["end"], word["source_span"]["start"])
+                self.assertIn(field, child)
+                self.assertTrue(child[field] is None or isinstance(child[field], str))
+            self.assertGreaterEqual(child["source_span"]["end"], child["source_span"]["start"])
+            if child.get("type") == "Phrase":
+                self.assertIn("tam_construction", child)
+                self.assertIsInstance(child["tam_construction"], str)
+            if child.get("type") == "Word":
+                self.assertIn("dep_label", child)
+                self.assertIsInstance(child["dep_label"], str)
+                self.assertIn("head_id", child)
+                self.assertTrue(child["head_id"] is None or isinstance(child["head_id"], str))
+                self.assertIn("features", child)
+                self.assertIsInstance(child["features"], dict)
 
     def test_pipeline_excludes_simple_determiner_noun_phrases(self):
         out = run_pipeline("She should have trusted her instincts before making the decision.", model_dir=None)
@@ -875,13 +938,23 @@ class PipelineTests(unittest.TestCase):
         words_by_id = {word.get("node_id"): word for word in self._iter_by_type(sentence, "Word")}
 
         ref_words = [w for w in words_by_id.values() if isinstance(w.get("ref_node_id"), str)]
-        self.assertTrue(ref_words)
         for word in ref_words:
             ref_id = word["ref_node_id"]
             self.assertIn(ref_id, words_by_id)
             canonical = words_by_id[ref_id]
             self.assertEqual(word.get("content"), canonical.get("content"))
             self.assertEqual(word.get("source_span"), canonical.get("source_span"))
+
+        sentence_children = [child for child in sentence.get("linguistic_elements", []) if isinstance(child, dict)]
+        sibling_spans = [
+            (
+                int((child.get("source_span") or {}).get("start", -1)),
+                int((child.get("source_span") or {}).get("end", -1)),
+                str(child.get("content") or ""),
+            )
+            for child in sentence_children
+        ]
+        self.assertEqual(len(sibling_spans), len(set(sibling_spans)))
 
     def test_regression_had_vbn_vs_should_have_vbn(self):
         modal_out = run_pipeline(

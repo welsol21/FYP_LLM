@@ -22,6 +22,7 @@ from .metadata import build_classifier_metadata_from_dataset
 
 
 CEFR_ORDER = ("A1", "A2", "B1", "B2", "C1", "C2")
+FEATURE_PROFILES = ("full", "no_source", "runtime_stable")
 
 
 def _load_jsonl(path: str) -> list[dict[str, Any]]:
@@ -81,7 +82,46 @@ def extract_tabular_features(row: dict[str, Any]) -> dict[str, Any]:
     return feature_row
 
 
-def build_feature_rows(rows: list[dict[str, Any]], *, label_field: str = "cefr_label") -> tuple[list[dict[str, Any]], list[str]]:
+def project_feature_profile(features: dict[str, Any], *, profile: str = "full") -> dict[str, Any]:
+    selected = str(profile or "full").strip().lower()
+    if selected not in FEATURE_PROFILES:
+        raise ValueError(f"Unknown feature profile: {selected}")
+    if selected == "full":
+        return dict(features)
+    if selected == "no_source":
+        return {
+            key: value
+            for key, value in features.items()
+            if key not in {"dataset_source", "treebank"}
+        }
+    return {
+        key: features[key]
+        for key in (
+            "word_count",
+            "char_count",
+            "token_count",
+            "dep_count",
+            "dep_unique_count",
+            "pos_count",
+            "pos_unique_count",
+            "grammar_class_count",
+            "tam_profile",
+            "has_relative_clause_marker",
+            "has_clause_embedding",
+            "has_passive_signal",
+            "dep_signature_join",
+            "pos_signature_join",
+        )
+        if key in features
+    }
+
+
+def build_feature_rows(
+    rows: list[dict[str, Any]],
+    *,
+    label_field: str = "cefr_label",
+    feature_profile: str = "runtime_stable",
+) -> tuple[list[dict[str, Any]], list[str]]:
     feature_rows: list[dict[str, Any]] = []
     labels: list[str] = []
     for row in rows:
@@ -91,7 +131,7 @@ def build_feature_rows(rows: list[dict[str, Any]], *, label_field: str = "cefr_l
         label = _normalize_label(raw_value, label_field=label_field)
         if not label:
             continue
-        feature_rows.append(extract_tabular_features(row))
+        feature_rows.append(project_feature_profile(extract_tabular_features(row), profile=feature_profile))
         labels.append(label)
     if not feature_rows:
         raise ValueError(f"No valid '{label_field}' rows found for baseline")
@@ -169,14 +209,15 @@ def train_tabular_cefr_baseline(
     model_names: list[str] | None = None,
     seed: int = 42,
     label_field: str = "cefr_label",
+    feature_profile: str = "runtime_stable",
 ) -> dict[str, Any]:
     train_rows = _load_jsonl(train_path)
     dev_rows = _load_jsonl(dev_path)
     test_rows = _load_jsonl(test_path)
 
-    x_train, y_train = build_feature_rows(train_rows, label_field=label_field)
-    x_dev, y_dev = build_feature_rows(dev_rows, label_field=label_field)
-    x_test, y_test = build_feature_rows(test_rows, label_field=label_field)
+    x_train, y_train = build_feature_rows(train_rows, label_field=label_field, feature_profile=feature_profile)
+    x_dev, y_dev = build_feature_rows(dev_rows, label_field=label_field, feature_profile=feature_profile)
+    x_test, y_test = build_feature_rows(test_rows, label_field=label_field, feature_profile=feature_profile)
 
     models = _make_models(seed)
     selected_names = list(model_names or models.keys())
@@ -233,6 +274,7 @@ def train_tabular_cefr_baseline(
         "dev_path": dev_path,
         "test_path": test_path,
         "label_field": label_field,
+        "feature_profile": feature_profile,
         "train_samples": len(x_train),
         "dev_samples": len(x_dev),
         "test_samples": len(x_test),
@@ -259,6 +301,7 @@ def main() -> None:
     parser.add_argument("--model", action="append", default=[], help="Model name to run. Can be passed multiple times.")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--label-field", default="cefr_label")
+    parser.add_argument("--feature-profile", default="runtime_stable", choices=list(FEATURE_PROFILES))
     args = parser.parse_args()
 
     summary = train_tabular_cefr_baseline(
@@ -269,6 +312,7 @@ def main() -> None:
         model_names=args.model or None,
         seed=args.seed,
         label_field=args.label_field,
+        feature_profile=args.feature_profile,
     )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 

@@ -32,7 +32,8 @@ def map_pedagogical_grammar_classes(
         classes.append(cid)
 
     dep_signature = [str(item).strip().lower() for item in (dep_labels or []) if str(item).strip()]
-    text = str(content or "").strip().lower()
+    raw_text = str(content or "").strip()
+    text = raw_text.lower()
     tense_value = str(tense or "").strip().lower()
     aspect_value = str(aspect or "").strip().lower()
     mood_value = str(mood or "").strip().lower()
@@ -82,5 +83,34 @@ def map_pedagogical_grammar_classes(
         add_class("present_continuous")
     elif construction == "be_copula" or (node_kind == "phrase" and pos_value == "noun phrase" and "cop" in dep_signature):
         add_class("copular_clause")
+
+    if node_kind == "phrase":
+        if pos_value == "noun phrase":
+            text_tokens = [token for token in raw_text.split() if token]
+            if len(text_tokens) >= 2:
+                if all(token[:1].isupper() for token in text_tokens if token[:1].isalpha()):
+                    add_class("proper_name_phrase")
+                else:
+                    add_class("noun_phrase_reference")
+        elif pos_value == "prepositional phrase":
+            add_class("prepositional_relation_phrase")
+
+    if node_kind == "word":
+        if pos_value == "pronoun":
+            add_class("pronoun_reference")
+        elif pos_value == "proper noun":
+            add_class("proper_noun_name")
+        elif pos_value == "noun":
+            add_class("common_noun_lexeme")
+        elif pos_value == "preposition":
+            add_class("preposition_linker")
+        elif pos_value == "article":
+            add_class("article_determiner")
+        elif pos_value == "adjective":
+            add_class("adjective_modifier")
+        elif pos_value == "adverb":
+            add_class("adverb_modifier")
+        elif pos_value == "punctuation":
+            add_class("punctuation_marker")
 
     return classes

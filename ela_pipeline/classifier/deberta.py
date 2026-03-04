@@ -27,7 +27,7 @@ def _normalize_cefr(label: str) -> str:
 class DebertaProfileClassifier:
     """Load local DeBERTa classifier and attach profile metadata by CEFR label."""
 
-    def __init__(self, model_path: str | None, device: str = "auto") -> None:
+    def __init__(self, model_path: str | None, device: str = "cuda") -> None:
         path = str(model_path or "").strip()
         if not path:
             raise ValueError("classifier_model_path must be provided for classifier_provider=deberta")
@@ -53,7 +53,7 @@ class DebertaProfileClassifier:
         self._metadata = metadata
         self.model_path = path
 
-        resolved_device = (device or "").strip().lower()
+        resolved_device = (device or "cuda").strip().lower()
         if resolved_device != "cuda":
             raise RuntimeError("GPU-only policy: DeBERTa classifier supports only device='cuda'")
         try:

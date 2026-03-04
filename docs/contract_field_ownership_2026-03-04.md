@@ -84,6 +84,8 @@ Current preferred design:
 ## Current State (2026-03-04)
 
 - `CEFR` on the merged full-ladder dataset is already near-perfect with the tabular baseline.
+- The production tabular CEFR path uses the `runtime_stable` feature profile.
+- `dataset_source` and `treebank` are intentionally excluded from that production profile because ablation showed no CEFR quality loss after removing them.
 - `grammar_label` is also learnable with tabular ML and clearly not blocked by corpus coverage.
 - Current `DeBERTa` training remains worse than the tabular baselines.
 
@@ -94,4 +96,3 @@ Therefore:
   - `spaCy/rules -> structural truth + grammar classes`
   - `tabular ML -> CEFR`
   - `T5 -> notes from blueprints`
-

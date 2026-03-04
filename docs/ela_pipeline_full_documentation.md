@@ -212,6 +212,7 @@ If `--model-dir` is omitted:
 
 ### 4.8.1 Planned Classifier/Generator Split (Roadmap Lock)
 - `CEFR` is served by the tabular baseline over structural evidence.
+- The production CEFR baseline uses the `runtime_stable` feature profile and excludes source-only corpus hints such as `dataset_source` and `treebank`.
 - `grammar_classes` are produced by rules-first mapping over parse/TAM evidence.
 - `T5` remains in backend only for controlled note text generation from blueprints.
 - Rationale:

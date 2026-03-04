@@ -31,6 +31,7 @@ TRANSLATION_CONFIG_STATE_KEY = "translation_config"
 MEDIA_FILE_SETTINGS_PREFIX = "media_file_settings:"
 BACKEND_TRANSLATION_PROVIDER_KEY = "backend_m2m100"
 MEDIA_STAGE_MANIFEST_PREFIX = "media_stage_manifest:"
+CONTRACT_BUILD_VERSION = "2026-03-04-rulesfirst-v1"
 
 
 def _normalize_provider_key(value: str | None) -> str:
@@ -536,6 +537,8 @@ class RuntimeMediaService:
         ]
 
     def list_document_artifacts(self, *, document_id: str) -> list[dict[str, Any]]:
+        if not self._is_current_document_contract(document_id):
+            return []
         base = Path(os.getenv("MEDIA_CONTRACT_ARTIFACTS_DIR", "artifacts/media_contracts"))
         doc_dir = (base / document_id).resolve()
         base_resolved = base.resolve()
@@ -557,6 +560,8 @@ class RuntimeMediaService:
         return out
 
     def get_visualizer_payload(self, *, document_id: str) -> dict[str, Any]:
+        if not self._is_current_document_contract(document_id):
+            return {}
         rows = self.repo.list_document_visualizer_rows(document_id=document_id)
         document = self.repo.get_document(document_id)
         selected_provider = None
@@ -622,6 +627,11 @@ class RuntimeMediaService:
         rows = self.repo.list_media_files_with_analysis(project_id=project_id)
         out: list[dict[str, Any]] = []
         for row in rows:
+            analyzed = bool(row["analyzed"])
+            document_id = row.get("document_id")
+            if analyzed and document_id and not self._is_current_document_contract(str(document_id)):
+                analyzed = False
+                document_id = None
             settings_state = self.repo.get_workspace_state(f"{MEDIA_FILE_SETTINGS_PREFIX}{row['id']}") or {}
             tp = str(settings_state.get("translation_provider") or "m2m100")
             subs = str(settings_state.get("subtitles_mode") or "bilingual")
@@ -635,11 +645,40 @@ class RuntimeMediaService:
                     "duration_seconds": row.get("duration_seconds"),
                     "settings": f"Transl: {tp} / Subs: {subs} / Voice: {voice}",
                     "updated": row["updated_at"],
-                    "analyzed": bool(row["analyzed"]),
-                    "document_id": row.get("document_id"),
+                    "analyzed": analyzed,
+                    "document_id": document_id,
                 }
             )
         return out
+
+    def _is_current_document_contract(self, document_id: str) -> bool:
+        doc_id = str(document_id or "").strip()
+        if not doc_id:
+            return False
+        doc_dir = self._doc_artifacts_dir(document_id=doc_id)
+        if not doc_dir.exists():
+            return True
+        manifest = self._load_stage_manifest(document_id=doc_id)
+        if not isinstance(manifest, dict):
+            return False
+        immutable = manifest.get("immutable")
+        if not isinstance(immutable, dict):
+            return False
+        build_version = str(immutable.get("contract_build_version") or "").strip()
+        expected = str(os.getenv("ELA_SENTENCE_CONTRACT_BUILD_VERSION", CONTRACT_BUILD_VERSION)).strip() or CONTRACT_BUILD_VERSION
+        return build_version == expected
+
+    @staticmethod
+    def _load_stage_manifest(*, document_id: str) -> dict[str, Any] | None:
+        doc_dir = RuntimeMediaService._doc_artifacts_dir(document_id=document_id)
+        target = doc_dir / "stage_manifest.json"
+        if not target.exists() or not target.is_file():
+            return None
+        try:
+            payload = json.loads(target.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+        return payload if isinstance(payload, dict) else None
 
     @staticmethod
     def _resolve_classifier_defaults(
@@ -654,11 +693,27 @@ class RuntimeMediaService:
         env_model_path = str(os.getenv("ELA_CLASSIFIER_MODEL_PATH", "")).strip()
 
         default_deberta_dir = "artifacts/models/deberta_classifier_cefr"
-        default_tabular_dir = "artifacts/models/tabular_cefr_baseline_full_ladder_logreg"
+        default_tabular_dirs = [
+            "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest",
+            "artifacts/models/tabular_cefr_baseline_full_ladder_logreg",
+        ]
+        preferred_tabular_dir = default_tabular_dirs[0]
         deberta_dir = explicit_model_path or env_model_path or default_deberta_dir
         has_local_deberta = (
             os.path.isdir(deberta_dir)
             and os.path.isfile(os.path.join(deberta_dir, "classifier_metadata.json"))
+        )
+        default_tabular_dir = next(
+            (
+                candidate
+                for candidate in default_tabular_dirs
+                if (
+                    os.path.isdir(candidate)
+                    and os.path.isfile(os.path.join(candidate, "classifier_metadata.json"))
+                    and os.path.isfile(os.path.join(candidate, "best_tabular_cefr_baseline.joblib"))
+                )
+            ),
+            default_tabular_dirs[0],
         )
         has_local_tabular = (
             os.path.isdir(default_tabular_dir)
@@ -677,7 +732,7 @@ class RuntimeMediaService:
         if provider == "deberta":
             return provider, deberta_dir
         if provider == "tabular":
-            return provider, explicit_model_path or env_model_path or default_tabular_dir
+            return provider, explicit_model_path or env_model_path or preferred_tabular_dir
         return provider, None
 
     def build_sentence_contract(
@@ -953,6 +1008,10 @@ class RuntimeMediaService:
             "last_document_id": document_id,
             "immutable": {
                 "signature": immutable_signature,
+                "contract_build_version": str(
+                    os.getenv("ELA_SENTENCE_CONTRACT_BUILD_VERSION", CONTRACT_BUILD_VERSION)
+                ).strip()
+                or CONTRACT_BUILD_VERSION,
                 "source_type": pipeline.source_type,
                 "text_hash": pipeline.text_hash,
                 "media_sentences_count": len(pipeline.media_sentences),
@@ -1077,7 +1136,11 @@ class RuntimeMediaService:
         asr_model = str(os.getenv("ELA_MEDIA_ASR_MODEL", "base")).strip().lower() or "base"
         asr_lang = str(os.getenv("ELA_MEDIA_ASR_SOURCE_LANG", "en")).strip().lower() or "en"
         backend_url = str(os.getenv("ELA_SENTENCE_CONTRACT_BACKEND_URL", "")).strip().lower()
-        payload = f"{media_signature}|{asr_model}|{asr_lang}|{backend_url}"
+        contract_build_version = (
+            str(os.getenv("ELA_SENTENCE_CONTRACT_BUILD_VERSION", CONTRACT_BUILD_VERSION)).strip()
+            or CONTRACT_BUILD_VERSION
+        )
+        payload = f"{media_signature}|{asr_model}|{asr_lang}|{backend_url}|{contract_build_version}"
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     @staticmethod

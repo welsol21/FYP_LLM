@@ -123,6 +123,97 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             rows = svc.list_files(project_id="proj-1")
             self.assertEqual(len(rows), 1)
 
+    def test_list_files_hides_legacy_document_without_current_contract_build_version(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            artifacts_dir = Path(tmpdir) / "artifacts"
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            svc.repo.create_project("Project A", project_id="proj-1")
+            svc.repo.create_media_file(
+                project_id="proj-1",
+                media_file_id="file-1",
+                name="lesson.txt",
+                path="/tmp/lesson.txt",
+            )
+            svc.repo.create_document(
+                document_id="doc-legacy",
+                project_id="proj-1",
+                media_file_id="file-1",
+                source_type="text",
+                source_path="/tmp/lesson.txt",
+                media_hash="mh-1",
+                status="completed",
+            )
+            doc_dir = artifacts_dir / "doc-legacy"
+            doc_dir.mkdir(parents=True)
+            (doc_dir / "stage_manifest.json").write_text(
+                json.dumps({"schema_version": 1, "immutable": {}}),
+                encoding="utf-8",
+            )
+            with patch.dict("os.environ", {"MEDIA_CONTRACT_ARTIFACTS_DIR": str(artifacts_dir)}):
+                rows = svc.list_files(project_id="proj-1")
+                self.assertEqual(len(rows), 1)
+                self.assertFalse(rows[0]["analyzed"])
+                self.assertIsNone(rows[0]["document_id"])
+
+    def test_visualizer_and_artifacts_reject_legacy_document_without_current_build_version(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            artifacts_dir = Path(tmpdir) / "artifacts"
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            svc.repo.create_project("Project A", project_id="proj-1")
+            svc.repo.create_media_file(
+                project_id="proj-1",
+                media_file_id="file-1",
+                name="lesson.txt",
+                path="/tmp/lesson.txt",
+            )
+            svc.repo.create_document(
+                document_id="doc-legacy",
+                project_id="proj-1",
+                media_file_id="file-1",
+                source_type="text",
+                source_path="/tmp/lesson.txt",
+                media_hash="mh-1",
+                status="completed",
+            )
+            h0 = build_sentence_hash("She trusted him.", 0)
+            svc.repo.replace_media_sentences(
+                document_id="doc-legacy",
+                sentences=[
+                    {
+                        "sentence_idx": 0,
+                        "sentence_text": "She trusted him.",
+                        "sentence_hash": h0,
+                    }
+                ],
+            )
+            svc.repo.upsert_contract_sentence(
+                document_id="doc-legacy",
+                sentence_hash=h0,
+                sentence_node={"type": "Sentence", "node_id": "s1", "content": "She trusted him.", "linguistic_elements": []},
+            )
+            svc.repo.replace_sentence_links(
+                document_id="doc-legacy",
+                links=[{"sentence_idx": 0, "sentence_hash": h0}],
+            )
+            doc_dir = artifacts_dir / "doc-legacy"
+            doc_dir.mkdir(parents=True)
+            (doc_dir / "stage_manifest.json").write_text(
+                json.dumps({"schema_version": 1, "immutable": {}}),
+                encoding="utf-8",
+            )
+            (doc_dir / "contract_sentences.json").write_text("[]", encoding="utf-8")
+            with patch.dict("os.environ", {"MEDIA_CONTRACT_ARTIFACTS_DIR": str(artifacts_dir)}):
+                self.assertEqual(svc.get_visualizer_payload(document_id="doc-legacy"), {})
+                self.assertEqual(svc.list_document_artifacts(document_id="doc-legacy"), [])
+
     def test_ui_state_exposes_mode_and_feature_flags(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             svc = RuntimeMediaService(
@@ -730,7 +821,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             )
             kwargs = mock_run_pipeline.call_args.kwargs
             self.assertEqual(kwargs["classifier_provider"], "tabular")
-            self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_cefr_baseline_full_ladder_logreg")
+            self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest")
 
     @patch("ela_pipeline.inference.run.run_pipeline")
     @patch("ela_pipeline.runtime.service.os.path.isfile", return_value=False)
@@ -793,7 +884,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             )
             kwargs = mock_run_pipeline.call_args.kwargs
             self.assertEqual(kwargs["classifier_provider"], "tabular")
-            self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_cefr_baseline_full_ladder_logreg")
+            self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest")
 
     def test_request_sentence_contract_uses_backend_endpoint_when_configured(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1101,6 +1192,34 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                     )
                 self.assertEqual(second["status"], "completed")
                 self.assertEqual(mocked.call_count, 1)
+
+    def test_immutable_signature_changes_when_contract_build_version_changes(self):
+        media_signature = "media-sig"
+        with patch.dict(
+            "os.environ",
+            {
+                "ELA_MEDIA_ASR_MODEL": "base",
+                "ELA_MEDIA_ASR_SOURCE_LANG": "en",
+                "ELA_SENTENCE_CONTRACT_BACKEND_URL": "http://127.0.0.1:8000",
+                "ELA_SENTENCE_CONTRACT_BUILD_VERSION": "build-v1",
+            },
+            clear=False,
+        ):
+            first = RuntimeMediaService._build_immutable_signature(media_signature=media_signature)
+
+        with patch.dict(
+            "os.environ",
+            {
+                "ELA_MEDIA_ASR_MODEL": "base",
+                "ELA_MEDIA_ASR_SOURCE_LANG": "en",
+                "ELA_SENTENCE_CONTRACT_BACKEND_URL": "http://127.0.0.1:8000",
+                "ELA_SENTENCE_CONTRACT_BUILD_VERSION": "build-v2",
+            },
+            clear=False,
+        ):
+            second = RuntimeMediaService._build_immutable_signature(media_signature=media_signature)
+
+        self.assertNotEqual(first, second)
 
     def test_incremental_cache_invalidates_when_asr_settings_change(self):
         with tempfile.TemporaryDirectory() as tmpdir:

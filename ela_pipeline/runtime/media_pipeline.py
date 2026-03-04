@@ -92,6 +92,64 @@ def _extract_translation_text(sentence_node: dict[str, Any]) -> str:
     return ""
 
 
+_BIBLIOGRAPHIC_MARKERS = (
+    "written by",
+    "translated by",
+    "translated from",
+    "read by",
+    "narrated by",
+    "performed by",
+    "adapted by",
+    "illustrated by",
+    "edited by",
+    "published by",
+    "produced by",
+)
+
+
+def _has_finite_verb(doc: Any) -> bool:
+    for token in doc:
+        if token.pos_ not in {"VERB", "AUX"}:
+            continue
+        verb_form = str(token.morph.get("VerbForm")[0]) if token.morph.get("VerbForm") else ""
+        if verb_form == "Fin":
+            return True
+    return False
+
+
+def _is_heading_like(doc: Any) -> bool:
+    alpha_tokens = [tok for tok in doc if tok.is_alpha]
+    if not alpha_tokens or len(alpha_tokens) > 8:
+        return False
+    if _has_finite_verb(doc):
+        return False
+
+    allowed_pos = {"NOUN", "PROPN", "ADJ", "ADP", "DET", "NUM", "CCONJ"}
+    disallowed_pos = {"PRON", "VERB", "AUX", "SCONJ"}
+    allowed = 0
+    for token in alpha_tokens:
+        if token.pos_ in disallowed_pos:
+            return False
+        if token.pos_ in allowed_pos:
+            allowed += 1
+    return allowed >= max(2, len(alpha_tokens) - 1)
+
+
+def _is_metadata_like_sentence(text: str, doc: Any) -> bool:
+    normalized = " ".join(str(text or "").strip().split())
+    if not normalized:
+        return True
+    lower = normalized.casefold()
+
+    if any(marker in lower for marker in _BIBLIOGRAPHIC_MARKERS) and not _has_finite_verb(doc):
+        return True
+
+    if _is_heading_like(doc):
+        return True
+
+    return False
+
+
 def _probe_media_duration_seconds(source_path: Path) -> float:
     try:
         proc = subprocess.run(
@@ -508,6 +566,9 @@ def run_media_pipeline(
             text = str(row.get("sentence_text") or "").strip()
             if not text:
                 continue
+            doc = nlp(text)
+            if _is_metadata_like_sentence(text, doc):
+                continue
             sentence_stream.append(text)
             sentence_timeline.append(
                 {
@@ -517,8 +578,15 @@ def run_media_pipeline(
             )
     else:
         skeleton = build_skeleton(full_text, nlp)
-        sentence_stream = [str(text).strip() for text in skeleton.keys() if str(text).strip()]
-        sentence_timeline = [None] * len(sentence_stream)
+        for text in skeleton.keys():
+            text_resolved = str(text).strip()
+            if not text_resolved:
+                continue
+            doc = nlp(text_resolved)
+            if _is_metadata_like_sentence(text_resolved, doc):
+                continue
+            sentence_stream.append(text_resolved)
+            sentence_timeline.append(None)
 
     media_sentences: list[dict[str, Any]] = []
     contract_sentences: list[dict[str, Any]] = []

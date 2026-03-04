@@ -1,6 +1,8 @@
 import json
+import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from ela_pipeline.classifier.run_full_orchestrator import run_full_orchestrator
@@ -26,32 +28,42 @@ class ClassifierRunFullOrchestratorTests(unittest.TestCase):
         metadata_mock.return_value = {"metadata_path": "model/classifier_metadata.json", "class_count": 3}
         qc_mock.return_value = {"all_gates_passed": True, "artifacts": {"quality_summary": "q.json"}}
 
-        with tempfile.TemporaryDirectory() as tmp:
-            summary = run_full_orchestrator(run_id="r-orch-1", output_dir=tmp)
-            self.assertEqual(summary["status"], "completed")
-            self.assertIn("summary_path", summary)
-            self.assertEqual(len(summary["stages"]), 5)
-            self.assertEqual(summary["stages"][0]["stage"], "build_kb")
-            self.assertEqual(summary["stages"][4]["stage"], "run_quality_cycle")
-            self.assertIn("build_kb", summary["artifacts"])
-            self.assertIn("build_classifier_metadata", summary["artifacts"])
-            self.assertIn("run_quality_cycle", summary["artifacts"])
+        fake_torch = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True))
+        with patch.dict(sys.modules, {"torch": fake_torch}):
+            with tempfile.TemporaryDirectory() as tmp:
+                summary = run_full_orchestrator(run_id="r-orch-1", output_dir=tmp)
+                self.assertEqual(summary["status"], "completed")
+                self.assertIn("summary_path", summary)
+                self.assertEqual(len(summary["stages"]), 5)
+                self.assertEqual(summary["stages"][0]["stage"], "build_kb")
+                self.assertEqual(summary["stages"][4]["stage"], "run_quality_cycle")
+                self.assertIn("build_kb", summary["artifacts"])
+                self.assertIn("build_classifier_metadata", summary["artifacts"])
+                self.assertIn("run_quality_cycle", summary["artifacts"])
 
-            with open(summary["summary_path"], "r", encoding="utf-8") as f:
-                on_disk = json.load(f)
-            self.assertEqual(on_disk["run_id"], "r-orch-1")
-            self.assertEqual(on_disk["status"], "completed")
-            self.assertEqual(len(on_disk["stages"]), 5)
+                with open(summary["summary_path"], "r", encoding="utf-8") as f:
+                    on_disk = json.load(f)
+                self.assertEqual(on_disk["run_id"], "r-orch-1")
+                self.assertEqual(on_disk["status"], "completed")
+                self.assertEqual(len(on_disk["stages"]), 5)
 
     @patch("ela_pipeline.classifier.run_full_orchestrator.build_kb_artifacts")
     def test_orchestrator_stops_on_failed_stage(self, kb_mock):
         kb_mock.side_effect = RuntimeError("kb failed")
-        with tempfile.TemporaryDirectory() as tmp:
-            summary = run_full_orchestrator(run_id="r-orch-2", output_dir=tmp)
-            self.assertEqual(summary["status"], "failed")
-            self.assertEqual(summary["failed_stage"], "build_kb")
-            self.assertIn("kb failed", str(summary["error_message"]))
-            self.assertGreaterEqual(len(summary["stages"]), 1)
+        fake_torch = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True))
+        with patch.dict(sys.modules, {"torch": fake_torch}):
+            with tempfile.TemporaryDirectory() as tmp:
+                summary = run_full_orchestrator(run_id="r-orch-2", output_dir=tmp)
+                self.assertEqual(summary["status"], "failed")
+                self.assertEqual(summary["failed_stage"], "build_kb")
+                self.assertIn("kb failed", str(summary["error_message"]))
+                self.assertGreaterEqual(len(summary["stages"]), 1)
+
+    def test_orchestrator_fails_without_cuda(self):
+        fake_torch = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: False))
+        with patch.dict(sys.modules, {"torch": fake_torch}):
+            with self.assertRaises(RuntimeError):
+                run_full_orchestrator(run_id="r-orch-3")
 
 
 if __name__ == "__main__":

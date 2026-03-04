@@ -48,6 +48,72 @@ PEDAGOGICAL_CLASS_SPECS: dict[str, dict[str, str]] = {
         "intermediate_text": "Explain how the copular verb connects the subject to a description or identity.",
         "advanced_text": "Describe the clause as a copular structure that links subject and complement meaning.",
     },
+    "noun_phrase_reference": {
+        "cefr_level": "A1",
+        "elementary_text": "Identify this noun phrase as one unit that names a person, thing, or idea.",
+        "intermediate_text": "Explain how this noun phrase groups words together to identify one referent.",
+        "advanced_text": "Describe how the noun phrase packages its referent as one grammatical unit in context.",
+    },
+    "proper_name_phrase": {
+        "cefr_level": "A1",
+        "elementary_text": "Identify this phrase as a proper name.",
+        "intermediate_text": "Explain how this proper-name phrase identifies a specific person, place, or title.",
+        "advanced_text": "Describe how the proper-name phrase fixes reference to a unique named entity in context.",
+    },
+    "prepositional_relation_phrase": {
+        "cefr_level": "A2",
+        "elementary_text": "Identify this prepositional phrase and the relation it adds.",
+        "intermediate_text": "Explain how this prepositional phrase links its object to the rest of the clause.",
+        "advanced_text": "Describe the semantic relation encoded by this prepositional phrase in context.",
+    },
+    "pronoun_reference": {
+        "cefr_level": "A1",
+        "elementary_text": "Identify the pronoun and who or what it refers to.",
+        "intermediate_text": "Explain how this pronoun stands in for a noun phrase in context.",
+        "advanced_text": "Describe how the pronoun maintains reference without repeating the full noun phrase.",
+    },
+    "proper_noun_name": {
+        "cefr_level": "A1",
+        "elementary_text": "Identify this word as a proper name.",
+        "intermediate_text": "Explain how this proper noun names a specific person, place, or title.",
+        "advanced_text": "Describe how the proper noun fixes reference to a unique named entity.",
+    },
+    "common_noun_lexeme": {
+        "cefr_level": "A1",
+        "elementary_text": "Identify this word as a noun naming a person, thing, or idea.",
+        "intermediate_text": "Explain how this noun contributes the main naming meaning in its phrase.",
+        "advanced_text": "Describe how the noun anchors the lexical meaning of the noun phrase.",
+    },
+    "preposition_linker": {
+        "cefr_level": "A1",
+        "elementary_text": "Identify the preposition that links this element to another part of the clause.",
+        "intermediate_text": "Explain how this preposition marks a relation such as direction, place, time, or source.",
+        "advanced_text": "Describe how the preposition encodes the semantic link between its complement and the larger clause.",
+    },
+    "article_determiner": {
+        "cefr_level": "A1",
+        "elementary_text": "Identify the article or determiner in this position.",
+        "intermediate_text": "Explain how this determiner helps mark reference in the noun phrase.",
+        "advanced_text": "Describe how the determiner constrains reference and information status in the noun phrase.",
+    },
+    "adjective_modifier": {
+        "cefr_level": "A1",
+        "elementary_text": "Identify the adjective that describes a noun.",
+        "intermediate_text": "Explain how this adjective adds descriptive meaning to the noun phrase.",
+        "advanced_text": "Describe how the adjective modifies the noun by adding qualitative information.",
+    },
+    "adverb_modifier": {
+        "cefr_level": "A2",
+        "elementary_text": "Identify the adverb that adds extra information to the action or clause.",
+        "intermediate_text": "Explain how this adverb modifies the verb, adjective, or whole clause.",
+        "advanced_text": "Describe how the adverb adjusts manner, degree, time, or speaker stance in context.",
+    },
+    "punctuation_marker": {
+        "cefr_level": "A1",
+        "elementary_text": "Identify this punctuation mark and where it separates parts of the sentence.",
+        "intermediate_text": "Explain how this punctuation mark organizes sentence structure and reading flow.",
+        "advanced_text": "Describe how punctuation contributes to clause boundary signaling and discourse rhythm.",
+    },
     "present_perfect_affirmative": {
         "cefr_level": "B1",
         "elementary_text": "Identify the present perfect form and the link between past action and present relevance.",
@@ -142,27 +208,7 @@ def build_note_blueprints(
             "intermediate_text": str(spec["intermediate_text"]).strip(),
             "advanced_text": str(spec["advanced_text"]).strip(),
         }
-
-    readable_type = str(node_type or "node").strip().lower() or "node"
-    readable_role = str(grammatical_role or "unknown").strip().lower() or "unknown"
-    readable_tam = str(tam_construction or "none").strip().lower() or "none"
-    readable_cefr = str(cefr_level or "B1").strip().upper() or "B1"
-    readable_content = str(content or "").strip()
-    focus = humanize_grammar_class_id(class_ids[0]) if class_ids else f"{readable_type} structure"
-    compact = ", ".join(humanize_grammar_class_id(class_id) for class_id in class_ids[:3]) if class_ids else focus
-    return {
-        "elementary_text": (
-            f"This {readable_type} expresses '{readable_content}'. "
-            f"Main grammar focus: {focus}."
-        ).strip(),
-        "intermediate_text": (
-            f"This {readable_type} is used as {readable_role}. "
-            f"Main grammar focus: {focus}. Estimated level: {readable_cefr}."
-        ).strip(),
-        "advanced_text": (
-            f"Grammar profile: [{compact}] | role={readable_role} | tam={readable_tam} | cefr={readable_cefr}."
-        ).strip(),
-    }
+    return {}
 
 
 def class_cefr_level(class_id: str) -> str | None:
@@ -171,4 +217,3 @@ def class_cefr_level(class_id: str) -> str | None:
         return None
     value = str(spec.get("cefr_level") or "").strip().upper()
     return value or None
-

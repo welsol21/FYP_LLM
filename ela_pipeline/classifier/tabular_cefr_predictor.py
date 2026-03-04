@@ -9,7 +9,7 @@ from typing import Any
 import joblib
 
 from .curriculum import validate_per_class_cefr_ladder
-from .train_tabular_cefr_baseline import extract_tabular_features
+from .train_tabular_cefr_baseline import extract_tabular_features, project_feature_profile
 
 CEFR_ALLOWED = {"A1", "A2", "B1", "B2", "C1", "C2"}
 
@@ -22,25 +22,32 @@ def _normalize_cefr(label: Any) -> str:
 
 
 class TabularCefrPredictor:
-    def __init__(self, model: Any) -> None:
+    def __init__(self, model: Any, *, feature_profile: str = "runtime_stable") -> None:
         self._model = model
+        self._feature_profile = str(feature_profile or "runtime_stable").strip().lower()
 
     @classmethod
-    def from_path(cls, model_path: str) -> "TabularCefrPredictor":
+    def from_path(cls, model_path: str, *, feature_profile: str = "runtime_stable") -> "TabularCefrPredictor":
         path = Path(model_path)
         if not path.is_file():
             raise FileNotFoundError(f"tabular CEFR model not found: {model_path}")
-        return cls(joblib.load(path))
+        return cls(joblib.load(path), feature_profile=feature_profile)
 
     def predict_row(self, row: dict[str, Any]) -> str:
-        features = extract_tabular_features(row)
+        features = project_feature_profile(
+            extract_tabular_features(row),
+            profile=self._feature_profile,
+        )
         result = self._model.predict([features])
         if not result:
             return ""
         return str(result[0]).strip().upper()
 
     def predict_rows(self, rows: list[dict[str, Any]]) -> list[str]:
-        feature_rows = [extract_tabular_features(row) for row in rows]
+        feature_rows = [
+            project_feature_profile(extract_tabular_features(row), profile=self._feature_profile)
+            for row in rows
+        ]
         out = self._model.predict(feature_rows)
         return [str(item).strip().upper() for item in out]
 
@@ -68,6 +75,15 @@ class TabularProfileClassifier:
             metadata = json.load(f)
         if not isinstance(metadata, dict):
             raise ValueError("classifier_metadata.json must be an object")
+        summary_path = model_file.parent / "tabular_cefr_baseline_summary.json"
+        summary = {}
+        if summary_path.is_file():
+            with summary_path.open("r", encoding="utf-8") as f:
+                loaded_summary = json.load(f)
+            if isinstance(loaded_summary, dict):
+                summary = loaded_summary
+        feature_profile = str(summary.get("feature_profile") or "runtime_stable").strip().lower()
+        self._predictor = TabularCefrPredictor.from_path(str(model_file), feature_profile=feature_profile)
         ladders = metadata.get("per_class_cefr_ladder")
         issues = validate_per_class_cefr_ladder(ladders)
         if issues:
@@ -75,6 +91,7 @@ class TabularProfileClassifier:
             raise ValueError(f"Invalid per_class_cefr_ladder: {details}")
         self._metadata = metadata
         self.model_path = str(model_file)
+        self.feature_profile = feature_profile
 
     @staticmethod
     def _build_runtime_row(*, node: dict[str, Any], source_text: str) -> dict[str, Any]:

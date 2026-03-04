@@ -42,7 +42,23 @@ def _resolve_classifier_settings() -> tuple[str, str | None]:
     provider_raw = _env_str("ELA_CLASSIFIER_PROVIDER", "").lower()
     model_path = _env_str("ELA_CLASSIFIER_MODEL_PATH", "")
 
-    default_tabular_dir = "artifacts/models/tabular_cefr_baseline_full_ladder_logreg"
+    default_tabular_dirs = [
+        "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest",
+        "artifacts/models/tabular_cefr_baseline_full_ladder_logreg",
+    ]
+    preferred_tabular_dir = default_tabular_dirs[0]
+    default_tabular_dir = next(
+        (
+            candidate
+            for candidate in default_tabular_dirs
+            if (
+                os.path.isdir(candidate)
+                and os.path.isfile(os.path.join(candidate, "classifier_metadata.json"))
+                and os.path.isfile(os.path.join(candidate, "best_tabular_cefr_baseline.joblib"))
+            )
+        ),
+        default_tabular_dirs[0],
+    )
 
     if provider_raw:
         provider = provider_raw
@@ -66,7 +82,7 @@ def _resolve_classifier_settings() -> tuple[str, str | None]:
     if provider == "deberta" and not model_path:
         model_path = "artifacts/models/deberta_classifier_cefr"
     if provider == "tabular" and not model_path:
-        model_path = default_tabular_dir
+        model_path = preferred_tabular_dir
 
     if provider not in {"rule", "deberta", "tabular"}:
         raise ValueError("ELA_CLASSIFIER_PROVIDER must be one of: rule | deberta | tabular")

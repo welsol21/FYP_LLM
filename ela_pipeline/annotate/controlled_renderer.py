@@ -19,13 +19,23 @@ class ControlledT5NoteRenderer:
         *,
         max_input_length: int = 512,
         max_target_length: int = 128,
+        device: str = "auto",
     ) -> None:
         if not os.path.isdir(model_dir):
             raise FileNotFoundError(f"Model directory not found: {model_dir}")
-        if not torch.cuda.is_available():
-            raise RuntimeError("CUDA is required for controlled T5 note rendering.")
+        requested = str(device or "auto").strip().lower()
+        if requested not in {"auto", "cpu", "cuda"}:
+            raise ValueError("device must be one of: auto | cpu | cuda")
+        if requested == "cuda":
+            if not torch.cuda.is_available():
+                raise RuntimeError("CUDA requested for controlled T5 renderer but not available.")
+            resolved_device = "cuda"
+        elif requested == "cpu":
+            resolved_device = "cpu"
+        else:
+            resolved_device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        self.device = torch.device("cuda")
+        self.device = torch.device(resolved_device)
         self.max_input_length = max_input_length
         self.max_target_length = max_target_length
         self.tokenizer = T5Tokenizer.from_pretrained(model_dir)
@@ -88,4 +98,3 @@ class ControlledT5NoteRenderer:
         if not note:
             return str(blueprint_text or "").strip()
         return note
-

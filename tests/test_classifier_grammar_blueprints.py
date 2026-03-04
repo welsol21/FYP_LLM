@@ -27,7 +27,7 @@ class GrammarBlueprintTests(unittest.TestCase):
         )
         self.assertEqual(blueprints["intermediate_text"], PEDAGOGICAL_CLASS_SPECS["modal_perfect"]["intermediate_text"])
 
-    def test_build_note_blueprints_falls_back_to_generic_text(self):
+    def test_build_note_blueprints_returns_empty_for_unknown_pattern(self):
         blueprints = build_note_blueprints(
             grammar_classes=["unknown_pattern"],
             cefr_level="B1",
@@ -36,7 +36,21 @@ class GrammarBlueprintTests(unittest.TestCase):
             grammatical_role="modifier",
             tam_construction="none",
         )
-        self.assertIn("Main grammar focus: unknown pattern.", blueprints["intermediate_text"])
+        self.assertEqual(blueprints, {})
+
+    def test_build_note_blueprints_uses_word_level_shared_spec(self):
+        blueprints = build_note_blueprints(
+            grammar_classes=["pronoun_reference"],
+            cefr_level="A1",
+            node_type="word",
+            content="him",
+            grammatical_role="object",
+            tam_construction="none",
+        )
+        self.assertEqual(
+            blueprints["intermediate_text"],
+            PEDAGOGICAL_CLASS_SPECS["pronoun_reference"]["intermediate_text"],
+        )
 
 
 if __name__ == "__main__":

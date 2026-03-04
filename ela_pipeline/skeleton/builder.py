@@ -159,7 +159,24 @@ def _phrase_candidates(sent) -> List[Tuple[int, int, str]]:
             right_indices = [token.i] + [
                 c.i
                 for c in token.children
-                if c.dep_ in {"aux", "auxpass", "neg", "prt", "dobj", "obj", "iobj", "attr", "acomp", "xcomp", "advmod"}
+                if c.dep_
+                in {
+                    "aux",
+                    "auxpass",
+                    "neg",
+                    "prt",
+                    "dobj",
+                    "obj",
+                    "iobj",
+                    "attr",
+                    "acomp",
+                    "xcomp",
+                    "advmod",
+                    "prep",
+                    "pobj",
+                    "obl",
+                    "npadvmod",
+                }
             ]
 
             start = min(left_indices)
@@ -180,6 +197,32 @@ def _phrase_candidates(sent) -> List[Tuple[int, int, str]]:
 
     spans.sort(key=lambda s: (s[0], s[1]))
     return spans
+
+
+def _is_weak_phrase_candidate(span, phrase_pos: str) -> bool:
+    tokens = [tok for tok in span if not tok.is_space and not tok.is_punct]
+    if len(tokens) < 2:
+        return True
+    if phrase_pos == "prepositional phrase" and len(tokens) < 3:
+        return True
+    return False
+
+
+def _phrase_parent_map(spans: List[Tuple[int, int, str]]) -> Dict[int, int | None]:
+    parent_by_idx: Dict[int, int | None] = {}
+    for idx, (start, end, _) in enumerate(spans):
+        best_parent: int | None = None
+        best_width: int | None = None
+        for candidate_idx, (p_start, p_end, _) in enumerate(spans):
+            if candidate_idx == idx:
+                continue
+            if p_start <= start and end <= p_end and (p_start, p_end) != (start, end):
+                width = p_end - p_start
+                if best_parent is None or (best_width is not None and width < best_width):
+                    best_parent = candidate_idx
+                    best_width = width
+        parent_by_idx[idx] = best_parent
+    return parent_by_idx
 
 
 def _with_metadata(node: Dict, *, node_id: str, parent_id: str | None, start: int, end: int) -> Dict:
@@ -268,6 +311,63 @@ def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
     return words
 
 
+def _sort_children_by_span(items: List[Dict]) -> List[Dict]:
+    return sorted(
+        items,
+        key=lambda item: (
+            int((item.get("source_span") or {}).get("start", 0)),
+            int((item.get("source_span") or {}).get("end", 0)),
+            0 if item.get("type") == "Word" else 1,
+        ),
+    )
+
+
+def _build_phrase_node(
+    *,
+    idx: int,
+    spans: List[Tuple[int, int, str]],
+    children_by_idx: Dict[int, List[int]],
+    doc,
+    sentence_id: str,
+    next_id,
+) -> Dict:
+    start, end, phrase_pos = spans[idx]
+    span = doc[start:end]
+    phrase_text = span.text.strip()
+    phrase_node = blank_node("Phrase", phrase_text, phrase_pos, tense="null")
+    phrase_id = next_id()
+    _with_metadata(
+        phrase_node,
+        node_id=phrase_id,
+        parent_id=sentence_id,
+        start=span.start_char,
+        end=span.end_char,
+    )
+    phrase_node["grammatical_role"] = _phrase_role(span, phrase_pos)
+
+    child_phrase_nodes = [
+        _build_phrase_node(
+            idx=child_idx,
+            spans=spans,
+            children_by_idx=children_by_idx,
+            doc=doc,
+            sentence_id=phrase_id,
+            next_id=next_id,
+        )
+        for child_idx in sorted(children_by_idx.get(idx, []), key=lambda i: (spans[i][0], spans[i][1]))
+    ]
+
+    covered_token_ids: set[int] = set()
+    for child_idx in children_by_idx.get(idx, []):
+        child_start, child_end, _ = spans[child_idx]
+        covered_token_ids.update(range(child_start, child_end))
+
+    direct_tokens = [token for token in span if not token.is_space and token.i not in covered_token_ids]
+    word_nodes = _build_word_nodes(direct_tokens, parent_id=phrase_id, next_id=next_id)
+    phrase_node["linguistic_elements"] = _sort_children_by_span(child_phrase_nodes + word_nodes)
+    return phrase_node
+
+
 def _mark_ref_duplicates(sentence_node: Dict) -> None:
     """Mark duplicate span/content nodes with ref_node_id without changing tree shape."""
     seen: Dict[Tuple[str, int, int, str, str], str] = {}
@@ -323,50 +423,45 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
         )
         sentence_node["grammatical_role"] = "clause"
 
+        phrase_spans: List[Tuple[int, int, str]] = []
         for start, end, phrase_pos in _phrase_candidates(sent):
             span = doc[start:end]
             phrase_text = span.text.strip()
             if not phrase_text:
                 continue
+            if _is_weak_phrase_candidate(span, phrase_pos):
+                continue
             if _is_simple_determiner_np(span, phrase_pos):
                 continue
+            phrase_spans.append((start, end, phrase_pos))
 
-            phrase_node = blank_node("Phrase", phrase_text, phrase_pos, tense="null")
-            phrase_id = next_id()
-            _with_metadata(
-                phrase_node,
-                node_id=phrase_id,
-                parent_id=sentence_id,
-                start=span.start_char,
-                end=span.end_char,
-            )
-            phrase_node["grammatical_role"] = _phrase_role(span, phrase_pos)
-            phrase_node["linguistic_elements"] = _build_word_nodes(
-                span,
-                parent_id=phrase_id,
+        parent_by_idx = _phrase_parent_map(phrase_spans)
+        children_by_idx: Dict[int, List[int]] = {}
+        top_level_indices: List[int] = []
+        for idx, parent_idx in parent_by_idx.items():
+            if parent_idx is None:
+                top_level_indices.append(idx)
+                continue
+            children_by_idx.setdefault(parent_idx, []).append(idx)
+
+        for idx in sorted(top_level_indices, key=lambda i: (phrase_spans[i][0], phrase_spans[i][1])):
+            phrase_node = _build_phrase_node(
+                idx=idx,
+                spans=phrase_spans,
+                children_by_idx=children_by_idx,
+                doc=doc,
+                sentence_id=sentence_id,
                 next_id=next_id,
             )
-
             sentence_node["linguistic_elements"].append(phrase_node)
 
         if not sentence_node["linguistic_elements"]:
-            # Fallback: single phrase with all non-space tokens.
-            phrase_node = blank_node("Phrase", sent_text, "clause", tense="null")
-            phrase_id = next_id()
-            _with_metadata(
-                phrase_node,
-                node_id=phrase_id,
-                parent_id=sentence_id,
-                start=sent.start_char,
-                end=sent.end_char,
-            )
-            phrase_node["grammatical_role"] = "predicate"
-            phrase_node["linguistic_elements"] = _build_word_nodes(
+            # Fallback: attach words directly to sentence.
+            sentence_node["linguistic_elements"] = _build_word_nodes(
                 sent,
-                parent_id=phrase_id,
+                parent_id=sentence_id,
                 next_id=next_id,
             )
-            sentence_node["linguistic_elements"].append(phrase_node)
 
         _mark_ref_duplicates(sentence_node)
         output[sent_text] = sentence_node

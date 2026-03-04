@@ -626,11 +626,17 @@ def _attach_generated_notes(doc: dict) -> None:
 
     def walk(node: dict) -> None:
         generated = build_notes(node)
-        node["note_blueprints"] = dict(generated)
-        node["generated_notes"] = generated
-        existing_notes = node.get("linguistic_notes")
-        if isinstance(existing_notes, list) and len(existing_notes) == 0:
-            node["linguistic_notes"] = [generated["intermediate_text"]]
+        if isinstance(generated, dict) and generated:
+            node["note_blueprints"] = dict(generated)
+            node["generated_notes"] = generated
+            existing_notes = node.get("linguistic_notes")
+            if isinstance(existing_notes, list) and len(existing_notes) == 0:
+                intermediate = str(generated.get("intermediate_text") or "").strip()
+                node["linguistic_notes"] = [intermediate] if intermediate else []
+        else:
+            node.pop("note_blueprints", None)
+            node.pop("generated_notes", None)
+            node["linguistic_notes"] = []
         for child in node.get("linguistic_elements", []) or []:
             if isinstance(child, dict):
                 walk(child)
