@@ -15,9 +15,9 @@ Core idea:
 - store level-specific note blueprints,
 - let T5 generate final user-facing note text from those blueprints.
 
-## 1.1 Model Split Decision (Locked)
+## 1.1 Model Split Decision (Historical / Superseded)
 
-Approved model split for backend rebuild:
+Originally approved model split for backend rebuild:
 
 - **Classification stage (`CEFR + grammar_classes`)**: `DeBERTa-v3-base`
 - **Generation stage (note text realization)**: `T5` (controlled generation only)
@@ -26,6 +26,8 @@ Why this decision:
 - CEFR/grammar labeling is a classification task; encoder-only models are more stable and contract-safe here.
 - T5 remains useful for controlled text rendering from classifier outputs/blueprints.
 - This split reduces schema-risk (fewer free-form label errors) and improves deterministic validation behavior.
+
+This decision is now superseded by the architecture update below.
 
 ## 1.2 Time Impact vs T5-as-Classifier
 
@@ -38,6 +40,33 @@ Using `DeBERTa-v3-base` for classification instead of T5 classification is expec
 Important:
 - major time consumption still remains in KB quality loops and gate retries, not in one model run.
 - T5 runtime remains in scope only for note text generation.
+
+## 1.3 Active Architecture Decision (2026-03-04)
+
+Current backend architecture is now fixed as:
+
+1. `spaCy + deterministic rules` for structural truth
+2. `tabular ML` for `cefr_level`
+3. `T5` for note wording only
+
+Meaning:
+
+- `grammar_classes` are no longer treated as a mandatory DeBERTa-owned field
+- `grammar_classes` are rules-first labels derived from parse/TAM evidence
+- `DeBERTa` remains an experimental branch only and is not part of the critical production path
+
+Why this changed:
+
+- the merged full-ladder dataset is now learnable,
+- a tabular CEFR baseline on the same dataset reaches near-perfect quality,
+- a tabular grammar-label baseline also strongly outperforms the current DeBERTa setup,
+- therefore the current blocker is not data coverage but the DeBERTa training regime,
+- and there is no architectural reason to keep DeBERTa in the production path while simpler components already solve the required truth-layer tasks.
+
+See also:
+
+- `docs/contract_field_ownership_2026-03-04.md`
+- `docs/reports/tabular_vs_deberta_full_ladder_2026-03-04.json`
 
 ## 2. Core Curriculum Backbone
 

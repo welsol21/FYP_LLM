@@ -11,9 +11,16 @@ This project converts English text into a validated hierarchical linguistic JSON
 - optional CEFR enrichment (`cefr_level`, rule baseline or ML model)
 - strict validation and frozen-structure checks
 
+Current backend truth-layer design:
+- `spaCy + rules` for structural grammar fields and `grammar_classes`
+- `tabular ML` for `cefr_level`
+- `T5` only for human-facing note wording
+- `DeBERTa` kept as research/benchmark path, not as production blocker
+
 Authoritative contract reference: `docs/sample.json`.
 Canonical CEFR corpus source: `linguistic_hierarchical_3000_v5_cefr_balanced.json`.
 Tool/model/data license inventory: `docs/licenses_inventory.md`.
+Field ownership matrix: `docs/contract_field_ownership_2026-03-04.md`.
 
 ## What Has Been Improved
 - Contract v2 metadata added and validated (`node_id`, `parent_id`, `source_span`, `grammatical_role`, dependency links, morphology features).

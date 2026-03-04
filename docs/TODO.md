@@ -6,13 +6,12 @@
 
 ## Backend Rebuild: Grammar Curriculum Classifier (New)
 
-- [x] Lock model split: `DeBERTa-v3-base` for classification, `T5` for controlled note generation.
-- [x] Record rationale and time-impact estimate in docs (classifier stage faster and more stable than T5-as-classifier).
-- [x] Adopt classifier-first note pipeline (`classification -> controlled generation`) as backend default.
-- [x] Implement DeBERTa-based classifier stage for:
-  - [x] `cefr_level`
-  - [x] `grammar_classes[]`
-  - [x] level-aware note blueprints (Elementary/Intermediate/Advanced outputs per node)
+- [x] Record historical `DeBERTa + T5` split and its rationale in docs.
+- [x] Replace it with the active production split:
+  - [x] `spaCy + rules` -> structural truth + `grammar_classes[]`
+  - [x] `tabular ML` -> `cefr_level`
+  - [x] `T5` -> controlled note wording only
+- [x] Publish explicit field-ownership matrix for contract fields.
 - [x] Use English tense table as curriculum core for initial grammar classes.
 - [x] Enforce per-class CEFR ladder: `A1 -> A2 -> B1 -> B2 -> C1 -> C2`.
 - [x] Implement phased rollout:
@@ -41,7 +40,7 @@
   - [x] `quality_events`
   - [x] `repair_actions`
 - [x] Add TDD suite for each stage and gate failure/retry behavior.
-- [x] Keep T5 in constrained role: generate note text only, never overwrite classifier truth fields.
+- [x] Keep T5 in constrained role: generate note text only, never overwrite rule/CEFR truth fields.
 - [x] Track note generator provenance in contract (`note_generator_version`).
 - [x] Document and run iterative improvement loop until all gates pass for repeated runs.
 - [x] Add one-button orchestrator (`build_kb -> build_train_dataset -> train_deberta -> run_quality_cycle`) with unified summary report.
@@ -122,18 +121,21 @@
 
 ## Backend Rebuild: Full-Ladder Classifier Training Quality
 
-- [ ] Stabilize full-ladder (`A1-C2`) DeBERTa training on merged dataset.
-- [ ] Improve macro-F1 on merged validation beyond current smoke baseline.
+- [x] Prove whether full-ladder CEFR is learnable on the merged dataset with a non-transformer baseline.
+- [x] Prove whether `grammar_label` is learnable on the merged dataset with a non-transformer baseline.
+- [x] Add runtime `tabular` CEFR provider as explicit non-default provider.
+- [ ] Move `grammar_classes` ownership fully to rules-first runtime path and remove DeBERTa dependency from that path.
+- [ ] Decide whether any DeBERTa work continues as research-only branch or is frozen.
 - [x] Eliminate `NaN`/loss explosion in conservative smoke configuration.
 - [x] Add balanced class-weighting option to DeBERTa training.
-- [ ] Compare `loss_weighting=none` vs `balanced` on the merged dataset and keep the better default.
+- [ ] Compare `loss_weighting=none` vs `balanced` on the merged dataset and keep the better default (research branch only, if DeBERTa stays alive).
 - [x] Add full-ladder evaluation report with:
   - [x] confusion matrix
   - [x] per-CEFR precision/recall/F1
   - [x] hardest confusion pairs
 - [x] Add tabular CEFR baseline on the same merged full-ladder train/dev/test splits.
 - [x] Confirm whether the current blocker is corpus coverage or DeBERTa training regime.
-- [ ] Decide whether runtime truth-layer can switch to full-ladder classifier, or whether another training-quality pass is required first.
+- [x] Confirm that the current production blocker is DeBERTa training regime, not corpus coverage.
 
 ## Media Pipeline Integration (ELA Bridge, Current)
 

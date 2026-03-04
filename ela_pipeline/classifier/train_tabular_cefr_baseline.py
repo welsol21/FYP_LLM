@@ -1,4 +1,4 @@
-"""Train tabular CEFR baselines on the merged full-ladder dataset."""
+"""Train tabular baselines on the merged full-ladder dataset."""
 
 from __future__ import annotations
 
@@ -36,9 +36,14 @@ def _load_jsonl(path: str) -> list[dict[str, Any]]:
     return out
 
 
-def _normalize_label(value: Any) -> str:
-    label = str(value or "").strip().upper()
-    return label if label in CEFR_ORDER else ""
+def _normalize_label(value: Any, *, label_field: str) -> str:
+    label = str(value or "").strip()
+    if not label:
+        return ""
+    if label_field == "cefr_label":
+        upper = label.upper()
+        return upper if upper in CEFR_ORDER else ""
+    return label.lower()
 
 
 def _safe_list(value: Any) -> list[str]:
@@ -76,22 +81,28 @@ def extract_tabular_features(row: dict[str, Any]) -> dict[str, Any]:
     return feature_row
 
 
-def build_feature_rows(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
+def build_feature_rows(rows: list[dict[str, Any]], *, label_field: str = "cefr_label") -> tuple[list[dict[str, Any]], list[str]]:
     feature_rows: list[dict[str, Any]] = []
     labels: list[str] = []
     for row in rows:
-        label = _normalize_label(row.get("cefr_label") or row.get("cefr_level"))
+        raw_value = row.get(label_field)
+        if raw_value in (None, "") and label_field == "cefr_label":
+            raw_value = row.get("cefr_level")
+        label = _normalize_label(raw_value, label_field=label_field)
         if not label:
             continue
         feature_rows.append(extract_tabular_features(row))
         labels.append(label)
     if not feature_rows:
-        raise ValueError("No valid CEFR-labelled rows found for baseline")
+        raise ValueError(f"No valid '{label_field}' rows found for baseline")
     return feature_rows, labels
 
 
-def evaluate_predictions(y_true: list[str], y_pred: list[str]) -> dict[str, Any]:
-    labels = [label for label in CEFR_ORDER if label in set(y_true) | set(y_pred)]
+def evaluate_predictions(y_true: list[str], y_pred: list[str], *, label_order: list[str] | None = None) -> dict[str, Any]:
+    if label_order:
+        labels = [label for label in label_order if label in set(y_true) | set(y_pred)]
+    else:
+        labels = sorted(set(y_true) | set(y_pred))
     cm = confusion_matrix(y_true, y_pred, labels=labels)
     return {
         "accuracy": float(accuracy_score(y_true, y_pred)),
@@ -157,14 +168,15 @@ def train_tabular_cefr_baseline(
     output_dir: str,
     model_names: list[str] | None = None,
     seed: int = 42,
+    label_field: str = "cefr_label",
 ) -> dict[str, Any]:
     train_rows = _load_jsonl(train_path)
     dev_rows = _load_jsonl(dev_path)
     test_rows = _load_jsonl(test_path)
 
-    x_train, y_train = build_feature_rows(train_rows)
-    x_dev, y_dev = build_feature_rows(dev_rows)
-    x_test, y_test = build_feature_rows(test_rows)
+    x_train, y_train = build_feature_rows(train_rows, label_field=label_field)
+    x_dev, y_dev = build_feature_rows(dev_rows, label_field=label_field)
+    x_test, y_test = build_feature_rows(test_rows, label_field=label_field)
 
     models = _make_models(seed)
     selected_names = list(model_names or models.keys())
@@ -177,12 +189,22 @@ def train_tabular_cefr_baseline(
     best_score = -1.0
     best_model: Any = None
 
+    label_order = list(CEFR_ORDER) if label_field == "cefr_label" else sorted(set(y_train) | set(y_dev) | set(y_test))
+
     for name, model in models.items():
         model.fit(x_train, y_train)
         dev_pred = model.predict(x_dev)
         test_pred = model.predict(x_test)
-        dev_metrics = evaluate_predictions(y_dev, dev_pred.tolist() if isinstance(dev_pred, np.ndarray) else list(dev_pred))
-        test_metrics = evaluate_predictions(y_test, test_pred.tolist() if isinstance(test_pred, np.ndarray) else list(test_pred))
+        dev_metrics = evaluate_predictions(
+            y_dev,
+            dev_pred.tolist() if isinstance(dev_pred, np.ndarray) else list(dev_pred),
+            label_order=label_order,
+        )
+        test_metrics = evaluate_predictions(
+            y_test,
+            test_pred.tolist() if isinstance(test_pred, np.ndarray) else list(test_pred),
+            label_order=label_order,
+        )
         results[name] = {
             "dev": dev_metrics,
             "test": test_metrics,
@@ -198,15 +220,19 @@ def train_tabular_cefr_baseline(
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump(best_model, out_dir / "best_tabular_cefr_baseline.joblib")
-    metadata_summary = build_classifier_metadata_from_dataset(
-        classifier_jsonl_path=train_path,
-        output_dir=str(out_dir),
-    )
+    metadata_path = None
+    if label_field == "cefr_label":
+        metadata_summary = build_classifier_metadata_from_dataset(
+            classifier_jsonl_path=train_path,
+            output_dir=str(out_dir),
+        )
+        metadata_path = metadata_summary["metadata_path"]
 
     summary = {
         "train_path": train_path,
         "dev_path": dev_path,
         "test_path": test_path,
+        "label_field": label_field,
         "train_samples": len(x_train),
         "dev_samples": len(x_dev),
         "test_samples": len(x_test),
@@ -215,7 +241,7 @@ def train_tabular_cefr_baseline(
         "best_model": best_name,
         "best_dev_macro_f1": best_score,
         "best_model_path": str(out_dir / "best_tabular_cefr_baseline.joblib"),
-        "classifier_metadata_path": metadata_summary["metadata_path"],
+        "classifier_metadata_path": metadata_path,
     }
     (out_dir / "tabular_cefr_baseline_summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2),
@@ -225,13 +251,14 @@ def train_tabular_cefr_baseline(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train tabular CEFR baselines on full-ladder dataset.")
+    parser = argparse.ArgumentParser(description="Train tabular baselines on full-ladder dataset.")
     parser.add_argument("--train-path", default="artifacts/classifier_full_ladder_dataset/train_classifier.jsonl")
     parser.add_argument("--dev-path", default="artifacts/classifier_full_ladder_dataset/dev_classifier.jsonl")
     parser.add_argument("--test-path", default="artifacts/classifier_full_ladder_dataset/test_classifier.jsonl")
     parser.add_argument("--output-dir", default="artifacts/models/tabular_cefr_baseline")
     parser.add_argument("--model", action="append", default=[], help="Model name to run. Can be passed multiple times.")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--label-field", default="cefr_label")
     args = parser.parse_args()
 
     summary = train_tabular_cefr_baseline(
@@ -241,6 +268,7 @@ def main() -> None:
         output_dir=args.output_dir,
         model_names=args.model or None,
         seed=args.seed,
+        label_field=args.label_field,
     )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 

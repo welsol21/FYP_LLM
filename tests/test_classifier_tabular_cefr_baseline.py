@@ -40,6 +40,15 @@ class TabularCefrBaselineTests(unittest.TestCase):
         self.assertEqual(len(features), 1)
         self.assertEqual(labels, ["A1"])
 
+    def test_build_feature_rows_supports_grammar_label(self):
+        rows = [
+            {"source_text": "A.", "grammar_label": "past_perfect", "grammar_evidence": {}},
+            {"source_text": "B.", "grammar_label": "", "grammar_evidence": {}},
+        ]
+        features, labels = build_feature_rows(rows, label_field="grammar_label")
+        self.assertEqual(len(features), 1)
+        self.assertEqual(labels, ["past_perfect"])
+
     def test_evaluate_predictions_returns_macro_metrics(self):
         y_true = ["A1", "A2", "B1", "B1"]
         y_pred = ["A1", "A2", "A2", "B1"]

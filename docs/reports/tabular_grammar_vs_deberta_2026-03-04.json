@@ -1,0 +1,23 @@
+{
+  "date": "2026-03-04",
+  "task": "full_ladder_grammar_label_comparison",
+  "dataset": "artifacts/classifier_full_ladder_dataset",
+  "summary": {
+    "conclusion": "grammar_label is learnable on the merged dataset; current DeBERTa setup is the bottleneck, not corpus coverage",
+    "recommended_production_path": "rules-first grammar classes; keep DeBERTa out of critical path"
+  },
+  "models": {
+    "deberta_grammar_first_smoke": {
+      "model_path": "artifacts/models/deberta_classifier_full_ladder_grammar_smoke",
+      "dev_accuracy": 0.1940928270042194,
+      "dev_macro_f1": 0.019122843483683226,
+      "note": "collapsed mostly to a single label"
+    },
+    "tabular_grammar_logreg": {
+      "model_path": "artifacts/models/tabular_grammar_baseline_full_ladder_logreg",
+      "dev_accuracy": 0.9670886075949368,
+      "dev_macro_f1": 0.778292970444137,
+      "note": "same merged dataset, strong learnability signal"
+    }
+  }
+}
