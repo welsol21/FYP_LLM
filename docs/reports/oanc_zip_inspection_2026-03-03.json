@@ -1,0 +1,38 @@
+{
+  "txt_files": 8826,
+  "anc_files": 9072,
+  "xml_files": 44120,
+  "top_genre_buckets": [
+    "written_1/journal",
+    "spoken/telephone",
+    "written_2/technical",
+    "written_1/letters",
+    "written_2/travel_guides",
+    "spoken/face-to-face",
+    "written_2/non-fiction",
+    "written_1/fiction"
+  ],
+  "advanced_candidate_files": 5999,
+  "advanced_candidate_examples": [
+    "OANC/data/written_1/journal/slate/1/Article247_4.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_40.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_42.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_47.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_5.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_55.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_61.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_62.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_63.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_66.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_67.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_68.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_69.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_70.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_72.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_73.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_74.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_75.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_76.txt",
+    "OANC/data/written_1/journal/slate/1/Article247_77.txt"
+  ]
+}

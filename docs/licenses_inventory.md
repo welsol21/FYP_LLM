@@ -53,6 +53,26 @@ Dataset/reference source licensing policy and allow/deny matrix are maintained i
 
 This includes tracked licenses for UD/OANC/Tatoeba/Wikinews and ingestion provenance requirements.
 
+Tracked corpus sources currently approved/planned for classifier-dataset work:
+
+| Source | Planned role | License / usage note |
+|---|---|---|
+| `UD_English-EWT` | baseline structural source | `CC BY-SA 4.0` |
+| `UD_English-GUM` | structural expansion source | check source-level attribution with the treebank package before release use |
+| `UD_English-ESL` | optional learner-language augmentation only | keep isolated from baseline training unless explicitly enabled |
+| `OANC` | advanced-register source for `B2/C1/C2` coverage | official site states unrestricted usage/redistribution including commercial use; record exact source package used |
+| `MASC` | validation/control source with richer annotation | `CC BY 3.0 US` |
+
+Notes:
+- For `OANC`, use the official wording from the source package/site documentation rather than paraphrasing it as `CC0` unless the downloaded package explicitly says so.
+- The historical `ANC-parses` archive is not treated as a dependable source artifact; if advanced dependency parses are needed, generate them locally from the downloaded `OANC` corpus package and record parser/model provenance.
+- Current downloaded package in project: `data/external_datasets/OANC/OANC-1.0.1-UTF8.zip`
+- For every downloaded corpus package, persist:
+  1. source URL,
+  2. local package/version identifier,
+  3. exact license text shipped with the package,
+  4. ingestion provenance in project metadata.
+
 ## 5) Operational guardrails
 
 - No model/tool is added to production path without explicit license entry in this file.

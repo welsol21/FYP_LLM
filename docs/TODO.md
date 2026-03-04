@@ -54,6 +54,55 @@
 - [x] Validate controlled T5 rewrite on top of classifier blueprints with produced artifacts.
 - [x] Capture baseline quality snapshot (contract + NLG gates) for “pre-Phase-2” freeze.
 
+## Backend Rebuild: Phase 1 Dataset Recovery (UD-backed)
+
+- [ ] Reject current synthetic Phase 1 dataset as runtime-training source after audit (`ambiguous_grammar_combo_ratio` too high).
+- [ ] Rebuild Phase 1 (`A1 -> A2 -> B1`) training source on top of Universal Dependencies:
+  - [x] primary source: `UD_English-EWT`
+  - [x] optional secondary source: `UD_English-GUM`
+  - [ ] keep `UD_English-ESL` isolated from baseline training set unless explicitly enabled as augmentation
+- [ ] Add local CoNLL-U ingestion pipeline for UD corpora:
+  - [x] sentence reader
+  - [x] token/POS/morph/dep extraction
+  - [x] provenance capture (`treebank`, `split`, `sent_id`, source path)
+- [ ] Add curriculum mapper from UD structures to Phase 1 grammar classes (`A1 -> A2 -> B1` only).
+- [ ] Build UD-backed candidate dataset with explicit separation between:
+  - [x] raw UD sentence
+  - [x] extracted grammar evidence
+  - [x] assigned CEFR rung
+  - [x] note blueprint payload
+- [ ] Add hard dataset gates before any DeBERTa retraining:
+  - [ ] fail on cross-level ambiguity for the same grammar combo above threshold
+  - [ ] fail on exact-text cross-level collisions above threshold
+  - [ ] fail on insufficient per-class support
+  - [ ] fail on empty/partial grammar evidence
+  - [ ] fail on missing blueprint coverage for any accepted sample
+- [ ] Add TDD coverage for:
+  - [ ] CoNLL-U ingest
+  - [ ] UD provenance extraction
+  - [ ] ambiguity gate failure behavior
+  - [ ] curriculum mapping sanity for representative Phase 1 grammar patterns
+- [ ] Produce new audited Phase 1 dataset only after all gates pass.
+- [ ] Retrain DeBERTa on UD-backed Phase 1 dataset and compare against rejected synthetic baseline.
+
+## Backend Rebuild: Advanced Coverage Recovery (`B2 -> C1 -> C2`)
+
+- [x] Add `OANC` as advanced-register corpus source for `B2/C1/C2`.
+- [ ] Add `MASC` as validation/control corpus source for advanced grammar coverage.
+- [ ] Record exact downloaded package provenance + bundled license texts for `OANC/MASC`.
+- [x] Treat historical `ANC-parses` archive as unavailable; do not block the pipeline on it.
+- [x] Add `OANC` zip inspection layer with candidate genre discovery and report artifact.
+- [ ] Implement dedicated `OANC` ingest path from the downloaded corpus package (`OANC-1.0.1-UTF8.zip` / extracted XML+text structure).
+- [ ] Add modern local dependency-generation stage for `OANC` during ingestion and persist parser/model provenance.
+- [ ] Implement `MASC` ingest path for validation/calibration slices.
+- [ ] Build merged advanced dataset source:
+  - [ ] `UD_English-EWT`
+  - [ ] `UD_English-GUM`
+  - [ ] `OANC`
+  - [ ] optional `MASC` validation slice
+- [ ] Add hard support thresholds for `B2/C1/C2` so advanced levels cannot pass on only a handful of examples.
+- [ ] Publish merged coverage report for `A1 -> A2 -> B1 -> B2 -> C1 -> C2` before any full-ladder retrain.
+
 ## Media Pipeline Integration (ELA Bridge, Current)
 
 - [x] Switch architecture to **client-only media analysis** (no backend media processing queue).

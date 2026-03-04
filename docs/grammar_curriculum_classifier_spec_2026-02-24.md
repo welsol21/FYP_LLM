@@ -76,6 +76,20 @@ Contract policy:
 
 ## 4. Dataset Build Strategy
 
+### 4.0 Phase 1 Dataset Recovery Decision (2026-03-03)
+
+The first synthetic Phase 1 dataset (`A1 -> A2 -> B1`) is rejected as the training source for the classifier-first backend.
+
+Reason:
+- dataset audit showed severe CEFR ambiguity for the same grammar combinations,
+- the trained DeBERTa classifier collapsed into a single class on validation,
+- therefore the issue is in supervision/data quality, not just in training hyperparameters.
+
+Implication:
+- the current synthetic Phase 1 dataset must not be used as the runtime truth-layer source,
+- retraining on the same source is not considered a meaningful fix,
+- Phase 1 must be rebuilt on top of a real structural corpus with hard ambiguity gates.
+
 ### 4.1 KB construction
 
 Build a grammar KB with 3 pedagogical bands:
@@ -89,6 +103,69 @@ Each KB item includes:
 - level mapping and blueprints
 - provenance metadata
 
+### 4.1.1 UD-backed structural backbone
+
+Use Universal Dependencies as the structural backbone for real sentence sources:
+
+- primary source: `UD_English-EWT`
+- optional expansion source: `UD_English-GUM`
+- learner-language source `UD_English-ESL` is kept separate from baseline training and may be used only as controlled augmentation
+
+Universal Dependencies is used for:
+- real English sentence text,
+- gold tokenization,
+- POS / morphology / dependency structure,
+- reproducible provenance.
+
+Universal Dependencies is **not** treated as a ready CEFR dataset.
+
+Therefore the project must add a mapping layer on top of UD:
+- `UD structure -> grammar classes`
+- `grammar evidence -> CEFR rung (Phase 1 only: A1/A2/B1)`
+- `accepted class/rung -> note blueprints`
+
+### 4.1.2 Advanced-register backbone for `B2 -> C1 -> C2`
+
+Universal Dependencies alone is not enough for strong advanced-level coverage.
+
+Observed limitation from real runs:
+- `UD_English-EWT + UD_English-GUM` already gives a usable lower/mid ladder,
+- but `C1/C2` support remains too small for reliable training,
+- therefore advanced coverage must be strengthened with an additional source that contains more formal, academic, and high-register prose.
+
+Approved next source layer:
+
+- `OANC` / `Open American National Corpus`
+  - role: main advanced-register source for `B2/C1/C2`
+  - expected value: more formal prose, journalism, academic-like text, broader adult written register
+  - usage in project: advanced training-source expansion, not a drop-in CEFR dataset
+  - current ingestion policy: use the main `OANC-1.0.1-UTF8` corpus package and generate modern dependency parses locally during ingestion; do not depend on the historical `ANC-parses` archive
+
+- `MASC`
+  - role: smaller but higher-quality control/validation source
+  - expected value: manually enriched annotation layer for validation and error analysis
+  - usage in project: validation/calibration slice first, optional targeted augmentation later
+
+Practical policy:
+- `UD` remains the baseline structural backbone for broad grammar coverage.
+- `OANC` strengthens advanced register coverage.
+- `MASC` is treated as a quality-oriented validation/control source, not bulk training by default.
+
+Operational note:
+- the legacy `ANC-parses` download is treated as unavailable/dead and is not a project dependency,
+- dependency structure for `OANC` must be generated locally from the downloaded corpus package using the current parser stack.
+
+Current project state:
+- the package `OANC-1.0.1-UTF8.zip` has already been downloaded into `data/external_datasets/OANC/`,
+- zip inspection is now implemented inside the project and recorded in `docs/reports/oanc_zip_inspection_2026-03-03.json`,
+- the first inspection pass found `5999` advanced candidate `.txt` files across the targeted `journal`, `technical`, and `non-fiction` buckets.
+
+As with UD, both `OANC` and `MASC` still require:
+- grammar extraction,
+- CEFR rung assignment,
+- note blueprint generation,
+- hard ambiguity/support gates before training.
+
 ### 4.2 spaCy enrichment at scale
 
 For every example, persist enriched features:
@@ -100,6 +177,27 @@ Output layers:
 - `kb_raw`
 - `kb_spacy_enriched`
 - `kb_train_ready`
+
+### 4.3 Phase 1 acceptance gates for rebuilt dataset
+
+Before any DeBERTa retraining, the rebuilt Phase 1 dataset must pass hard dataset gates:
+
+1. **Grammar-combo ambiguity gate**
+- reject dataset when the same normalized grammar combo appears across multiple CEFR levels above threshold
+
+2. **Exact-text collision gate**
+- reject dataset when the same sentence text appears across multiple CEFR levels above threshold
+
+3. **Per-class support gate**
+- reject dataset when accepted grammar classes do not have enough examples per CEFR rung
+
+4. **Evidence completeness gate**
+- reject dataset when accepted rows have empty or partial grammar evidence
+
+5. **Blueprint completeness gate**
+- reject dataset when any accepted row lacks the required note blueprint payload
+
+These gates exist specifically to prevent another classifier collapse caused by structurally non-identifiable supervision.
 
 ## 5. Quality Loop with Step Repetition
 
