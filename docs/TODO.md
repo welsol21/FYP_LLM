@@ -92,7 +92,8 @@
 - [ ] Record exact downloaded package provenance + bundled license texts for `OANC/MASC`.
 - [x] Treat historical `ANC-parses` archive as unavailable; do not block the pipeline on it.
 - [x] Add `OANC` zip inspection layer with candidate genre discovery and report artifact.
-- [ ] Implement dedicated `OANC` ingest path from the downloaded corpus package (`OANC-1.0.1-UTF8.zip` / extracted XML+text structure).
+- [x] Implement dedicated `OANC` ingest path from the downloaded corpus package (`OANC-1.0.1-UTF8.zip` / extracted XML+text structure).
+- [ ] Replace temporary regex OANC sentence splitting with parser-backed sentence segmentation before promoting any OANC rows to train-ready advanced dataset.
 - [ ] Add modern local dependency-generation stage for `OANC` during ingestion and persist parser/model provenance.
 - [ ] Implement `MASC` ingest path for validation/calibration slices.
 - [ ] Build merged advanced dataset source:

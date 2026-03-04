@@ -159,6 +159,8 @@ Current project state:
 - the package `OANC-1.0.1-UTF8.zip` has already been downloaded into `data/external_datasets/OANC/`,
 - zip inspection is now implemented inside the project and recorded in `docs/reports/oanc_zip_inspection_2026-03-03.json`,
 - the first inspection pass found `5999` advanced candidate `.txt` files across the targeted `journal`, `technical`, and `non-fiction` buckets.
+- a bounded candidate-ingest pass is now implemented and recorded in `docs/reports/oanc_sentence_candidates_2026-03-04.json`,
+- current status: file-level ingest and provenance are working, but regex sentence splitting is not yet good enough for train-ready advanced rows; parser-backed sentence segmentation is required before promoting OANC rows into the classifier dataset.
 
 As with UD, both `OANC` and `MASC` still require:
 - grammar extraction,

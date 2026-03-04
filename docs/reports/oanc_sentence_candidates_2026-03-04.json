@@ -1,0 +1,198 @@
+{
+  "manifest": {
+    "selected_files": 30,
+    "bucket_counts": {
+      "written_1/journal": 10,
+      "written_2/non-fiction": 10,
+      "written_2/technical": 10
+    }
+  },
+  "candidate_sentences": 10801,
+  "bucket_sentence_counts": {
+    "written_1/journal": 32,
+    "written_2/non-fiction": 2676,
+    "written_2/technical": 8093
+  },
+  "sample_rows": [
+    {
+      "text": "matters as how not to give the wrong impression on a first date.",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_4.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 0
+      }
+    },
+    {
+      "text": "concerns his take-out order when he eats dinner at his desk, before the show.",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_40.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 0
+      }
+    },
+    {
+      "text": "the set was when King went out to dinner.",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_40.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 1
+      }
+    },
+    {
+      "text": "forward to fill the ensuing culture gap.",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_42.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 0
+      }
+    },
+    {
+      "text": "they shared a vision, and are historical.",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_42.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 1
+      }
+    },
+    {
+      "text": "Gerald Ford, Valery Giscard d'Estaing, James Callaghan, and Helmut Schmidt.",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_42.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 2
+      }
+    },
+    {
+      "text": "Can we have Karen Finley and Piss Christ back, please?",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_42.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 3
+      }
+    },
+    {
+      "text": "readers may not quite share Baker's indignation.",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_47.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 0
+      }
+    },
+    {
+      "text": "I'm pretty sure Cooper was joking, but the dis was clear.",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_5.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 0
+      }
+    },
+    {
+      "text": "We've come a long way since Clarence Thomas.",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_5.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 1
+      }
+    },
+    {
+      "text": "dead letter both in magazines and in the culture at large .",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_5.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 2
+      }
+    },
+    {
+      "text": "slides of elephants a few years ago while planning a story on them.",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_55.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 0
+      }
+    },
+    {
+      "text": "damaging on tape, as Starr apparently planned to do?...",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_61.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 0
+      }
+    },
+    {
+      "text": "it's less than 100 percent--less than 50 percent, even ...",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_61.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 1
+      }
+    },
+    {
+      "text": "Walter, who pointed this out, thinks not ...",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_61.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 2
+      }
+    },
+    {
+      "text": "Prepare to be bothered greatly, buddy ...",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_61.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 3
+      }
+    },
+    {
+      "text": "her in 1993, along with the travel-office staff ...",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_61.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 4
+      }
+    },
+    {
+      "text": "we avoid a speculative rush to judgment ...",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_62.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 0
+      }
+    },
+    {
+      "text": "which to build his own record of accomplishment.",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_62.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 1
+      }
+    },
+    {
+      "text": "on the character of the Clinton administration, Kelly ... how to put it ...",
+      "provenance": {
+        "source": "OANC",
+        "member_path": "OANC/data/written_1/journal/slate/1/Article247_62.txt",
+        "genre_bucket": "written_1/journal",
+        "sentence_index_in_file": 2
+      }
+    }
+  ]
+}
