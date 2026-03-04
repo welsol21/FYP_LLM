@@ -180,7 +180,7 @@ def _assert_model_trained_on_gpu(model: Any, model_name: str) -> None:
         .get("device", "")
         .lower()
     )
-    if device != "cuda":
+    if not device.startswith("cuda"):
         raise RuntimeError(
             f"GPU-only policy violated: model '{model_name}' trained on device='{device or 'unknown'}'."
         )
