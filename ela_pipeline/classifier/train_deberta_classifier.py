@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
 from pathlib import Path
 import inspect
@@ -25,6 +26,30 @@ def _load_jsonl(path: str) -> list[dict[str, Any]]:
     return out
 
 
+def _compute_class_weights(
+    labels: list[int],
+    *,
+    num_labels: int,
+    strategy: str,
+) -> list[float]:
+    if strategy == "none":
+        return [1.0] * num_labels
+    if strategy != "balanced":
+        raise ValueError(f"Unsupported loss weighting strategy: {strategy}")
+    counts = Counter(labels)
+    total = len(labels)
+    if total == 0:
+        raise ValueError("Cannot compute class weights for empty labels")
+    weights: list[float] = []
+    for class_id in range(num_labels):
+        count = counts.get(class_id, 0)
+        if count <= 0:
+            weights.append(0.0)
+        else:
+            weights.append(total / (num_labels * count))
+    return weights
+
+
 def train_deberta_classifier(
     *,
     train_path: str,
@@ -36,6 +61,8 @@ def train_deberta_classifier(
     learning_rate: float = 2e-5,
     warmup_ratio: float = 0.06,
     max_grad_norm: float = 1.0,
+    weight_decay: float = 0.01,
+    loss_weighting: str = "balanced",
     seed: int = 42,
     max_length: int = 256,
     device: str = "cuda",
@@ -95,6 +122,12 @@ def train_deberta_classifier(
     for row in dev_norm:
         row["label"] = cefr_to_id[row["label"]]
 
+    class_weights = _compute_class_weights(
+        [int(row["label"]) for row in train_norm],
+        num_labels=len(label_space),
+        strategy=loss_weighting,
+    )
+
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     def tokenize(batch: dict[str, list[Any]]) -> dict[str, Any]:
@@ -119,6 +152,7 @@ def train_deberta_classifier(
         "learning_rate": learning_rate,
         "warmup_ratio": warmup_ratio,
         "max_grad_norm": max_grad_norm,
+        "weight_decay": weight_decay,
         "seed": seed,
         "save_strategy": "epoch",
         "logging_steps": 50,
@@ -134,6 +168,25 @@ def train_deberta_classifier(
         ta_kwargs["evaluation_strategy"] = "epoch"
 
     args = TrainingArguments(**ta_kwargs)
+
+    class WeightedTrainer(Trainer):
+        def compute_loss(
+            self,
+            model: Any,
+            inputs: dict[str, Any],
+            return_outputs: bool = False,
+            **kwargs: Any,
+        ) -> Any:
+            labels = inputs.get("labels")
+            outputs = model(**inputs)
+            logits = outputs.get("logits")
+            if labels is None or logits is None:
+                loss = outputs.get("loss")
+                return (loss, outputs) if return_outputs else loss
+            weight_tensor = torch.tensor(class_weights, dtype=logits.dtype, device=logits.device)
+            loss_fct = torch.nn.CrossEntropyLoss(weight=weight_tensor)
+            loss = loss_fct(logits.view(-1, logits.size(-1)), labels.view(-1))
+            return (loss, outputs) if return_outputs else loss
 
     def compute_metrics(eval_pred: Any) -> dict[str, float]:
         logits, labels = eval_pred
@@ -154,7 +207,7 @@ def train_deberta_classifier(
         macro_f1 = float(sum(f1_scores) / len(f1_scores)) if f1_scores else 0.0
         return {"accuracy": accuracy, "macro_f1": macro_f1}
 
-    trainer = Trainer(
+    trainer = WeightedTrainer(
         **(
             {
                 "model": model,
@@ -180,6 +233,8 @@ def train_deberta_classifier(
         "output_dir": output_dir,
         "model_name": model_name,
         "label_space": label_space,
+        "class_weights": class_weights,
+        "loss_weighting": loss_weighting,
         "train_samples": len(train_norm),
         "dev_samples": len(dev_norm),
         "metrics": metrics,
@@ -202,6 +257,8 @@ def main() -> None:
     parser.add_argument("--learning-rate", type=float, default=2e-5)
     parser.add_argument("--warmup-ratio", type=float, default=0.06)
     parser.add_argument("--max-grad-norm", type=float, default=1.0)
+    parser.add_argument("--weight-decay", type=float, default=0.01)
+    parser.add_argument("--loss-weighting", choices=["none", "balanced"], default="balanced")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-length", type=int, default=256)
     parser.add_argument("--device", default="cuda", choices=["cuda"])
@@ -217,6 +274,8 @@ def main() -> None:
         learning_rate=args.learning_rate,
         warmup_ratio=args.warmup_ratio,
         max_grad_norm=args.max_grad_norm,
+        weight_decay=args.weight_decay,
+        loss_weighting=args.loss_weighting,
         seed=args.seed,
         max_length=args.max_length,
         device=args.device,

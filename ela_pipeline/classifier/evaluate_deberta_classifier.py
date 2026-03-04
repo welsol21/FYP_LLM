@@ -54,6 +54,50 @@ def _macro_f1(confusion: dict[str, dict[str, int]], labels: list[str]) -> float:
     return sum(f1_values) / max(1, len(f1_values))
 
 
+def _per_label_metrics(confusion: dict[str, dict[str, int]], labels: list[str]) -> dict[str, dict[str, float]]:
+    out: dict[str, dict[str, float]] = {}
+    for label in labels:
+        tp = confusion[label].get(label, 0)
+        fp = sum(confusion[p].get(label, 0) for p in labels if p != label)
+        fn = sum(confusion[label].get(p, 0) for p in labels if p != label)
+        support = sum(confusion[label].values())
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = 0.0 if precision + recall == 0 else 2 * precision * recall / (precision + recall)
+        out[label] = {
+            "support": float(support),
+            "precision": precision,
+            "recall": recall,
+            "f1": f1,
+        }
+    return out
+
+
+def _top_confusions(
+    confusion: dict[str, dict[str, int]],
+    labels: list[str],
+    *,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    pairs: list[dict[str, Any]] = []
+    for true_label in labels:
+        for pred_label in labels:
+            if true_label == pred_label:
+                continue
+            count = int(confusion[true_label].get(pred_label, 0))
+            if count <= 0:
+                continue
+            pairs.append(
+                {
+                    "true_label": true_label,
+                    "pred_label": pred_label,
+                    "count": count,
+                }
+            )
+    pairs.sort(key=lambda row: (-int(row["count"]), str(row["true_label"]), str(row["pred_label"])))
+    return pairs[:limit]
+
+
 def evaluate_rows(
     rows: list[dict[str, Any]],
     predict_fn: Callable[[str], str],
@@ -82,12 +126,16 @@ def evaluate_rows(
     total = len(y_true)
     accuracy = correct / total if total > 0 else 0.0
     macro_f1 = _macro_f1(confusion, labels) if labels else 0.0
+    per_label = _per_label_metrics(confusion, labels) if labels else {}
+    top_confusions = _top_confusions(confusion, labels) if labels else []
 
     return {
         "samples": total,
         "labels": labels,
         "accuracy": accuracy,
         "macro_f1": macro_f1,
+        "per_label": per_label,
+        "top_confusions": top_confusions,
         "confusion": confusion,
     }
 

@@ -240,13 +240,40 @@ Current project state:
   - `B2` can already be trusted structurally,
   - `C1` can now be trusted structurally,
   - `C2` can now also be trusted structurally at the current support threshold.
-- next required step: freeze this corpus snapshot, rebuild the merged classifier dataset, and move to full-ladder DeBERTa retraining/evaluation before wiring it into runtime truth fields.
+- merged full-ladder classifier dataset has now been built and frozen under:
+  - `artifacts/classifier_full_ladder_dataset/full_ladder_dataset_summary.json`
+- current merged dataset split sizes:
+  - train: `13267`
+  - dev: `1892`
+  - test: `1912`
+- all six CEFR levels are now present in the merged train/dev/test splits.
+- threshold-aware advanced split preservation is now enforced, so advanced holdout splitting cannot silently push `C1/C2` below required train support.
+- the current blocker has therefore changed:
+  - no longer corpus coverage,
+  - now DeBERTa training quality/stability on the merged full-ladder dataset.
+- latest observed training status:
+  - aggressive full-ladder smoke config produced unstable training and `NaN` loss,
+  - conservative full-ladder smoke config removed `NaN`,
+  - immediate next step is training-quality tuning and evaluation, not more corpus recovery.
 
 As with UD, both `OANC` and `MASC` still require:
 - grammar extraction,
 - CEFR rung assignment,
 - note blueprint generation,
 - hard ambiguity/support gates before training.
+
+### 4.1.3 Immediate post-coverage focus
+
+Because the merged ladder is now structurally ready, the immediate backend priority is:
+
+1. stabilize DeBERTa on the merged `A1-C2` dataset,
+2. improve macro-F1 on validation,
+3. publish full-ladder evaluation artifacts,
+4. only then switch runtime truth fields to the rebuilt classifier.
+
+This is the key milestone shift:
+- the main risk is no longer "missing `C1/C2` data",
+- the main risk is now "insufficient classifier quality on the final merged dataset".
 
 ### 4.2 spaCy enrichment at scale
 

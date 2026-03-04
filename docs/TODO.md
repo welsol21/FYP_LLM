@@ -56,34 +56,34 @@
 
 ## Backend Rebuild: Phase 1 Dataset Recovery (UD-backed)
 
-- [ ] Reject current synthetic Phase 1 dataset as runtime-training source after audit (`ambiguous_grammar_combo_ratio` too high).
-- [ ] Rebuild Phase 1 (`A1 -> A2 -> B1`) training source on top of Universal Dependencies:
+- [x] Reject current synthetic Phase 1 dataset as runtime-training source after audit (`ambiguous_grammar_combo_ratio` too high).
+- [x] Rebuild Phase 1 (`A1 -> A2 -> B1`) training source on top of Universal Dependencies:
   - [x] primary source: `UD_English-EWT`
   - [x] optional secondary source: `UD_English-GUM`
   - [ ] keep `UD_English-ESL` isolated from baseline training set unless explicitly enabled as augmentation
-- [ ] Add local CoNLL-U ingestion pipeline for UD corpora:
+- [x] Add local CoNLL-U ingestion pipeline for UD corpora:
   - [x] sentence reader
   - [x] token/POS/morph/dep extraction
   - [x] provenance capture (`treebank`, `split`, `sent_id`, source path)
-- [ ] Add curriculum mapper from UD structures to Phase 1 grammar classes (`A1 -> A2 -> B1` only).
-- [ ] Build UD-backed candidate dataset with explicit separation between:
+- [x] Add curriculum mapper from UD structures to Phase 1 grammar classes (`A1 -> A2 -> B1` only).
+- [x] Build UD-backed candidate dataset with explicit separation between:
   - [x] raw UD sentence
   - [x] extracted grammar evidence
   - [x] assigned CEFR rung
   - [x] note blueprint payload
-- [ ] Add hard dataset gates before any DeBERTa retraining:
-  - [ ] fail on cross-level ambiguity for the same grammar combo above threshold
-  - [ ] fail on exact-text cross-level collisions above threshold
-  - [ ] fail on insufficient per-class support
-  - [ ] fail on empty/partial grammar evidence
-  - [ ] fail on missing blueprint coverage for any accepted sample
-- [ ] Add TDD coverage for:
-  - [ ] CoNLL-U ingest
-  - [ ] UD provenance extraction
-  - [ ] ambiguity gate failure behavior
-  - [ ] curriculum mapping sanity for representative Phase 1 grammar patterns
-- [ ] Produce new audited Phase 1 dataset only after all gates pass.
-- [ ] Retrain DeBERTa on UD-backed Phase 1 dataset and compare against rejected synthetic baseline.
+- [x] Add hard dataset gates before any DeBERTa retraining:
+  - [x] fail on cross-level ambiguity for the same grammar combo above threshold
+  - [x] fail on exact-text cross-level collisions above threshold
+  - [x] fail on insufficient per-class support
+  - [x] fail on empty/partial grammar evidence
+  - [x] fail on missing blueprint coverage for any accepted sample
+- [x] Add TDD coverage for:
+  - [x] CoNLL-U ingest
+  - [x] UD provenance extraction
+  - [x] ambiguity gate failure behavior
+  - [x] curriculum mapping sanity for representative Phase 1 grammar patterns
+- [x] Produce new audited Phase 1 dataset only after all gates pass.
+- [x] Retrain DeBERTa on UD-backed Phase 1 dataset and compare against rejected synthetic baseline.
 
 ## Backend Rebuild: Advanced Coverage Recovery (`B2 -> C1 -> C2`)
 
@@ -108,16 +108,30 @@
 - [x] Add bounded `Project Gutenberg` catalog ingest/filtering scaffold.
 - [x] Add `Project Gutenberg` text ingest path with source/license/provenance capture.
 - [x] Add targeted `Project Gutenberg` harvest for `modal_perfect` / `future_perfect`.
-- [ ] Build merged advanced dataset source:
-  - [ ] `UD_English-EWT`
-  - [ ] `UD_English-GUM`
-  - [ ] `OANC`
+- [x] Build merged advanced dataset source:
+  - [x] `UD_English-EWT`
+  - [x] `UD_English-GUM`
+  - [x] `OANC`
   - [x] `Project Gutenberg`
-  - [ ] optional `MASC` validation slice
+  - [x] optional `MASC` validation slice
 - [x] Add hard support thresholds for `B2/C1/C2` so advanced levels cannot pass on only a handful of examples.
 - [x] Publish merged coverage report for `A1 -> A2 -> B1 -> B2 -> C1 -> C2` before any full-ladder retrain.
 - [x] Raise `modal_perfect / C1` train support from `30` to at least `50` (`docs/reports/advanced_coverage_report_2026-03-04.json`).
 - [x] Raise `future_perfect / C2` train support from `7` to at least `50` (`docs/reports/advanced_coverage_report_2026-03-04.json`).
+- [x] Build merged full-ladder classifier dataset with threshold-aware advanced split preservation.
+
+## Backend Rebuild: Full-Ladder Classifier Training Quality
+
+- [ ] Stabilize full-ladder (`A1-C2`) DeBERTa training on merged dataset.
+- [ ] Improve macro-F1 on merged validation beyond current smoke baseline.
+- [x] Eliminate `NaN`/loss explosion in conservative smoke configuration.
+- [x] Add balanced class-weighting option to DeBERTa training.
+- [ ] Compare `loss_weighting=none` vs `balanced` on the merged dataset and keep the better default.
+- [ ] Add full-ladder evaluation report with:
+  - [ ] confusion matrix
+  - [ ] per-CEFR precision/recall/F1
+  - [ ] hardest confusion pairs
+- [ ] Decide whether runtime truth-layer can switch to full-ladder classifier, or whether another training-quality pass is required first.
 
 ## Media Pipeline Integration (ELA Bridge, Current)
 
