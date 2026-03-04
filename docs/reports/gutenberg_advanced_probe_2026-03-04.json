@@ -1,0 +1,56 @@
+{
+  "patterns": [
+    "\\bshould have\\b",
+    "\\bcould have\\b",
+    "\\bwould have\\b",
+    "\\bmight have\\b",
+    "\\bmust have\\b",
+    "\\bmay have\\b",
+    "\\bwill have\\b"
+  ],
+  "summary": {
+    "dataset_path": "artifacts/classifier_gutenberg_advanced_probe/gutenberg_advanced_classifier.jsonl",
+    "rejected_path": "artifacts/classifier_gutenberg_advanced_probe/gutenberg_advanced_rejected.jsonl",
+    "manifest_path": "artifacts/classifier_gutenberg_advanced_probe/gutenberg_advanced_manifest.json",
+    "gate_report_path": "artifacts/classifier_gutenberg_advanced_probe/gutenberg_advanced_gate_report.json",
+    "accepted_rows": 251,
+    "rejected_rows": 335,
+    "candidates": 586,
+    "mapped_rows_before_gates": 251,
+    "mapped_cefr_counts": {
+      "B2": 26,
+      "C1": 223,
+      "C2": 2
+    },
+    "mapped_class_support": [
+      {
+        "cefr_level": "B2",
+        "class_id": "past_perfect",
+        "count": 26
+      },
+      {
+        "cefr_level": "C1",
+        "class_id": "modal_perfect",
+        "count": 223
+      },
+      {
+        "cefr_level": "C2",
+        "class_id": "future_perfect",
+        "count": 2
+      }
+    ],
+    "gate_report": {
+      "passed": true,
+      "failed_gates": [],
+      "samples": 251,
+      "unique_grammar_combos": 3,
+      "ambiguous_grammar_combo_count": 0,
+      "ambiguous_grammar_combo_ratio": 0.0,
+      "exact_text_cross_level_count": 0,
+      "exact_text_cross_level_ratio": 0.0,
+      "evidence_missing_count": 0,
+      "blueprint_missing_count": 0,
+      "insufficient_support": []
+    }
+  }
+}

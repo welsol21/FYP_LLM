@@ -161,6 +161,8 @@ def extract_phase1_grammar_signal(row: dict[str, Any]) -> dict[str, Any]:
         has_modal_will = "will" in aux_lemmas or "MD" in aux_forms and any(str(tok.get("lemma") or "").strip().lower() == "will" for tok in auxiliaries)
         has_modal_can = "can" in aux_lemmas
         has_modal_should = "should" in aux_lemmas
+        modal_perfect_lemmas = {"should", "could", "would", "might", "may", "must", "can"}
+        has_modal_perfect = bool(modal_perfect_lemmas.intersection(aux_lemmas)) and has_have_aux and xpos == "VBN"
         has_auxpass = any(str(tok.get("dep") or "").strip() == "aux:pass" for tok in auxiliaries)
         has_nsubjpass = any(str(tok.get("dep") or "").strip() in {"nsubj:pass", "csubj:pass"} for tok in token_rows)
         has_to_inf_xcomp = any(
@@ -174,7 +176,7 @@ def extract_phase1_grammar_signal(row: dict[str, Any]) -> dict[str, Any]:
         elif has_modal_will and has_have_aux and xpos == "VBN":
             tam_profile = "future_perfect"
             grammar_classes.append("future_perfect")
-        elif has_modal_should and has_have_aux and xpos == "VBN":
+        elif has_modal_perfect:
             tam_profile = "modal_perfect"
             grammar_classes.append("modal_perfect")
         elif has_have_aux and any(str(tok.get("xpos") or "").strip().upper() == "VBD" for tok in auxiliaries) and xpos == "VBN":

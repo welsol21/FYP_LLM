@@ -285,6 +285,20 @@ class UDPhase1Tests(unittest.TestCase):
         self.assertIn("modal_perfect", signal["grammar_classes"])
         self.assertEqual(signal["tam_profile"], "modal_perfect")
 
+    def test_extract_phase1_grammar_signal_detects_non_should_modal_perfect(self):
+        row = {
+            "text": "She might have left earlier.",
+            "tokens": [
+                {"id": 1, "text": "She", "lemma": "she", "upos": "PRON", "xpos": "PRP", "morph": {}, "head": 4, "dep": "nsubj"},
+                {"id": 2, "text": "might", "lemma": "might", "upos": "AUX", "xpos": "MD", "morph": {"VerbForm": "Fin"}, "head": 4, "dep": "aux"},
+                {"id": 3, "text": "have", "lemma": "have", "upos": "AUX", "xpos": "VB", "morph": {"VerbForm": "Inf"}, "head": 4, "dep": "aux"},
+                {"id": 4, "text": "left", "lemma": "leave", "upos": "VERB", "xpos": "VBN", "morph": {"VerbForm": "Part"}, "head": 0, "dep": "root"},
+            ],
+        }
+        signal = extract_phase1_grammar_signal(row)
+        self.assertIn("modal_perfect", signal["grammar_classes"])
+        self.assertEqual(signal["tam_profile"], "modal_perfect")
+
     def test_extract_phase1_grammar_signal_detects_future_perfect(self):
         row = {
             "text": "She will have finished by noon.",
