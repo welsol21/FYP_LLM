@@ -5,6 +5,29 @@
   "gate_report_path": "artifacts/classifier_oanc_advanced_targeted_probe/oanc_advanced_gate_report.json",
   "accepted_rows": 0,
   "rejected_rows": 2798,
+  "mapped_rows_before_gates": 13,
+  "mapped_cefr_counts": {
+    "B2": 11,
+    "C1": 1,
+    "C2": 1
+  },
+  "mapped_class_support": [
+    {
+      "cefr_level": "B2",
+      "class_id": "past_perfect",
+      "count": 11
+    },
+    {
+      "cefr_level": "C1",
+      "class_id": "modal_perfect",
+      "count": 1
+    },
+    {
+      "cefr_level": "C2",
+      "class_id": "future_perfect",
+      "count": 1
+    }
+  ],
   "gate_report": {
     "passed": false,
     "failed_gates": [
@@ -30,5 +53,8 @@
         "count": 1
       }
     ]
+  },
+  "probe_scope": {
+    "member_paths": 48
   }
 }

@@ -1,0 +1,78 @@
+{
+  "sources": {
+    "ud_train_total": 11006,
+    "ud_dev_total": 1629,
+    "ud_test_total": 1642,
+    "oanc_mapped_total": 514,
+    "masc_mapped_total": 25
+  },
+  "source_cefr_counts": {
+    "ud_train": {
+      "A1": 3098,
+      "A2": 4061,
+      "B1": 2748,
+      "B2": 1085,
+      "C1": 11,
+      "C2": 3
+    },
+    "ud_dev": {
+      "A1": 484,
+      "A2": 591,
+      "B1": 407,
+      "B2": 146,
+      "C2": 1
+    },
+    "ud_test": {
+      "A1": 516,
+      "A2": 560,
+      "B1": 402,
+      "B2": 161,
+      "C1": 2,
+      "C2": 1
+    },
+    "oanc_pre_gate": {
+      "B2": 495,
+      "C1": 16,
+      "C2": 3
+    },
+    "masc_pre_gate": {
+      "B2": 24,
+      "C1": 1
+    }
+  },
+  "advanced_thresholds": [
+    {
+      "cefr_level": "B2",
+      "class_id": "past_perfect",
+      "required_train_support": 100,
+      "observed_train_support": 579,
+      "observed_control_support": 44,
+      "ready": true
+    },
+    {
+      "cefr_level": "B2",
+      "class_id": "passive_voice",
+      "required_train_support": 100,
+      "observed_train_support": 1001,
+      "observed_control_support": 287,
+      "ready": true
+    },
+    {
+      "cefr_level": "C1",
+      "class_id": "modal_perfect",
+      "required_train_support": 50,
+      "observed_train_support": 27,
+      "observed_control_support": 3,
+      "ready": false
+    },
+    {
+      "cefr_level": "C2",
+      "class_id": "future_perfect",
+      "required_train_support": 50,
+      "observed_train_support": 6,
+      "observed_control_support": 2,
+      "ready": false
+    }
+  ],
+  "overall_advanced_readiness": false
+}

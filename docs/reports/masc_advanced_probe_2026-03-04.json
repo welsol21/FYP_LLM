@@ -7,6 +7,23 @@
     "accepted_rows": 0,
     "rejected_rows": 2288,
     "candidates": 2288,
+    "mapped_rows_before_gates": 25,
+    "mapped_cefr_counts": {
+      "B2": 24,
+      "C1": 1
+    },
+    "mapped_class_support": [
+      {
+        "cefr_level": "B2",
+        "class_id": "past_perfect",
+        "count": 24
+      },
+      {
+        "cefr_level": "C1",
+        "class_id": "modal_perfect",
+        "count": 1
+      }
+    ],
     "gate_report": {
       "passed": false,
       "failed_gates": [
@@ -28,6 +45,5 @@
         }
       ]
     }
-  },
-  "accepted_cefr_counts": {}
+  }
 }

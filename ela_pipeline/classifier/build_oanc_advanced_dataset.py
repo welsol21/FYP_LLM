@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -103,6 +104,13 @@ def build_oanc_advanced_dataset(
             continue
         accepted_rows.append(built)
 
+    mapped_cefr_counts = Counter(str(row.get("cefr_level") or "").strip().upper() for row in accepted_rows)
+    mapped_class_support = Counter()
+    for row in accepted_rows:
+        cefr = str(row.get("cefr_level") or "").strip().upper()
+        for class_id in row.get("grammar_classes", []):
+            mapped_class_support[(cefr, class_id)] += 1
+
     gate_report = validate_phase1_dataset_gates(
         accepted_rows,
         min_examples_per_class=min_examples_per_class,
@@ -141,5 +149,11 @@ def build_oanc_advanced_dataset(
         "gate_report_path": str(gate_path),
         "accepted_rows": len(final_rows),
         "rejected_rows": len(rejected_rows),
+        "mapped_rows_before_gates": len(accepted_rows),
+        "mapped_cefr_counts": dict(sorted(mapped_cefr_counts.items())),
+        "mapped_class_support": [
+            {"cefr_level": cefr, "class_id": class_id, "count": count}
+            for (cefr, class_id), count in sorted(mapped_class_support.items())
+        ],
         "gate_report": gate_report,
     }

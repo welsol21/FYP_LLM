@@ -189,6 +189,16 @@ Current project state:
   - `MASC` is now confirmed as a useful validation/control source,
   - but it does not by itself repair `C1/C2` support gaps,
   - therefore `MASC` complements `OANC`; it does not replace the need for stronger rare advanced-pattern harvesting.
+- merged advanced readiness report is now published in `docs/reports/advanced_coverage_report_2026-03-04.json`,
+- current readiness result:
+  - `B2 / past_perfect`: ready
+  - `B2 / passive_voice`: ready
+  - `C1 / modal_perfect`: not ready (`27 < 50` required train support)
+  - `C2 / future_perfect`: not ready (`6 < 50` required train support)
+- current project-level conclusion:
+  - the advanced ladder is **not** ready for full-ladder retrain,
+  - `B2` can already be trusted structurally,
+  - `C1/C2` still require targeted corpus expansion before DeBERTa full-ladder training is allowed.
 - next required step: increase rare advanced-pattern coverage (especially `C2`) and then rerun advanced support gates before merging `OANC` rows into the classifier dataset.
 
 As with UD, both `OANC` and `MASC` still require:
