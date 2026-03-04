@@ -663,6 +663,14 @@ class PipelineTests(unittest.TestCase):
         self.assertNotIn("to him", top_level_contents)
         self.assertNotIn("towards morning", top_level_contents)
 
+    def test_pipeline_does_not_create_phrase_equal_to_whole_sentence(self):
+        out = run_pipeline("She came to him towards morning.", model_dir=None)
+        sentence = out[next(iter(out))]
+        sentence_text = str(sentence.get("content") or "").strip().rstrip(".").lower()
+        for phrase in self._iter_by_type(sentence, "Phrase"):
+            phrase_text = str(phrase.get("content") or "").strip().rstrip(".").lower()
+            self.assertNotEqual(phrase_text, sentence_text)
+
     def test_pipeline_leaves_unknown_phrase_without_generic_notes(self):
         out = run_pipeline("She entered through the chamber like a phantom.", model_dir=None)
         sentence = out[next(iter(out))]

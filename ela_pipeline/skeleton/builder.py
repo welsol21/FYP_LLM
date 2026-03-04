@@ -429,6 +429,9 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
             phrase_text = span.text.strip()
             if not phrase_text:
                 continue
+            # Do not create a phrase node that duplicates the whole sentence span.
+            if int(start) == int(sent.start) and int(end) == int(sent.end):
+                continue
             if _is_weak_phrase_candidate(span, phrase_pos):
                 continue
             if _is_simple_determiner_np(span, phrase_pos):
