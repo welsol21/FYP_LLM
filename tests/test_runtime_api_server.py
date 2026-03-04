@@ -25,6 +25,12 @@ class RuntimeApiServerTests(unittest.TestCase):
         self.assertEqual(provider, "rule")
         self.assertIsNone(model_path)
 
+    def test_resolve_classifier_settings_accepts_explicit_tabular_provider(self):
+        with patch.dict("os.environ", {"ELA_CLASSIFIER_PROVIDER": "tabular"}, clear=False):
+            provider, model_path = api_server._resolve_classifier_settings()
+        self.assertEqual(provider, "tabular")
+        self.assertEqual(model_path, "artifacts/models/tabular_cefr_baseline_full_ladder_logreg")
+
     def test_resolve_classifier_settings_rejects_invalid_provider(self):
         with patch.dict("os.environ", {"ELA_CLASSIFIER_PROVIDER": "invalid"}, clear=False):
             with self.assertRaisesRegex(ValueError, "ELA_CLASSIFIER_PROVIDER must be one of"):

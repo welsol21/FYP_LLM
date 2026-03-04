@@ -649,21 +649,22 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertEqual(missing["status"], "not_found")
 
     def test_build_sentence_contract_payload(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            svc = RuntimeMediaService(
-                db_path=Path(tmpdir) / "client.sqlite3",
-                runtime_mode="online",
-                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
-            )
-            payload = svc.build_sentence_contract(
-                sentence_text="She should have trusted her instincts before making the decision.",
-                sentence_idx=3,
-            )
-            self.assertEqual(payload["sentence_text"], "She should have trusted her instincts before making the decision.")
-            self.assertTrue(payload["sentence_hash"])
-            node = payload["sentence_node"]
-            self.assertEqual(node["type"], "Sentence")
-            self.assertIsInstance(node.get("linguistic_notes"), list)
+        with patch.dict("os.environ", {"ELA_CLASSIFIER_PROVIDER": "rule"}, clear=False):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                svc = RuntimeMediaService(
+                    db_path=Path(tmpdir) / "client.sqlite3",
+                    runtime_mode="online",
+                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+                )
+                payload = svc.build_sentence_contract(
+                    sentence_text="She should have trusted her instincts before making the decision.",
+                    sentence_idx=3,
+                )
+                self.assertEqual(payload["sentence_text"], "She should have trusted her instincts before making the decision.")
+                self.assertTrue(payload["sentence_hash"])
+                node = payload["sentence_node"]
+                self.assertEqual(node["type"], "Sentence")
+                self.assertIsInstance(node.get("linguistic_notes"), list)
 
     @patch("ela_pipeline.inference.run.run_pipeline")
     def test_build_sentence_contract_forwards_controlled_classifier_params(self, mock_run_pipeline):
@@ -763,6 +764,36 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             kwargs = mock_run_pipeline.call_args.kwargs
             self.assertEqual(kwargs["classifier_provider"], "rule")
             self.assertIsNone(kwargs["classifier_model_path"])
+
+    @patch("ela_pipeline.inference.run.run_pipeline")
+    def test_build_sentence_contract_accepts_explicit_tabular_provider(
+        self,
+        mock_run_pipeline,
+    ):
+        mock_run_pipeline.return_value = {
+            "She trusted him.": {
+                "type": "Sentence",
+                "node_id": "s1",
+                "content": "She trusted him.",
+                "linguistic_elements": [],
+                "linguistic_notes": [],
+            }
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            _ = svc.build_sentence_contract(
+                sentence_text="She trusted him.",
+                sentence_idx=1,
+                note_mode="controlled",
+                classifier_provider="tabular",
+            )
+            kwargs = mock_run_pipeline.call_args.kwargs
+            self.assertEqual(kwargs["classifier_provider"], "tabular")
+            self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_cefr_baseline_full_ladder_logreg")
 
     def test_request_sentence_contract_uses_backend_endpoint_when_configured(self):
         with tempfile.TemporaryDirectory() as tmpdir:

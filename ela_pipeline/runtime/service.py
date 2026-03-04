@@ -658,7 +658,6 @@ class RuntimeMediaService:
             os.path.isdir(model_dir)
             and os.path.isfile(os.path.join(model_dir, "classifier_metadata.json"))
         )
-
         if explicit_provider and explicit_provider != "rule":
             provider = explicit_provider
         elif env_provider:
@@ -666,10 +665,12 @@ class RuntimeMediaService:
         else:
             provider = "deberta" if has_local_deberta else "rule"
 
-        if provider not in {"rule", "deberta"}:
-            raise ValueError("classifier_provider must be one of: rule | deberta")
+        if provider not in {"rule", "deberta", "tabular"}:
+            raise ValueError("classifier_provider must be one of: rule | deberta | tabular")
         if provider == "deberta":
             return provider, model_dir
+        if provider == "tabular":
+            return provider, explicit_model_path or env_model_path or "artifacts/models/tabular_cefr_baseline_full_ladder_logreg"
         return provider, None
 
     def build_sentence_contract(

@@ -685,6 +685,34 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(sentence.get("linguistic_notes"), ["Intermediate note."])
         self.assertGreaterEqual(fake_classifier.classify_node.call_count, 1)
 
+    @patch("ela_pipeline.classifier.tabular_cefr_predictor.TabularProfileClassifier")
+    def test_pipeline_uses_tabular_classifier_provider(self, mock_classifier_cls):
+        fake_classifier = MagicMock()
+        fake_classifier.classify_node.return_value = {
+            "cefr_level": "B1",
+            "grammar_classes": [{"class_id": "relative_clause", "confidence": 0.8}],
+            "generated_notes": {
+                "elementary_text": "Elementary note.",
+                "intermediate_text": "Intermediate note.",
+                "advanced_text": "Advanced note.",
+            },
+        }
+        mock_classifier_cls.return_value = fake_classifier
+
+        out = run_pipeline(
+            "She trusted him.",
+            model_dir=None,
+            note_mode="controlled",
+            classifier_provider="tabular",
+            classifier_model_path="/tmp/fake-tabular",
+        )
+        sentence = out[next(iter(out))]
+        self.assertEqual(sentence.get("cefr_level"), "B1")
+        self.assertEqual(sentence.get("grammar_classes")[0]["class_id"], "relative_clause")
+        self.assertEqual(sentence.get("generated_notes", {}).get("intermediate_text"), "Intermediate note.")
+        self.assertEqual(sentence.get("linguistic_notes"), ["Intermediate note."])
+        self.assertGreaterEqual(fake_classifier.classify_node.call_count, 1)
+
     @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.annotate")
     @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.__init__", return_value=None)
     def test_t5_annotation_cannot_override_classifier_truth_fields(self, _mock_init, mock_annotate):

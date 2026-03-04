@@ -18,6 +18,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
 
+from .metadata import build_classifier_metadata_from_dataset
+
 
 CEFR_ORDER = ("A1", "A2", "B1", "B2", "C1", "C2")
 
@@ -196,6 +198,10 @@ def train_tabular_cefr_baseline(
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump(best_model, out_dir / "best_tabular_cefr_baseline.joblib")
+    metadata_summary = build_classifier_metadata_from_dataset(
+        classifier_jsonl_path=train_path,
+        output_dir=str(out_dir),
+    )
 
     summary = {
         "train_path": train_path,
@@ -209,6 +215,7 @@ def train_tabular_cefr_baseline(
         "best_model": best_name,
         "best_dev_macro_f1": best_score,
         "best_model_path": str(out_dir / "best_tabular_cefr_baseline.joblib"),
+        "classifier_metadata_path": metadata_summary["metadata_path"],
     }
     (out_dir / "tabular_cefr_baseline_summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=2),

@@ -925,6 +925,11 @@ def run_pipeline(
             device=classifier_device,
         )
         _attach_classifier_profiles(enriched, classifier=classifier)
+    elif classifier_provider == "tabular":
+        from ela_pipeline.classifier.tabular_cefr_predictor import TabularProfileClassifier
+
+        classifier = TabularProfileClassifier(model_path=classifier_model_path)
+        _attach_classifier_profiles(enriched, classifier=classifier)
     elif classifier_provider == "rule":
         if enable_cefr:
             if cefr_provider == "rule":
@@ -948,7 +953,7 @@ def run_pipeline(
             _attach_grammar_classes(enriched)
             _attach_generated_notes(enriched)
     else:
-        raise ValueError("classifier_provider must be one of: rule | deberta")
+        raise ValueError("classifier_provider must be one of: rule | deberta | tabular")
 
     if note_mode == "controlled":
         _apply_controlled_notes(enriched)
@@ -1080,7 +1085,7 @@ def main() -> None:
     parser.add_argument(
         "--classifier-provider",
         default="rule",
-        choices=["rule", "deberta"],
+        choices=["rule", "deberta", "tabular"],
         help="Classifier profile provider (CEFR + grammar classes + generated note blueprints).",
     )
     parser.add_argument(
