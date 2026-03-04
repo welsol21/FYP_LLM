@@ -107,8 +107,8 @@
   - [ ] optional `MASC` validation slice
 - [x] Add hard support thresholds for `B2/C1/C2` so advanced levels cannot pass on only a handful of examples.
 - [x] Publish merged coverage report for `A1 -> A2 -> B1 -> B2 -> C1 -> C2` before any full-ladder retrain.
-- [ ] Raise `modal_perfect / C1` train support from `27` to at least `50` (`docs/reports/advanced_coverage_report_2026-03-04.json`).
-- [ ] Raise `future_perfect / C2` train support from `6` to at least `50` (`docs/reports/advanced_coverage_report_2026-03-04.json`).
+- [ ] Raise `modal_perfect / C1` train support from `30` to at least `50` (`docs/reports/advanced_coverage_report_2026-03-04.json`).
+- [ ] Raise `future_perfect / C2` train support from `7` to at least `50` (`docs/reports/advanced_coverage_report_2026-03-04.json`).
 
 ## Media Pipeline Integration (ELA Bridge, Current)
 

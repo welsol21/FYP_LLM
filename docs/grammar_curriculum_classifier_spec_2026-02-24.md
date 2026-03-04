@@ -190,11 +190,18 @@ Current project state:
   - but it does not by itself repair `C1/C2` support gaps,
   - therefore `MASC` complements `OANC`; it does not replace the need for stronger rare advanced-pattern harvesting.
 - merged advanced readiness report is now published in `docs/reports/advanced_coverage_report_2026-03-04.json`,
+- targeted `OANC` harvest logic has been corrected so that the downstream probe uses the full matched `member_paths` set rather than only the truncated `examples` preview stored in the report,
+- after that correction, the targeted `OANC` probe result increased from the earlier undercounted sample to:
+  - `141` accepted advanced rows
+  - `B2: 135`
+  - `C1: 4`
+  - `C2: 2`
+  - elapsed probe time on the current targeted pool (`119` files): about `127s`
 - current readiness result:
   - `B2 / past_perfect`: ready
   - `B2 / passive_voice`: ready
-  - `C1 / modal_perfect`: not ready (`27 < 50` required train support)
-  - `C2 / future_perfect`: not ready (`6 < 50` required train support)
+  - `C1 / modal_perfect`: not ready (`30 < 50` required train support)
+  - `C2 / future_perfect`: not ready (`7 < 50` required train support)
 - current project-level conclusion:
   - the advanced ladder is **not** ready for full-ladder retrain,
   - `B2` can already be trusted structurally,

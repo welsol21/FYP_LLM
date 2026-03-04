@@ -3,37 +3,35 @@
   "rejected_path": "artifacts/classifier_oanc_advanced_targeted_probe/oanc_advanced_rejected.jsonl",
   "manifest_path": "artifacts/classifier_oanc_advanced_targeted_probe/oanc_advanced_manifest.json",
   "gate_report_path": "artifacts/classifier_oanc_advanced_targeted_probe/oanc_advanced_gate_report.json",
-  "accepted_rows": 0,
-  "rejected_rows": 2798,
-  "mapped_rows_before_gates": 13,
+  "accepted_rows": 141,
+  "rejected_rows": 14581,
+  "mapped_rows_before_gates": 141,
   "mapped_cefr_counts": {
-    "B2": 11,
-    "C1": 1,
-    "C2": 1
+    "B2": 135,
+    "C1": 4,
+    "C2": 2
   },
   "mapped_class_support": [
     {
       "cefr_level": "B2",
       "class_id": "past_perfect",
-      "count": 11
+      "count": 135
     },
     {
       "cefr_level": "C1",
       "class_id": "modal_perfect",
-      "count": 1
+      "count": 4
     },
     {
       "cefr_level": "C2",
       "class_id": "future_perfect",
-      "count": 1
+      "count": 2
     }
   ],
   "gate_report": {
-    "passed": false,
-    "failed_gates": [
-      "per_class_support"
-    ],
-    "samples": 13,
+    "passed": true,
+    "failed_gates": [],
+    "samples": 141,
     "unique_grammar_combos": 3,
     "ambiguous_grammar_combo_count": 0,
     "ambiguous_grammar_combo_ratio": 0.0,
@@ -41,20 +39,10 @@
     "exact_text_cross_level_ratio": 0.0,
     "evidence_missing_count": 0,
     "blueprint_missing_count": 0,
-    "insufficient_support": [
-      {
-        "class_id": "future_perfect",
-        "cefr_level": "C2",
-        "count": 1
-      },
-      {
-        "class_id": "modal_perfect",
-        "cefr_level": "C1",
-        "count": 1
-      }
-    ]
+    "insufficient_support": []
   },
   "probe_scope": {
-    "member_paths": 48
+    "member_paths": 119,
+    "elapsed_sec": 126.93
   }
 }
