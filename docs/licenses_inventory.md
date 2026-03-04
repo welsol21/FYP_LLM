@@ -67,6 +67,11 @@ Notes:
 - For `OANC`, use the official wording from the source package/site documentation rather than paraphrasing it as `CC0` unless the downloaded package explicitly says so.
 - The historical `ANC-parses` archive is not treated as a dependable source artifact; if advanced dependency parses are needed, generate them locally from the downloaded `OANC` corpus package and record parser/model provenance.
 - Current downloaded package in project: `data/external_datasets/OANC/OANC-1.0.1-UTF8.zip`
+- Current downloaded `MASC` packages in project:
+  - `data/external_datasets/MASC/masc-conll.zip`
+  - `data/external_datasets/MASC/MASC-3.0.0.zip`
+- Current bundled `MASC` package readme captured from the full package:
+  - `MASC-3.0.0/README-MASC-3.0.0.txt`
 - For every downloaded corpus package, persist:
   1. source URL,
   2. local package/version identifier,

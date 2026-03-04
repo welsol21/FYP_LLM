@@ -1,0 +1,33 @@
+{
+  "source_zip": "data/external_datasets/MASC/masc-conll.zip",
+  "summary": {
+    "dataset_path": "artifacts/classifier_masc_advanced_probe/masc_advanced_classifier.jsonl",
+    "rejected_path": "artifacts/classifier_masc_advanced_probe/masc_advanced_rejected.jsonl",
+    "gate_report_path": "artifacts/classifier_masc_advanced_probe/masc_advanced_gate_report.json",
+    "accepted_rows": 0,
+    "rejected_rows": 2288,
+    "candidates": 2288,
+    "gate_report": {
+      "passed": false,
+      "failed_gates": [
+        "per_class_support"
+      ],
+      "samples": 25,
+      "unique_grammar_combos": 2,
+      "ambiguous_grammar_combo_count": 0,
+      "ambiguous_grammar_combo_ratio": 0.0,
+      "exact_text_cross_level_count": 0,
+      "exact_text_cross_level_ratio": 0.0,
+      "evidence_missing_count": 0,
+      "blueprint_missing_count": 0,
+      "insufficient_support": [
+        {
+          "class_id": "modal_perfect",
+          "cefr_level": "C1",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "accepted_cefr_counts": {}
+}

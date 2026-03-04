@@ -1,0 +1,45 @@
+{
+  "zip_path": "data/external_datasets/MASC/MASC-3.0.0.zip",
+  "top_extensions": {
+    ".xml": 3171,
+    ".txt": 395,
+    ".hdr": 392,
+    ".gz": 198,
+    ".0": 119,
+    "<none>": 65,
+    ".mrg": 64,
+    ".pdf": 2,
+    ".xml_0001d": 1,
+    ".xml_0001e": 1
+  },
+  "annotation_kinds": {
+    "penn_xml": 392,
+    "ptb_xml": 96,
+    "ptbtok_xml": 96,
+    "sentence_xml": 392,
+    "seg_xml": 392,
+    "hdr": 392,
+    "txt": 395
+  },
+  "top_genre_buckets": {
+    "written/email": 1596,
+    "written/newspaper": 605,
+    "written/letters": 544,
+    "written/blog": 189,
+    "written/jokes": 144,
+    "written/journal": 105,
+    "written/travel-guides": 81,
+    "spoken/face-to-face": 75,
+    "written/technical": 74,
+    "written/essays": 72,
+    "written/fiction": 65,
+    "spoken/telephone": 61,
+    "written/movie-script": 54,
+    "written/non-fiction": 50,
+    "written/govt-docs": 48,
+    "written/ficlets": 45,
+    "spoken/court-transcript": 20,
+    "spoken/debate-transcript": 18,
+    "written/twitter": 18
+  }
+}

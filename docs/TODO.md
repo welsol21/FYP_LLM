@@ -88,7 +88,7 @@
 ## Backend Rebuild: Advanced Coverage Recovery (`B2 -> C1 -> C2`)
 
 - [x] Add `OANC` as advanced-register corpus source for `B2/C1/C2`.
-- [ ] Add `MASC` as validation/control corpus source for advanced grammar coverage.
+- [x] Add `MASC` as validation/control corpus source for advanced grammar coverage.
 - [ ] Record exact downloaded package provenance + bundled license texts for `OANC/MASC`.
 - [x] Treat historical `ANC-parses` archive as unavailable; do not block the pipeline on it.
 - [x] Add `OANC` zip inspection layer with candidate genre discovery and report artifact.
@@ -98,7 +98,8 @@
 - [x] Build train-ready advanced rows from parsed `OANC` sentences and run advanced support/ambiguity gates.
 - [ ] Increase `C2` coverage for `future_perfect` and other rare advanced patterns; current `OANC` probe still fails `per_class_support` because `future_perfect` has only one accepted example in the bounded sample.
 - [ ] Increase `C1` coverage for `modal_perfect`; targeted `OANC` probe still yields only one accepted `modal_perfect` example.
-- [ ] Implement `MASC` ingest path for validation/calibration slices.
+- [x] Implement `MASC` ingest path for validation/calibration slices.
+- [ ] Add richer `MASC-3.0.0` XML-based ingest path (`txt + s.xml + provenance-rich annotations`) if `masc-conll` control slice proves too narrow.
 - [ ] Build merged advanced dataset source:
   - [ ] `UD_English-EWT`
   - [ ] `UD_English-GUM`

@@ -175,6 +175,20 @@ Current project state:
   - blockers:
     - `future_perfect / C2`: `1`
     - `modal_perfect / C1`: `1`
+- the package `masc-conll.zip` has now been downloaded into `data/external_datasets/MASC/` and wired into a parser-backed validation/control ingest path,
+- the full package `MASC-3.0.0.zip` has also been downloaded into `data/external_datasets/MASC/` for provenance capture and future richer ingest,
+- package inventory from the full download is recorded in `docs/reports/masc_package_inventory_2026-03-04.json`,
+- first `MASC` advanced probe is recorded in `docs/reports/masc_advanced_probe_2026-03-04.json`,
+- current `MASC` probe result:
+  - sentence candidates from `masc-conll`: `2288`
+  - advanced mapped samples before final gate acceptance: `25`
+  - gate outcome: `failed`
+  - blocker:
+    - `modal_perfect / C1`: `1`
+- interpretation:
+  - `MASC` is now confirmed as a useful validation/control source,
+  - but it does not by itself repair `C1/C2` support gaps,
+  - therefore `MASC` complements `OANC`; it does not replace the need for stronger rare advanced-pattern harvesting.
 - next required step: increase rare advanced-pattern coverage (especially `C2`) and then rerun advanced support gates before merging `OANC` rows into the classifier dataset.
 
 As with UD, both `OANC` and `MASC` still require:
