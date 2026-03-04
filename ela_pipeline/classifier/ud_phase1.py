@@ -6,6 +6,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+from .grammar_rules import map_pedagogical_grammar_classes
 from .audit_phase1_dataset import audit_classifier_dataset
 
 
@@ -206,53 +207,60 @@ def extract_phase1_grammar_signal(row: dict[str, Any]) -> dict[str, Any]:
             for tok in token_rows
         ) and any(str(tok.get("lemma") or "").strip().lower() == "to" for tok in token_rows)
 
-        if priority_class:
-            pass
-        elif has_relative_clause:
-            tam_profile = "relative_clause"
-            grammar_classes.append("relative_clause")
-        elif has_modal_will and has_have_aux and xpos == "VBN":
-            tam_profile = "future_perfect"
-            grammar_classes.append("future_perfect")
-        elif has_modal_perfect:
-            tam_profile = "modal_perfect"
-            grammar_classes.append("modal_perfect")
-        elif has_have_aux and any(str(tok.get("xpos") or "").strip().upper() == "VBD" for tok in auxiliaries) and xpos == "VBN":
+        dep_signature = [str(tok.get("dep") or "").strip() for tok in token_rows]
+        if not priority_class and has_have_aux and any(str(tok.get("xpos") or "").strip().upper() == "VBD" for tok in auxiliaries) and xpos == "VBN":
             tam_profile = "past_perfect"
-            grammar_classes.append("past_perfect")
-        elif (has_auxpass or has_nsubjpass) and xpos == "VBN":
+        elif not priority_class and (has_auxpass or has_nsubjpass) and xpos == "VBN":
             tam_profile = "passive_voice"
-            grammar_classes.append("passive_voice")
-        elif has_modal_should:
+        elif not priority_class and has_modal_should:
             tam_profile = "modal_should"
-            grammar_classes.append("modal_should_advice")
-        elif has_modal_can:
+        elif not priority_class and has_modal_can:
             tam_profile = "modal_can"
-            grammar_classes.append("modal_can_ability")
-        elif has_modal_will:
+        elif not priority_class and has_modal_will:
             tam_profile = "future_will"
-            grammar_classes.append("future_will")
-        elif lemma == "go" and has_progressive_aux and has_to_inf_xcomp:
+        elif not priority_class and lemma == "go" and has_progressive_aux and has_to_inf_xcomp:
             tam_profile = "future_going_to"
-            grammar_classes.append("future_going_to")
-        elif has_do_aux and has_question_punct:
+        elif not priority_class and has_do_aux and has_question_punct:
             tam_profile = "present_simple"
-            grammar_classes.append("present_simple_question")
-        elif has_have_aux and xpos == "VBN":
+        elif not priority_class and has_have_aux and xpos == "VBN":
             tam_profile = "present_perfect"
-            grammar_classes.append("present_perfect_negative" if has_neg else "present_perfect_affirmative")
-        elif tense == "Pres" and xpos in {"VB", "VBP", "VBZ"}:
+        elif not priority_class and tense == "Pres" and xpos in {"VB", "VBP", "VBZ"}:
             tam_profile = "present_simple"
-            grammar_classes.append("present_simple_negative" if has_neg else "present_simple_affirmative")
-        elif tense == "Past" and xpos in {"VBD", "VBN"} and lemma != "be":
+        elif not priority_class and tense == "Past" and xpos in {"VBD", "VBN"} and lemma != "be":
             tam_profile = "past_simple"
-            grammar_classes.append("past_simple_negative" if has_neg else "past_simple_affirmative")
-        elif str(morph.get("VerbForm") or "").strip() == "Part" and has_progressive_aux:
+        elif not priority_class and str(morph.get("VerbForm") or "").strip() == "Part" and has_progressive_aux:
             tam_profile = "present_continuous"
-            grammar_classes.append("present_continuous")
-        elif has_aux and lemma == "be":
+        elif not priority_class and has_aux and lemma == "be":
             tam_profile = "be_copula"
-            grammar_classes.append("copular_clause")
+        mapped = map_pedagogical_grammar_classes(
+            tense=(
+                "future" if tam_profile == "future_will"
+                else "past" if tam_profile == "past_simple"
+                else "present" if tam_profile == "present_simple"
+                else "present perfect" if tam_profile == "present_perfect"
+                else "past perfect" if tam_profile == "past_perfect"
+                else "present progressive" if tam_profile == "present_continuous"
+                else None
+            ),
+            aspect=(
+                "perfect" if tam_profile in {"present_perfect", "past_perfect", "modal_perfect", "future_perfect"}
+                else "progressive" if tam_profile == "present_continuous"
+                else "simple" if tam_profile in {"present_simple", "past_simple", "future_will"}
+                else None
+            ),
+            mood=(
+                "modal" if tam_profile in {"modal_perfect", "modal_should", "modal_can"} else "indicative"
+            ),
+            voice="passive" if tam_profile == "passive_voice" else "active",
+            tam_construction=tam_profile if tam_profile != "unknown" else None,
+            dep_labels=dep_signature,
+            content=row.get("text"),
+            has_neg=has_neg,
+            has_relative_clause=has_relative_clause,
+            has_passive_signal=has_auxpass or has_nsubjpass,
+            is_question=has_question_punct and has_do_aux,
+        )
+        grammar_classes = sorted(set(grammar_classes + mapped))
 
     dep_signature = [str(tok.get("dep") or "").strip() for tok in token_rows]
     pos_signature = [str(tok.get("upos") or "").strip() for tok in token_rows]

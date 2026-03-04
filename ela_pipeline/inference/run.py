@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Any
 
 from ela_pipeline.classifier.grammar_blueprints import build_note_blueprints
+from ela_pipeline.classifier.grammar_rules import map_pedagogical_grammar_classes
 from ela_pipeline.contract import deep_copy_contract
 from ela_pipeline.parse.spacy_parser import load_nlp
 from ela_pipeline.runtime import (
@@ -573,51 +574,19 @@ def _attach_grammar_classes(doc: dict) -> None:
             return out
 
         dep_signature = collect_dep_labels(node)
-        content = str(node.get("content") or "").strip().lower()
-        tense = str(node.get("tense") or "").strip().lower()
-        aspect = str(node.get("aspect") or "").strip().lower()
-        mood = str(node.get("mood") or "").strip().lower()
-        voice = str(node.get("voice") or "").strip().lower()
-        construction = str(node.get("tam_construction") or "").strip().lower()
-        node_type = str(node.get("type") or "").strip().lower()
-
-        has_neg = "neg" in dep_signature or " not " in f" {content} " or "n't" in content
-        has_relcl = "acl:relcl" in dep_signature
-        has_passive_signal = "aux:pass" in dep_signature or "nsubj:pass" in dep_signature or voice == "passive" or construction == "passive_voice"
-        is_question = content.endswith("?") or "aux" in dep_signature and "?" in content
-
-        if has_relcl:
-            add_class("relative_clause", 0.9)
-        if construction == "future_perfect" or ("future" in tense and aspect == "perfect"):
-            add_class("future_perfect", 0.95)
-        if construction == "modal_perfect" or (mood == "modal" and aspect == "perfect"):
-            add_class("modal_perfect", 0.95)
-        if construction == "past_perfect" or ("past perfect" in tense) or (tense == "past" and aspect == "perfect"):
-            add_class("past_perfect", 0.93)
-        if has_passive_signal:
-            add_class("passive_voice", 0.9)
-        if construction == "modal_should":
-            add_class("modal_should_advice", 0.88)
-        if construction == "modal_can":
-            add_class("modal_can_ability", 0.88)
-        if construction == "future_will":
-            add_class("future_will", 0.9)
-        elif tense == "future" and aspect in {"simple", ""}:
-            add_class("future_will", 0.84)
-        if construction == "future_going_to":
-            add_class("future_going_to", 0.9)
-        if construction == "present_simple" and is_question:
-            add_class("present_simple_question", 0.86)
-        if construction == "present_perfect" or "present perfect" in tense:
-            add_class("present_perfect_negative" if has_neg else "present_perfect_affirmative", 0.9)
-        elif construction == "present_simple" or tense == "present":
-            add_class("present_simple_negative" if has_neg else "present_simple_affirmative", 0.88)
-        elif construction == "past_simple" or tense == "past":
-            add_class("past_simple_negative" if has_neg else "past_simple_affirmative", 0.88)
-        elif construction == "present_continuous" or "progressive" in tense or aspect in {"progressive", "continuous"}:
-            add_class("present_continuous", 0.88)
-        elif construction == "be_copula" or (node_type == "phrase" and str(node.get("part_of_speech") or "").strip().lower() == "noun phrase" and "cop" in dep_signature):
-            add_class("copular_clause", 0.82)
+        mapped = map_pedagogical_grammar_classes(
+            tense=node.get("tense"),
+            aspect=node.get("aspect"),
+            mood=node.get("mood"),
+            voice=node.get("voice"),
+            tam_construction=node.get("tam_construction"),
+            dep_labels=dep_signature,
+            content=node.get("content"),
+            node_type=node.get("type"),
+            part_of_speech=node.get("part_of_speech"),
+        )
+        for class_id in mapped:
+            add_class(class_id, 0.9)
 
         return classes
 
