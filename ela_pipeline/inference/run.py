@@ -8,6 +8,7 @@ import os
 from datetime import datetime
 from typing import Any
 
+from ela_pipeline.classifier.grammar_blueprints import build_note_blueprints
 from ela_pipeline.contract import deep_copy_contract
 from ela_pipeline.parse.spacy_parser import load_nlp
 from ela_pipeline.runtime import (
@@ -632,15 +633,8 @@ def _attach_grammar_classes(doc: dict) -> None:
 
 
 def _attach_generated_notes(doc: dict) -> None:
-    def humanize_class_id(class_id: str) -> str:
-        raw = str(class_id or "").strip()
-        if not raw:
-            return "core grammar pattern"
-        return raw.replace("_", " ")
-
     def build_notes(node: dict) -> dict[str, str]:
         node_type = str(node.get("type") or "").strip().lower() or "node"
-        pos = str(node.get("part_of_speech") or "").strip().lower() or "unknown"
         role = str(node.get("grammatical_role") or "").strip().lower() or "unknown"
         tam = str(node.get("tam_construction") or "").strip().lower() or "none"
         cefr = str(node.get("cefr_level") or "").strip().upper() or "B1"
@@ -652,26 +646,14 @@ def _attach_generated_notes(doc: dict) -> None:
                 class_id = str(item.get("class_id") or "").strip()
                 if class_id:
                     class_ids.append(class_id)
-        primary = humanize_class_id(class_ids[0]) if class_ids else f"{node_type} structure"
-        secondary = humanize_class_id(class_ids[1]) if len(class_ids) > 1 else primary
-        compact_classes = ", ".join(humanize_class_id(class_id) for class_id in class_ids[:3]) if class_ids else primary
-
-        elementary = (
-            f"This {node_type} expresses '{content}'. "
-            f"Main grammar focus: {primary}."
+        return build_note_blueprints(
+            grammar_classes=class_ids,
+            cefr_level=cefr,
+            node_type=node_type,
+            content=content,
+            grammatical_role=role,
+            tam_construction=tam,
         )
-        intermediate = (
-            f"This {node_type} ({pos}) is used as {role} and maps to {secondary}. "
-            f"Estimated level: {cefr}."
-        )
-        advanced = (
-            f"Grammar profile: [{compact_classes}] | role={role} | tam={tam} | cefr={cefr}."
-        )
-        return {
-            "elementary_text": elementary.strip(),
-            "intermediate_text": intermediate.strip(),
-            "advanced_text": advanced.strip(),
-        }
 
     def walk(node: dict) -> None:
         generated = build_notes(node)

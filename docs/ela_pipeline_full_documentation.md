@@ -57,7 +57,7 @@ Allowed types only:
 - `phonetic` object: `{uk, us}`
 - `synonyms` list: `[string, ...]`
 - `cefr_level`: one of `A1|A2|B1|B2|C1|C2`
-- `grammar_classes`: classifier output (`[{class_id, confidence, ...}]`)
+- `grammar_classes`: rules-first pedagogical labels derived from parse/TAM evidence (`[{class_id, confidence, ...}]`)
 - `generated_notes`: current user-facing level texts (`elementary|intermediate|advanced`)
 - `note_blueprints`: immutable classifier blueprint source for controlled note generation
 - `note_generator_version`: rendering mode/version marker (`controlled::...`, `controlled_t5::...`, or legacy `local_t5::...`)
@@ -211,8 +211,9 @@ If `--model-dir` is omitted:
   - duplicate source spans/text reuse cached CEFR by normalized source key.
 
 ### 4.8.1 Planned Classifier/Generator Split (Roadmap Lock)
-- CEFR + grammar-class prediction is being migrated to **`DeBERTa-v3-base`** (encoder-only classifier stage).
-- T5 remains in backend only for controlled note text generation from classifier outputs and level blueprints.
+- `CEFR` is served by the tabular baseline over structural evidence.
+- `grammar_classes` are produced by rules-first mapping over parse/TAM evidence.
+- `T5` remains in backend only for controlled note text generation from blueprints.
 - Rationale:
   - classification workload matches encoder-only architecture better than seq2seq generation,
   - lower contract-risk for strict schema fields (fewer free-form label errors),

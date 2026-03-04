@@ -581,6 +581,10 @@ class PipelineTests(unittest.TestCase):
         classes = sentence.get("grammar_classes") or []
         class_ids = {str(item.get("class_id")) for item in classes if isinstance(item, dict)}
         self.assertIn("modal_perfect", class_ids)
+        self.assertEqual(
+            sentence.get("generated_notes", {}).get("intermediate_text"),
+            "Explain how modal + have + past participle evaluates a past event.",
+        )
 
     def test_pipeline_attaches_generated_notes_and_populates_linguistic_notes(self):
         out = run_pipeline("She trusted him.", model_dir=None)
