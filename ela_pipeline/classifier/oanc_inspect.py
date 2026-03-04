@@ -101,3 +101,18 @@ def find_oanc_candidate_files_by_patterns(
             if rx.search(text):
                 found[name].append(member_path)
     return found
+
+
+def summarize_oanc_pattern_matches(
+    matches: dict[str, list[str]],
+    *,
+    example_limit: int = 20,
+) -> dict[str, dict[str, Any]]:
+    summary: dict[str, dict[str, Any]] = {}
+    for name, member_paths in matches.items():
+        summary[name] = {
+            "count": len(member_paths),
+            "examples": list(member_paths[:example_limit]),
+            "member_paths": list(member_paths),
+        }
+    return summary

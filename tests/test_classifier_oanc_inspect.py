@@ -8,6 +8,7 @@ from ela_pipeline.classifier.oanc_inspect import (
     extract_oanc_text,
     find_oanc_candidate_files_by_patterns,
     list_oanc_candidate_files,
+    summarize_oanc_pattern_matches,
     summarize_oanc_zip,
 )
 
@@ -74,6 +75,19 @@ class OANCInspectTests(unittest.TestCase):
         self.assertIn("past_perfect", result)
         self.assertEqual(len(result["future_perfect"]), 1)
         self.assertEqual(len(result["past_perfect"]), 0)
+
+    def test_summarize_oanc_pattern_matches_keeps_full_member_paths(self):
+        summary = summarize_oanc_pattern_matches(
+            {
+                "future_perfect": [f"doc{i}.txt" for i in range(5)],
+                "modal_perfect": ["m1.txt"],
+            },
+            example_limit=2,
+        )
+
+        self.assertEqual(summary["future_perfect"]["count"], 5)
+        self.assertEqual(summary["future_perfect"]["examples"], ["doc0.txt", "doc1.txt"])
+        self.assertEqual(len(summary["future_perfect"]["member_paths"]), 5)
 
 
 if __name__ == "__main__":
