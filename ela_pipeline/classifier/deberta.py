@@ -1,4 +1,4 @@
-"""DeBERTa-backed profile classifier (CEFR + grammar classes + note blueprints)."""
+"""DeBERTa-backed CEFR classifier for research/benchmark use."""
 
 from __future__ import annotations
 
@@ -99,44 +99,6 @@ class DebertaProfileClassifier:
         )
 
         cefr = _normalize_cefr(self._predict_label(prompt))
-        grammar_map = self._metadata.get("grammar_classes_by_cefr")
-        if not isinstance(grammar_map, dict):
-            grammar_map = {}
-        grammar_rows = grammar_map.get(cefr) if isinstance(grammar_map.get(cefr), list) else []
-        grammar_classes: list[dict[str, Any]] = []
-        for item in grammar_rows:
-            if isinstance(item, str) and item.strip():
-                grammar_classes.append({"class_id": item.strip().lower(), "confidence": 0.9})
-            elif isinstance(item, dict):
-                class_id = str(item.get("class_id") or "").strip().lower()
-                if not class_id:
-                    continue
-                confidence = item.get("confidence", 0.9)
-                try:
-                    confidence_num = float(confidence)
-                except Exception:
-                    confidence_num = 0.9
-                grammar_classes.append(
-                    {
-                        "class_id": class_id,
-                        "confidence": max(0.0, min(1.0, confidence_num)),
-                    }
-                )
-        if not grammar_classes:
-            grammar_classes = [{"class_id": f"cefr::{cefr.lower()}", "confidence": 0.8}]
-
-        notes_map = self._metadata.get("note_blueprints_by_cefr")
-        if not isinstance(notes_map, dict):
-            notes_map = {}
-        blueprint = notes_map.get(cefr) if isinstance(notes_map.get(cefr), dict) else {}
-        generated_notes = {
-            "elementary_text": str(blueprint.get("elementary_text") or f"[{cefr}] elementary note").strip(),
-            "intermediate_text": str(blueprint.get("intermediate_text") or f"[{cefr}] intermediate note").strip(),
-            "advanced_text": str(blueprint.get("advanced_text") or f"[{cefr}] advanced note").strip(),
-        }
-
         return {
             "cefr_level": cefr,
-            "grammar_classes": grammar_classes,
-            "generated_notes": generated_notes,
         }

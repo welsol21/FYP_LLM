@@ -648,9 +648,11 @@ Main tested areas:
 5. `run_pipeline` CLI default is `--note-mode controlled`.
 6. Legacy note modes remain available for regression/debug only (`template_only|llm|hybrid|two_stage`).
 7. Runtime classifier default is:
-   - `deberta` when `artifacts/models/deberta_classifier_cefr` exists,
+   - `tabular` when `artifacts/models/tabular_cefr_baseline_full_ladder_logreg` exists,
+   - otherwise `deberta` when `artifacts/models/deberta_classifier_cefr` exists,
    - otherwise `rule`.
-8. Local sentence-contract fallback in media pipeline is disabled; media flow requires external sentence-contract builder (backend path).
+8. Even when `classifier_provider=deberta`, runtime grammar classes and note blueprints stay rules-first; `deberta` is CEFR-only in the current architecture.
+9. Local sentence-contract fallback in media pipeline is disabled; media flow requires external sentence-contract builder (backend path).
 
 ## 8. Related Documents
 - `docs/pipeline_cli.md`

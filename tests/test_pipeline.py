@@ -675,12 +675,6 @@ class PipelineTests(unittest.TestCase):
         fake_classifier = MagicMock()
         fake_classifier.classify_node.return_value = {
             "cefr_level": "B2",
-            "grammar_classes": [{"class_id": "tam::modal_perfect", "confidence": 0.9}],
-            "generated_notes": {
-                "elementary_text": "Elementary note.",
-                "intermediate_text": "Intermediate note.",
-                "advanced_text": "Advanced note.",
-            },
         }
         mock_classifier_cls.return_value = fake_classifier
 
@@ -694,9 +688,10 @@ class PipelineTests(unittest.TestCase):
         )
         sentence = out[next(iter(out))]
         self.assertEqual(sentence.get("cefr_level"), "B2")
-        self.assertEqual(sentence.get("grammar_classes")[0]["class_id"], "tam::modal_perfect")
-        self.assertEqual(sentence.get("generated_notes", {}).get("intermediate_text"), "Intermediate note.")
-        self.assertEqual(sentence.get("linguistic_notes"), ["Intermediate note."])
+        self.assertIsInstance(sentence.get("grammar_classes"), list)
+        self.assertGreater(len(sentence.get("grammar_classes")), 0)
+        self.assertTrue(sentence.get("generated_notes", {}).get("intermediate_text"))
+        self.assertEqual(sentence.get("linguistic_notes"), [sentence.get("generated_notes", {}).get("intermediate_text")])
         self.assertGreaterEqual(fake_classifier.classify_node.call_count, 1)
 
     @patch("ela_pipeline.classifier.tabular_cefr_predictor.TabularProfileClassifier")

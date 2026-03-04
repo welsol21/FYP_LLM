@@ -902,7 +902,12 @@ def run_pipeline(
             model_path=classifier_model_path,
             device=classifier_device,
         )
-        _attach_classifier_profiles(enriched, classifier=classifier)
+        _attach_classifier_profiles(
+            enriched,
+            classifier=classifier,
+            include_grammar_classes=False,
+            include_generated_notes=False,
+        )
     elif classifier_provider == "tabular":
         from ela_pipeline.classifier.tabular_cefr_predictor import TabularProfileClassifier
 
@@ -932,7 +937,7 @@ def run_pipeline(
                 include_node_cefr=cefr_nodes,
             )
 
-    if classifier_provider in {"rule", "tabular"} and enable_grammar_classes:
+    if classifier_provider in {"rule", "tabular", "deberta"} and enable_grammar_classes:
         _attach_grammar_classes(enriched)
         _attach_generated_notes(enriched)
     elif classifier_provider not in {"rule", "deberta", "tabular"}:
@@ -1069,12 +1074,17 @@ def main() -> None:
         "--classifier-provider",
         default="rule",
         choices=["rule", "deberta", "tabular"],
-        help="Classifier profile provider (CEFR + grammar classes + generated note blueprints).",
+        help=(
+            "CEFR classifier provider. "
+            "`tabular` is the production default, "
+            "`rule` keeps rule-based CEFR, "
+            "`deberta` is research-only and CEFR-only."
+        ),
     )
     parser.add_argument(
         "--classifier-model-path",
         default=None,
-        help="Local model path for classifier_provider=deberta.",
+        help="Local model path for classifier_provider=deberta or tabular.",
     )
     parser.add_argument(
         "--classifier-device",
