@@ -107,29 +107,6 @@ class TabularProfileClassifier:
     def classify_node(self, *, node: dict[str, Any], source_text: str, sentence_text: str) -> dict[str, Any]:
         row = self._build_runtime_row(node=node, source_text=source_text)
         cefr = _normalize_cefr(self._predictor.predict_row(row))
-        grammar_map = self._metadata.get("grammar_classes_by_cefr")
-        if not isinstance(grammar_map, dict):
-            grammar_map = {}
-        grammar_rows = grammar_map.get(cefr) if isinstance(grammar_map.get(cefr), list) else []
-        grammar_classes: list[dict[str, Any]] = []
-        for item in grammar_rows:
-            class_id = str(item or "").strip().lower()
-            if class_id:
-                grammar_classes.append({"class_id": class_id, "confidence": 0.8})
-        if not grammar_classes:
-            grammar_classes = [{"class_id": f"cefr::{cefr.lower()}", "confidence": 0.7}]
-
-        notes_map = self._metadata.get("note_blueprints_by_cefr")
-        if not isinstance(notes_map, dict):
-            notes_map = {}
-        blueprint = notes_map.get(cefr) if isinstance(notes_map.get(cefr), dict) else {}
-        generated_notes = {
-            "elementary_text": str(blueprint.get("elementary_text") or f"[{cefr}] elementary note").strip(),
-            "intermediate_text": str(blueprint.get("intermediate_text") or f"[{cefr}] intermediate note").strip(),
-            "advanced_text": str(blueprint.get("advanced_text") or f"[{cefr}] advanced note").strip(),
-        }
         return {
             "cefr_level": cefr,
-            "grammar_classes": grammar_classes,
-            "generated_notes": generated_notes,
         }

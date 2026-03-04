@@ -557,15 +557,21 @@ class PipelineTests(unittest.TestCase):
         for cls in sentence_classes:
             self.assertIn("class_id", cls)
             self.assertIn("confidence", cls)
+            self.assertFalse(str(cls["class_id"]).startswith(("type::", "pos::", "role::", "tense_table::", "tam::")))
 
         phrases = list(self._iter_by_type(sentence, "Phrase"))
         self.assertGreaterEqual(len(phrases), 1)
+        non_empty_phrase_count = 0
         for phrase in phrases:
             phrase_classes = phrase.get("grammar_classes")
             self.assertIsInstance(phrase_classes, list)
-            self.assertGreater(len(phrase_classes), 0)
+            if phrase_classes:
+                non_empty_phrase_count += 1
+                for cls in phrase_classes:
+                    self.assertFalse(str(cls["class_id"]).startswith(("type::", "pos::", "role::", "tense_table::", "tam::")))
+        self.assertGreaterEqual(non_empty_phrase_count, 1)
 
-    def test_pipeline_attaches_tense_table_grammar_class(self):
+    def test_pipeline_attaches_pedagogical_modal_perfect_grammar_class(self):
         out = run_pipeline(
             "She should have trusted her instincts before making the decision.",
             model_dir=None,
@@ -574,7 +580,7 @@ class PipelineTests(unittest.TestCase):
         sentence = out[next(iter(out))]
         classes = sentence.get("grammar_classes") or []
         class_ids = {str(item.get("class_id")) for item in classes if isinstance(item, dict)}
-        self.assertIn("tense_table::modal_perfect", class_ids)
+        self.assertIn("modal_perfect", class_ids)
 
     def test_pipeline_attaches_generated_notes_and_populates_linguistic_notes(self):
         out = run_pipeline("She trusted him.", model_dir=None)
@@ -586,6 +592,10 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(generated.get("elementary_text"))
         self.assertTrue(generated.get("intermediate_text"))
         self.assertTrue(generated.get("advanced_text"))
+        self.assertNotIn("pos::", str(generated.get("intermediate_text")))
+        self.assertNotIn("type::", str(generated.get("intermediate_text")))
+        self.assertNotIn("tam::", str(generated.get("intermediate_text")))
+        self.assertNotIn("tense_table::", str(generated.get("intermediate_text")))
         self.assertEqual(blueprints, generated)
         notes = sentence.get("linguistic_notes")
         self.assertIsInstance(notes, list)
@@ -690,12 +700,6 @@ class PipelineTests(unittest.TestCase):
         fake_classifier = MagicMock()
         fake_classifier.classify_node.return_value = {
             "cefr_level": "B1",
-            "grammar_classes": [{"class_id": "relative_clause", "confidence": 0.8}],
-            "generated_notes": {
-                "elementary_text": "Elementary note.",
-                "intermediate_text": "Intermediate note.",
-                "advanced_text": "Advanced note.",
-            },
         }
         mock_classifier_cls.return_value = fake_classifier
 
@@ -708,9 +712,10 @@ class PipelineTests(unittest.TestCase):
         )
         sentence = out[next(iter(out))]
         self.assertEqual(sentence.get("cefr_level"), "B1")
-        self.assertEqual(sentence.get("grammar_classes")[0]["class_id"], "relative_clause")
-        self.assertEqual(sentence.get("generated_notes", {}).get("intermediate_text"), "Intermediate note.")
-        self.assertEqual(sentence.get("linguistic_notes"), ["Intermediate note."])
+        self.assertIsInstance(sentence.get("grammar_classes"), list)
+        self.assertGreater(len(sentence.get("grammar_classes")), 0)
+        self.assertTrue(sentence.get("generated_notes", {}).get("intermediate_text"))
+        self.assertEqual(sentence.get("linguistic_notes"), [sentence.get("generated_notes", {}).get("intermediate_text")])
         self.assertGreaterEqual(fake_classifier.classify_node.call_count, 1)
 
     @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.annotate")

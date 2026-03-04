@@ -60,8 +60,8 @@ class TabularCefrPredictorTests(unittest.TestCase):
                 sentence_text="She smiles.",
             )
             self.assertEqual(profile["cefr_level"], "A1")
-            self.assertEqual(profile["grammar_classes"][0]["class_id"], "present_simple_affirmative")
-            self.assertEqual(profile["generated_notes"]["intermediate_text"], "A1 i")
+            self.assertNotIn("grammar_classes", profile)
+            self.assertNotIn("generated_notes", profile)
 
     def test_tabular_profile_classifier_uses_node_features_when_runtime_evidence_missing(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -80,7 +80,6 @@ class TabularCefrPredictorTests(unittest.TestCase):
                 sentence_text="Although he had already finished the work, he stayed.",
             )
             self.assertEqual(profile["cefr_level"], "B2")
-            self.assertEqual(profile["grammar_classes"][0]["class_id"], "past_perfect")
 
 
 if __name__ == "__main__":

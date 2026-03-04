@@ -547,30 +547,6 @@ def _attach_cefr(
 
 
 def _attach_grammar_classes(doc: dict) -> None:
-    def tense_table_bucket(node: dict) -> str | None:
-        mood = str(node.get("mood") or "").strip().lower()
-        tense = str(node.get("tense") or "").strip().lower()
-        aspect = str(node.get("aspect") or "").strip().lower()
-        voice = str(node.get("voice") or "").strip().lower()
-        construction = str(node.get("tam_construction") or "").strip().lower()
-
-        if construction == "modal_perfect":
-            return "modal_perfect"
-        if mood == "modal" and aspect == "perfect":
-            return "modal_perfect"
-        if tense in {"null", "none"}:
-            tense = ""
-        if aspect in {"null", "none"}:
-            aspect = ""
-        if voice in {"null", "none"}:
-            voice = ""
-        if not tense and not aspect and not voice:
-            return None
-        parts = [p for p in (tense, aspect, voice) if p]
-        if not parts:
-            return None
-        return "_".join(parts)
-
     def build_classes(node: dict) -> list[dict[str, Any]]:
         classes: list[dict[str, Any]] = []
         seen: set[str] = set()
@@ -582,27 +558,65 @@ def _attach_grammar_classes(doc: dict) -> None:
             seen.add(cid)
             classes.append({"class_id": cid, "confidence": confidence})
 
+        def collect_dep_labels(current: dict) -> list[str]:
+            out: list[str] = []
+            dep_label = str(current.get("dep_label") or "").strip().lower()
+            if dep_label:
+                out.append(dep_label)
+            features = current.get("features") if isinstance(current.get("features"), dict) else {}
+            if isinstance(features.get("dep"), list):
+                out.extend(str(x).strip().lower() for x in features.get("dep", []) if str(x).strip())
+            for child in current.get("linguistic_elements", []) or []:
+                if isinstance(child, dict):
+                    out.extend(collect_dep_labels(child))
+            return out
+
+        dep_signature = collect_dep_labels(node)
+        content = str(node.get("content") or "").strip().lower()
+        tense = str(node.get("tense") or "").strip().lower()
+        aspect = str(node.get("aspect") or "").strip().lower()
+        mood = str(node.get("mood") or "").strip().lower()
+        voice = str(node.get("voice") or "").strip().lower()
+        construction = str(node.get("tam_construction") or "").strip().lower()
         node_type = str(node.get("type") or "").strip().lower()
-        if node_type:
-            add_class(f"type::{node_type}", 0.7)
 
-        pos = str(node.get("part_of_speech") or "").strip().lower()
-        if pos:
-            normalized_pos = "_".join(pos.split())
-            add_class(f"pos::{normalized_pos}", 0.82)
+        has_neg = "neg" in dep_signature or " not " in f" {content} " or "n't" in content
+        has_relcl = "acl:relcl" in dep_signature
+        has_passive_signal = "aux:pass" in dep_signature or "nsubj:pass" in dep_signature or voice == "passive" or construction == "passive_voice"
+        is_question = content.endswith("?") or "aux" in dep_signature and "?" in content
 
-        grammatical_role = str(node.get("grammatical_role") or "").strip().lower()
-        if grammatical_role and grammatical_role not in {"unknown", "none", "null"}:
-            normalized_role = "_".join(grammatical_role.split())
-            add_class(f"role::{normalized_role}", 0.75)
-
-        tam = str(node.get("tam_construction") or "").strip().lower()
-        if tam and tam not in {"none", "null"}:
-            add_class(f"tam::{tam}", 0.9)
-
-        tense_bucket = tense_table_bucket(node)
-        if tense_bucket:
-            add_class(f"tense_table::{tense_bucket}", 0.93)
+        if has_relcl:
+            add_class("relative_clause", 0.9)
+        if construction == "future_perfect" or ("future" in tense and aspect == "perfect"):
+            add_class("future_perfect", 0.95)
+        if construction == "modal_perfect" or (mood == "modal" and aspect == "perfect"):
+            add_class("modal_perfect", 0.95)
+        if construction == "past_perfect" or ("past perfect" in tense) or (tense == "past" and aspect == "perfect"):
+            add_class("past_perfect", 0.93)
+        if has_passive_signal:
+            add_class("passive_voice", 0.9)
+        if construction == "modal_should":
+            add_class("modal_should_advice", 0.88)
+        if construction == "modal_can":
+            add_class("modal_can_ability", 0.88)
+        if construction == "future_will":
+            add_class("future_will", 0.9)
+        elif tense == "future" and aspect in {"simple", ""}:
+            add_class("future_will", 0.84)
+        if construction == "future_going_to":
+            add_class("future_going_to", 0.9)
+        if construction == "present_simple" and is_question:
+            add_class("present_simple_question", 0.86)
+        if construction == "present_perfect" or "present perfect" in tense:
+            add_class("present_perfect_negative" if has_neg else "present_perfect_affirmative", 0.9)
+        elif construction == "present_simple" or tense == "present":
+            add_class("present_simple_negative" if has_neg else "present_simple_affirmative", 0.88)
+        elif construction == "past_simple" or tense == "past":
+            add_class("past_simple_negative" if has_neg else "past_simple_affirmative", 0.88)
+        elif construction == "present_continuous" or "progressive" in tense or aspect in {"progressive", "continuous"}:
+            add_class("present_continuous", 0.88)
+        elif construction == "be_copula" or (node_type == "phrase" and str(node.get("part_of_speech") or "").strip().lower() == "noun phrase" and "cop" in dep_signature):
+            add_class("copular_clause", 0.82)
 
         return classes
 
@@ -618,6 +632,12 @@ def _attach_grammar_classes(doc: dict) -> None:
 
 
 def _attach_generated_notes(doc: dict) -> None:
+    def humanize_class_id(class_id: str) -> str:
+        raw = str(class_id or "").strip()
+        if not raw:
+            return "core grammar pattern"
+        return raw.replace("_", " ")
+
     def build_notes(node: dict) -> dict[str, str]:
         node_type = str(node.get("type") or "").strip().lower() or "node"
         pos = str(node.get("part_of_speech") or "").strip().lower() or "unknown"
@@ -632,9 +652,9 @@ def _attach_generated_notes(doc: dict) -> None:
                 class_id = str(item.get("class_id") or "").strip()
                 if class_id:
                     class_ids.append(class_id)
-        primary = class_ids[0] if class_ids else f"type::{node_type}"
-        secondary = class_ids[1] if len(class_ids) > 1 else f"pos::{'_'.join(pos.split())}"
-        compact_classes = ", ".join(class_ids[:3]) if class_ids else primary
+        primary = humanize_class_id(class_ids[0]) if class_ids else f"{node_type} structure"
+        secondary = humanize_class_id(class_ids[1]) if len(class_ids) > 1 else primary
+        compact_classes = ", ".join(humanize_class_id(class_id) for class_id in class_ids[:3]) if class_ids else primary
 
         elementary = (
             f"This {node_type} expresses '{content}'. "
@@ -735,15 +755,22 @@ def _rewrite_controlled_notes_with_t5(doc: dict, renderer: Any) -> None:
         walk(sentence_node, sentence_text)
 
 
-def _attach_classifier_profiles(doc: dict, classifier: Any) -> None:
+def _attach_classifier_profiles(
+    doc: dict,
+    classifier: Any,
+    *,
+    include_grammar_classes: bool = True,
+    include_generated_notes: bool = True,
+) -> None:
     def walk(node: dict, sentence_text: str) -> None:
         source_text = _node_source_text(node, sentence_text)
         profile = classifier.classify_node(node=node, source_text=source_text, sentence_text=sentence_text)
         node["cefr_level"] = str(profile.get("cefr_level") or "B1").strip().upper()
-        grammar_classes = profile.get("grammar_classes")
-        node["grammar_classes"] = grammar_classes if isinstance(grammar_classes, list) else []
+        if include_grammar_classes:
+            grammar_classes = profile.get("grammar_classes")
+            node["grammar_classes"] = grammar_classes if isinstance(grammar_classes, list) else []
         generated_notes = profile.get("generated_notes")
-        if isinstance(generated_notes, dict):
+        if include_generated_notes and isinstance(generated_notes, dict):
             node["note_blueprints"] = dict(generated_notes)
             node["generated_notes"] = generated_notes
             existing_notes = node.get("linguistic_notes")
@@ -929,7 +956,12 @@ def run_pipeline(
         from ela_pipeline.classifier.tabular_cefr_predictor import TabularProfileClassifier
 
         classifier = TabularProfileClassifier(model_path=classifier_model_path)
-        _attach_classifier_profiles(enriched, classifier=classifier)
+        _attach_classifier_profiles(
+            enriched,
+            classifier=classifier,
+            include_grammar_classes=False,
+            include_generated_notes=False,
+        )
     elif classifier_provider == "rule":
         if enable_cefr:
             if cefr_provider == "rule":
@@ -949,10 +981,10 @@ def run_pipeline(
                 include_node_cefr=cefr_nodes,
             )
 
-        if enable_grammar_classes:
-            _attach_grammar_classes(enriched)
-            _attach_generated_notes(enriched)
-    else:
+    if classifier_provider in {"rule", "tabular"} and enable_grammar_classes:
+        _attach_grammar_classes(enriched)
+        _attach_generated_notes(enriched)
+    elif classifier_provider not in {"rule", "deberta", "tabular"}:
         raise ValueError("classifier_provider must be one of: rule | deberta | tabular")
 
     if note_mode == "controlled":
