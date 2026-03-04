@@ -1,0 +1,176 @@
+{
+  "manifest": {
+    "selected_files": 9,
+    "bucket_counts": {
+      "written_1/journal": 3,
+      "written_2/non-fiction": 3,
+      "written_2/technical": 3
+    }
+  },
+  "probe_rows": 120,
+  "class_counts": {
+    "present_simple_affirmative": 47,
+    "present_continuous": 3,
+    "past_simple_affirmative": 27,
+    "present_simple_negative": 5,
+    "modal_can_ability": 4,
+    "future_will": 1,
+    "copular_clause": 2,
+    "past_simple_negative": 1,
+    "past_perfect": 2,
+    "present_perfect_affirmative": 13,
+    "present_perfect_negative": 2,
+    "present_simple_question": 1
+  },
+  "tam_counts": {
+    "present_simple": 53,
+    "present_continuous": 3,
+    "past_simple": 28,
+    "modal_can": 4,
+    "unknown": 12,
+    "future_will": 1,
+    "be_copula": 2,
+    "past_perfect": 2,
+    "present_perfect": 15
+  },
+  "examples": [
+    {
+      "text": "You're right, Maxim's strong point is that it's totally unsentimental and ungenteel.",
+      "grammar_classes": [
+        "present_simple_affirmative"
+      ],
+      "tam_profile": "present_simple"
+    },
+    {
+      "text": "It's a sendup of the old model, but in a different way than, say, Hustler was, and the difference (surprise) reflects the sexual culture of the '90s.",
+      "grammar_classes": [
+        "present_simple_affirmative"
+      ],
+      "tam_profile": "present_simple"
+    },
+    {
+      "text": "With its belligerent grossness and misogyny, Hustler rebelled against the establishment men's mags' class condescension, the earnest philosophizing about the sexual revolution, the \"thinking men's sex bomb\" syndrome, at the same time that it was deliberately goading feminists.",
+      "grammar_classes": [
+        "present_continuous"
+      ],
+      "tam_profile": "present_continuous"
+    },
+    {
+      "text": "It came right out with the anger that the regular men's mags tried to hide.",
+      "grammar_classes": [
+        "past_simple_affirmative"
+      ],
+      "tam_profile": "past_simple"
+    },
+    {
+      "text": "Maxim pokes fun at its progenitors but with considerable ironic affection.",
+      "grammar_classes": [
+        "present_simple_affirmative"
+      ],
+      "tam_profile": "present_simple"
+    },
+    {
+      "text": "In fact, while its fondness for the most idiotic, juvenile humor knows no bounds, any strong emotion is taboo (unless you count horror at having your penis mangled)--that's part of the British influence, I guess.",
+      "grammar_classes": [
+        "present_simple_affirmative"
+      ],
+      "tam_profile": "present_simple"
+    },
+    {
+      "text": "And feminism isn't an issue, at least not directly--partly because its basic ideas have been assimilated and are taken for granted, partly because politics in general and feminism in particular barely exist in the consciousness of Maxim's age group.",
+      "grammar_classes": [
+        "present_simple_negative"
+      ],
+      "tam_profile": "present_simple"
+    },
+    {
+      "text": "Another thing I've noticed is that the trajectory of the new men's magazines and that of contemporary women's magazines seem to be converging, at least compared with 20 years ago.",
+      "grammar_classes": [
+        "present_simple_affirmative"
+      ],
+      "tam_profile": "present_simple"
+    },
+    {
+      "text": "There used to be an enormous gulf between the sense of entitlement to the good things of life, including women, that pervaded the men's mags and women's anxious obsession with self-improvement in order to be worthy of male attention.",
+      "grammar_classes": [
+        "past_simple_affirmative"
+      ],
+      "tam_profile": "past_simple"
+    },
+    {
+      "text": "In young women's magazines now, Cosmo being the paradigm, there's a much more bluntly instrumental, \"male\" attitude toward getting sex of the quantity and quality desired.",
+      "grammar_classes": [
+        "present_simple_affirmative"
+      ],
+      "tam_profile": "present_simple"
+    },
+    {
+      "text": "Beauty is as central a preoccupation as ever, if anything more so, but the preoccupation has much more of a narcissistic, self-pampering quality and less of a desperation to make up for some irrecoverable, primal imperfection.",
+      "grammar_classes": [
+        "present_simple_affirmative"
+      ],
+      "tam_profile": "present_simple"
+    },
+    {
+      "text": "In the men's magazines, there's much more of a sense that if you want women to give you the time of day, you have to make some effort to find out what they want and give it to them.",
+      "grammar_classes": [
+        "present_simple_affirmative"
+      ],
+      "tam_profile": "present_simple"
+    },
+    {
+      "text": "In the old model, if men needed advice on women or sex, they got it from a male expert like the \"Playboy Advisor.\"",
+      "grammar_classes": [
+        "past_simple_affirmative"
+      ],
+      "tam_profile": "past_simple"
+    },
+    {
+      "text": "Now Maxim features advice from women on such matters as how not to give the wrong impression on a first date.",
+      "grammar_classes": [
+        "present_simple_negative"
+      ],
+      "tam_profile": "present_simple"
+    },
+    {
+      "text": "On the other hand, men still don't like to express anxiety directly--I'd guess that part of the reason men's mags have gotten sillier is that they've seized on men's time-honored method of covering up insecurity by clowning around.",
+      "grammar_classes": [
+        "present_simple_negative"
+      ],
+      "tam_profile": "present_simple"
+    },
+    {
+      "text": "Regarding your suggestion that these magazines give men a safe place to be together without their heterosexuality being questioned: That sounds like more of a hope (on their part) than a reality.",
+      "grammar_classes": [
+        "present_simple_affirmative"
+      ],
+      "tam_profile": "present_simple"
+    },
+    {
+      "text": "Because it's ultimately self-doubt that really matters, no place can really be safe--hence the need to escalate the jokes.",
+      "grammar_classes": [
+        "modal_can_ability"
+      ],
+      "tam_profile": "modal_can"
+    },
+    {
+      "text": "In the September Vanity Fair , profiler Marjorie Williams offers this tasty Larry King anecdote:",
+      "grammar_classes": [],
+      "tam_profile": "unknown"
+    },
+    {
+      "text": "\"One of the most oft told of the Larry Stories that circulate at CNN concerns his take-out order when he eats dinner at his desk, before the show.",
+      "grammar_classes": [
+        "past_simple_affirmative"
+      ],
+      "tam_profile": "past_simple"
+    },
+    {
+      "text": "His favorite dish, from a local Chinese restaurant, is a chicken with cashews--without the fat-laden cashews.",
+      "grammar_classes": [
+        "present_simple_affirmative"
+      ],
+      "tam_profile": "present_simple"
+    }
+  ]
+}

@@ -93,8 +93,11 @@
 - [x] Treat historical `ANC-parses` archive as unavailable; do not block the pipeline on it.
 - [x] Add `OANC` zip inspection layer with candidate genre discovery and report artifact.
 - [x] Implement dedicated `OANC` ingest path from the downloaded corpus package (`OANC-1.0.1-UTF8.zip` / extracted XML+text structure).
-- [ ] Replace temporary regex OANC sentence splitting with parser-backed sentence segmentation before promoting any OANC rows to train-ready advanced dataset.
-- [ ] Add modern local dependency-generation stage for `OANC` during ingestion and persist parser/model provenance.
+- [x] Replace temporary regex OANC sentence splitting with corpus sentence-boundary annotations (`*-s.xml`) and parser fallback.
+- [x] Add modern local dependency-generation stage for `OANC` during ingestion and persist parser/model provenance.
+- [x] Build train-ready advanced rows from parsed `OANC` sentences and run advanced support/ambiguity gates.
+- [ ] Increase `C2` coverage for `future_perfect` and other rare advanced patterns; current `OANC` probe still fails `per_class_support` because `future_perfect` has only one accepted example in the bounded sample.
+- [ ] Increase `C1` coverage for `modal_perfect`; targeted `OANC` probe still yields only one accepted `modal_perfect` example.
 - [ ] Implement `MASC` ingest path for validation/calibration slices.
 - [ ] Build merged advanced dataset source:
   - [ ] `UD_English-EWT`

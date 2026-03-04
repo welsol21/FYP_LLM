@@ -1,0 +1,85 @@
+{
+  "manifest_selected_files": 545,
+  "bucket_counts": {
+    "written_1/journal": 250,
+    "written_2/non-fiction": 45,
+    "written_2/technical": 250
+  },
+  "matches": {
+    "future_perfect": {
+      "count": 50,
+      "examples": [
+        "OANC/data/written_1/journal/slate/1/Article247_81.txt",
+        "OANC/data/written_1/journal/slate/10/Article247_3332.txt",
+        "OANC/data/written_1/journal/slate/10/Article247_3357.txt",
+        "OANC/data/written_1/journal/slate/11/Article247_3416.txt",
+        "OANC/data/written_1/journal/slate/11/Article247_3445.txt",
+        "OANC/data/written_1/journal/slate/11/Article247_3456.txt",
+        "OANC/data/written_1/journal/slate/11/Article247_3457.txt",
+        "OANC/data/written_1/journal/slate/11/Article247_3472.txt",
+        "OANC/data/written_1/journal/slate/11/Article247_3482.txt",
+        "OANC/data/written_1/journal/slate/11/Article247_3484.txt",
+        "OANC/data/written_1/journal/slate/12/Article247_3504.txt",
+        "OANC/data/written_1/journal/slate/12/Article247_3558.txt",
+        "OANC/data/written_2/non-fiction/OUP/Abernathy/ch14.txt",
+        "OANC/data/written_2/non-fiction/OUP/Abernathy/ch15.txt",
+        "OANC/data/written_2/non-fiction/OUP/Abernathy/ch7.txt",
+        "OANC/data/written_2/non-fiction/OUP/Abernathy/ch8.txt",
+        "OANC/data/written_2/non-fiction/OUP/Abernathy/ch9.txt",
+        "OANC/data/written_2/non-fiction/OUP/Castro/chC.txt",
+        "OANC/data/written_2/non-fiction/OUP/Castro/chN.txt",
+        "OANC/data/written_2/non-fiction/OUP/Castro/chO.txt"
+      ]
+    },
+    "modal_perfect": {
+      "count": 50,
+      "examples": [
+        "OANC/data/written_1/journal/slate/1/Article247_5.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_61.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_68.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_69.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_70.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_72.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_75.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_78.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_80.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_81.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_84.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_87.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_90.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_92.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_98.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_99.txt",
+        "OANC/data/written_1/journal/slate/10/Article247_3301.txt",
+        "OANC/data/written_1/journal/slate/10/Article247_3318.txt",
+        "OANC/data/written_1/journal/slate/10/Article247_3322.txt",
+        "OANC/data/written_1/journal/slate/10/Article247_3323.txt"
+      ]
+    },
+    "past_perfect": {
+      "count": 50,
+      "examples": [
+        "OANC/data/written_1/journal/slate/1/Article247_5.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_61.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_63.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_66.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_68.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_69.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_70.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_72.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_73.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_74.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_75.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_78.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_79.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_80.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_81.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_82.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_83.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_86.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_87.txt",
+        "OANC/data/written_1/journal/slate/1/Article247_88.txt"
+      ]
+    }
+  }
+}

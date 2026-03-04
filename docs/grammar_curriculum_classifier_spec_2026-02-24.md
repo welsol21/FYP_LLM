@@ -160,7 +160,22 @@ Current project state:
 - zip inspection is now implemented inside the project and recorded in `docs/reports/oanc_zip_inspection_2026-03-03.json`,
 - the first inspection pass found `5999` advanced candidate `.txt` files across the targeted `journal`, `technical`, and `non-fiction` buckets.
 - a bounded candidate-ingest pass is now implemented and recorded in `docs/reports/oanc_sentence_candidates_2026-03-04.json`,
-- current status: file-level ingest and provenance are working, but regex sentence splitting is not yet good enough for train-ready advanced rows; parser-backed sentence segmentation is required before promoting OANC rows into the classifier dataset.
+- current status: file-level ingest and provenance are working, OANC sentence boundaries are now read from the corpus `*-s.xml` annotations when available, and local dependency parsing with parser provenance is implemented for the resulting candidate sentences,
+- parsed `OANC` sentence candidates are now convertible into train-ready advanced rows, and the first bounded probe is recorded in `docs/reports/oanc_advanced_probe_2026-03-04.json`,
+- first bounded probe result:
+  - advanced mapped samples before final gate acceptance: `427`
+  - gate outcome: `failed`
+  - reason: `per_class_support`
+  - concrete blocker: `future_perfect / C2` had only `1` accepted example in the bounded sample,
+- targeted rare-pattern harvesting is now also implemented and probed in `docs/reports/oanc_targeted_pattern_search_2026-03-04.json` and `docs/reports/oanc_advanced_targeted_probe_2026-03-04.json`,
+- targeted probe result:
+  - selected targeted files: `48`
+  - advanced mapped samples before final gate acceptance: `13`
+  - gate outcome: `failed`
+  - blockers:
+    - `future_perfect / C2`: `1`
+    - `modal_perfect / C1`: `1`
+- next required step: increase rare advanced-pattern coverage (especially `C2`) and then rerun advanced support gates before merging `OANC` rows into the classifier dataset.
 
 As with UD, both `OANC` and `MASC` still require:
 - grammar extraction,

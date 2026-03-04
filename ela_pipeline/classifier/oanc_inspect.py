@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import PurePosixPath
 from typing import Any
+import re
 import zipfile
 
 
@@ -77,3 +78,26 @@ def extract_oanc_text(zip_path: str, member_path: str) -> str:
         with zf.open(member_path) as handle:
             payload = handle.read()
     return payload.decode("utf-8", errors="replace")
+
+
+def find_oanc_candidate_files_by_patterns(
+    zip_path: str,
+    patterns: dict[str, str],
+    *,
+    member_paths: list[str] | None = None,
+    limit_per_pattern: int | None = None,
+) -> dict[str, list[str]]:
+    candidates = member_paths if member_paths is not None else list_oanc_candidate_files(zip_path)
+    compiled = {name: re.compile(pattern, flags=re.IGNORECASE) for name, pattern in patterns.items()}
+    found: dict[str, list[str]] = {name: [] for name in patterns}
+
+    for member_path in candidates:
+        if limit_per_pattern is not None and all(len(matches) >= int(limit_per_pattern) for matches in found.values()):
+            break
+        text = extract_oanc_text(zip_path, member_path)
+        for name, rx in compiled.items():
+            if limit_per_pattern is not None and len(found[name]) >= int(limit_per_pattern):
+                continue
+            if rx.search(text):
+                found[name].append(member_path)
+    return found

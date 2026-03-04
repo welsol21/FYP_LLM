@@ -6,6 +6,7 @@ from pathlib import Path
 from ela_pipeline.classifier.oanc_inspect import (
     OANC_ADVANCED_GENRE_MARKERS,
     extract_oanc_text,
+    find_oanc_candidate_files_by_patterns,
     list_oanc_candidate_files,
     summarize_oanc_zip,
 )
@@ -42,6 +43,37 @@ class OANCInspectTests(unittest.TestCase):
         self.assertIn("Line one.", text)
         self.assertIn("Line two.", text)
         self.assertTrue(any(marker in "OANC/data/written_1/journal/slate/1/doc1.txt" for marker in OANC_ADVANCED_GENRE_MARKERS))
+
+    def test_find_oanc_candidate_files_by_patterns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            zip_path = Path(tmp) / "oanc.zip"
+            with zipfile.ZipFile(zip_path, "w") as z:
+                z.writestr(
+                    "OANC/data/written_2/technical/manuals/doc1.txt",
+                    "The archive will have been migrated by the end of the quarter.",
+                )
+                z.writestr(
+                    "OANC/data/written_2/technical/manuals/doc2.txt",
+                    "The system had completed the calibration before the test started.",
+                )
+                z.writestr(
+                    "OANC/data/written_1/journal/slate/1/doc3.txt",
+                    "A neutral sentence without advanced pattern.",
+                )
+
+            result = find_oanc_candidate_files_by_patterns(
+                str(zip_path),
+                {
+                    "future_perfect": r"\bwill\s+have\s+\w+",
+                    "past_perfect": r"\bhad\s+\w+",
+                },
+                member_paths=["OANC/data/written_2/technical/manuals/doc1.txt"],
+            )
+
+        self.assertIn("future_perfect", result)
+        self.assertIn("past_perfect", result)
+        self.assertEqual(len(result["future_perfect"]), 1)
+        self.assertEqual(len(result["past_perfect"]), 0)
 
 
 if __name__ == "__main__":
