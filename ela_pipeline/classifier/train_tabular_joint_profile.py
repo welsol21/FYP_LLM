@@ -219,6 +219,12 @@ def train_tabular_joint_profile(
         json.dump(report, f, ensure_ascii=False, indent=2)
 
     build_classifier_metadata_from_dataset(classifier_jsonl_path=train_path, output_dir=str(out_dir))
+    metadata_path = out_dir / "classifier_metadata.json"
+    if metadata_path.is_file():
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        if isinstance(metadata, dict):
+            metadata["joint_label_order"] = list(joint_label_order)
+            metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
     return {
         "model_path": str(model_path),
         "summary_path": str(summary_path),

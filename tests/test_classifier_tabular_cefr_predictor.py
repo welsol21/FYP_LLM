@@ -44,6 +44,11 @@ class _FakeJointModelIncompatibleClass:
         return ["A2|modal_can_ability" for _ in rows]
 
 
+class _FakeJointModelNumericIndex:
+    def predict(self, rows):
+        return [1 for _ in rows]
+
+
 class TabularCefrPredictorTests(unittest.TestCase):
     def test_normalize_cefr_accepts_numeric_legacy_labels(self):
         self.assertEqual(_normalize_cefr("0"), "A1")
@@ -203,6 +208,28 @@ class TabularCefrPredictorTests(unittest.TestCase):
             )
             self.assertEqual(profile["cefr_level"], "A2")
             self.assertEqual(profile["grammar_classes"][0]["class_id"], "pronoun_reference")
+
+    def test_tabular_profile_classifier_joint_model_decodes_numeric_label_id_from_metadata(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model_dir = Path(tmpdir)
+            joblib.dump(_FakeJointModelNumericIndex(), model_dir / "best_tabular_joint_profile.joblib")
+            metadata = {
+                "joint_label_order": ["A1|present_simple_affirmative", "B2|past_perfect"],
+                "per_class_cefr_ladder": {
+                    "past_perfect": ["A1", "A2", "B1", "B2", "C1", "C2"],
+                },
+                "grammar_classes_by_cefr": {"A1": [], "A2": [], "B1": [], "B2": ["past_perfect"], "C1": [], "C2": []},
+                "note_blueprints_by_cefr": {level: {"elementary_text": f"{level} e", "intermediate_text": f"{level} i", "advanced_text": f"{level} a"} for level in ["A1","A2","B1","B2","C1","C2"]},
+            }
+            (model_dir / "classifier_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+            classifier = TabularProfileClassifier(str(model_dir))
+            profile = classifier.classify_node(
+                node={"features": {"dep": ["nsubj", "aux", "root"], "pos": ["PRON", "AUX", "VERB"]}},
+                source_text="He had worked.",
+                sentence_text="He had worked.",
+            )
+            self.assertEqual(profile["cefr_level"], "B2")
+            self.assertEqual(profile["grammar_classes"][0]["class_id"], "past_perfect")
 
 
 if __name__ == "__main__":

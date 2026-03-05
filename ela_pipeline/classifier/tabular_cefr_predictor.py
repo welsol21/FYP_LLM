@@ -74,9 +74,16 @@ class TabularCefrPredictor:
 class TabularJointProfilePredictor:
     """Joint predictor: CEFR + primary grammar class + note blueprint id."""
 
-    def __init__(self, model: Any, *, feature_profile: str = "runtime_stable") -> None:
+    def __init__(
+        self,
+        model: Any,
+        *,
+        feature_profile: str = "runtime_stable",
+        joint_label_order: list[str] | None = None,
+    ) -> None:
         self._model = model
         self._feature_profile = str(feature_profile or "runtime_stable").strip().lower()
+        self._joint_label_order = list(joint_label_order or [])
 
     @classmethod
     def from_path(cls, model_path: str, *, feature_profile: str = "runtime_stable") -> "TabularJointProfilePredictor":
@@ -98,7 +105,21 @@ class TabularJointProfilePredictor:
             return str(item[0]).strip(), str(item[1]).strip().lower()
         if hasattr(item, "__len__") and not isinstance(item, str) and len(item) >= 2:  # numpy row
             return str(item[0]).strip(), str(item[1]).strip().lower()
+        if isinstance(item, (int, float)):
+            idx = int(item)
+            if 0 <= idx < len(self._joint_label_order):
+                label = str(self._joint_label_order[idx]).strip()
+                if "|" in label:
+                    cefr, grammar_class = label.split("|", 1)
+                    return cefr.strip(), grammar_class.strip().lower()
         scalar = str(item).strip()
+        if scalar.isdigit():
+            idx = int(scalar)
+            if 0 <= idx < len(self._joint_label_order):
+                label = str(self._joint_label_order[idx]).strip()
+                if "|" in label:
+                    cefr, grammar_class = label.split("|", 1)
+                    return cefr.strip(), grammar_class.strip().lower()
         if "|" in scalar:
             cefr, grammar_class = scalar.split("|", 1)
             return cefr.strip(), grammar_class.strip().lower()
@@ -140,10 +161,14 @@ class TabularProfileClassifier:
                 summary = loaded_summary
         feature_profile = str(summary.get("feature_profile") or "runtime_stable").strip().lower()
         self._joint_mode = bool(joint_model_file.is_file())
+        joint_label_order = metadata.get("joint_label_order")
+        if not isinstance(joint_label_order, list):
+            joint_label_order = []
         if self._joint_mode:
-            self._predictor = TabularJointProfilePredictor.from_path(
-                str(joint_model_file),
+            self._predictor = TabularJointProfilePredictor(
+                joblib.load(joint_model_file),
                 feature_profile=feature_profile,
+                joint_label_order=[str(item) for item in joint_label_order if str(item).strip()],
             )
         else:
             self._predictor = TabularCefrPredictor.from_path(str(model_file), feature_profile=feature_profile)

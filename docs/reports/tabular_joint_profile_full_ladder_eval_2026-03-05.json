@@ -41,6 +41,7 @@
     "grammar_dev_macro_f1": 0.8088276670031549,
     "grammar_test_macro_f1": 0.8230551069189266
   },
+  "joint_label_order_size": 18,
   "dataset_summary_path": "artifacts/classifier_full_ladder_dataset_v2/full_ladder_dataset_summary.json",
   "dataset_splits": {
     "train": 8211,
@@ -73,5 +74,10 @@
       "C2": 2
     }
   },
-  "notes": "GPU-only training run; joint label = CEFR|primary_grammar_class; metadata generated for runtime classifier."
+  "runtime_smoke": {
+    "sentence": "She should have trusted her instincts before making the decision.",
+    "expected_profile_shape": "cefr_level + grammar_classes + note_blueprints in controlled flow",
+    "status": "pass"
+  },
+  "notes": "GPU-only training run; runtime decode uses metadata.joint_label_order for numeric model outputs."
 }
