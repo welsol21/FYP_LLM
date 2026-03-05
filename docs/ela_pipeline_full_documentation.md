@@ -47,8 +47,6 @@ Allowed types only:
 - `dep_label`, `head_id` (Word)
   - `dep_label` is the original dependency label from source parse (not phrase-internal relabeling)
 - `features` (normalized morphology)
-- `notes` typed objects: `{text, kind, confidence, source}`
-- note trace fields: `quality_flags`, `rejected_candidates`, `rejected_candidate_stats`, `reason_codes`
 - `schema_version`
 - `translations` object (required):
   - provider-keyed map: `{ [provider_key]: {source_lang, target_lang, text, ...} }`
@@ -58,9 +56,15 @@ Allowed types only:
 - `synonyms` list: `[string, ...]`
 - `cefr_level`: one of `A1|A2|B1|B2|C1|C2`
 - `grammar_classes`: rules-first pedagogical labels derived from parse/TAM evidence (`[{class_id, confidence, ...}]`)
-- `generated_notes`: current user-facing level texts (`elementary|intermediate|advanced`)
 - `note_blueprints`: immutable classifier blueprint source for controlled note generation
 - `note_generator_version`: rendering mode/version marker (`controlled::...`, `controlled_t5::...`, or legacy `local_t5::...`)
+
+Legacy-only fields kept for backward compatibility in validator, but not emitted in current controlled production flow:
+- `notes`
+- `quality_flags`
+- `rejected_candidates`
+- `rejected_candidate_stats`
+- `reason_codes`
 
 ### 2.5 Nesting Rules
 - `Sentence` can contain `Phrase` and `Word`

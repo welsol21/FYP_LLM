@@ -72,6 +72,27 @@ WORD_DEP_ROLE_MAP = {
     "conj": "conjunct",
 }
 
+# Deterministic dependency-driven phrase shaping:
+# build phrase spans from parser structure, not from ad-hoc token tails.
+VP_DIRECT_CHILD_DEPS = {
+    "aux",
+    "auxpass",
+    "neg",
+    "prt",
+    "dobj",
+    "obj",
+    "iobj",
+    "attr",
+    "acomp",
+    "xcomp",
+    "advmod",
+    "prep",
+    "pobj",
+    "obl",
+    "npadvmod",
+}
+VP_SUBTREE_CHILD_DEPS = {"prep", "obl", "xcomp", "ccomp", "advcl"}
+
 
 def _word_tense(token) -> str:
     morph = token.morph
@@ -153,34 +174,19 @@ def _phrase_candidates(sent) -> List[Tuple[int, int, str]]:
 
     for token in sent:
         if token.dep_ == "ROOT" and token.pos_ in {"VERB", "AUX"}:
-            left_indices = [token.i] + [
-                c.i for c in token.children if c.dep_ in {"aux", "auxpass", "neg", "prt"}
-            ]
-            right_indices = [token.i] + [
-                c.i
-                for c in token.children
-                if c.dep_
-                in {
-                    "aux",
-                    "auxpass",
-                    "neg",
-                    "prt",
-                    "dobj",
-                    "obj",
-                    "iobj",
-                    "attr",
-                    "acomp",
-                    "xcomp",
-                    "advmod",
-                    "prep",
-                    "pobj",
-                    "obl",
-                    "npadvmod",
-                }
-            ]
-
-            start = min(left_indices)
-            end = max(right_indices) + 1
+            token_ids: set[int] = {token.i}
+            for child in token.children:
+                dep = child.dep_
+                if dep not in VP_DIRECT_CHILD_DEPS:
+                    continue
+                if dep in VP_SUBTREE_CHILD_DEPS:
+                    token_ids.update(tok.i for tok in child.subtree)
+                else:
+                    token_ids.add(child.i)
+            if not token_ids:
+                continue
+            start = min(token_ids)
+            end = max(token_ids) + 1
             key = (start, end)
             if key not in seen:
                 spans.append((start, end, "verb phrase"))
@@ -458,8 +464,28 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
             )
             sentence_node["linguistic_elements"].append(phrase_node)
 
+        # Always keep sentence words not covered by phrase spans.
+        covered_token_ids: set[int] = set()
+        for idx in top_level_indices:
+            start, end, _ = phrase_spans[idx]
+            covered_token_ids.update(range(start, end))
+
+        uncovered_sentence_tokens = [
+            token
+            for token in sent
+            if not token.is_space and token.i not in covered_token_ids
+        ]
+        uncovered_word_nodes = _build_word_nodes(
+            uncovered_sentence_tokens,
+            parent_id=sentence_id,
+            next_id=next_id,
+        )
+        sentence_node["linguistic_elements"] = _sort_children_by_span(
+            sentence_node["linguistic_elements"] + uncovered_word_nodes
+        )
+
         if not sentence_node["linguistic_elements"]:
-            # Fallback: attach words directly to sentence.
+            # Ultimate fallback: attach all sentence tokens.
             sentence_node["linguistic_elements"] = _build_word_nodes(
                 sent,
                 parent_id=sentence_id,

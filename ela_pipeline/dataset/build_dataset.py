@@ -12,6 +12,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
+from ela_pipeline.annotate.note_context import build_note_context_prompt
 from ela_pipeline.corpus import validate_cefr_corpus
 
 TELEMETRY_PATTERNS = (
@@ -424,54 +425,6 @@ def _extract_cefr_level(node: Dict[str, Any]) -> str | None:
     return None
 
 
-def _render_sentence_prompt(sentence: str, pos_text: str, dep_text: str, tam_bucket: str) -> str:
-    return (
-        f"task: write_linguistic_note "
-        f"template_version: {PROMPT_TEMPLATE_VERSION} "
-        f"node_type: Sentence "
-        f"tam_bucket: {tam_bucket} "
-        f"sentence: {sentence} "
-        f"pos: {pos_text} "
-        f"dep: {dep_text}"
-    )
-
-
-def _render_phrase_prompt(sentence: str, phrase_text: str, pos_text: str, dep_text: str, tam_bucket: str) -> str:
-    return (
-        f"task: write_linguistic_note "
-        f"template_version: {PROMPT_TEMPLATE_VERSION} "
-        f"node_type: Phrase "
-        f"tam_bucket: {tam_bucket} "
-        f"sentence: {sentence} "
-        f"phrase: {phrase_text} "
-        f"pos: {pos_text} "
-        f"dep: {dep_text}"
-    )
-
-
-def _render_word_prompt(
-    sentence: str,
-    word_text: str,
-    pos_text: str,
-    tag_text: str,
-    dep_text: str,
-    morph_text: str,
-    tam_bucket: str,
-) -> str:
-    return (
-        f"task: write_linguistic_note "
-        f"template_version: {PROMPT_TEMPLATE_VERSION} "
-        f"node_type: Word "
-        f"tam_bucket: {tam_bucket} "
-        f"sentence: {sentence} "
-        f"word: {word_text} "
-        f"pos: {pos_text} "
-        f"tag: {tag_text} "
-        f"dep: {dep_text} "
-        f"morph: {morph_text}"
-    )
-
-
 def _render_sentence_cefr_prompt(sentence: str, pos_text: str, dep_text: str, tam_bucket: str) -> str:
     return (
         f"task: predict_cefr_level "
@@ -573,11 +526,15 @@ def iter_examples(
         sentence_note = _extract_note_from_targets(sent_targets, counters=counters)
 
     if task == "linguistic_note" and sentence_note:
-        prompt = _render_sentence_prompt(
-            sentence=sentence,
-            pos_text=format_feature_list(sent_features.get("pos", [])),
-            dep_text=format_feature_list(sent_features.get("dep", [])),
-            tam_bucket=sent_tam,
+        prompt = build_note_context_prompt(
+            node=item,
+            parent=None,
+            sentence_node=item,
+            path_types=[str(item.get("type") or "").strip() or "Sentence"],
+            depth=0,
+            sibling_index=0,
+            sibling_count=1,
+            template_version=PROMPT_TEMPLATE_VERSION,
         )
         yield {
             "input": prompt,
@@ -590,7 +547,7 @@ def iter_examples(
         if counters is not None:
             counters["rows_emitted"] += 1
 
-    for node in _iter_descendants(item):
+    for node, parent, depth, sibling_index, sibling_count, path_types in _iter_descendants_with_context(item):
         node_type = node.get("type")
         if node_type == "Phrase":
             phrase_tam = _extract_tam_bucket(node)
@@ -625,12 +582,15 @@ def iter_examples(
                         tam_bucket=phrase_tam,
                     )
                 else:
-                    prompt = _render_phrase_prompt(
-                        sentence=sentence,
-                        phrase_text=phrase_text,
-                        pos_text=format_feature_list(phrase_features.get("pos", [])),
-                        dep_text=format_feature_list(phrase_features.get("dep", [])),
-                        tam_bucket=phrase_tam,
+                    prompt = build_note_context_prompt(
+                        node=node,
+                        parent=parent,
+                        sentence_node=item,
+                        path_types=path_types,
+                        depth=depth,
+                        sibling_index=sibling_index,
+                        sibling_count=sibling_count,
+                        template_version=PROMPT_TEMPLATE_VERSION,
                     )
                 yield {
                     "input": prompt,
@@ -680,14 +640,15 @@ def iter_examples(
                 tam_bucket=word_tam,
             )
         else:
-            prompt = _render_word_prompt(
-                sentence=sentence,
-                word_text=word_text,
-                pos_text=(word_features.get("pos", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                tag_text=(word_features.get("tag", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                dep_text=(word_features.get("dep", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                morph_text=format_feature_list(word_features.get("morph", [])),
-                tam_bucket=word_tam,
+            prompt = build_note_context_prompt(
+                node=node,
+                parent=parent,
+                sentence_node=item,
+                path_types=path_types,
+                depth=depth,
+                sibling_index=sibling_index,
+                sibling_count=sibling_count,
+                template_version=PROMPT_TEMPLATE_VERSION,
             )
         yield {
             "input": prompt,
@@ -707,6 +668,39 @@ def _iter_descendants(node: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
             continue
         yield child
         yield from _iter_descendants(child)
+
+
+def _iter_descendants_with_context(
+    node: Dict[str, Any],
+    *,
+    parent: Dict[str, Any] | None = None,
+    depth: int = 0,
+    path_types: list[str] | None = None,
+) -> Iterable[tuple[Dict[str, Any], Dict[str, Any] | None, int, int, int, list[str]]]:
+    current_path = list(path_types or [])
+    current_type = str(node.get("type") or "").strip()
+    if current_type:
+        current_path.append(current_type)
+    children = node.get("linguistic_elements", [])
+    if not isinstance(children, list):
+        return
+    total = len([c for c in children if isinstance(c, dict)])
+    idx = 0
+    for child in children:
+        if not isinstance(child, dict):
+            continue
+        child_path = list(current_path)
+        child_type = str(child.get("type") or "").strip()
+        if child_type:
+            child_path.append(child_type)
+        yield child, node, depth + 1, idx, total, child_path
+        yield from _iter_descendants_with_context(
+            child,
+            parent=node,
+            depth=depth + 1,
+            path_types=current_path,
+        )
+        idx += 1
 
 
 def _iter_nodes(item: Dict[str, Any]) -> Iterable[Dict[str, Any]]:

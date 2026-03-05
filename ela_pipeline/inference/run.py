@@ -601,7 +601,7 @@ def _attach_grammar_classes(doc: dict) -> None:
             walk(sentence_node)
 
 
-def _attach_generated_notes(doc: dict) -> None:
+def _attach_note_blueprints(doc: dict) -> None:
     def build_notes(node: dict) -> dict[str, str]:
         node_type = str(node.get("type") or "").strip().lower() or "node"
         role = str(node.get("grammatical_role") or "").strip().lower() or "unknown"
@@ -628,14 +628,12 @@ def _attach_generated_notes(doc: dict) -> None:
         generated = build_notes(node)
         if isinstance(generated, dict) and generated:
             node["note_blueprints"] = dict(generated)
-            node["generated_notes"] = generated
             existing_notes = node.get("linguistic_notes")
             if isinstance(existing_notes, list) and len(existing_notes) == 0:
                 intermediate = str(generated.get("intermediate_text") or "").strip()
                 node["linguistic_notes"] = [intermediate] if intermediate else []
         else:
             node.pop("note_blueprints", None)
-            node.pop("generated_notes", None)
             node["linguistic_notes"] = []
         for child in node.get("linguistic_elements", []) or []:
             if isinstance(child, dict):
@@ -650,19 +648,12 @@ def _apply_controlled_notes(doc: dict) -> None:
     """Populate user-facing linguistic_notes from classifier-owned note blueprints."""
 
     def walk(node: dict) -> None:
-        generated = node.get("generated_notes")
-        if isinstance(generated, dict):
-            preferred = str(generated.get("intermediate_text") or "").strip()
-            fallback = str(generated.get("elementary_text") or "").strip()
+        blueprints = node.get("note_blueprints")
+        if isinstance(blueprints, dict):
+            preferred = str(blueprints.get("intermediate_text") or "").strip()
+            fallback = str(blueprints.get("elementary_text") or "").strip()
             note = preferred or fallback
             node["linguistic_notes"] = [note] if note else []
-        else:
-            blueprints = node.get("note_blueprints")
-            if isinstance(blueprints, dict):
-                preferred = str(blueprints.get("intermediate_text") or "").strip()
-                fallback = str(blueprints.get("elementary_text") or "").strip()
-                note = preferred or fallback
-                node["linguistic_notes"] = [note] if note else []
         for child in node.get("linguistic_elements", []) or []:
             if isinstance(child, dict):
                 walk(child)
@@ -679,37 +670,65 @@ def _rewrite_controlled_notes_with_t5(doc: dict, renderer: Any) -> None:
         "advanced_text": "advanced",
     }
 
-    def walk(node: dict, sentence_text: str) -> None:
-        generated = node.get("generated_notes")
-        if isinstance(generated, dict):
-            node.setdefault("note_blueprints", dict(generated))
+    def walk(
+        node: dict,
+        sentence_node: dict,
+        parent: dict | None,
+        *,
+        path_types: list[str],
+        depth: int,
+        sibling_index: int,
+        sibling_count: int,
+    ) -> None:
+        blueprints = node.get("note_blueprints")
+        if isinstance(blueprints, dict):
             for key, level in key_to_level.items():
-                blueprint = str(generated.get(key) or "").strip()
+                blueprint = str(blueprints.get(key) or "").strip()
                 if not blueprint:
                     continue
                 rendered = str(
                     renderer.render_note(
                         blueprint_text=blueprint,
                         level=level,
-                        sentence_text=sentence_text,
-                        node_text=str(node.get("content") or "").strip(),
-                        node_type=str(node.get("type") or "").strip(),
-                        part_of_speech=str(node.get("part_of_speech") or "").strip(),
-                        cefr_level=str(node.get("cefr_level") or "").strip(),
+                        node=node,
+                        parent=parent,
+                        sentence_node=sentence_node,
+                        path_types=path_types,
+                        depth=depth,
+                        sibling_index=sibling_index,
+                        sibling_count=sibling_count,
                     )
                     or ""
                 ).strip()
                 if rendered:
-                    generated[key] = rendered
-        for child in node.get("linguistic_elements", []) or []:
+                    blueprints[key] = rendered
+        children = [c for c in (node.get("linguistic_elements") or []) if isinstance(c, dict)]
+        for idx, child in enumerate(children):
             if isinstance(child, dict):
-                walk(child, sentence_text)
+                child_type = str(child.get("type") or "").strip()
+                walk(
+                    child,
+                    sentence_node,
+                    node,
+                    path_types=[*path_types, child_type] if child_type else list(path_types),
+                    depth=depth + 1,
+                    sibling_index=idx,
+                    sibling_count=len(children),
+                )
 
     for sentence_node in doc.values():
         if not isinstance(sentence_node, dict):
             continue
-        sentence_text = str(sentence_node.get("content") or "")
-        walk(sentence_node, sentence_text)
+        sentence_type = str(sentence_node.get("type") or "").strip() or "Sentence"
+        walk(
+            sentence_node,
+            sentence_node,
+            None,
+            path_types=[sentence_type],
+            depth=0,
+            sibling_index=0,
+            sibling_count=1,
+        )
 
 
 def _attach_classifier_profiles(
@@ -717,7 +736,7 @@ def _attach_classifier_profiles(
     classifier: Any,
     *,
     include_grammar_classes: bool = True,
-    include_generated_notes: bool = True,
+    include_note_blueprints: bool = True,
 ) -> None:
     def walk(node: dict, sentence_text: str) -> None:
         source_text = _node_source_text(node, sentence_text)
@@ -727,9 +746,8 @@ def _attach_classifier_profiles(
             grammar_classes = profile.get("grammar_classes")
             node["grammar_classes"] = grammar_classes if isinstance(grammar_classes, list) else []
         generated_notes = profile.get("generated_notes")
-        if include_generated_notes and isinstance(generated_notes, dict):
+        if include_note_blueprints and isinstance(generated_notes, dict):
             node["note_blueprints"] = dict(generated_notes)
-            node["generated_notes"] = generated_notes
             existing_notes = node.get("linguistic_notes")
             if isinstance(existing_notes, list) and len(existing_notes) == 0:
                 intermediate = str(generated_notes.get("intermediate_text") or "").strip()
@@ -768,6 +786,29 @@ def _attach_note_generator_version(doc: dict, version: str) -> None:
 
     def walk(node: dict) -> None:
         node["note_generator_version"] = resolved
+        for child in node.get("linguistic_elements", []) or []:
+            if isinstance(child, dict):
+                walk(child)
+
+    for sentence_node in doc.values():
+        if isinstance(sentence_node, dict):
+            walk(sentence_node)
+
+
+def _prune_unused_legacy_fields(doc: dict) -> None:
+    """Remove legacy note-trace fields that are not used in controlled production flow."""
+    drop_keys = {
+        "generated_notes",
+        "notes",
+        "quality_flags",
+        "rejected_candidates",
+        "rejected_candidate_stats",
+        "reason_codes",
+    }
+
+    def walk(node: dict) -> None:
+        for key in drop_keys:
+            node.pop(key, None)
         for child in node.get("linguistic_elements", []) or []:
             if isinstance(child, dict):
                 walk(child)
@@ -912,7 +953,7 @@ def run_pipeline(
             enriched,
             classifier=classifier,
             include_grammar_classes=False,
-            include_generated_notes=False,
+            include_note_blueprints=False,
         )
     elif classifier_provider == "tabular":
         from ela_pipeline.classifier.tabular_cefr_predictor import TabularProfileClassifier
@@ -922,7 +963,7 @@ def run_pipeline(
             enriched,
             classifier=classifier,
             include_grammar_classes=False,
-            include_generated_notes=False,
+            include_note_blueprints=False,
         )
     elif classifier_provider == "rule":
         if enable_cefr:
@@ -945,7 +986,7 @@ def run_pipeline(
 
     if classifier_provider in {"rule", "tabular", "deberta"} and enable_grammar_classes:
         _attach_grammar_classes(enriched)
-        _attach_generated_notes(enriched)
+        _attach_note_blueprints(enriched)
     elif classifier_provider not in {"rule", "deberta", "tabular"}:
         raise ValueError("classifier_provider must be one of: rule | deberta | tabular")
 
@@ -963,6 +1004,7 @@ def run_pipeline(
             enriched,
             version=note_version,
         )
+        _prune_unused_legacy_fields(enriched)
 
     raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
     raise_if_invalid(validate_frozen_structure(skeleton, enriched))

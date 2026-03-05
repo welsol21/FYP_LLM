@@ -12,12 +12,28 @@ from .curriculum import validate_per_class_cefr_ladder
 from .train_tabular_cefr_baseline import extract_tabular_features, project_feature_profile
 
 CEFR_ALLOWED = {"A1", "A2", "B1", "B2", "C1", "C2"}
+CEFR_ORDER = ("A1", "A2", "B1", "B2", "C1", "C2")
 
 
 def _normalize_cefr(label: Any) -> str:
-    value = str(label or "").strip().upper()
+    value_raw = str(label or "").strip()
+    value = value_raw.upper()
     if value in CEFR_ALLOWED:
         return value
+    # Accept legacy/indexed labels from sklearn/xgboost models.
+    # Supported encodings:
+    # - 0..5 -> A1..C2
+    # - 1..6 -> A1..C2
+    # - float strings like "4.0"
+    try:
+        numeric = int(float(value_raw))
+    except (TypeError, ValueError):
+        numeric = None
+    if numeric is not None:
+        if 0 <= numeric < len(CEFR_ORDER):
+            return CEFR_ORDER[numeric]
+        if 1 <= numeric <= len(CEFR_ORDER):
+            return CEFR_ORDER[numeric - 1]
     raise ValueError(f"Invalid CEFR label from tabular classifier: {label!r}")
 
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import joblib
 
-from ela_pipeline.classifier.tabular_cefr_predictor import TabularCefrPredictor, TabularProfileClassifier
+from ela_pipeline.classifier.tabular_cefr_predictor import TabularCefrPredictor, TabularProfileClassifier, _normalize_cefr
 
 
 class _FakeModel:
@@ -24,6 +24,12 @@ class _FakeModel:
 
 
 class TabularCefrPredictorTests(unittest.TestCase):
+    def test_normalize_cefr_accepts_numeric_legacy_labels(self):
+        self.assertEqual(_normalize_cefr("0"), "A1")
+        self.assertEqual(_normalize_cefr("4"), "C1")
+        self.assertEqual(_normalize_cefr("6"), "C2")
+        self.assertEqual(_normalize_cefr("4.0"), "C1")
+
     def test_predict_row_uses_extracted_features(self):
         model = _FakeModel()
         predictor = TabularCefrPredictor(model)

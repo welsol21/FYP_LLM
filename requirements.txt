@@ -7,6 +7,7 @@ rouge-score
 pandas
 numpy
 scikit-learn
+xgboost
 accelerate
 
 spacy

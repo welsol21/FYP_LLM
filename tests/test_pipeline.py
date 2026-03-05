@@ -600,25 +600,22 @@ class PipelineTests(unittest.TestCase):
         class_ids = {str(item.get("class_id")) for item in classes if isinstance(item, dict)}
         self.assertIn("modal_perfect", class_ids)
         self.assertEqual(
-            sentence.get("generated_notes", {}).get("intermediate_text"),
+            sentence.get("note_blueprints", {}).get("intermediate_text"),
             "Explain how modal + have + past participle evaluates a past event.",
         )
 
-    def test_pipeline_attaches_generated_notes_and_populates_linguistic_notes(self):
+    def test_pipeline_attaches_note_blueprints_and_populates_linguistic_notes(self):
         out = run_pipeline("She trusted him.", model_dir=None)
         sentence = out[next(iter(out))]
-        generated = sentence.get("generated_notes")
         blueprints = sentence.get("note_blueprints")
-        self.assertIsInstance(generated, dict)
         self.assertIsInstance(blueprints, dict)
-        self.assertTrue(generated.get("elementary_text"))
-        self.assertTrue(generated.get("intermediate_text"))
-        self.assertTrue(generated.get("advanced_text"))
-        self.assertNotIn("pos::", str(generated.get("intermediate_text")))
-        self.assertNotIn("type::", str(generated.get("intermediate_text")))
-        self.assertNotIn("tam::", str(generated.get("intermediate_text")))
-        self.assertNotIn("tense_table::", str(generated.get("intermediate_text")))
-        self.assertEqual(blueprints, generated)
+        self.assertTrue(blueprints.get("elementary_text"))
+        self.assertTrue(blueprints.get("intermediate_text"))
+        self.assertTrue(blueprints.get("advanced_text"))
+        self.assertNotIn("pos::", str(blueprints.get("intermediate_text")))
+        self.assertNotIn("type::", str(blueprints.get("intermediate_text")))
+        self.assertNotIn("tam::", str(blueprints.get("intermediate_text")))
+        self.assertNotIn("tense_table::", str(blueprints.get("intermediate_text")))
         notes = sentence.get("linguistic_notes")
         self.assertIsInstance(notes, list)
         self.assertGreater(len(notes), 0)
@@ -630,38 +627,39 @@ class PipelineTests(unittest.TestCase):
             note_mode="controlled",
         )
         sentence = out[next(iter(out))]
-        generated = sentence.get("generated_notes")
         blueprints = sentence.get("note_blueprints")
-        self.assertIsInstance(generated, dict)
         self.assertIsInstance(blueprints, dict)
         self.assertEqual(
             sentence.get("linguistic_notes"),
-            [generated.get("intermediate_text")],
+            [blueprints.get("intermediate_text")],
         )
         self.assertEqual(sentence.get("note_generator_version"), "controlled::classifier_blueprints")
 
     def test_pipeline_default_note_mode_is_controlled(self):
         out = run_pipeline("She trusted him.", model_dir=None)
         sentence = out[next(iter(out))]
-        generated = sentence.get("generated_notes")
-        self.assertIsInstance(generated, dict)
+        blueprints = sentence.get("note_blueprints")
+        self.assertIsInstance(blueprints, dict)
         self.assertEqual(
             sentence.get("linguistic_notes"),
-            [generated.get("intermediate_text")],
+            [blueprints.get("intermediate_text")],
         )
 
-    def test_pipeline_skips_weak_phrase_candidates_and_generic_phrase_notes(self):
+    def test_pipeline_keeps_uncovered_sentence_words_when_phrase_nodes_exist(self):
         out = run_pipeline("She came to him towards morning.", model_dir=None)
         sentence = out[next(iter(out))]
         top_level_phrases = [node for node in sentence.get("linguistic_elements", []) if node.get("type") == "Phrase"]
         self.assertEqual(len(top_level_phrases), 1)
         phrase_text = str(top_level_phrases[0].get("content") or "")
-        self.assertTrue(phrase_text.startswith("came to him towards"))
+        self.assertTrue(phrase_text.startswith("came to him towards morning"))
         top_level_contents = [str(node.get("content") or "") for node in sentence.get("linguistic_elements", [])]
-        self.assertNotIn("She", top_level_contents)
-        self.assertNotIn("came", top_level_contents)
-        self.assertNotIn("to him", top_level_contents)
+        self.assertIn("She", top_level_contents)
         self.assertNotIn("towards morning", top_level_contents)
+        phrase_words = [
+            str(node.get("content") or "")
+            for node in self._iter_by_type(top_level_phrases[0], "Word")
+        ]
+        self.assertIn("morning", phrase_words)
 
     def test_pipeline_does_not_create_phrase_equal_to_whole_sentence(self):
         out = run_pipeline("She came to him towards morning.", model_dir=None)
@@ -717,13 +715,11 @@ class PipelineTests(unittest.TestCase):
             note_mode="controlled",
         )
         sentence = out[next(iter(out))]
-        generated = sentence.get("generated_notes", {})
         blueprints = sentence.get("note_blueprints", {})
-        self.assertTrue(str(generated.get("elementary_text")).startswith("rendered::elementary::"))
-        self.assertTrue(str(generated.get("intermediate_text")).startswith("rendered::intermediate::"))
-        self.assertTrue(str(generated.get("advanced_text")).startswith("rendered::advanced::"))
-        self.assertFalse(str(blueprints.get("intermediate_text")).startswith("rendered::"))
-        self.assertEqual(sentence.get("linguistic_notes"), [generated.get("intermediate_text")])
+        self.assertTrue(str(blueprints.get("elementary_text")).startswith("rendered::elementary::"))
+        self.assertTrue(str(blueprints.get("intermediate_text")).startswith("rendered::intermediate::"))
+        self.assertTrue(str(blueprints.get("advanced_text")).startswith("rendered::advanced::"))
+        self.assertEqual(sentence.get("linguistic_notes"), [blueprints.get("intermediate_text")])
 
     @patch("ela_pipeline.classifier.deberta.DebertaProfileClassifier")
     def test_pipeline_uses_deberta_classifier_provider(self, mock_classifier_cls):
@@ -745,8 +741,8 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(sentence.get("cefr_level"), "B2")
         self.assertIsInstance(sentence.get("grammar_classes"), list)
         self.assertGreater(len(sentence.get("grammar_classes")), 0)
-        self.assertTrue(sentence.get("generated_notes", {}).get("intermediate_text"))
-        self.assertEqual(sentence.get("linguistic_notes"), [sentence.get("generated_notes", {}).get("intermediate_text")])
+        self.assertTrue(sentence.get("note_blueprints", {}).get("intermediate_text"))
+        self.assertEqual(sentence.get("linguistic_notes"), [sentence.get("note_blueprints", {}).get("intermediate_text")])
         self.assertGreaterEqual(fake_classifier.classify_node.call_count, 1)
 
     @patch("ela_pipeline.classifier.tabular_cefr_predictor.TabularProfileClassifier")
@@ -768,8 +764,8 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(sentence.get("cefr_level"), "B1")
         self.assertIsInstance(sentence.get("grammar_classes"), list)
         self.assertGreater(len(sentence.get("grammar_classes")), 0)
-        self.assertTrue(sentence.get("generated_notes", {}).get("intermediate_text"))
-        self.assertEqual(sentence.get("linguistic_notes"), [sentence.get("generated_notes", {}).get("intermediate_text")])
+        self.assertTrue(sentence.get("note_blueprints", {}).get("intermediate_text"))
+        self.assertEqual(sentence.get("linguistic_notes"), [sentence.get("note_blueprints", {}).get("intermediate_text")])
         self.assertGreaterEqual(fake_classifier.classify_node.call_count, 1)
 
     @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.annotate")
@@ -779,7 +775,7 @@ class PipelineTests(unittest.TestCase):
             sentence = doc[next(iter(doc))]
             sentence["cefr_level"] = "C2"
             sentence["grammar_classes"] = [{"class_id": "tampered::from_t5", "confidence": 1.0}]
-            sentence["generated_notes"] = {
+            sentence["note_blueprints"] = {
                 "elementary_text": "tampered",
                 "intermediate_text": "tampered",
                 "advanced_text": "tampered",
@@ -797,7 +793,7 @@ class PipelineTests(unittest.TestCase):
         sentence = out[next(iter(out))]
         class_ids = {row["class_id"] for row in sentence.get("grammar_classes", []) if isinstance(row, dict)}
         self.assertNotIn("tampered::from_t5", class_ids)
-        self.assertNotEqual(sentence.get("generated_notes", {}).get("intermediate_text"), "tampered")
+        self.assertNotEqual(sentence.get("note_blueprints", {}).get("intermediate_text"), "tampered")
 
     def test_pipeline_replaces_weak_one_word_phrases_with_sentence_words_fallback(self):
         out = run_pipeline("I run.", model_dir=None)

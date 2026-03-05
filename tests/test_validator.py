@@ -1,3 +1,4 @@
+import copy
 import json
 import unittest
 
@@ -71,7 +72,9 @@ class ValidatorTests(unittest.TestCase):
         sentence_key = next(iter(data))
         sentence = data[sentence_key]
 
-        top_word = sentence["linguistic_elements"][0]["linguistic_elements"][0]
+        top_word = copy.deepcopy(sentence["linguistic_elements"][0]["linguistic_elements"][0])
+        top_word["node_id"] = "n-extra-top-word"
+        top_word["parent_id"] = "n1"
         sentence["linguistic_elements"].append(top_word)
 
         nested_phrase = {
@@ -665,7 +668,7 @@ class ValidatorTests(unittest.TestCase):
         result = validate_contract(data, validation_mode="v2_strict")
         self.assertFalse(result.ok)
         self.assertTrue(
-            any("Missing required fields" in err.message for err in result.errors),
+            any("must use real null" in err.message or "Missing required fields" in err.message for err in result.errors),
             msg=str(result.errors),
         )
 

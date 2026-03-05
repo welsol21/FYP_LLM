@@ -7,6 +7,7 @@ import os
 import torch
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
+from ela_pipeline.annotate.note_context import build_note_context_prompt
 from ela_pipeline.validation.notes_quality import sanitize_note
 
 
@@ -47,17 +48,31 @@ class ControlledT5NoteRenderer:
         *,
         blueprint_text: str,
         level: str,
-        sentence_text: str,
-        node_text: str,
-        node_type: str,
-        part_of_speech: str,
-        cefr_level: str,
+        node: dict,
+        parent: dict | None,
+        sentence_node: dict,
+        path_types: list[str],
+        depth: int,
+        sibling_index: int,
+        sibling_count: int,
     ) -> str:
+        context = build_note_context_prompt(
+            node=node,
+            parent=parent,
+            sentence_node=sentence_node,
+            path_types=path_types,
+            depth=depth,
+            sibling_index=sibling_index,
+            sibling_count=sibling_count,
+            template_version="v2_flat_context",
+        )
         return (
             "Rewrite this linguistic note blueprint into one short educational note in natural English. "
-            "Keep grammar meaning precise. Do not add JSON, labels, or extra fields. "
-            f"Level: {level}. CEFR: {cefr_level}. Node type: {node_type}. Part of speech: {part_of_speech}. "
-            f"Sentence: {sentence_text} Node: {node_text} Blueprint: {blueprint_text}"
+            "Keep grammar meaning precise. Use only grammatical context from the payload. "
+            "Do not add JSON, labels, or extra fields. "
+            f"Audience level: {level}. "
+            f"Blueprint: {blueprint_text}. "
+            f"Context: {context}"
         )
 
     def render_note(
@@ -65,20 +80,24 @@ class ControlledT5NoteRenderer:
         *,
         blueprint_text: str,
         level: str,
-        sentence_text: str,
-        node_text: str,
-        node_type: str,
-        part_of_speech: str,
-        cefr_level: str,
+        node: dict,
+        parent: dict | None,
+        sentence_node: dict,
+        path_types: list[str],
+        depth: int,
+        sibling_index: int,
+        sibling_count: int,
     ) -> str:
         prompt = self._build_prompt(
             blueprint_text=blueprint_text,
             level=level,
-            sentence_text=sentence_text,
-            node_text=node_text,
-            node_type=node_type,
-            part_of_speech=part_of_speech,
-            cefr_level=cefr_level,
+            node=node,
+            parent=parent,
+            sentence_node=sentence_node,
+            path_types=path_types,
+            depth=depth,
+            sibling_index=sibling_index,
+            sibling_count=sibling_count,
         )
         enc = self.tokenizer(
             prompt,

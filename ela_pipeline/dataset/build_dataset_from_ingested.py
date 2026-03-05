@@ -14,6 +14,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
+from ela_pipeline.annotate.note_context import build_note_context_prompt
 from ela_pipeline.dataset.build_dataset import (
     PROMPT_TEMPLATE_VERSION,
     _build_template_target,
@@ -24,7 +25,6 @@ from ela_pipeline.dataset.build_dataset import (
     balance_rows_by_level_tam,
     dedup_and_cap_rows,
     evaluate_quality_gates,
-    format_feature_list,
     split_data,
     write_jsonl,
 )
@@ -110,66 +110,19 @@ def _features_for_level(row: Dict[str, Any], level: str) -> Dict[str, List[str]]
     }
 
 
-def _render_sentence_prompt(sentence: str, pos_text: str, dep_text: str, tam_bucket: str) -> str:
-    return (
-        f"task: write_linguistic_note "
-        f"template_version: {PROMPT_TEMPLATE_VERSION} "
-        f"node_type: Sentence "
-        f"tam_bucket: {tam_bucket} "
-        f"sentence: {sentence} "
-        f"pos: {pos_text} "
-        f"dep: {dep_text}"
-    )
-
-
-def _render_phrase_prompt(sentence: str, phrase_text: str, pos_text: str, dep_text: str, tam_bucket: str) -> str:
-    return (
-        f"task: write_linguistic_note "
-        f"template_version: {PROMPT_TEMPLATE_VERSION} "
-        f"node_type: Phrase "
-        f"tam_bucket: {tam_bucket} "
-        f"sentence: {sentence} "
-        f"phrase: {phrase_text} "
-        f"pos: {pos_text} "
-        f"dep: {dep_text}"
-    )
-
-
-def _render_word_prompt(
-    sentence: str,
-    word_text: str,
-    pos_text: str,
-    tag_text: str,
-    dep_text: str,
-    morph_text: str,
-    tam_bucket: str,
-) -> str:
-    return (
-        f"task: write_linguistic_note "
-        f"template_version: {PROMPT_TEMPLATE_VERSION} "
-        f"node_type: Word "
-        f"tam_bucket: {tam_bucket} "
-        f"sentence: {sentence} "
-        f"word: {word_text} "
-        f"pos: {pos_text} "
-        f"tag: {tag_text} "
-        f"dep: {dep_text} "
-        f"morph: {morph_text}"
-    )
-
-
 def _make_rows(nodes_dir: Path) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
     rows: List[Dict[str, str]] = []
     counters: Dict[str, int] = defaultdict(int)
 
     for level, fname in [("Sentence", "sentences.jsonl"), ("Phrase", "phrases.jsonl"), ("Word", "words.jsonl")]:
         for node in _iter_jsonl(nodes_dir / fname):
-            content = str(node.get("content", "")).strip()
-            sentence = str(node.get("sentence_text", "")).strip() or content
+            src = node
+            content = str(src.get("content", "")).strip()
+            sentence = str(src.get("sentence_text", "")).strip() or content
             if not content:
                 continue
-            features = _features_for_level(node, level)
-            tam = _tam_bucket(node)
+            features = _features_for_level(src, level)
+            tam = _tam_bucket(src)
             target, reason = _build_template_target(level, content, features, tam)
             if not target:
                 if reason:
@@ -177,29 +130,135 @@ def _make_rows(nodes_dir: Path) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
                 continue
 
             if level == "Sentence":
-                prompt = _render_sentence_prompt(
-                    sentence=sentence,
-                    pos_text=format_feature_list(features.get("pos", [])),
-                    dep_text=format_feature_list(features.get("dep", [])),
-                    tam_bucket=tam,
+                sentence_node = {
+                    "type": "Sentence",
+                    "content": content,
+                    "part_of_speech": "sentence",
+                    "grammatical_role": "root",
+                    "cefr_level": src.get("cefr_level"),
+                    "tense": src.get("tense"),
+                    "aspect": src.get("aspect"),
+                    "mood": src.get("mood"),
+                    "voice": src.get("voice"),
+                    "finiteness": src.get("finiteness"),
+                    "tam_construction": src.get("tam_construction") or tam,
+                    "grammar_classes": src.get("grammar_classes"),
+                    "source_span": src.get("source_span"),
+                    "linguistic_elements": [],
+                }
+                prompt = build_note_context_prompt(
+                    node=sentence_node,
+                    parent=None,
+                    sentence_node=sentence_node,
+                    path_types=["Sentence"],
+                    depth=0,
+                    sibling_index=0,
+                    sibling_count=1,
+                    template_version=PROMPT_TEMPLATE_VERSION,
                 )
             elif level == "Phrase":
-                prompt = _render_phrase_prompt(
-                    sentence=sentence,
-                    phrase_text=content,
-                    pos_text=format_feature_list(features.get("pos", [])),
-                    dep_text=format_feature_list(features.get("dep", [])),
-                    tam_bucket=tam,
+                phrase_node = {
+                    "type": "Phrase",
+                    "content": content,
+                    "part_of_speech": src.get("part_of_speech"),
+                    "grammatical_role": src.get("grammatical_role"),
+                    "cefr_level": src.get("cefr_level"),
+                    "tense": src.get("tense"),
+                    "aspect": src.get("aspect"),
+                    "mood": src.get("mood"),
+                    "voice": src.get("voice"),
+                    "finiteness": src.get("finiteness"),
+                    "tam_construction": src.get("tam_construction") or tam,
+                    "grammar_classes": src.get("grammar_classes"),
+                    "source_span": src.get("source_span"),
+                    "linguistic_elements": [],
+                }
+                sentence_stub = {
+                    "type": "Sentence",
+                    "content": sentence,
+                    "part_of_speech": "sentence",
+                    "grammatical_role": "clause",
+                    "cefr_level": src.get("sentence_cefr_level") or src.get("cefr_level"),
+                    "tense": src.get("sentence_tense"),
+                    "aspect": src.get("sentence_aspect"),
+                    "mood": src.get("sentence_mood"),
+                    "voice": src.get("sentence_voice"),
+                    "finiteness": src.get("sentence_finiteness"),
+                    "tam_construction": src.get("sentence_tam_construction"),
+                    "grammar_classes": src.get("sentence_grammar_classes"),
+                    "source_span": None,
+                    "linguistic_elements": [],
+                }
+                prompt = build_note_context_prompt(
+                    node=phrase_node,
+                    parent=sentence_stub,
+                    sentence_node=sentence_stub,
+                    path_types=["Sentence", "Phrase"],
+                    depth=1,
+                    sibling_index=0,
+                    sibling_count=1,
+                    template_version=PROMPT_TEMPLATE_VERSION,
                 )
             else:
-                prompt = _render_word_prompt(
-                    sentence=sentence,
-                    word_text=content,
-                    pos_text=(features.get("pos", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                    tag_text=(features.get("tag", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                    dep_text=(features.get("dep", ["UNKNOWN"]) or ["UNKNOWN"])[0],
-                    morph_text=format_feature_list(features.get("morph", [])),
-                    tam_bucket=tam,
+                word_node = {
+                    "type": "Word",
+                    "content": content,
+                    "part_of_speech": src.get("part_of_speech"),
+                    "grammatical_role": src.get("grammatical_role"),
+                    "cefr_level": src.get("cefr_level"),
+                    "tense": src.get("tense"),
+                    "aspect": src.get("aspect"),
+                    "mood": src.get("mood"),
+                    "voice": src.get("voice"),
+                    "finiteness": src.get("finiteness"),
+                    "tam_construction": src.get("tam_construction") or tam,
+                    "grammar_classes": src.get("grammar_classes"),
+                    "source_span": src.get("source_span"),
+                    "dep_label": src.get("dep_label"),
+                    "head_id": src.get("head_id"),
+                    "linguistic_elements": [],
+                }
+                parent_stub = {
+                    "type": "Phrase",
+                    "content": src.get("parent_content"),
+                    "part_of_speech": src.get("parent_part_of_speech"),
+                    "grammatical_role": src.get("parent_grammatical_role"),
+                    "cefr_level": src.get("parent_cefr_level"),
+                    "tense": src.get("parent_tense"),
+                    "aspect": src.get("parent_aspect"),
+                    "mood": src.get("parent_mood"),
+                    "voice": src.get("parent_voice"),
+                    "finiteness": src.get("parent_finiteness"),
+                    "tam_construction": src.get("parent_tam_construction"),
+                    "grammar_classes": src.get("parent_grammar_classes"),
+                    "source_span": None,
+                    "linguistic_elements": [],
+                }
+                sentence_stub = {
+                    "type": "Sentence",
+                    "content": sentence,
+                    "part_of_speech": "sentence",
+                    "grammatical_role": "clause",
+                    "cefr_level": src.get("sentence_cefr_level") or src.get("cefr_level"),
+                    "tense": src.get("sentence_tense"),
+                    "aspect": src.get("sentence_aspect"),
+                    "mood": src.get("sentence_mood"),
+                    "voice": src.get("sentence_voice"),
+                    "finiteness": src.get("sentence_finiteness"),
+                    "tam_construction": src.get("sentence_tam_construction"),
+                    "grammar_classes": src.get("sentence_grammar_classes"),
+                    "source_span": None,
+                    "linguistic_elements": [],
+                }
+                prompt = build_note_context_prompt(
+                    node=word_node,
+                    parent=parent_stub,
+                    sentence_node=sentence_stub,
+                    path_types=["Sentence", "Phrase", "Word"],
+                    depth=2,
+                    sibling_index=0,
+                    sibling_count=1,
+                    template_version=PROMPT_TEMPLATE_VERSION,
                 )
 
             rows.append(
