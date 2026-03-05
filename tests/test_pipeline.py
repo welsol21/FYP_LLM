@@ -1,4 +1,5 @@
 import unittest
+import re
 from unittest.mock import MagicMock, patch
 
 from ela_pipeline.annotate.local_generator import LocalT5Annotator
@@ -18,6 +19,8 @@ from ela_pipeline.tam.rules import apply_tam
 
 
 class PipelineTests(unittest.TestCase):
+    TOKEN_RE = re.compile(r"[A-Za-z0-9']+")
+
     @staticmethod
     def _iter_descendants(node):
         for child in node.get("linguistic_elements", []):
@@ -684,6 +687,24 @@ class PipelineTests(unittest.TestCase):
             notes = " ".join(phrase.get("linguistic_notes") or [])
             self.assertNotIn("Main grammar focus: phrase structure", notes)
             self.assertNotIn("This phrase is used as modifier", notes)
+
+    def test_pipeline_phrase_nodes_respect_minimum_quality_and_word_spans_are_unique(self):
+        out = run_pipeline("She came to him towards morning.", model_dir=None)
+        sentence = out[next(iter(out))]
+
+        word_spans: set[tuple[int, int]] = set()
+        for word in self._iter_by_type(sentence, "Word"):
+            span = word.get("source_span") or {}
+            key = (int(span.get("start", -1)), int(span.get("end", -1)))
+            self.assertNotIn(key, word_spans)
+            word_spans.add(key)
+
+        for phrase in self._iter_by_type(sentence, "Phrase"):
+            phrase_text = str(phrase.get("content") or "")
+            token_count = len(self.TOKEN_RE.findall(phrase_text))
+            self.assertGreaterEqual(token_count, 2)
+            if str(phrase.get("part_of_speech") or "") == "prepositional phrase":
+                self.assertGreaterEqual(token_count, 3)
 
     @patch("ela_pipeline.annotate.controlled_renderer.ControlledT5NoteRenderer")
     @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.__init__", side_effect=AssertionError("must not be called"))
