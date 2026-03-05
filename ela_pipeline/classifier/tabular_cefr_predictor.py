@@ -8,7 +8,9 @@ from typing import Any
 
 import joblib
 
-from .grammar_blueprints import build_note_blueprints, class_cefr_level
+from .class_taxonomy import normalize_grammar_class_id
+from .grammar_blueprints import build_note_blueprints
+from .grammar_rules import map_pedagogical_grammar_classes
 from .curriculum import validate_per_class_cefr_ladder
 from .train_tabular_cefr_baseline import extract_tabular_features, project_feature_profile
 
@@ -96,7 +98,11 @@ class TabularJointProfilePredictor:
             return str(item[0]).strip(), str(item[1]).strip().lower()
         if hasattr(item, "__len__") and not isinstance(item, str) and len(item) >= 2:  # numpy row
             return str(item[0]).strip(), str(item[1]).strip().lower()
-        return str(item).strip(), ""
+        scalar = str(item).strip()
+        if "|" in scalar:
+            cefr, grammar_class = scalar.split("|", 1)
+            return cefr.strip(), grammar_class.strip().lower()
+        return scalar, ""
 
 
 class TabularProfileClassifier:
@@ -179,22 +185,52 @@ class TabularProfileClassifier:
             },
         }
 
+    def _resolve_note_blueprints(self, *, cefr: str, class_id: str) -> dict[str, str]:
+        generated = build_note_blueprints(grammar_classes=[class_id], cefr_level=cefr) if class_id else {}
+        required_keys = ("elementary_text", "intermediate_text", "advanced_text")
+        if all(str(generated.get(k) or "").strip() for k in required_keys):
+            return {k: str(generated.get(k) or "").strip() for k in required_keys}
+
+        per_cefr = self._metadata.get("note_blueprints_by_cefr")
+        if isinstance(per_cefr, dict):
+            candidate = per_cefr.get(cefr)
+            if isinstance(candidate, dict):
+                fallback = {k: str(candidate.get(k) or "").strip() for k in required_keys}
+                if all(fallback[k] for k in required_keys):
+                    return fallback
+
+        return {
+            "elementary_text": f"[{cefr}] identify the grammar pattern in this node.",
+            "intermediate_text": f"[{cefr}] explain the grammar pattern and its meaning in context.",
+            "advanced_text": f"[{cefr}] analyze the grammar pattern and its discourse function in context.",
+        }
+
+    @staticmethod
+    def _rule_candidates(node: dict[str, Any], source_text: str) -> list[str]:
+        features = node.get("features") if isinstance(node.get("features"), dict) else {}
+        dep_labels = features.get("dep") if isinstance(features.get("dep"), list) else []
+        return map_pedagogical_grammar_classes(
+            tense=str(node.get("tense") or ""),
+            aspect=str(node.get("aspect") or ""),
+            mood=str(node.get("mood") or ""),
+            voice=str(node.get("voice") or ""),
+            tam_construction=str(node.get("tam_construction") or ""),
+            dep_labels=dep_labels,
+            content=str(node.get("content") or source_text or ""),
+            node_type=str(node.get("type") or ""),
+            part_of_speech=str(node.get("part_of_speech") or ""),
+        )
+
     def classify_node(self, *, node: dict[str, Any], source_text: str, sentence_text: str) -> dict[str, Any]:
         row = self._build_runtime_row(node=node, source_text=source_text)
         if self._joint_mode:
             pred_cefr, pred_class = self._predictor.predict_row(row)
-            class_id = str(pred_class or "").strip().lower()
+            class_id = normalize_grammar_class_id(str(pred_class or "").strip().lower())
             cefr = _normalize_cefr(pred_cefr)
-            if class_id:
-                # Keep CEFR and class consistent with pedagogical class registry.
-                mapped_cefr = class_cefr_level(class_id)
-                if mapped_cefr:
-                    cefr = mapped_cefr
-            note_blueprints = (
-                build_note_blueprints(grammar_classes=[class_id], cefr_level=cefr)
-                if class_id
-                else {}
-            )
+            rule_candidates = self._rule_candidates(node=node, source_text=source_text)
+            if rule_candidates and class_id not in set(rule_candidates):
+                class_id = str(rule_candidates[0]).strip().lower()
+            note_blueprints = self._resolve_note_blueprints(cefr=cefr, class_id=class_id)
             return {
                 "cefr_level": cefr,
                 "grammar_classes": (

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .class_taxonomy import normalize_grammar_class_id
+
 from typing import Any
 
 
@@ -199,7 +201,11 @@ def build_note_blueprints(
     grammatical_role: str | None = None,
     tam_construction: str | None = None,
 ) -> dict[str, str]:
-    class_ids = [str(class_id).strip() for class_id in (grammar_classes or []) if str(class_id).strip()]
+    class_ids = [
+        normalize_grammar_class_id(str(class_id).strip())
+        for class_id in (grammar_classes or [])
+        if str(class_id).strip()
+    ]
     primary_class = next((class_id for class_id in class_ids if class_id in PEDAGOGICAL_CLASS_SPECS), "")
     if primary_class:
         spec = PEDAGOGICAL_CLASS_SPECS[primary_class]
@@ -212,7 +218,7 @@ def build_note_blueprints(
 
 
 def class_cefr_level(class_id: str) -> str | None:
-    spec = PEDAGOGICAL_CLASS_SPECS.get(str(class_id or "").strip())
+    spec = PEDAGOGICAL_CLASS_SPECS.get(normalize_grammar_class_id(str(class_id or "").strip()))
     if not isinstance(spec, dict):
         return None
     value = str(spec.get("cefr_level") or "").strip().upper()

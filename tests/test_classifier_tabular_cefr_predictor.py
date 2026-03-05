@@ -34,6 +34,16 @@ class _FakeJointModel:
         return out
 
 
+class _FakeJointModelScalar:
+    def predict(self, rows):
+        return ["A1|prepositions_time" for _ in rows]
+
+
+class _FakeJointModelIncompatibleClass:
+    def predict(self, rows):
+        return ["A2|modal_can_ability" for _ in rows]
+
+
 class TabularCefrPredictorTests(unittest.TestCase):
     def test_normalize_cefr_accepts_numeric_legacy_labels(self):
         self.assertEqual(_normalize_cefr("0"), "A1")
@@ -140,6 +150,59 @@ class TabularCefrPredictorTests(unittest.TestCase):
             self.assertEqual(profile["grammar_classes"][0]["class_id"], "pronoun_reference")
             self.assertIsInstance(profile.get("generated_notes"), dict)
             self.assertTrue(profile["generated_notes"].get("intermediate_text"))
+
+    def test_tabular_profile_classifier_joint_model_parses_scalar_joint_label(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model_dir = Path(tmpdir)
+            joblib.dump(_FakeJointModelScalar(), model_dir / "best_tabular_joint_profile.joblib")
+            metadata = {
+                "per_class_cefr_ladder": {"prepositions_time": ["A1", "A2", "B1", "B2", "C1", "C2"]},
+                "grammar_classes_by_cefr": {"A1": [], "A2": ["prepositions_time"], "B1": [], "B2": [], "C1": [], "C2": []},
+                "note_blueprints_by_cefr": {level: {"elementary_text": f"{level} e", "intermediate_text": f"{level} i", "advanced_text": f"{level} a"} for level in ["A1","A2","B1","B2","C1","C2"]},
+            }
+            (model_dir / "classifier_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+            (model_dir / "tabular_cefr_baseline_summary.json").write_text(
+                json.dumps({"feature_profile": "runtime_stable"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            classifier = TabularProfileClassifier(str(model_dir))
+            profile = classifier.classify_node(
+                node={"features": {"dep": ["prep", "pobj"], "pos": ["ADP", "NOUN"]}},
+                source_text="towards morning",
+                sentence_text="She came to him towards morning.",
+            )
+            self.assertEqual(profile["cefr_level"], "A1")
+            self.assertEqual(profile["grammar_classes"][0]["class_id"], "preposition_linker")
+            self.assertIsInstance(profile.get("generated_notes"), dict)
+            self.assertTrue(str(profile["generated_notes"].get("elementary_text") or "").strip())
+            self.assertTrue(str(profile["generated_notes"].get("intermediate_text") or "").strip())
+            self.assertTrue(str(profile["generated_notes"].get("advanced_text") or "").strip())
+
+    def test_tabular_profile_classifier_joint_model_applies_rule_sanity_on_class(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model_dir = Path(tmpdir)
+            joblib.dump(_FakeJointModelIncompatibleClass(), model_dir / "best_tabular_joint_profile.joblib")
+            metadata = {
+                "per_class_cefr_ladder": {
+                    "pronoun_reference": ["A1", "A2", "B1", "B2", "C1", "C2"],
+                    "modal_can_ability": ["A1", "A2", "B1", "B2", "C1", "C2"],
+                },
+                "grammar_classes_by_cefr": {"A1": ["pronoun_reference"], "A2": ["modal_can_ability"], "B1": [], "B2": [], "C1": [], "C2": []},
+                "note_blueprints_by_cefr": {level: {"elementary_text": f"{level} e", "intermediate_text": f"{level} i", "advanced_text": f"{level} a"} for level in ["A1","A2","B1","B2","C1","C2"]},
+            }
+            (model_dir / "classifier_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+            (model_dir / "tabular_cefr_baseline_summary.json").write_text(
+                json.dumps({"feature_profile": "runtime_stable"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            classifier = TabularProfileClassifier(str(model_dir))
+            profile = classifier.classify_node(
+                node={"type": "Word", "part_of_speech": "pronoun", "features": {"dep": ["nsubj"], "pos": ["PRON"]}},
+                source_text="She",
+                sentence_text="She came.",
+            )
+            self.assertEqual(profile["cefr_level"], "A2")
+            self.assertEqual(profile["grammar_classes"][0]["class_id"], "pronoun_reference")
 
 
 if __name__ == "__main__":

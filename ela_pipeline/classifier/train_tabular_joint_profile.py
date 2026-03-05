@@ -9,11 +9,12 @@ from pathlib import Path
 from typing import Any
 
 import joblib
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.metrics import accuracy_score, f1_score
 from sklearn.pipeline import Pipeline
+import numpy as np
 
+from .class_taxonomy import normalize_grammar_class_id
 from .metadata import build_classifier_metadata_from_dataset
 from .train_tabular_cefr_baseline import extract_tabular_features, project_feature_profile
 
@@ -41,7 +42,9 @@ def _safe_list(value: Any) -> list[str]:
 
 def _primary_class(row: dict[str, Any]) -> str:
     classes = _safe_list(row.get("grammar_classes"))
-    return classes[0] if classes else "unknown_class"
+    if not classes:
+        return "unknown_class"
+    return normalize_grammar_class_id(classes[0]) or "unknown_class"
 
 
 def _normalize_cefr(value: Any) -> str:
@@ -55,6 +58,38 @@ def _split_joint_label(value: str) -> tuple[str, str]:
         return text.strip().upper(), ""
     cefr, grammar_class = text.split("|", 1)
     return cefr.strip().upper(), grammar_class.strip().lower()
+
+
+def _assert_gpu_training_available() -> None:
+    try:
+        import xgboost as xgb
+    except Exception as exc:
+        raise ImportError("xgboost is required for GPU tabular training") from exc
+    build_info = xgb.build_info()
+    if not bool(build_info.get("USE_CUDA")):
+        raise RuntimeError("GPU-only policy: installed xgboost was built without CUDA support.")
+
+
+def _assert_model_trained_on_gpu(model: Any, model_name: str) -> None:
+    classifier = model
+    if hasattr(model, "named_steps") and isinstance(model.named_steps, dict):
+        classifier = model.named_steps.get("classifier", model)
+    if not hasattr(classifier, "get_booster"):
+        return
+    try:
+        booster_cfg = json.loads(classifier.get_booster().save_config())
+    except Exception:
+        return
+    device = (
+        booster_cfg.get("learner", {})
+        .get("generic_param", {})
+        .get("device", "")
+        .lower()
+    )
+    if not device.startswith("cuda"):
+        raise RuntimeError(
+            f"GPU-only policy violated: model '{model_name}' trained on device='{device or 'unknown'}'."
+        )
 
 
 def _feature_row(row: dict[str, Any], *, profile: str = "runtime_stable") -> dict[str, Any]:
@@ -108,26 +143,48 @@ def train_tabular_joint_profile(
     x_dev, y_dev_joint, y_dev_cefr, y_dev_class = _build_xy(dev_rows, feature_profile=feature_profile)
     x_test, y_test_joint, y_test_cefr, y_test_class = _build_xy(test_rows, feature_profile=feature_profile)
 
+    _assert_gpu_training_available()
+    joint_label_order = sorted(set(y_train_joint) | set(y_dev_joint) | set(y_test_joint))
+    joint_to_id = {label: idx for idx, label in enumerate(joint_label_order)}
+    id_to_joint = {idx: label for label, idx in joint_to_id.items()}
+    y_train_ids = [joint_to_id[label] for label in y_train_joint]
+    y_dev_ids = [joint_to_id[label] for label in y_dev_joint]
+    y_test_ids = [joint_to_id[label] for label in y_test_joint]
+
+    try:
+        from xgboost import XGBClassifier
+    except Exception as exc:
+        raise ImportError("xgboost is required for GPU tabular training") from exc
+
     model = Pipeline(
         steps=[
             ("vectorizer", DictVectorizer(sparse=False)),
             (
                 "classifier",
-                RandomForestClassifier(
-                    n_estimators=700,
-                    max_depth=None,
-                    min_samples_leaf=1,
-                    class_weight="balanced_subsample",
-                    n_jobs=-1,
+                XGBClassifier(
+                    objective="multi:softmax",
+                    num_class=int(len(joint_label_order)),
+                    n_estimators=800,
+                    max_depth=10,
+                    learning_rate=0.06,
+                    subsample=0.9,
+                    colsample_bytree=0.9,
+                    reg_lambda=1.0,
                     random_state=seed,
+                    tree_method="hist",
+                    device="cuda",
+                    eval_metric="mlogloss",
                 ),
             ),
         ]
     )
-    model.fit(x_train, y_train_joint)
+    model.fit(x_train, y_train_ids)
+    _assert_model_trained_on_gpu(model, "xgboost_joint_gpu")
 
-    dev_pred_joint = [str(item) for item in model.predict(x_dev)]
-    test_pred_joint = [str(item) for item in model.predict(x_test)]
+    dev_pred_ids = model.predict(x_dev)
+    test_pred_ids = model.predict(x_test)
+    dev_pred_joint = [id_to_joint[int(x)] for x in (dev_pred_ids.tolist() if isinstance(dev_pred_ids, np.ndarray) else list(dev_pred_ids))]
+    test_pred_joint = [id_to_joint[int(x)] for x in (test_pred_ids.tolist() if isinstance(test_pred_ids, np.ndarray) else list(test_pred_ids))]
 
     dev_pred_cefr, dev_pred_class = zip(*[_split_joint_label(item) for item in dev_pred_joint])
     test_pred_cefr, test_pred_class = zip(*[_split_joint_label(item) for item in test_pred_joint])
