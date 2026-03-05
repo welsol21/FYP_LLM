@@ -51,6 +51,9 @@ def _safe_list(value: Any) -> list[str]:
 
 def extract_tabular_features(row: dict[str, Any]) -> dict[str, Any]:
     text = str(row.get("source_text") or row.get("text") or row.get("input") or "").strip()
+    normalized_text = " ".join(part for part in text.lower().split() if part)
+    tokens = [part for part in normalized_text.split(" ") if part]
+    bigrams = [f"{tokens[i]}_{tokens[i+1]}" for i in range(max(0, len(tokens) - 1))]
     evidence = row.get("grammar_evidence") if isinstance(row.get("grammar_evidence"), dict) else {}
     dep_signature = _safe_list(evidence.get("dep_signature"))
     pos_signature = _safe_list(evidence.get("pos_signature"))
@@ -74,7 +77,30 @@ def extract_tabular_features(row: dict[str, Any]) -> dict[str, Any]:
         "has_relative_clause_marker": int(any(dep in {"acl:relcl"} for dep in dep_signature)),
         "has_clause_embedding": int(any(dep in {"ccomp", "xcomp", "advcl", "acl", "acl:relcl", "parataxis"} for dep in dep_signature)),
         "has_passive_signal": int("aux:pass" in dep_signature or "nsubj:pass" in dep_signature),
+        "first_token": tokens[0] if tokens else "",
+        "second_token": tokens[1] if len(tokens) > 1 else "",
+        "last_token": tokens[-1] if tokens else "",
+        "first_bigram": bigrams[0] if bigrams else "",
+        "last_bigram": bigrams[-1] if bigrams else "",
+        "has_modal_should": int("should" in tokens),
+        "has_modal_would": int("would" in tokens),
+        "has_modal_could": int("could" in tokens),
+        "has_modal_must": int("must" in tokens),
+        "has_modal_might": int("might" in tokens),
+        "has_modal_may": int("may" in tokens),
+        "has_modal_can": int("can" in tokens),
+        "has_have_aux": int("have" in tokens or "has" in tokens or "had" in tokens),
+        "has_be_aux": int(any(tok in {"am", "is", "are", "was", "were", "be", "been", "being"} for tok in tokens)),
+        "has_ing_form": int(any(tok.endswith("ing") for tok in tokens)),
+        "has_ed_form": int(any(tok.endswith("ed") for tok in tokens)),
+        "has_before_after": int(any(tok in {"before", "after"} for tok in tokens)),
+        "has_if_when_while": int(any(tok in {"if", "when", "while"} for tok in tokens)),
+        "ends_with_question": int(text.endswith("?")),
     }
+    for idx, tok in enumerate(tokens[:8]):
+        feature_row[f"tok_{idx}"] = tok
+    for idx, bg in enumerate(bigrams[:6]):
+        feature_row[f"bg_{idx}"] = bg
     return feature_row
 
 
@@ -107,6 +133,39 @@ def project_feature_profile(features: dict[str, Any], *, profile: str = "full") 
             "has_passive_signal",
             "dep_signature_join",
             "pos_signature_join",
+            "first_token",
+            "second_token",
+            "last_token",
+            "first_bigram",
+            "last_bigram",
+            "has_modal_should",
+            "has_modal_would",
+            "has_modal_could",
+            "has_modal_must",
+            "has_modal_might",
+            "has_modal_may",
+            "has_modal_can",
+            "has_have_aux",
+            "has_be_aux",
+            "has_ing_form",
+            "has_ed_form",
+            "has_before_after",
+            "has_if_when_while",
+            "ends_with_question",
+            "tok_0",
+            "tok_1",
+            "tok_2",
+            "tok_3",
+            "tok_4",
+            "tok_5",
+            "tok_6",
+            "tok_7",
+            "bg_0",
+            "bg_1",
+            "bg_2",
+            "bg_3",
+            "bg_4",
+            "bg_5",
         )
         if key in features
     }

@@ -43,6 +43,7 @@ def _resolve_classifier_settings() -> tuple[str, str | None]:
     model_path = _env_str("ELA_CLASSIFIER_MODEL_PATH", "")
 
     default_tabular_dirs = [
+        "artifacts/models/tabular_joint_profile_random_forest_v1",
         "artifacts/models/tabular_cefr_baseline_full_ladder_xgboost_gpu_v1",
         "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest_v2",
         "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest",
@@ -56,7 +57,10 @@ def _resolve_classifier_settings() -> tuple[str, str | None]:
             if (
                 os.path.isdir(candidate)
                 and os.path.isfile(os.path.join(candidate, "classifier_metadata.json"))
-                and os.path.isfile(os.path.join(candidate, "best_tabular_cefr_baseline.joblib"))
+                and (
+                    os.path.isfile(os.path.join(candidate, "best_tabular_joint_profile.joblib"))
+                    or os.path.isfile(os.path.join(candidate, "best_tabular_cefr_baseline.joblib"))
+                )
             )
         ),
         default_tabular_dirs[0],

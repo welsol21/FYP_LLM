@@ -23,6 +23,17 @@ class _FakeModel:
         return out
 
 
+class _FakeJointModel:
+    def predict(self, rows):
+        out = []
+        for row in rows:
+            if int(row.get("token_count", 0)) <= 4:
+                out.append(("A1", "pronoun_reference"))
+            else:
+                out.append(("B2", "past_perfect"))
+        return out
+
+
 class TabularCefrPredictorTests(unittest.TestCase):
     def test_normalize_cefr_accepts_numeric_legacy_labels(self):
         self.assertEqual(_normalize_cefr("0"), "A1")
@@ -102,6 +113,33 @@ class TabularCefrPredictorTests(unittest.TestCase):
                 sentence_text="Although he had already finished the work, he stayed.",
             )
             self.assertEqual(profile["cefr_level"], "B2")
+
+    def test_tabular_profile_classifier_joint_model_returns_cefr_grammar_and_blueprints(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model_dir = Path(tmpdir)
+            joblib.dump(_FakeJointModel(), model_dir / "best_tabular_joint_profile.joblib")
+            metadata = {
+                "per_class_cefr_ladder": {"pronoun_reference": ["A1", "A2", "B1", "B2", "C1", "C2"]},
+                "grammar_classes_by_cefr": {"A1": ["pronoun_reference"], "A2": [], "B1": [], "B2": [], "C1": [], "C2": []},
+                "note_blueprints_by_cefr": {level: {"elementary_text": f"{level} e", "intermediate_text": f"{level} i", "advanced_text": f"{level} a"} for level in ["A1","A2","B1","B2","C1","C2"]},
+            }
+            (model_dir / "classifier_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+            (model_dir / "tabular_cefr_baseline_summary.json").write_text(
+                json.dumps({"feature_profile": "runtime_stable"}, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            classifier = TabularProfileClassifier(str(model_dir))
+            profile = classifier.classify_node(
+                node={"features": {"dep": ["nsubj", "root"], "pos": ["PRON", "VERB"]}},
+                source_text="She smiled.",
+                sentence_text="She smiled.",
+            )
+            self.assertTrue(classifier.supports_joint_profiles)
+            self.assertEqual(profile["cefr_level"], "A1")
+            self.assertIsInstance(profile.get("grammar_classes"), list)
+            self.assertEqual(profile["grammar_classes"][0]["class_id"], "pronoun_reference")
+            self.assertIsInstance(profile.get("generated_notes"), dict)
+            self.assertTrue(profile["generated_notes"].get("intermediate_text"))
 
 
 if __name__ == "__main__":

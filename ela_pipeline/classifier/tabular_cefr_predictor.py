@@ -8,6 +8,7 @@ from typing import Any
 
 import joblib
 
+from .grammar_blueprints import build_note_blueprints, class_cefr_level
 from .curriculum import validate_per_class_cefr_ladder
 from .train_tabular_cefr_baseline import extract_tabular_features, project_feature_profile
 
@@ -68,6 +69,36 @@ class TabularCefrPredictor:
         return [str(item).strip().upper() for item in out]
 
 
+class TabularJointProfilePredictor:
+    """Joint predictor: CEFR + primary grammar class + note blueprint id."""
+
+    def __init__(self, model: Any, *, feature_profile: str = "runtime_stable") -> None:
+        self._model = model
+        self._feature_profile = str(feature_profile or "runtime_stable").strip().lower()
+
+    @classmethod
+    def from_path(cls, model_path: str, *, feature_profile: str = "runtime_stable") -> "TabularJointProfilePredictor":
+        path = Path(model_path)
+        if not path.is_file():
+            raise FileNotFoundError(f"tabular joint model not found: {model_path}")
+        return cls(joblib.load(path), feature_profile=feature_profile)
+
+    def predict_row(self, row: dict[str, Any]) -> tuple[str, str]:
+        features = project_feature_profile(
+            extract_tabular_features(row),
+            profile=self._feature_profile,
+        )
+        result = self._model.predict([features])
+        if result is None or len(result) == 0:
+            return "", ""
+        item = result[0]
+        if isinstance(item, (list, tuple)) and len(item) >= 2:
+            return str(item[0]).strip(), str(item[1]).strip().lower()
+        if hasattr(item, "__len__") and not isinstance(item, str) and len(item) >= 2:  # numpy row
+            return str(item[0]).strip(), str(item[1]).strip().lower()
+        return str(item).strip(), ""
+
+
 class TabularProfileClassifier:
     """CEFR classifier backed by the tabular baseline plus runtime metadata."""
 
@@ -76,17 +107,20 @@ class TabularProfileClassifier:
         if not str(path):
             raise ValueError("classifier_model_path must be provided for classifier_provider=tabular")
         if path.is_dir():
+            joint_model_file = path / "best_tabular_joint_profile.joblib"
             model_file = path / "best_tabular_cefr_baseline.joblib"
             metadata_file = path / "classifier_metadata.json"
         else:
+            joint_model_file = Path("")
             model_file = path
             metadata_file = path.parent / "classifier_metadata.json"
-        if not model_file.is_file():
-            raise FileNotFoundError(f"tabular classifier model not found: {model_file}")
+        if not model_file.is_file() and not joint_model_file.is_file():
+            raise FileNotFoundError(
+                f"tabular classifier model not found: {model_file} and joint model not found: {joint_model_file}"
+            )
         if not metadata_file.is_file():
             raise FileNotFoundError(f"Missing classifier metadata file: {metadata_file}")
 
-        self._predictor = TabularCefrPredictor.from_path(str(model_file))
         with metadata_file.open("r", encoding="utf-8") as f:
             metadata = json.load(f)
         if not isinstance(metadata, dict):
@@ -99,15 +133,23 @@ class TabularProfileClassifier:
             if isinstance(loaded_summary, dict):
                 summary = loaded_summary
         feature_profile = str(summary.get("feature_profile") or "runtime_stable").strip().lower()
-        self._predictor = TabularCefrPredictor.from_path(str(model_file), feature_profile=feature_profile)
+        self._joint_mode = bool(joint_model_file.is_file())
+        if self._joint_mode:
+            self._predictor = TabularJointProfilePredictor.from_path(
+                str(joint_model_file),
+                feature_profile=feature_profile,
+            )
+        else:
+            self._predictor = TabularCefrPredictor.from_path(str(model_file), feature_profile=feature_profile)
         ladders = metadata.get("per_class_cefr_ladder")
         issues = validate_per_class_cefr_ladder(ladders)
         if issues:
             details = "; ".join(f"{i.class_id}: {i.message}" for i in issues)
             raise ValueError(f"Invalid per_class_cefr_ladder: {details}")
         self._metadata = metadata
-        self.model_path = str(model_file)
+        self.model_path = str(joint_model_file if self._joint_mode else model_file)
         self.feature_profile = feature_profile
+        self.supports_joint_profiles = self._joint_mode
 
     @staticmethod
     def _build_runtime_row(*, node: dict[str, Any], source_text: str) -> dict[str, Any]:
@@ -139,6 +181,30 @@ class TabularProfileClassifier:
 
     def classify_node(self, *, node: dict[str, Any], source_text: str, sentence_text: str) -> dict[str, Any]:
         row = self._build_runtime_row(node=node, source_text=source_text)
+        if self._joint_mode:
+            pred_cefr, pred_class = self._predictor.predict_row(row)
+            class_id = str(pred_class or "").strip().lower()
+            cefr = _normalize_cefr(pred_cefr)
+            if class_id:
+                # Keep CEFR and class consistent with pedagogical class registry.
+                mapped_cefr = class_cefr_level(class_id)
+                if mapped_cefr:
+                    cefr = mapped_cefr
+            note_blueprints = (
+                build_note_blueprints(grammar_classes=[class_id], cefr_level=cefr)
+                if class_id
+                else {}
+            )
+            return {
+                "cefr_level": cefr,
+                "grammar_classes": (
+                    [{"class_id": class_id, "confidence": 0.5}]
+                    if class_id
+                    else []
+                ),
+                "generated_notes": note_blueprints,
+            }
+
         cefr = _normalize_cefr(self._predictor.predict_row(row))
         return {
             "cefr_level": cefr,

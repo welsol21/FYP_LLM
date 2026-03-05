@@ -942,6 +942,7 @@ def run_pipeline(
             include_node_synonyms=synonym_nodes,
         )
 
+    tabular_supports_joint = False
     if classifier_provider == "deberta":
         from ela_pipeline.classifier.deberta import DebertaProfileClassifier
 
@@ -959,11 +960,12 @@ def run_pipeline(
         from ela_pipeline.classifier.tabular_cefr_predictor import TabularProfileClassifier
 
         classifier = TabularProfileClassifier(model_path=classifier_model_path)
+        tabular_supports_joint = bool(getattr(classifier, "supports_joint_profiles", False))
         _attach_classifier_profiles(
             enriched,
             classifier=classifier,
-            include_grammar_classes=False,
-            include_note_blueprints=False,
+            include_grammar_classes=tabular_supports_joint,
+            include_note_blueprints=tabular_supports_joint,
         )
     elif classifier_provider == "rule":
         if enable_cefr:
@@ -984,7 +986,17 @@ def run_pipeline(
                 include_node_cefr=cefr_nodes,
             )
 
-    if classifier_provider in {"rule", "tabular", "deberta"} and enable_grammar_classes:
+    should_attach_rule_grammar = False
+    if enable_grammar_classes:
+        if classifier_provider == "rule":
+            should_attach_rule_grammar = True
+        elif classifier_provider == "deberta":
+            should_attach_rule_grammar = True
+        elif classifier_provider == "tabular":
+            # New joint tabular model can own grammar+blueprints directly.
+            should_attach_rule_grammar = not tabular_supports_joint
+
+    if should_attach_rule_grammar:
         _attach_grammar_classes(enriched)
         _attach_note_blueprints(enriched)
     elif classifier_provider not in {"rule", "deberta", "tabular"}:
