@@ -9,6 +9,8 @@ from pathlib import Path
 import random
 from typing import Any
 
+from .dataset_protocol import normalize_classifier_row
+
 
 def _load_json(path: str) -> dict[str, Any]:
     src = Path(path)
@@ -104,13 +106,9 @@ def _prepare_row(row: dict[str, Any], *, source_name: str) -> dict[str, Any]:
     payload = dict(row)
     payload["source_text"] = text
     payload["cefr_label"] = label
-    grammar_classes = payload.get("grammar_classes") if isinstance(payload.get("grammar_classes"), list) else []
-    grammar_label = "|".join(sorted(str(item).strip().lower() for item in grammar_classes if str(item).strip()))
-    if grammar_label:
-        payload["grammar_label"] = grammar_label
     provenance = payload.get("provenance") if isinstance(payload.get("provenance"), dict) else {}
     payload["provenance"] = {**provenance, "dataset_source": source_name}
-    return payload
+    return normalize_classifier_row(payload)
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:

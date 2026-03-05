@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .curriculum import CEFR_LADDER
+from .dataset_protocol import canonicalize_grammar_classes
 
 
 def _load_jsonl(path: str) -> list[dict[str, Any]]:
@@ -102,8 +103,7 @@ def build_classifier_metadata_from_dataset(*, classifier_jsonl_path: str, output
 
         grammar_classes = row.get("grammar_classes")
         if isinstance(grammar_classes, list):
-            for item in grammar_classes:
-                class_id = str(item).strip().lower()
+            for class_id in canonicalize_grammar_classes(grammar_classes, keep_unknown=True):
                 if not class_id:
                     continue
                 if class_id not in grammar_classes_by_cefr[cefr]:

@@ -7,6 +7,8 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+from .dataset_protocol import normalize_classifier_row
+
 
 REQUIRED_TOP = ("id", "text", "cefr_level", "grammar_classes", "note_blueprints")
 REQUIRED_NB = ("elementary_text", "intermediate_text", "advanced_text")
@@ -82,14 +84,16 @@ def _convert_split_to_classifier(src_path: Path, dst_path: Path, valid_classes: 
     with dst_path.open("w", encoding="utf-8") as out:
         for line_no, row in _iter_jsonl(src_path):
             _validate_row(row, where=f"{src_path.name}:{line_no}", valid_classes=valid_classes)
-            payload = {
-                "id": row["id"],
-                "input": _compose_classifier_input(str(row["text"])),
-                "cefr_label": str(row["cefr_level"]).upper(),
-                "grammar_classes": [str(x) for x in row["grammar_classes"]],
-                "note_blueprints": row["note_blueprints"],
-                "source_text": str(row["text"]),
-            }
+            payload = normalize_classifier_row(
+                {
+                    "id": row["id"],
+                    "input": _compose_classifier_input(str(row["text"])),
+                    "cefr_label": str(row["cefr_level"]).upper(),
+                    "grammar_classes": [str(x) for x in row["grammar_classes"]],
+                    "note_blueprints": row["note_blueprints"],
+                    "source_text": str(row["text"]),
+                }
+            )
             out.write(json.dumps(payload, ensure_ascii=False) + "\n")
             count += 1
     return count
