@@ -7,7 +7,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from .build_ud_phase1_dataset import PHASE1_CLASS_SPECS, _compose_classifier_input
+from .build_ud_phase1_dataset import PHASE1_CLASS_SPECS, _to_classifier_payload
 from .masc_ingest import load_masc_conll_sentences
 from .text_parse import enrich_sentence_candidates
 from .ud_phase1 import extract_phase1_grammar_signal, validate_phase1_dataset_gates
@@ -112,12 +112,7 @@ def build_masc_advanced_dataset(
 
     with dataset_path.open("w", encoding="utf-8") as f:
         for row in final_rows:
-            payload = {
-                **row,
-                "input": _compose_classifier_input(row),
-                "cefr_label": row["cefr_level"],
-                "source_text": row["text"],
-            }
+            payload = _to_classifier_payload(row)
             f.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
     with rejected_path.open("w", encoding="utf-8") as f:

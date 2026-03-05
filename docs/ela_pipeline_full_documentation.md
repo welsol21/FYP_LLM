@@ -247,6 +247,7 @@ If `--model-dir` is omitted:
   - stable `cefr_label`, `source_text`, and derived `grammar_label`.
 - This protocol is applied in:
   - dataset import (`import_phase1_datasets`),
+  - UD/advanced corpus builders (`build_ud_phase1_dataset`, `build_oanc_advanced_dataset`, `build_masc_advanced_dataset`, `build_pmc_advanced_dataset`, `build_gutenberg_advanced_dataset`),
   - merged full-ladder dataset builder (`build_full_ladder_classifier_dataset`),
   - joint tabular training data loading (`train_tabular_joint_profile`).
 - Purpose:

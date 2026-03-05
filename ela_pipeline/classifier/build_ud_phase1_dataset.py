@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .dataset_protocol import normalize_classifier_row
 from .grammar_blueprints import PEDAGOGICAL_CLASS_SPECS
 from .ud_phase1 import extract_phase1_grammar_signal, load_ud_conllu, validate_phase1_dataset_gates
 
@@ -38,6 +39,17 @@ def _compose_classifier_input(row: dict[str, Any]) -> str:
         f"dep_signature: {dep_signature} "
         f"pos_signature: {pos_signature} "
         f"text: {text}"
+    )
+
+
+def _to_classifier_payload(row: dict[str, Any]) -> dict[str, Any]:
+    return normalize_classifier_row(
+        {
+            **row,
+            "input": _compose_classifier_input(row),
+            "cefr_label": row.get("cefr_level"),
+            "source_text": row.get("text"),
+        }
     )
 
 
@@ -134,12 +146,7 @@ def build_phase1_dataset_from_ud(
 
     with dataset_path.open("w", encoding="utf-8") as f:
         for row in accepted_rows:
-            payload = {
-                **row,
-                "input": _compose_classifier_input(row),
-                "cefr_label": row["cefr_level"],
-                "source_text": row["text"],
-            }
+            payload = _to_classifier_payload(row)
             f.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
     with rejected_path.open("w", encoding="utf-8") as f:
@@ -195,12 +202,7 @@ def build_merged_ud_dataset(
 
     with dataset_path.open("w", encoding="utf-8") as f:
         for row in accepted_rows:
-            payload = {
-                **row,
-                "input": _compose_classifier_input(row),
-                "cefr_label": row["cefr_level"],
-                "source_text": row["text"],
-            }
+            payload = _to_classifier_payload(row)
             f.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
     gate_path.write_text(json.dumps(gate_report, ensure_ascii=False, indent=2), encoding="utf-8")
