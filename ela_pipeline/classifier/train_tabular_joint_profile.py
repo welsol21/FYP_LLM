@@ -231,7 +231,7 @@ def main() -> None:
     parser.add_argument("--train-path", default="data/processed_classifier/phase1/train_classifier.jsonl")
     parser.add_argument("--dev-path", default="data/processed_classifier/phase1/dev_classifier.jsonl")
     parser.add_argument("--test-path", default="data/processed_classifier/phase1/test_classifier.jsonl")
-    parser.add_argument("--output-dir", default="artifacts/models/tabular_joint_profile_random_forest_v1")
+    parser.add_argument("--output-dir", default="artifacts/models/tabular_joint_profile_full_ladder_xgboost_gpu_v2")
     parser.add_argument("--feature-profile", default="runtime_stable", choices=["full", "no_source", "runtime_stable"])
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()

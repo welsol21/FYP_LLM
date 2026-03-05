@@ -228,6 +228,10 @@ If `--model-dir` is omitted:
   - classifier inference latency: ~`50-75%` faster,
   - full backend rebuild schedule: ~`20-35%` faster (assuming same gate quality thresholds).
 
+Current runtime baseline (latest full-ladder GPU run):
+- model dir: `artifacts/models/tabular_joint_profile_full_ladder_xgboost_gpu_v2`
+- report: `docs/reports/tabular_joint_profile_full_ladder_eval_2026-03-05.json`
+
 ### 4.8.2 Quality-Cycle CLI (Curriculum Gates)
 - Runtime utility:
   - `python -m ela_pipeline.classifier.run_quality_cycle --output-dir artifacts/classifier_quality --run-id qc-<date>`

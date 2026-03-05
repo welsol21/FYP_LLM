@@ -9,13 +9,20 @@ from ela_pipeline.runtime import api_server
 
 
 class RuntimeApiServerTests(unittest.TestCase):
-    @patch("ela_pipeline.runtime.api_server.os.path.isfile", side_effect=lambda path: str(path).endswith("classifier_metadata.json") or str(path).endswith("best_tabular_cefr_baseline.joblib"))
+    @patch(
+        "ela_pipeline.runtime.api_server.os.path.isfile",
+        side_effect=lambda path: (
+            str(path).endswith("classifier_metadata.json")
+            or str(path).endswith("best_tabular_cefr_baseline.joblib")
+            or str(path).endswith("best_tabular_joint_profile.joblib")
+        ),
+    )
     @patch("ela_pipeline.runtime.api_server.os.path.isdir", return_value=True)
     def test_resolve_classifier_settings_defaults_to_tabular_when_model_dir_exists(self, _mock_isdir, _mock_isfile):
         with patch.dict("os.environ", {}, clear=False):
             provider, model_path = api_server._resolve_classifier_settings()
         self.assertEqual(provider, "tabular")
-        self.assertEqual(model_path, "artifacts/models/tabular_cefr_baseline_full_ladder_xgboost_gpu_v1")
+        self.assertEqual(model_path, "artifacts/models/tabular_joint_profile_full_ladder_xgboost_gpu_v2")
 
     @patch("ela_pipeline.runtime.api_server.os.path.isfile", return_value=False)
     @patch("ela_pipeline.runtime.api_server.os.path.isdir", return_value=False)
@@ -29,7 +36,7 @@ class RuntimeApiServerTests(unittest.TestCase):
         with patch.dict("os.environ", {"ELA_CLASSIFIER_PROVIDER": "tabular"}, clear=False):
             provider, model_path = api_server._resolve_classifier_settings()
         self.assertEqual(provider, "tabular")
-        self.assertEqual(model_path, "artifacts/models/tabular_cefr_baseline_full_ladder_xgboost_gpu_v1")
+        self.assertEqual(model_path, "artifacts/models/tabular_joint_profile_full_ladder_xgboost_gpu_v2")
 
     def test_resolve_classifier_settings_rejects_invalid_provider(self):
         with patch.dict("os.environ", {"ELA_CLASSIFIER_PROVIDER": "invalid"}, clear=False):
@@ -37,7 +44,14 @@ class RuntimeApiServerTests(unittest.TestCase):
                 api_server._resolve_classifier_settings()
 
     @patch("ela_pipeline.runtime.api_server.SERVICE.build_sentence_contract")
-    @patch("ela_pipeline.runtime.api_server.os.path.isfile", side_effect=lambda path: str(path).endswith("classifier_metadata.json") or str(path).endswith("best_tabular_cefr_baseline.joblib"))
+    @patch(
+        "ela_pipeline.runtime.api_server.os.path.isfile",
+        side_effect=lambda path: (
+            str(path).endswith("classifier_metadata.json")
+            or str(path).endswith("best_tabular_cefr_baseline.joblib")
+            or str(path).endswith("best_tabular_joint_profile.joblib")
+        ),
+    )
     @patch("ela_pipeline.runtime.api_server.os.path.isdir", return_value=True)
     def test_build_sentence_contract_payload_uses_controlled_and_resolved_classifier(
         self,
@@ -52,10 +66,17 @@ class RuntimeApiServerTests(unittest.TestCase):
         kwargs = mock_build_sentence_contract.call_args.kwargs
         self.assertEqual(kwargs["note_mode"], "controlled")
         self.assertEqual(kwargs["classifier_provider"], "tabular")
-        self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_cefr_baseline_full_ladder_xgboost_gpu_v1")
+        self.assertEqual(kwargs["classifier_model_path"], "artifacts/models/tabular_joint_profile_full_ladder_xgboost_gpu_v2")
 
     @patch("ela_pipeline.runtime.api_server.SERVICE.build_sentence_contract")
-    @patch("ela_pipeline.runtime.api_server.os.path.isfile", side_effect=lambda path: str(path).endswith("classifier_metadata.json") or str(path).endswith("best_tabular_cefr_baseline.joblib"))
+    @patch(
+        "ela_pipeline.runtime.api_server.os.path.isfile",
+        side_effect=lambda path: (
+            str(path).endswith("classifier_metadata.json")
+            or str(path).endswith("best_tabular_cefr_baseline.joblib")
+            or str(path).endswith("best_tabular_joint_profile.joblib")
+        ),
+    )
     @patch("ela_pipeline.runtime.api_server.os.path.isdir", return_value=True)
     def test_sentence_contract_http_e2e_smoke(self, _mock_isdir, _mock_isfile, mock_build_sentence_contract):
         mock_build_sentence_contract.return_value = {

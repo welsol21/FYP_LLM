@@ -1,0 +1,77 @@
+{
+  "model_output_dir": "artifacts/models/tabular_joint_profile_full_ladder_xgboost_gpu_v2",
+  "model_path": "artifacts/models/tabular_joint_profile_full_ladder_xgboost_gpu_v2/best_tabular_joint_profile.joblib",
+  "summary": {
+    "feature_profile": "runtime_stable",
+    "train_rows": 8211,
+    "dev_rows": 1182,
+    "test_rows": 1196,
+    "train_cefr_distribution": {
+      "A1": 830,
+      "A2": 2155,
+      "B1": 2064,
+      "B2": 1587,
+      "C1": 1522,
+      "C2": 53
+    },
+    "dev_cefr_distribution": {
+      "A1": 150,
+      "A2": 321,
+      "B1": 314,
+      "B2": 207,
+      "C1": 188,
+      "C2": 2
+    },
+    "test_cefr_distribution": {
+      "A1": 156,
+      "A2": 320,
+      "B1": 306,
+      "B2": 222,
+      "C1": 190,
+      "C2": 2
+    },
+    "joint_dev_accuracy": 0.9796954314720813,
+    "joint_test_accuracy": 0.9849498327759197,
+    "cefr_dev_accuracy": 1.0,
+    "cefr_test_accuracy": 1.0,
+    "cefr_dev_macro_f1": 1.0,
+    "cefr_test_macro_f1": 1.0,
+    "grammar_dev_accuracy": 0.9796954314720813,
+    "grammar_test_accuracy": 0.9849498327759197,
+    "grammar_dev_macro_f1": 0.8088276670031549,
+    "grammar_test_macro_f1": 0.8230551069189266
+  },
+  "dataset_summary_path": "artifacts/classifier_full_ladder_dataset_v2/full_ladder_dataset_summary.json",
+  "dataset_splits": {
+    "train": 8211,
+    "dev": 1182,
+    "test": 1196
+  },
+  "dataset_cefr_counts": {
+    "train": {
+      "A1": 830,
+      "A2": 2155,
+      "B1": 2064,
+      "B2": 1587,
+      "C1": 1522,
+      "C2": 53
+    },
+    "dev": {
+      "A1": 150,
+      "A2": 321,
+      "B1": 314,
+      "B2": 207,
+      "C1": 188,
+      "C2": 2
+    },
+    "test": {
+      "A1": 156,
+      "A2": 320,
+      "B1": 306,
+      "B2": 222,
+      "C1": 190,
+      "C2": 2
+    }
+  },
+  "notes": "GPU-only training run; joint label = CEFR|primary_grammar_class; metadata generated for runtime classifier."
+}

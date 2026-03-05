@@ -43,38 +43,35 @@ def _resolve_classifier_settings() -> tuple[str, str | None]:
     model_path = _env_str("ELA_CLASSIFIER_MODEL_PATH", "")
 
     default_tabular_dirs = [
+        "artifacts/models/tabular_joint_profile_full_ladder_xgboost_gpu_v2",
         "artifacts/models/tabular_joint_profile_random_forest_v1",
         "artifacts/models/tabular_cefr_baseline_full_ladder_xgboost_gpu_v1",
         "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest_v2",
         "artifacts/models/tabular_cefr_baseline_full_ladder_random_forest",
         "artifacts/models/tabular_cefr_baseline_full_ladder_logreg",
     ]
-    preferred_tabular_dir = default_tabular_dirs[0]
-    default_tabular_dir = next(
-        (
-            candidate
-            for candidate in default_tabular_dirs
-            if (
-                os.path.isdir(candidate)
-                and os.path.isfile(os.path.join(candidate, "classifier_metadata.json"))
-                and (
-                    os.path.isfile(os.path.join(candidate, "best_tabular_joint_profile.joblib"))
-                    or os.path.isfile(os.path.join(candidate, "best_tabular_cefr_baseline.joblib"))
-                )
+
+    def _tabular_dir_ready(path: str) -> bool:
+        return (
+            os.path.isdir(path)
+            and os.path.isfile(os.path.join(path, "classifier_metadata.json"))
+            and (
+                os.path.isfile(os.path.join(path, "best_tabular_joint_profile.joblib"))
+                or os.path.isfile(os.path.join(path, "best_tabular_cefr_baseline.joblib"))
             )
-        ),
+        )
+
+    default_tabular_dir = next(
+        (candidate for candidate in default_tabular_dirs if _tabular_dir_ready(candidate)),
         default_tabular_dirs[0],
     )
+    preferred_tabular_dir = default_tabular_dir
 
     if provider_raw:
         provider = provider_raw
     else:
         default_model_dir = "artifacts/models/deberta_classifier_cefr"
-        has_tabular = (
-            os.path.isdir(default_tabular_dir)
-            and os.path.isfile(os.path.join(default_tabular_dir, "classifier_metadata.json"))
-            and os.path.isfile(os.path.join(default_tabular_dir, "best_tabular_cefr_baseline.joblib"))
-        )
+        has_tabular = _tabular_dir_ready(default_tabular_dir)
         has_deberta = (
             os.path.isdir(default_model_dir)
             and os.path.isfile(os.path.join(default_model_dir, "classifier_metadata.json"))

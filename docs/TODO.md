@@ -122,6 +122,8 @@
 ## Backend Rebuild: Full-Ladder Classifier Training Quality
 
 - [x] Enforce a canonical classifier row protocol before training (`grammar_classes` canonicalization, non-empty 3-level note blueprints, stable `cefr_label/source_text/grammar_label`).
+- [x] Train full-ladder joint tabular profile on GPU and publish runtime-ready report (`docs/reports/tabular_joint_profile_full_ladder_eval_2026-03-05.json`).
+- [x] Switch runtime classifier auto-resolution to prioritize the latest full-ladder joint tabular model (`tabular_joint_profile_full_ladder_xgboost_gpu_v2`).
 - [x] Prove whether full-ladder CEFR is learnable on the merged dataset with a non-transformer baseline.
 - [x] Prove whether `grammar_label` is learnable on the merged dataset with a non-transformer baseline.
 - [x] Add runtime `tabular` CEFR provider as explicit non-default provider.
