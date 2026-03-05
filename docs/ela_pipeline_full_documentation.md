@@ -238,6 +238,21 @@ If `--model-dir` is omitted:
   - evaluates iterative full-pass completion criterion
 - Artifacts:
   - `quality_events.jsonl` (metrics/thresholds/pass-fail per attempt)
+
+### 4.8.3 Classifier Dataset Protocol (Canonical Row Shape)
+- Before any tabular/joint classifier training, each dataset row is normalized to a canonical shape.
+- Enforced invariants:
+  - canonical `grammar_classes` ids (taxonomy aliases normalized, unknown ids dropped in training path),
+  - non-empty `note_blueprints` for all three levels (`elementary/intermediate/advanced`),
+  - stable `cefr_label`, `source_text`, and derived `grammar_label`.
+- This protocol is applied in:
+  - dataset import (`import_phase1_datasets`),
+  - merged full-ladder dataset builder (`build_full_ladder_classifier_dataset`),
+  - joint tabular training data loading (`train_tabular_joint_profile`).
+- Purpose:
+  - remove label noise before model fitting,
+  - prevent training on malformed rows,
+  - guarantee deterministic metadata extraction for runtime classifier usage.
   - `repair_actions.jsonl` (applied fix actions)
   - `quality_summary.json` (final gate status + loop completion)
 

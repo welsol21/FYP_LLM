@@ -121,6 +121,7 @@
 
 ## Backend Rebuild: Full-Ladder Classifier Training Quality
 
+- [x] Enforce a canonical classifier row protocol before training (`grammar_classes` canonicalization, non-empty 3-level note blueprints, stable `cefr_label/source_text/grammar_label`).
 - [x] Prove whether full-ladder CEFR is learnable on the merged dataset with a non-transformer baseline.
 - [x] Prove whether `grammar_label` is learnable on the merged dataset with a non-transformer baseline.
 - [x] Add runtime `tabular` CEFR provider as explicit non-default provider.

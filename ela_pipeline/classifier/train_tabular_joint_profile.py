@@ -14,7 +14,7 @@ from sklearn.metrics import accuracy_score, f1_score
 from sklearn.pipeline import Pipeline
 import numpy as np
 
-from .class_taxonomy import normalize_grammar_class_id
+from .dataset_protocol import canonicalize_grammar_classes, normalize_classifier_row
 from .metadata import build_classifier_metadata_from_dataset
 from .train_tabular_cefr_baseline import extract_tabular_features, project_feature_profile
 
@@ -30,21 +30,22 @@ def _load_jsonl(path: str) -> list[dict[str, Any]]:
     with src.open("r", encoding="utf-8") as f:
         for line in f:
             if line.strip():
-                out.append(json.loads(line))
+                row = json.loads(line)
+                if isinstance(row, dict):
+                    row = normalize_classifier_row(row)
+                out.append(row)
     return out
 
 
-def _safe_list(value: Any) -> list[str]:
-    if not isinstance(value, list):
-        return []
-    return [str(item).strip().lower() for item in value if str(item).strip()]
-
-
 def _primary_class(row: dict[str, Any]) -> str:
-    classes = _safe_list(row.get("grammar_classes"))
+    classes = canonicalize_grammar_classes(row.get("grammar_classes"))
     if not classes:
-        return "unknown_class"
-    return normalize_grammar_class_id(classes[0]) or "unknown_class"
+        grammar_label = str(row.get("grammar_label") or "").strip().lower()
+        if grammar_label:
+            classes = canonicalize_grammar_classes(grammar_label.split("|"))
+    if not classes:
+        return ""
+    return str(classes[0]).strip().lower()
 
 
 def _normalize_cefr(value: Any) -> str:
