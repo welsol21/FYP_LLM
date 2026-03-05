@@ -283,7 +283,7 @@ def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
     words: List[Dict] = []
     entries: List[Tuple[object, Dict]] = []
     for token in span:
-        if token.is_space:
+        if token.is_space or token.is_punct:
             continue
         word_node = blank_node(
             "Word",
@@ -473,7 +473,7 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
         uncovered_sentence_tokens = [
             token
             for token in sent
-            if not token.is_space and token.i not in covered_token_ids
+            if not token.is_space and not token.is_punct and token.i not in covered_token_ids
         ]
         uncovered_word_nodes = _build_word_nodes(
             uncovered_sentence_tokens,

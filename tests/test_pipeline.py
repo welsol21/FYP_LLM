@@ -863,6 +863,22 @@ class PipelineTests(unittest.TestCase):
                 self.assertIn("features", child)
                 self.assertIsInstance(child["features"], dict)
 
+    def test_pipeline_does_not_emit_punctuation_word_nodes(self):
+        out = run_pipeline("She came to him towards morning.", model_dir=None)
+        sentence = out[next(iter(out))]
+        punctuation_words = [
+            word
+            for word in self._iter_by_type(sentence, "Word")
+            if str(word.get("part_of_speech") or "") == "punctuation"
+        ]
+        self.assertEqual(punctuation_words, [])
+        punct_contents = {
+            str(word.get("content") or "")
+            for word in self._iter_by_type(sentence, "Word")
+            if str(word.get("content") or "") in {".", ",", "!", "?"}
+        }
+        self.assertEqual(punct_contents, set())
+
     def test_pipeline_excludes_simple_determiner_noun_phrases(self):
         out = run_pipeline("She should have trusted her instincts before making the decision.", model_dir=None)
         key = next(iter(out))
