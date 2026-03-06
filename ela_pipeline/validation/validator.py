@@ -328,7 +328,7 @@ def _is_tam_relevant_node(node: Dict[str, Any]) -> bool:
     tam_construction = str(node.get("tam_construction") or "").strip().lower()
     if node_type == "sentence":
         return True
-    if pos in {"verb phrase", "clause", "verb", "auxiliary verb"}:
+    if pos in {"clause chunk", "phrasal verb", "idiom", "collocation", "clause", "verb", "auxiliary verb"}:
         return True
     return tam_construction not in {"", "none", "null"}
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
 from ela_pipeline.contract import blank_node
@@ -92,6 +94,123 @@ VP_DIRECT_CHILD_DEPS = {
     "npadvmod",
 }
 VP_SUBTREE_CHILD_DEPS = {"prep", "obl", "xcomp", "ccomp", "advcl"}
+_DEFAULT_CLAUSE_HEAD_DEPS = {
+    "ROOT",
+    "conj",
+    "advcl",
+    "ccomp",
+    "xcomp",
+    "acl",
+    "relcl",
+}
+_DEFAULT_PHRASAL_PREP_LEMMA_PAIRS = {
+    ("look", "after"),
+    ("come", "across"),
+    ("run", "into"),
+    ("get", "over"),
+    ("put", "off"),
+    ("turn", "down"),
+    ("go", "on"),
+    ("carry", "out"),
+    ("set", "up"),
+    ("take", "off"),
+    ("find", "out"),
+    ("make", "up"),
+}
+
+_DEFAULT_IDIOM_PATTERNS = {
+    ("kick", "the", "bucket"),
+    ("break", "the", "ice"),
+    ("piece", "of", "cake"),
+    ("under", "the", "weather"),
+    ("spill", "the", "beans"),
+    ("hit", "the", "sack"),
+}
+
+_DEFAULT_COLLOCATION_VERB_OBJECT_LEMMA_PAIRS = {
+    ("make", "decision"),
+    ("take", "risk"),
+    ("pay", "attention"),
+    ("raise", "baton"),
+    ("reach", "conclusion"),
+    ("draw", "attention"),
+    ("have", "impact"),
+    ("conduct", "research"),
+    ("set", "goal"),
+    ("meet", "requirement"),
+    ("file", "complaint"),
+    ("provide", "support"),
+    ("cause", "problem"),
+}
+
+_PHRASE_PATTERNS_CONFIG_PATH = Path(__file__).with_name("phrase_patterns.json")
+
+
+def _normalize_string_set(value: object, *, uppercase: bool = False) -> Set[str]:
+    if not isinstance(value, list):
+        return set()
+    out: Set[str] = set()
+    for item in value:
+        text = str(item or "").strip()
+        if not text:
+            continue
+        out.add(text.upper() if uppercase else text.lower())
+    return out
+
+
+def _normalize_tuple_set(value: object, *, width: int | None = None) -> Set[Tuple[str, ...]]:
+    if not isinstance(value, list):
+        return set()
+    out: Set[Tuple[str, ...]] = set()
+    for row in value:
+        if not isinstance(row, list):
+            continue
+        if width is not None and len(row) != width:
+            continue
+        if len(row) < 2:
+            continue
+        parts: List[str] = []
+        for item in row:
+            text = str(item or "").strip().lower()
+            if not text:
+                parts = []
+                break
+            parts.append(text)
+        if width is None and parts:
+            out.add(tuple(parts))
+        elif width is not None and len(parts) == width:
+            out.add(tuple(parts))
+    return out
+
+
+def _load_phrase_patterns() -> Dict[str, Set]:
+    config: Dict[str, object] = {}
+    if _PHRASE_PATTERNS_CONFIG_PATH.is_file():
+        try:
+            loaded = json.loads(_PHRASE_PATTERNS_CONFIG_PATH.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                config = loaded
+        except Exception:
+            config = {}
+
+    clause_head_deps = _normalize_string_set(config.get("clause_head_deps"), uppercase=True)
+    phrasal_pairs = _normalize_tuple_set(config.get("phrasal_prep_lemma_pairs"), width=2)
+    idioms = _normalize_tuple_set(config.get("idiom_patterns"))
+    collocations = _normalize_tuple_set(config.get("collocation_verb_object_lemma_pairs"), width=2)
+
+    return {
+        "clause_head_deps": clause_head_deps if clause_head_deps else set(_DEFAULT_CLAUSE_HEAD_DEPS),
+        "phrasal_pairs": phrasal_pairs if phrasal_pairs else set(_DEFAULT_PHRASAL_PREP_LEMMA_PAIRS),
+        "idioms": idioms if idioms else set(_DEFAULT_IDIOM_PATTERNS),
+        "collocations": collocations if collocations else set(_DEFAULT_COLLOCATION_VERB_OBJECT_LEMMA_PAIRS),
+    }
+
+
+_PHRASE_PATTERNS = _load_phrase_patterns()
+CLAUSE_HEAD_DEPS = _PHRASE_PATTERNS["clause_head_deps"]
+PHRASAL_PREP_LEMMA_PAIRS = _PHRASE_PATTERNS["phrasal_pairs"]
+IDIOM_PATTERNS = _PHRASE_PATTERNS["idioms"]
+COLLOCATION_VERB_OBJECT_LEMMA_PAIRS = _PHRASE_PATTERNS["collocations"]
 
 
 def _word_tense(token) -> str:
@@ -164,42 +283,76 @@ def _word_features(token) -> Dict[str, str]:
 
 def _phrase_candidates(sent) -> List[Tuple[int, int, str]]:
     spans: List[Tuple[int, int, str]] = []
-    seen: Set[Tuple[int, int]] = set()
+    seen: Set[Tuple[int, int, str]] = set()
 
-    for chunk in sent.noun_chunks:
-        key = (chunk.start, chunk.end)
-        if key not in seen:
-            spans.append((chunk.start, chunk.end, "noun phrase"))
-            seen.add(key)
+    def add_span(start: int, end: int, phrase_type: str) -> None:
+        if end <= start:
+            return
+        item = (int(start), int(end), str(phrase_type))
+        if item in seen:
+            return
+        seen.add(item)
+        spans.append(item)
 
-    for token in sent:
-        if token.dep_ == "ROOT" and token.pos_ in {"VERB", "AUX"}:
-            token_ids: set[int] = {token.i}
-            for child in token.children:
-                dep = child.dep_
-                if dep not in VP_DIRECT_CHILD_DEPS:
-                    continue
-                if dep in VP_SUBTREE_CHILD_DEPS:
-                    token_ids.update(tok.i for tok in child.subtree)
-                else:
-                    token_ids.add(child.i)
-            if not token_ids:
+    # 1) Idioms (contiguous lemma/text pattern match)
+    token_window = [tok for tok in sent if not tok.is_space and not tok.is_punct]
+    for size in sorted({len(p) for p in IDIOM_PATTERNS}, reverse=True):
+        if size <= 0 or len(token_window) < size:
+            continue
+        for i in range(0, len(token_window) - size + 1):
+            chunk = token_window[i : i + size]
+            if chunk[-1].i + 1 - chunk[0].i != size:
                 continue
-            start = min(token_ids)
-            end = max(token_ids) + 1
-            key = (start, end)
-            if key not in seen:
-                spans.append((start, end, "verb phrase"))
-                seen.add(key)
+            lemmas = tuple(tok.lemma_.lower() for tok in chunk)
+            lowers = tuple(tok.lower_ for tok in chunk)
+            if lemmas in IDIOM_PATTERNS or lowers in IDIOM_PATTERNS:
+                add_span(chunk[0].i, chunk[-1].i + 1, "idiom")
 
+    # 2) Phrasal verbs
+    for token in sent:
+        if token.pos_ not in {"VERB", "AUX"}:
+            continue
+        particles = [child for child in token.children if child.dep_ == "prt"]
+        if particles:
+            token_ids = {token.i, *(child.i for child in particles)}
+            add_span(min(token_ids), max(token_ids) + 1, "phrasal verb")
+        for child in token.children:
+            if child.dep_ != "prep":
+                continue
+            pair = (token.lemma_.lower(), child.lemma_.lower())
+            if pair in PHRASAL_PREP_LEMMA_PAIRS:
+                add_span(min(token.i, child.i), max(token.i, child.i) + 1, "phrasal verb")
+
+    # 3) Verb-object collocations
+    for token in sent:
+        if token.pos_ not in {"VERB", "AUX"}:
+            continue
+        for child in token.children:
+            if child.dep_ not in {"dobj", "obj", "attr", "oprd", "pobj"}:
+                continue
+            pair = (token.lemma_.lower(), child.lemma_.lower())
+            if pair in COLLOCATION_VERB_OBJECT_LEMMA_PAIRS:
+                add_span(min(token.i, child.left_edge.i), max(token.i, child.right_edge.i) + 1, "collocation")
+
+    # 4) Clause-like chunks around verbal clause heads
+    for token in sent:
+        if token.pos_ not in {"VERB", "AUX"}:
+            continue
+        if token.dep_ not in CLAUSE_HEAD_DEPS:
+            continue
+        token_ids = {tok.i for tok in token.subtree if not tok.is_space and not tok.is_punct}
+        if not token_ids:
+            continue
+        add_span(min(token_ids), max(token_ids) + 1, "clause chunk")
+
+    # 5) Noun chunks
+    for chunk in sent.noun_chunks:
+        add_span(chunk.start, chunk.end, "noun phrase")
+
+    # 6) Prepositional phrases
     for token in sent:
         if token.pos_ == "ADP":
-            start = token.i
-            end = token.right_edge.i + 1
-            key = (start, end)
-            if key not in seen and end > start:
-                spans.append((start, end, "prepositional phrase"))
-                seen.add(key)
+            add_span(token.i, token.right_edge.i + 1, "prepositional phrase")
 
     spans.sort(key=lambda s: (s[0], s[1]))
     return spans
@@ -208,8 +361,6 @@ def _phrase_candidates(sent) -> List[Tuple[int, int, str]]:
 def _is_weak_phrase_candidate(span, phrase_pos: str) -> bool:
     tokens = [tok for tok in span if not tok.is_space and not tok.is_punct]
     if len(tokens) < 2:
-        return True
-    if phrase_pos == "prepositional phrase" and len(tokens) < 3:
         return True
     return False
 
@@ -257,8 +408,10 @@ def _span_head_token(span):
 
 
 def _phrase_role(span, phrase_pos: str) -> str:
-    if phrase_pos == "verb phrase":
+    if phrase_pos in {"phrasal verb", "idiom", "collocation"}:
         return "predicate"
+    if phrase_pos == "clause chunk":
+        return "clause"
     head = _span_head_token(span)
     if head is None:
         return "other"

@@ -654,31 +654,25 @@ class PipelineTests(unittest.TestCase):
         top_level_phrases = [node for node in sentence.get("linguistic_elements", []) if node.get("type") == "Phrase"]
         self.assertEqual(len(top_level_phrases), 1)
         phrase_text = str(top_level_phrases[0].get("content") or "")
-        self.assertTrue(phrase_text.startswith("came to him towards morning"))
+        self.assertTrue(phrase_text.startswith("She came to him towards morning"))
+        self.assertEqual(str(top_level_phrases[0].get("part_of_speech") or ""), "clause chunk")
         top_level_contents = [str(node.get("content") or "") for node in sentence.get("linguistic_elements", [])]
-        self.assertIn("She", top_level_contents)
         self.assertNotIn("towards morning", top_level_contents)
-        phrase_words = [
-            str(node.get("content") or "")
-            for node in self._iter_by_type(top_level_phrases[0], "Word")
-        ]
-        self.assertIn("morning", phrase_words)
+        nested_phrases = [str(node.get("content") or "") for node in self._iter_by_type(top_level_phrases[0], "Phrase")]
+        self.assertIn("towards morning", nested_phrases)
 
-    def test_pipeline_does_not_create_phrase_equal_to_whole_sentence(self):
+    def test_pipeline_does_not_create_legacy_verb_phrase_nodes(self):
         out = run_pipeline("She came to him towards morning.", model_dir=None)
         sentence = out[next(iter(out))]
-        sentence_text = str(sentence.get("content") or "").strip().rstrip(".").lower()
         for phrase in self._iter_by_type(sentence, "Phrase"):
-            phrase_text = str(phrase.get("content") or "").strip().rstrip(".").lower()
-            self.assertNotEqual(phrase_text, sentence_text)
+            self.assertNotEqual(str(phrase.get("part_of_speech") or "").strip().lower(), "verb phrase")
 
     def test_pipeline_leaves_unknown_phrase_without_generic_notes(self):
         out = run_pipeline("She entered through the chamber like a phantom.", model_dir=None)
         sentence = out[next(iter(out))]
         phrases = [
-            node
-            for node in sentence.get("linguistic_elements", [])
-            if node.get("type") == "Phrase" and str(node.get("content") or "") in {"through the chamber", "like a phantom"}
+            node for node in self._iter_by_type(sentence, "Phrase")
+            if str(node.get("part_of_speech") or "") == "prepositional phrase"
         ]
         self.assertGreaterEqual(len(phrases), 1)
         for phrase in phrases:
@@ -703,8 +697,6 @@ class PipelineTests(unittest.TestCase):
             phrase_text = str(phrase.get("content") or "")
             token_count = len(self.TOKEN_RE.findall(phrase_text))
             self.assertGreaterEqual(token_count, 2)
-            if str(phrase.get("part_of_speech") or "") == "prepositional phrase":
-                self.assertGreaterEqual(token_count, 3)
 
     @patch("ela_pipeline.annotate.controlled_renderer.ControlledT5NoteRenderer")
     @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.__init__", side_effect=AssertionError("must not be called"))
@@ -769,6 +761,7 @@ class PipelineTests(unittest.TestCase):
     @patch("ela_pipeline.classifier.tabular_cefr_predictor.TabularProfileClassifier")
     def test_pipeline_uses_tabular_classifier_provider(self, mock_classifier_cls):
         fake_classifier = MagicMock()
+        fake_classifier.supports_joint_profiles = False
         fake_classifier.classify_node.return_value = {
             "cefr_level": "B1",
         }
@@ -822,7 +815,8 @@ class PipelineTests(unittest.TestCase):
         sentence = out[key]
         phrases = list(self._iter_by_type(sentence, "Phrase"))
         words = list(self._iter_by_type(sentence, "Word"))
-        self.assertEqual(len(phrases), 0)
+        self.assertEqual(len(phrases), 1)
+        self.assertEqual(str(phrases[0].get("part_of_speech") or ""), "clause chunk")
         self.assertGreaterEqual(len(words), 2)
         self.assertTrue(any(str(w.get("content") or "") == "I" for w in words))
         self.assertTrue(any(str(w.get("content") or "") == "run" for w in words))

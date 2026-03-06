@@ -26,7 +26,15 @@ from ela_pipeline.validation.notes_quality import is_valid_note, sanitize_note
 
 
 class LocalT5Annotator:
-    _TAM_RELEVANT_POS = {"sentence", "verb phrase", "verb", "auxiliary verb"}
+    _TAM_RELEVANT_POS = {
+        "sentence",
+        "clause chunk",
+        "phrasal verb",
+        "idiom",
+        "collocation",
+        "verb",
+        "auxiliary verb",
+    }
 
     def __init__(
         self,
@@ -338,7 +346,7 @@ class LocalT5Annotator:
                 return
 
             # For non-verbal phrases, mood/voice/finiteness are usually not meaningful.
-            if pos not in {"verb phrase"}:
+            if pos not in {"clause chunk", "phrasal verb", "idiom", "collocation", "verb phrase"}:
                 for field in ("mood", "voice", "finiteness"):
                     node[field] = "null"
 

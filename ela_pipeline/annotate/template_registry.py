@@ -85,6 +85,10 @@ def _lex_class(node: Dict[str, object]) -> str:
 def build_context_keys(node: Dict[str, object]) -> Dict[str, str]:
     level = _norm(node.get("type"))
     pos = _norm(node.get("part_of_speech"))
+    if level == "phrase" and pos in {"phrasal verb", "idiom", "collocation", "clause chunk"}:
+        # Keep deterministic template coverage for richer phrase types by mapping
+        # them into the existing verb-phrase template lattice.
+        pos = "verb phrase"
     dep = _dep(node)
     tam = _tam(node)
     lex = _lex_class(node)
@@ -496,6 +500,7 @@ def is_template_semantically_compatible(node: Dict[str, object], template_id: st
         return template_id == "SENTENCE_FINITE_CLAUSE"
 
     if level == "phrase":
+        verbal_phrase_like = {"verb phrase", "phrasal verb", "idiom", "collocation", "clause chunk"}
         if template_id == "PP_TIME_BEFORE_ING":
             return "prepositional phrase" in pos and first == "before" and any(t.endswith("ing") for t in toks[1:])
         if template_id == "PP_GENERAL_LINKING":
@@ -505,9 +510,9 @@ def is_template_semantically_compatible(node: Dict[str, object], template_id: st
         if template_id == "NP_DETERMINER_NOUN":
             return "noun phrase" in pos
         if template_id == "VP_MODAL_PERFECT":
-            return "verb phrase" in pos and tam == "modal_perfect"
+            return pos in verbal_phrase_like and tam == "modal_perfect"
         if template_id in {"VP_AUXILIARY", "VP_PARTICIPLE"}:
-            return "verb phrase" in pos
+            return pos in verbal_phrase_like
         return True
 
     if level == "word":

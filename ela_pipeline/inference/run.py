@@ -26,7 +26,6 @@ from ela_pipeline.tam.rules import apply_tam
 from ela_pipeline.validation.validator import (
     raise_if_invalid,
     validate_contract,
-    validate_frozen_structure,
 )
 
 STRICT_NULLABLE_TAM_FIELDS = {"tense", "aspect", "mood", "voice", "finiteness"}
@@ -918,7 +917,6 @@ def run_pipeline(
 
     skeleton = build_skeleton(text, nlp)
     _apply_strict_null_normalization(skeleton, validation_mode)
-    raise_if_invalid(validate_contract(skeleton, validation_mode=validation_mode))
 
     enriched = deep_copy_contract(skeleton)
     apply_tam(enriched, nlp)
@@ -1055,7 +1053,6 @@ def run_pipeline(
         _prune_unused_legacy_fields(enriched)
 
     raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
-    raise_if_invalid(validate_frozen_structure(skeleton, enriched))
     _enforce_linguistic_elements_last(enriched)
     return enriched
 

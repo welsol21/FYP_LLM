@@ -42,6 +42,26 @@ def _phrase_note(node: Dict) -> str:
                 f"with {tense} temporal interpretation."
             )
         return f"The phrase '{content}' is a verb phrase encoding an action or state."
+    if pos == "clause chunk":
+        return (
+            f"The phrase '{content}' is a clause chunk that packages a clause-level event "
+            "or proposition in context."
+        )
+    if pos == "phrasal verb":
+        return (
+            f"The phrase '{content}' functions as a phrasal verb where verb and particle "
+            "jointly encode predicate meaning."
+        )
+    if pos == "idiom":
+        return (
+            f"The phrase '{content}' is an idiomatic construction whose meaning is not fully "
+            "compositional from individual words."
+        )
+    if pos == "collocation":
+        return (
+            f"The phrase '{content}' is a lexical collocation where words combine in a "
+            "conventional pattern."
+        )
     if "prepositional phrase" in pos:
         return (
             f"The phrase '{content}' is a prepositional phrase introducing relational context "

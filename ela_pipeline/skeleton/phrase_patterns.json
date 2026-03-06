@@ -1,0 +1,48 @@
+{
+  "clause_head_deps": [
+    "ROOT",
+    "conj",
+    "advcl",
+    "ccomp",
+    "xcomp",
+    "acl",
+    "relcl"
+  ],
+  "phrasal_prep_lemma_pairs": [
+    ["look", "after"],
+    ["come", "across"],
+    ["run", "into"],
+    ["get", "over"],
+    ["put", "off"],
+    ["turn", "down"],
+    ["go", "on"],
+    ["carry", "out"],
+    ["set", "up"],
+    ["take", "off"],
+    ["find", "out"],
+    ["make", "up"]
+  ],
+  "idiom_patterns": [
+    ["kick", "the", "bucket"],
+    ["break", "the", "ice"],
+    ["piece", "of", "cake"],
+    ["under", "the", "weather"],
+    ["spill", "the", "beans"],
+    ["hit", "the", "sack"]
+  ],
+  "collocation_verb_object_lemma_pairs": [
+    ["make", "decision"],
+    ["take", "risk"],
+    ["pay", "attention"],
+    ["raise", "baton"],
+    ["reach", "conclusion"],
+    ["draw", "attention"],
+    ["have", "impact"],
+    ["conduct", "research"],
+    ["set", "goal"],
+    ["meet", "requirement"],
+    ["file", "complaint"],
+    ["provide", "support"],
+    ["cause", "problem"]
+  ]
+}
