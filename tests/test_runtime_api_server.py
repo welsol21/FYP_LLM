@@ -121,6 +121,44 @@ class RuntimeApiServerTests(unittest.TestCase):
             server.server_close()
             thread.join(timeout=2)
 
+    @patch("ela_pipeline.runtime.api_server.SERVICE.analyze_text_contract")
+    def test_analyze_text_http_e2e_smoke(self, mock_analyze_text_contract):
+        mock_analyze_text_contract.return_value = {
+            "raw_text": "She trusted him. He apologized.",
+            "sentences": ["She trusted him.", "He apologized."],
+            "razbor": [],
+            "contract": {},
+            "notes_sources": ["chatgpt", "chatgpt"],
+        }
+
+        with patch.dict("os.environ", {}, clear=False):
+            try:
+                server = ThreadingHTTPServer(("127.0.0.1", 0), api_server.RuntimeApiHandler)
+            except PermissionError:
+                self.skipTest("Socket bind is not permitted in current sandbox environment.")
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            host, port = server.server_address
+            req = urlrequest.Request(
+                f"http://{host}:{port}/api/analyze-text",
+                method="POST",
+                data=json.dumps({"rawText": "She trusted him. He apologized."}).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+            )
+            with urlrequest.urlopen(req, timeout=5) as resp:  # nosec B310
+                body = json.loads(resp.read().decode("utf-8"))
+
+            self.assertEqual(body["sentences"], ["She trusted him.", "He apologized."])
+            kwargs = mock_analyze_text_contract.call_args.kwargs
+            self.assertEqual(kwargs["raw_text"], "She trusted him. He apologized.")
+            self.assertIsNone(kwargs["sentences"])
+            self.assertTrue(kwargs["generate_notes"])
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
 
 if __name__ == "__main__":
     unittest.main()

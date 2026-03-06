@@ -804,6 +804,21 @@ class RuntimeMediaService:
             "sentence_node": sentence_node,
         }
 
+    def analyze_text_contract(
+        self,
+        *,
+        raw_text: str,
+        sentences: list[Any] | None = None,
+        generate_notes: bool = True,
+    ) -> dict[str, Any]:
+        from .razbor_pipeline import build_text_analysis_payload
+
+        return build_text_analysis_payload(
+            raw_text=raw_text,
+            sentences=sentences,
+            generate_notes=generate_notes,
+        )
+
     @staticmethod
     def _select_sentence_node_from_contract(*, contract: dict[str, Any], sentence_text: str) -> dict[str, Any]:
         if not isinstance(contract, dict) or not contract:

@@ -1,0 +1,4788 @@
+{
+    "schema_version": "gold_standard_full_schema_v1",
+    "description": "30 gold-standard English analyses: CEFR A1–C2, 5 examples per level. Notes include Elementary/Intermediate/Advanced with natural, pedagogically oriented explanations.",
+    "levels": [
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+    ],
+    "examples_per_level": 5,
+    "examples": [
+        {
+            "id": "A1_01",
+            "cefr_level": "A1",
+            "input": "I live in Cork.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Simple",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "I live in Cork."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "I",
+                    "predicate_span": "live",
+                    "post_predicate_span": "in Cork."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "I"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "live"
+                    },
+                    {
+                        "phrase_type": "PP",
+                        "function": "Adjunct",
+                        "span": "in Cork"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "I",
+                            "pos": "PRON",
+                            "lemma": "i",
+                            "features": {}
+                        },
+                        {
+                            "text": "live",
+                            "pos": "WORD",
+                            "lemma": "live",
+                            "features": {}
+                        },
+                        {
+                            "text": "in",
+                            "pos": "ADP",
+                            "lemma": "in",
+                            "features": {}
+                        },
+                        {
+                            "text": "Cork",
+                            "pos": "PROPN",
+                            "lemma": "cork",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "I live in Cork.",
+                            "tense": "Present",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Present/General",
+                            "evidence": [
+                                "present simple for a general fact"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "present/general",
+                    "pragmatic_notes": [
+                        "Neutral factual statement about residence."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "A1",
+                    "markers": [
+                        "present_simple",
+                        "basic_pp_place"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This is a statement about where someone lives.",
+                "intermediate": "Present Simple ('live') expresses a general fact/habit. Core pattern: Subject (I) + verb (live) + place PP ('in Cork').",
+                "advanced": "A1: single clause, canonical SVO, basic place adjunct; minimal lexical load and no subordination."
+            }
+        },
+        {
+            "id": "A1_02",
+            "cefr_level": "A1",
+            "input": "She has a car.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Simple",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "She has a car."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "She",
+                    "predicate_span": "has",
+                    "post_predicate_span": "a car."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "She"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "has"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Object",
+                        "span": "a car"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "She",
+                            "pos": "PRON",
+                            "lemma": "she",
+                            "features": {}
+                        },
+                        {
+                            "text": "has",
+                            "pos": "AUX",
+                            "lemma": "has",
+                            "features": {}
+                        },
+                        {
+                            "text": "a",
+                            "pos": "DET",
+                            "lemma": "a",
+                            "features": {}
+                        },
+                        {
+                            "text": "car",
+                            "pos": "WORD",
+                            "lemma": "car",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "She has a car.",
+                            "tense": "Present",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Present/General",
+                            "evidence": [
+                                "have for possession"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "present/general",
+                    "pragmatic_notes": [
+                        "Simple possession statement."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "A1",
+                    "markers": [
+                        "have_possession",
+                        "article_a"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This says she owns a car.",
+                "intermediate": "Present Simple 'have' for possession: Subject (She) + has + object NP ('a car').",
+                "advanced": "A1: transparent form–meaning mapping; no modifiers beyond an article."
+            }
+        },
+        {
+            "id": "A1_03",
+            "cefr_level": "A1",
+            "input": "Is he a doctor?",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Simple",
+                    "communicative_type": "Interrogative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "Is he a doctor?"
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "Is he",
+                    "predicate_span": "a doctor",
+                    "post_predicate_span": "?"
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "AUX",
+                        "function": "Question auxiliary",
+                        "span": "Is"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "he"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject complement",
+                        "span": "a doctor"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "Is",
+                            "pos": "AUX",
+                            "lemma": "is",
+                            "features": {}
+                        },
+                        {
+                            "text": "he",
+                            "pos": "PRON",
+                            "lemma": "he",
+                            "features": {}
+                        },
+                        {
+                            "text": "a",
+                            "pos": "DET",
+                            "lemma": "a",
+                            "features": {}
+                        },
+                        {
+                            "text": "doctor",
+                            "pos": "WORD",
+                            "lemma": "doctor",
+                            "features": {}
+                        },
+                        {
+                            "text": "?",
+                            "pos": "PUNCT",
+                            "lemma": "?",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "Is he a doctor?",
+                            "tense": "Present",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Interrogative",
+                            "modality": null,
+                            "time_reference": "Present/General",
+                            "evidence": [
+                                "copular inversion in yes/no question"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "question",
+                    "time_reference": "present/general",
+                    "pragmatic_notes": [
+                        "Yes/no identification question."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "A1",
+                    "markers": [
+                        "be_copula",
+                        "yes_no_question_inversion"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This is a yes/no question about his job.",
+                "intermediate": "Copular question: auxiliary 'be' precedes the subject (Is + he). Complement NP: 'a doctor'.",
+                "advanced": "A1: correct interrogative word order with 'be'; minimal clause complexity."
+            }
+        },
+        {
+            "id": "A1_04",
+            "cefr_level": "A1",
+            "input": "The book is on the table.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Simple",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "The book is on the table."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "The book",
+                    "predicate_span": "is",
+                    "post_predicate_span": "on the table."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "The book"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "is"
+                    },
+                    {
+                        "phrase_type": "PP",
+                        "function": "Adjunct",
+                        "span": "on the table"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "The",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "book",
+                            "pos": "WORD",
+                            "lemma": "book",
+                            "features": {}
+                        },
+                        {
+                            "text": "is",
+                            "pos": "AUX",
+                            "lemma": "is",
+                            "features": {}
+                        },
+                        {
+                            "text": "on",
+                            "pos": "ADP",
+                            "lemma": "on",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "table",
+                            "pos": "WORD",
+                            "lemma": "table",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "The book is on the table.",
+                            "tense": "Present",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Present",
+                            "evidence": [
+                                "copula + locative PP"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "present",
+                    "pragmatic_notes": [
+                        "Locative description."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "A1",
+                    "markers": [
+                        "be_location",
+                        "basic_preposition_on"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This tells where the book is.",
+                "intermediate": "Copular clause: Subject NP + 'be' + locative PP ('on the table').",
+                "advanced": "A1: concrete nouns and basic preposition; no subordination or aspect complexity."
+            }
+        },
+        {
+            "id": "A1_05",
+            "cefr_level": "A1",
+            "input": "We don’t like milk.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Simple",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "We don’t like milk."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "We",
+                    "predicate_span": "don’t like",
+                    "post_predicate_span": "milk."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "We"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "do not like"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Object",
+                        "span": "milk"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "We",
+                            "pos": "PRON",
+                            "lemma": "we",
+                            "features": {}
+                        },
+                        {
+                            "text": "don",
+                            "pos": "WORD",
+                            "lemma": "don",
+                            "features": {}
+                        },
+                        {
+                            "text": "’",
+                            "pos": "PUNCT",
+                            "lemma": "’",
+                            "features": {}
+                        },
+                        {
+                            "text": "t",
+                            "pos": "WORD",
+                            "lemma": "t",
+                            "features": {}
+                        },
+                        {
+                            "text": "like",
+                            "pos": "WORD",
+                            "lemma": "like",
+                            "features": {}
+                        },
+                        {
+                            "text": "milk",
+                            "pos": "WORD",
+                            "lemma": "milk",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "We don’t like milk.",
+                            "tense": "Present",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Present/General",
+                            "evidence": [
+                                "do-support negation"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "present/general",
+                    "pragmatic_notes": [
+                        "General dislike statement."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "A1",
+                    "markers": [
+                        "do_support_negation"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This says they do not like milk.",
+                "intermediate": "Present Simple negation: do not + base verb ('like'); object NP 'milk'.",
+                "advanced": "A1: core polarity marking without embedding; high transparency."
+            }
+        },
+        {
+            "id": "A2_01",
+            "cefr_level": "A2",
+            "input": "She is visiting her grandmother tomorrow.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Simple",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "She is visiting her grandmother tomorrow."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "She",
+                    "predicate_span": "is visiting",
+                    "post_predicate_span": "her grandmother tomorrow."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "She"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "is visiting"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Object",
+                        "span": "her grandmother"
+                    },
+                    {
+                        "phrase_type": "AdvP",
+                        "function": "Adjunct",
+                        "span": "tomorrow"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "She",
+                            "pos": "PRON",
+                            "lemma": "she",
+                            "features": {}
+                        },
+                        {
+                            "text": "is",
+                            "pos": "AUX",
+                            "lemma": "is",
+                            "features": {}
+                        },
+                        {
+                            "text": "visiting",
+                            "pos": "VERB",
+                            "lemma": "visiting",
+                            "features": {}
+                        },
+                        {
+                            "text": "her",
+                            "pos": "DET",
+                            "lemma": "her",
+                            "features": {}
+                        },
+                        {
+                            "text": "grandmother",
+                            "pos": "WORD",
+                            "lemma": "grandmother",
+                            "features": {}
+                        },
+                        {
+                            "text": "tomorrow",
+                            "pos": "WORD",
+                            "lemma": "tomorrow",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "She is visiting her grandmother tomorrow.",
+                            "tense": "Present",
+                            "aspect": "Progressive",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Future (arrangement)",
+                            "evidence": [
+                                "be + V-ing",
+                                "future time adverbial"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "future arrangement",
+                    "pragmatic_notes": [
+                        "Present Continuous used for a planned arrangement."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "A2",
+                    "markers": [
+                        "progressive_aspect",
+                        "future_time_adverbial"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This talks about a plan for tomorrow.",
+                "intermediate": "Present Continuous (be + V-ing) can express a fixed arrangement; 'tomorrow' supplies future time reference.",
+                "advanced": "A2: aspect used with future reference; still one clause and high transparency."
+            }
+        },
+        {
+            "id": "A2_02",
+            "cefr_level": "A2",
+            "input": "We went to the cinema last night.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Simple",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "We went to the cinema last night."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "We",
+                    "predicate_span": "went",
+                    "post_predicate_span": "to the cinema last night."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "We"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "went"
+                    },
+                    {
+                        "phrase_type": "PP",
+                        "function": "Adjunct",
+                        "span": "to the cinema"
+                    },
+                    {
+                        "phrase_type": "NP/Adv",
+                        "function": "Time adjunct",
+                        "span": "last night"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "We",
+                            "pos": "PRON",
+                            "lemma": "we",
+                            "features": {}
+                        },
+                        {
+                            "text": "went",
+                            "pos": "WORD",
+                            "lemma": "went",
+                            "features": {}
+                        },
+                        {
+                            "text": "to",
+                            "pos": "ADP",
+                            "lemma": "to",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "cinema",
+                            "pos": "WORD",
+                            "lemma": "cinema",
+                            "features": {}
+                        },
+                        {
+                            "text": "last",
+                            "pos": "WORD",
+                            "lemma": "last",
+                            "features": {}
+                        },
+                        {
+                            "text": "night",
+                            "pos": "WORD",
+                            "lemma": "night",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "We went to the cinema last night.",
+                            "tense": "Past",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past",
+                            "evidence": [
+                                "irregular past verb",
+                                "definite past time"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "past",
+                    "pragmatic_notes": [
+                        "Finished past event; narrative reporting."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [
+                        {
+                            "pair": [
+                                "last",
+                                "night"
+                            ],
+                            "label": "time expression"
+                        }
+                    ],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "A2",
+                    "markers": [
+                        "past_simple",
+                        "definite_time_marker"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "They went to the cinema in the past.",
+                "intermediate": "Past Simple ('went') + definite time phrase ('last night') → finished event narrative.",
+                "advanced": "A2: basic narrative past with an irregular form; no subordination."
+            }
+        },
+        {
+            "id": "A2_03",
+            "cefr_level": "A2",
+            "input": "Can you help me, please?",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Simple",
+                    "communicative_type": "Interrogative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "Can you help me, please?"
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "Can you",
+                    "predicate_span": "help",
+                    "post_predicate_span": "me, please?"
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "AUX",
+                        "function": "Question modal",
+                        "span": "Can"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "you"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "help"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Object",
+                        "span": "me"
+                    },
+                    {
+                        "phrase_type": "AdvP",
+                        "function": "Politeness marker",
+                        "span": "please"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "Can",
+                            "pos": "AUX",
+                            "lemma": "can",
+                            "features": {}
+                        },
+                        {
+                            "text": "you",
+                            "pos": "PRON",
+                            "lemma": "you",
+                            "features": {}
+                        },
+                        {
+                            "text": "help",
+                            "pos": "WORD",
+                            "lemma": "help",
+                            "features": {}
+                        },
+                        {
+                            "text": "me",
+                            "pos": "PRON",
+                            "lemma": "me",
+                            "features": {}
+                        },
+                        {
+                            "text": ",",
+                            "pos": "PUNCT",
+                            "lemma": ",",
+                            "features": {}
+                        },
+                        {
+                            "text": "please",
+                            "pos": "WORD",
+                            "lemma": "please",
+                            "features": {}
+                        },
+                        {
+                            "text": "?",
+                            "pos": "PUNCT",
+                            "lemma": "?",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "Can you help me, please?",
+                            "tense": "Present",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Interrogative",
+                            "modality": "can",
+                            "time_reference": "Present",
+                            "evidence": [
+                                "modal question",
+                                "politeness marker"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "request",
+                    "time_reference": "present",
+                    "pragmatic_notes": [
+                        "Polite request using a modal + 'please'."
+                    ]
+                },
+                "lexis": {
+                    "register": "polite neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "A2",
+                    "markers": [
+                        "modal_request",
+                        "politeness_marker"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This is a polite request for help.",
+                "intermediate": "Modal yes/no question: Can + subject + base verb; 'please' softens the request.",
+                "advanced": "A2 pragmatic control: conventional request formula; meaning relies on social convention rather than complex syntax."
+            }
+        },
+        {
+            "id": "A2_04",
+            "cefr_level": "A2",
+            "input": "It is hotter today than yesterday.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Simple",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "It is hotter today than yesterday."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "It",
+                    "predicate_span": "is",
+                    "post_predicate_span": "hotter today than yesterday."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "It"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "is"
+                    },
+                    {
+                        "phrase_type": "AdjP",
+                        "function": "Complement",
+                        "span": "hotter"
+                    },
+                    {
+                        "phrase_type": "AdvP",
+                        "function": "Adjunct",
+                        "span": "today"
+                    },
+                    {
+                        "phrase_type": "Comp",
+                        "function": "Comparison",
+                        "span": "than yesterday"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "It",
+                            "pos": "PRON",
+                            "lemma": "it",
+                            "features": {}
+                        },
+                        {
+                            "text": "is",
+                            "pos": "AUX",
+                            "lemma": "is",
+                            "features": {}
+                        },
+                        {
+                            "text": "hotter",
+                            "pos": "WORD",
+                            "lemma": "hotter",
+                            "features": {}
+                        },
+                        {
+                            "text": "today",
+                            "pos": "WORD",
+                            "lemma": "today",
+                            "features": {}
+                        },
+                        {
+                            "text": "than",
+                            "pos": "WORD",
+                            "lemma": "than",
+                            "features": {}
+                        },
+                        {
+                            "text": "yesterday",
+                            "pos": "WORD",
+                            "lemma": "yesterday",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "It is hotter today than yesterday.",
+                            "tense": "Present",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Present",
+                            "evidence": [
+                                "comparative adjective + than-phrase"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "present",
+                    "pragmatic_notes": [
+                        "Comparison across time points."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "A2",
+                    "markers": [
+                        "comparative_structure"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This compares today and yesterday.",
+                "intermediate": "Comparative pattern: copula + comparative adjective ('hotter') + than-phrase providing the comparison baseline.",
+                "advanced": "A2: comparative meaning expressed without clause embedding; low processing load."
+            }
+        },
+        {
+            "id": "A2_05",
+            "cefr_level": "A2",
+            "input": "They are going to buy a new sofa.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Simple",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "They are going to buy a new sofa."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "They",
+                    "predicate_span": "are going to buy",
+                    "post_predicate_span": "a new sofa."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "They"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "are going to buy"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Object",
+                        "span": "a new sofa"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "They",
+                            "pos": "PRON",
+                            "lemma": "they",
+                            "features": {}
+                        },
+                        {
+                            "text": "are",
+                            "pos": "AUX",
+                            "lemma": "are",
+                            "features": {}
+                        },
+                        {
+                            "text": "going",
+                            "pos": "VERB",
+                            "lemma": "going",
+                            "features": {}
+                        },
+                        {
+                            "text": "to",
+                            "pos": "ADP",
+                            "lemma": "to",
+                            "features": {}
+                        },
+                        {
+                            "text": "buy",
+                            "pos": "WORD",
+                            "lemma": "buy",
+                            "features": {}
+                        },
+                        {
+                            "text": "a",
+                            "pos": "DET",
+                            "lemma": "a",
+                            "features": {}
+                        },
+                        {
+                            "text": "new",
+                            "pos": "WORD",
+                            "lemma": "new",
+                            "features": {}
+                        },
+                        {
+                            "text": "sofa",
+                            "pos": "WORD",
+                            "lemma": "sofa",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "They are going to buy a new sofa.",
+                            "tense": "Present",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Future (intention)",
+                            "evidence": [
+                                "be going to + base verb"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "future intention",
+                    "pragmatic_notes": [
+                        "Intention/plan."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "A2",
+                    "markers": [
+                        "be_going_to_future"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This talks about a plan to buy something.",
+                "intermediate": "'Be going to' expresses intention: are + going to + base verb (buy). Object NP: 'a new sofa'.",
+                "advanced": "A2: future meaning via periphrastic construction; still a single clause."
+            }
+        },
+        {
+            "id": "B1_01",
+            "cefr_level": "B1",
+            "input": "I have lived here for five years.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Simple",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "I have lived here for five years."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "I",
+                    "predicate_span": "have lived",
+                    "post_predicate_span": "here for five years."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "I"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "have lived"
+                    },
+                    {
+                        "phrase_type": "AdvP",
+                        "function": "Adjunct",
+                        "span": "here"
+                    },
+                    {
+                        "phrase_type": "PP",
+                        "function": "Adjunct",
+                        "span": "for five years"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "I",
+                            "pos": "PRON",
+                            "lemma": "i",
+                            "features": {}
+                        },
+                        {
+                            "text": "have",
+                            "pos": "AUX",
+                            "lemma": "have",
+                            "features": {}
+                        },
+                        {
+                            "text": "lived",
+                            "pos": "VERB",
+                            "lemma": "lived",
+                            "features": {}
+                        },
+                        {
+                            "text": "here",
+                            "pos": "WORD",
+                            "lemma": "here",
+                            "features": {}
+                        },
+                        {
+                            "text": "for",
+                            "pos": "ADP",
+                            "lemma": "for",
+                            "features": {}
+                        },
+                        {
+                            "text": "five",
+                            "pos": "WORD",
+                            "lemma": "five",
+                            "features": {}
+                        },
+                        {
+                            "text": "years",
+                            "pos": "WORD",
+                            "lemma": "years",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "I have lived here for five years.",
+                            "tense": "Present",
+                            "aspect": "Perfect",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Up to now (continuative)",
+                            "evidence": [
+                                "have + past participle",
+                                "for-duration"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "continuative",
+                    "pragmatic_notes": [
+                        "State continues to the present."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "B1",
+                    "markers": [
+                        "present_perfect_continuative",
+                        "duration_for"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "The person started living here in the past and still lives here now.",
+                "intermediate": "Present Perfect (have + past participle) + 'for' duration → continuative meaning (state holds up to now).",
+                "advanced": "B1: stable time-span interpretation; correct use of perfect aspect to connect past onset with present relevance."
+            }
+        },
+        {
+            "id": "B1_02",
+            "cefr_level": "B1",
+            "input": "If it rains, we will stay at home.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "subordinate",
+                            "marker": "if",
+                            "relation": "conditional",
+                            "span": "If it rains"
+                        },
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "we will stay at home."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "If it",
+                    "predicate_span": "rains",
+                    "post_predicate_span": ", we will stay at home."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "Clause",
+                        "function": "If-clause",
+                        "span": "If it rains"
+                    },
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Main clause",
+                        "span": "we will stay at home"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "If",
+                            "pos": "CONJ",
+                            "lemma": "if",
+                            "features": {}
+                        },
+                        {
+                            "text": "it",
+                            "pos": "PRON",
+                            "lemma": "it",
+                            "features": {}
+                        },
+                        {
+                            "text": "rains",
+                            "pos": "WORD",
+                            "lemma": "rains",
+                            "features": {}
+                        },
+                        {
+                            "text": ",",
+                            "pos": "PUNCT",
+                            "lemma": ",",
+                            "features": {}
+                        },
+                        {
+                            "text": "we",
+                            "pos": "PRON",
+                            "lemma": "we",
+                            "features": {}
+                        },
+                        {
+                            "text": "will",
+                            "pos": "AUX",
+                            "lemma": "will",
+                            "features": {}
+                        },
+                        {
+                            "text": "stay",
+                            "pos": "WORD",
+                            "lemma": "stay",
+                            "features": {}
+                        },
+                        {
+                            "text": "at",
+                            "pos": "ADP",
+                            "lemma": "at",
+                            "features": {}
+                        },
+                        {
+                            "text": "home",
+                            "pos": "WORD",
+                            "lemma": "home",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "If it rains",
+                            "tense": "Present",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Future condition",
+                            "evidence": [
+                                "if + present simple"
+                            ]
+                        },
+                        {
+                            "clause_span": "we will stay at home.",
+                            "tense": "Present",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": "will",
+                            "time_reference": "Future",
+                            "evidence": [
+                                "will + base verb"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "future conditional",
+                    "pragmatic_notes": [
+                        "Real future condition (planning)."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "B1",
+                    "markers": [
+                        "first_conditional"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "If it rains, they will stay at home.",
+                "intermediate": "First Conditional: if-clause in Present Simple + main clause with 'will' for a future result.",
+                "advanced": "B1: subordination supports planning discourse; explicit cause–effect mapping."
+            }
+        },
+        {
+            "id": "B1_03",
+            "cefr_level": "B1",
+            "input": "The man who lives next door is very friendly.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "The man who lives next door is very friendly."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "The man who lives next door",
+                    "predicate_span": "is",
+                    "post_predicate_span": "very friendly."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "The man who lives next door"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "is"
+                    },
+                    {
+                        "phrase_type": "AdjP",
+                        "function": "Complement",
+                        "span": "very friendly"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "The",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "man",
+                            "pos": "WORD",
+                            "lemma": "man",
+                            "features": {}
+                        },
+                        {
+                            "text": "who",
+                            "pos": "WORD",
+                            "lemma": "who",
+                            "features": {}
+                        },
+                        {
+                            "text": "lives",
+                            "pos": "WORD",
+                            "lemma": "lives",
+                            "features": {}
+                        },
+                        {
+                            "text": "next",
+                            "pos": "WORD",
+                            "lemma": "next",
+                            "features": {}
+                        },
+                        {
+                            "text": "door",
+                            "pos": "WORD",
+                            "lemma": "door",
+                            "features": {}
+                        },
+                        {
+                            "text": "is",
+                            "pos": "AUX",
+                            "lemma": "is",
+                            "features": {}
+                        },
+                        {
+                            "text": "very",
+                            "pos": "WORD",
+                            "lemma": "very",
+                            "features": {}
+                        },
+                        {
+                            "text": "friendly",
+                            "pos": "WORD",
+                            "lemma": "friendly",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "The man who lives next door is very friendly.",
+                            "tense": "Present",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Present/General",
+                            "evidence": [
+                                "defining relative clause modifies NP"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "present/general",
+                    "pragmatic_notes": [
+                        "Relative clause adds identifying information."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "B1",
+                    "markers": [
+                        "relative_clause_defining"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This describes a friendly neighbour.",
+                "intermediate": "Defining relative clause ('who lives next door') modifies the head noun 'man'; main clause uses copular 'is' + adjective phrase.",
+                "advanced": "B1: embedding within NP increases syntactic density while keeping discourse accessible."
+            }
+        },
+        {
+            "id": "B1_04",
+            "cefr_level": "B1",
+            "input": "This email was sent yesterday.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Simple",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "This email was sent yesterday."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "This email",
+                    "predicate_span": "was sent",
+                    "post_predicate_span": "yesterday."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "This email"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "was sent"
+                    },
+                    {
+                        "phrase_type": "AdvP",
+                        "function": "Adjunct",
+                        "span": "yesterday"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "This",
+                            "pos": "DET",
+                            "lemma": "this",
+                            "features": {}
+                        },
+                        {
+                            "text": "email",
+                            "pos": "WORD",
+                            "lemma": "email",
+                            "features": {}
+                        },
+                        {
+                            "text": "was",
+                            "pos": "AUX",
+                            "lemma": "was",
+                            "features": {}
+                        },
+                        {
+                            "text": "sent",
+                            "pos": "WORD",
+                            "lemma": "sent",
+                            "features": {}
+                        },
+                        {
+                            "text": "yesterday",
+                            "pos": "WORD",
+                            "lemma": "yesterday",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "This email was sent yesterday.",
+                            "tense": "Past",
+                            "aspect": "Simple",
+                            "voice": "Passive",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past",
+                            "evidence": [
+                                "was + past participle"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "past",
+                    "pragmatic_notes": [
+                        "Patient-focused framing; agent omitted."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "B1",
+                    "markers": [
+                        "passive_voice_basic"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "The email was sent in the past.",
+                "intermediate": "Past Simple passive: was + past participle ('sent'); 'yesterday' anchors the event in time.",
+                "advanced": "B1: passive voice foregrounds the affected entity (email) and backgrounds the agent."
+            }
+        },
+        {
+            "id": "B1_05",
+            "cefr_level": "B1",
+            "input": "I stopped smoking because I wanted to feel healthier.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "I stopped smoking"
+                        },
+                        {
+                            "role": "subordinate",
+                            "marker": "because",
+                            "relation": "reason",
+                            "span": "because I wanted to feel healthier."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "I",
+                    "predicate_span": "stopped smoking",
+                    "post_predicate_span": "because I wanted to feel healthier."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Main clause",
+                        "span": "I stopped smoking"
+                    },
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Reason clause",
+                        "span": "because I wanted to feel healthier"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "I",
+                            "pos": "PRON",
+                            "lemma": "i",
+                            "features": {}
+                        },
+                        {
+                            "text": "stopped",
+                            "pos": "VERB",
+                            "lemma": "stopped",
+                            "features": {}
+                        },
+                        {
+                            "text": "smoking",
+                            "pos": "VERB",
+                            "lemma": "smoking",
+                            "features": {}
+                        },
+                        {
+                            "text": "because",
+                            "pos": "CONJ",
+                            "lemma": "because",
+                            "features": {}
+                        },
+                        {
+                            "text": "I",
+                            "pos": "PRON",
+                            "lemma": "i",
+                            "features": {}
+                        },
+                        {
+                            "text": "wanted",
+                            "pos": "VERB",
+                            "lemma": "wanted",
+                            "features": {}
+                        },
+                        {
+                            "text": "to",
+                            "pos": "ADP",
+                            "lemma": "to",
+                            "features": {}
+                        },
+                        {
+                            "text": "feel",
+                            "pos": "WORD",
+                            "lemma": "feel",
+                            "features": {}
+                        },
+                        {
+                            "text": "healthier",
+                            "pos": "WORD",
+                            "lemma": "healthier",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "I stopped smoking",
+                            "tense": "Past",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past",
+                            "evidence": [
+                                "past verb stopped"
+                            ]
+                        },
+                        {
+                            "clause_span": "because I wanted to feel healthier.",
+                            "tense": "Past",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past",
+                            "evidence": [
+                                "because reason clause"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "past",
+                    "pragmatic_notes": [
+                        "Causal justification; infinitive expresses goal."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "B1",
+                    "markers": [
+                        "because_reason_clause",
+                        "non_finite_complement"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This explains a past change and the reason for it.",
+                "intermediate": "Main clause in Past Simple + because-clause for reason; gerund ('smoking') as complement; infinitive ('to feel') for intended outcome.",
+                "advanced": "B1: multiple complementation patterns increase variety while causal logic stays explicit."
+            }
+        },
+        {
+            "id": "B2_01",
+            "cefr_level": "B2",
+            "input": "If they had arrived earlier, they would have caught the train.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "subordinate",
+                            "marker": "if",
+                            "relation": "conditional",
+                            "span": "If they had arrived earlier"
+                        },
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "they would have caught the train."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "If they",
+                    "predicate_span": "had arrived",
+                    "post_predicate_span": "earlier, they would have caught the train."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "Clause",
+                        "function": "If-clause",
+                        "span": "If they had arrived earlier"
+                    },
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Main clause",
+                        "span": "they would have caught the train"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "If",
+                            "pos": "CONJ",
+                            "lemma": "if",
+                            "features": {}
+                        },
+                        {
+                            "text": "they",
+                            "pos": "PRON",
+                            "lemma": "they",
+                            "features": {}
+                        },
+                        {
+                            "text": "had",
+                            "pos": "AUX",
+                            "lemma": "had",
+                            "features": {}
+                        },
+                        {
+                            "text": "arrived",
+                            "pos": "VERB",
+                            "lemma": "arrived",
+                            "features": {}
+                        },
+                        {
+                            "text": "earlier",
+                            "pos": "WORD",
+                            "lemma": "earlier",
+                            "features": {}
+                        },
+                        {
+                            "text": ",",
+                            "pos": "PUNCT",
+                            "lemma": ",",
+                            "features": {}
+                        },
+                        {
+                            "text": "they",
+                            "pos": "PRON",
+                            "lemma": "they",
+                            "features": {}
+                        },
+                        {
+                            "text": "would",
+                            "pos": "AUX",
+                            "lemma": "would",
+                            "features": {}
+                        },
+                        {
+                            "text": "have",
+                            "pos": "AUX",
+                            "lemma": "have",
+                            "features": {}
+                        },
+                        {
+                            "text": "caught",
+                            "pos": "WORD",
+                            "lemma": "caught",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "train",
+                            "pos": "WORD",
+                            "lemma": "train",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "If they had arrived earlier",
+                            "tense": "Past",
+                            "aspect": "Perfect",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Counterfactual past",
+                            "evidence": [
+                                "had + past participle"
+                            ]
+                        },
+                        {
+                            "clause_span": "they would have caught the train.",
+                            "tense": "Past (modal)",
+                            "aspect": "Perfect",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": "would",
+                            "time_reference": "Counterfactual past result",
+                            "evidence": [
+                                "would have + past participle"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "counterfactual past",
+                    "pragmatic_notes": [
+                        "Expresses regret/alternative outcome."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [
+                        {
+                            "pair": [
+                                "catch",
+                                "train"
+                            ],
+                            "label": "catch a train"
+                        }
+                    ],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "B2",
+                    "markers": [
+                        "third_conditional",
+                        "modal_perfect"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This describes a past situation that did not happen.",
+                "intermediate": "Third Conditional: Past Perfect in the if-clause + would have + past participle in the main clause for an unreal past result.",
+                "advanced": "B2: counterfactual reasoning and stance; modal perfect encodes unrealised outcome and implied evaluation."
+            }
+        },
+        {
+            "id": "B2_02",
+            "cefr_level": "B2",
+            "input": "The report must have been finished by Friday.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Simple",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "The report must have been finished by Friday."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "The report",
+                    "predicate_span": "must have been finished",
+                    "post_predicate_span": "by Friday."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "The report"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "must have been finished"
+                    },
+                    {
+                        "phrase_type": "PP",
+                        "function": "Adjunct",
+                        "span": "by Friday"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "The",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "report",
+                            "pos": "WORD",
+                            "lemma": "report",
+                            "features": {}
+                        },
+                        {
+                            "text": "must",
+                            "pos": "AUX",
+                            "lemma": "must",
+                            "features": {}
+                        },
+                        {
+                            "text": "have",
+                            "pos": "AUX",
+                            "lemma": "have",
+                            "features": {}
+                        },
+                        {
+                            "text": "been",
+                            "pos": "AUX",
+                            "lemma": "been",
+                            "features": {}
+                        },
+                        {
+                            "text": "finished",
+                            "pos": "VERB",
+                            "lemma": "finished",
+                            "features": {}
+                        },
+                        {
+                            "text": "by",
+                            "pos": "ADP",
+                            "lemma": "by",
+                            "features": {}
+                        },
+                        {
+                            "text": "Friday",
+                            "pos": "PROPN",
+                            "lemma": "friday",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "The report must have been finished by Friday.",
+                            "tense": "—",
+                            "aspect": "Perfect",
+                            "voice": "Passive",
+                            "mood": "Indicative",
+                            "modality": "must",
+                            "time_reference": "Inference/requirement",
+                            "evidence": [
+                                "must have + past participle",
+                                "passive: been finished"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "deadline/inference",
+                    "pragmatic_notes": [
+                        "Epistemic inference or deontic requirement depends on context."
+                    ]
+                },
+                "lexis": {
+                    "register": "formal",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "B2",
+                    "markers": [
+                        "modal_perfect",
+                        "passive_voice"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This suggests the report was finished by Friday (or it was required to be).",
+                "intermediate": "Modal perfect passive: must have been + past participle. 'By Friday' sets a deadline boundary.",
+                "advanced": "B2: modality–aspect interaction; interpretation (epistemic vs deontic) is context-sensitive and discourse-driven."
+            }
+        },
+        {
+            "id": "B2_03",
+            "cefr_level": "B2",
+            "input": "I wish I had studied harder.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": "wish",
+                            "relation": "counterfactual regret",
+                            "span": "I wish I had studied harder."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "I",
+                    "predicate_span": "wish",
+                    "post_predicate_span": "I had studied harder."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Matrix clause",
+                        "span": "I wish"
+                    },
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Complement clause",
+                        "span": "I had studied harder"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "I",
+                            "pos": "PRON",
+                            "lemma": "i",
+                            "features": {}
+                        },
+                        {
+                            "text": "wish",
+                            "pos": "WORD",
+                            "lemma": "wish",
+                            "features": {}
+                        },
+                        {
+                            "text": "I",
+                            "pos": "PRON",
+                            "lemma": "i",
+                            "features": {}
+                        },
+                        {
+                            "text": "had",
+                            "pos": "AUX",
+                            "lemma": "had",
+                            "features": {}
+                        },
+                        {
+                            "text": "studied",
+                            "pos": "VERB",
+                            "lemma": "studied",
+                            "features": {}
+                        },
+                        {
+                            "text": "harder",
+                            "pos": "WORD",
+                            "lemma": "harder",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "I wish I had studied harder.",
+                            "tense": "Present (matrix) + Past Perfect (complement)",
+                            "aspect": "Perfect (complement)",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Counterfactual past",
+                            "evidence": [
+                                "wish + past perfect for regret"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "past regret",
+                    "pragmatic_notes": [
+                        "Regret about an unreal past alternative."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "B2",
+                    "markers": [
+                        "wish_regret",
+                        "past_perfect"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This shows regret about the past.",
+                "intermediate": "'Wish' + Past Perfect ('had studied') expresses an unreal past alternative (regret).",
+                "advanced": "B2 stance construction: grammar encodes irreversibility and affective evaluation, not just chronology."
+            }
+        },
+        {
+            "id": "B2_04",
+            "cefr_level": "B2",
+            "input": "Although it was late, he kept working.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "subordinate",
+                            "marker": "although",
+                            "relation": "concession",
+                            "span": "Although it was late"
+                        },
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "he kept working."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "Although it",
+                    "predicate_span": "was",
+                    "post_predicate_span": "late, he kept working."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Concessive clause",
+                        "span": "Although it was late"
+                    },
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Main clause",
+                        "span": "he kept working"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "Although",
+                            "pos": "CONJ",
+                            "lemma": "although",
+                            "features": {}
+                        },
+                        {
+                            "text": "it",
+                            "pos": "PRON",
+                            "lemma": "it",
+                            "features": {}
+                        },
+                        {
+                            "text": "was",
+                            "pos": "AUX",
+                            "lemma": "was",
+                            "features": {}
+                        },
+                        {
+                            "text": "late",
+                            "pos": "WORD",
+                            "lemma": "late",
+                            "features": {}
+                        },
+                        {
+                            "text": ",",
+                            "pos": "PUNCT",
+                            "lemma": ",",
+                            "features": {}
+                        },
+                        {
+                            "text": "he",
+                            "pos": "PRON",
+                            "lemma": "he",
+                            "features": {}
+                        },
+                        {
+                            "text": "kept",
+                            "pos": "WORD",
+                            "lemma": "kept",
+                            "features": {}
+                        },
+                        {
+                            "text": "working",
+                            "pos": "VERB",
+                            "lemma": "working",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "Although it was late",
+                            "tense": "Past",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past",
+                            "evidence": [
+                                "although introduces concession"
+                            ]
+                        },
+                        {
+                            "clause_span": "he kept working.",
+                            "tense": "Past",
+                            "aspect": "—",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past",
+                            "evidence": [
+                                "keep + V-ing for continuation"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "past",
+                    "pragmatic_notes": [
+                        "Concession: continuation despite obstacle."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "B2",
+                    "markers": [
+                        "concession_clause",
+                        "aspectual_verb_keep"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "He continued working even though it was late.",
+                "intermediate": "Concessive clause with 'although' sets an opposing background condition; main clause uses 'keep + V-ing' to encode continuation.",
+                "advanced": "B2: explicit discourse relation (concession) plus aspectual verb adds nuance to event structure."
+            }
+        },
+        {
+            "id": "B2_05",
+            "cefr_level": "B2",
+            "input": "She had been waiting for an hour when the bus finally arrived.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "She had been waiting for an hour"
+                        },
+                        {
+                            "role": "subordinate",
+                            "marker": "when",
+                            "relation": "time",
+                            "span": "when the bus finally arrived."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "She",
+                    "predicate_span": "had been waiting",
+                    "post_predicate_span": "for an hour when the bus finally arrived."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Main clause (background)",
+                        "span": "She had been waiting for an hour"
+                    },
+                    {
+                        "phrase_type": "Clause",
+                        "function": "When-clause (foreground)",
+                        "span": "when the bus finally arrived"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "She",
+                            "pos": "PRON",
+                            "lemma": "she",
+                            "features": {}
+                        },
+                        {
+                            "text": "had",
+                            "pos": "AUX",
+                            "lemma": "had",
+                            "features": {}
+                        },
+                        {
+                            "text": "been",
+                            "pos": "AUX",
+                            "lemma": "been",
+                            "features": {}
+                        },
+                        {
+                            "text": "waiting",
+                            "pos": "VERB",
+                            "lemma": "waiting",
+                            "features": {}
+                        },
+                        {
+                            "text": "for",
+                            "pos": "ADP",
+                            "lemma": "for",
+                            "features": {}
+                        },
+                        {
+                            "text": "an",
+                            "pos": "DET",
+                            "lemma": "an",
+                            "features": {}
+                        },
+                        {
+                            "text": "hour",
+                            "pos": "WORD",
+                            "lemma": "hour",
+                            "features": {}
+                        },
+                        {
+                            "text": "when",
+                            "pos": "CONJ",
+                            "lemma": "when",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "bus",
+                            "pos": "WORD",
+                            "lemma": "bus",
+                            "features": {}
+                        },
+                        {
+                            "text": "finally",
+                            "pos": "ADV",
+                            "lemma": "finally",
+                            "features": {}
+                        },
+                        {
+                            "text": "arrived",
+                            "pos": "VERB",
+                            "lemma": "arrived",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "She had been waiting for an hour",
+                            "tense": "Past",
+                            "aspect": "Perfect Progressive",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past background duration",
+                            "evidence": [
+                                "had been + V-ing"
+                            ]
+                        },
+                        {
+                            "clause_span": "when the bus finally arrived.",
+                            "tense": "Past",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past",
+                            "evidence": [
+                                "when marks interrupting event"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "past narrative",
+                    "pragmatic_notes": [
+                        "Background duration interrupted by a punctual event."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": []
+                    }
+                },
+                "cefr": {
+                    "level": "B2",
+                    "markers": [
+                        "past_perfect_continuous",
+                        "background_foreground_timing"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "She waited for a long time, then the bus arrived.",
+                "intermediate": "Past Perfect Continuous sets background duration; 'when' introduces the interrupting arrival event, creating a background–foreground narrative contrast.",
+                "advanced": "B2: aspectual layering supports temporal coherence and narrative structuring (durative background vs punctual foreground)."
+            }
+        },
+        {
+            "id": "C1_01",
+            "cefr_level": "C1",
+            "input": "Not only did he refuse, but he also walked out.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Compound",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": "Not only",
+                            "relation": "correlative focus",
+                            "span": "Not only did he refuse"
+                        },
+                        {
+                            "role": "main",
+                            "marker": "but",
+                            "relation": "addition",
+                            "span": "but he also walked out."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "Not only",
+                    "predicate_span": "did he refuse",
+                    "post_predicate_span": ", but he also walked out."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Clause 1 (inversion)",
+                        "span": "Not only did he refuse"
+                    },
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Clause 2 (addition)",
+                        "span": "but he also walked out"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "Not",
+                            "pos": "WORD",
+                            "lemma": "not",
+                            "features": {}
+                        },
+                        {
+                            "text": "only",
+                            "pos": "WORD",
+                            "lemma": "only",
+                            "features": {}
+                        },
+                        {
+                            "text": "did",
+                            "pos": "AUX",
+                            "lemma": "did",
+                            "features": {}
+                        },
+                        {
+                            "text": "he",
+                            "pos": "PRON",
+                            "lemma": "he",
+                            "features": {}
+                        },
+                        {
+                            "text": "refuse",
+                            "pos": "WORD",
+                            "lemma": "refuse",
+                            "features": {}
+                        },
+                        {
+                            "text": ",",
+                            "pos": "PUNCT",
+                            "lemma": ",",
+                            "features": {}
+                        },
+                        {
+                            "text": "but",
+                            "pos": "CONJ",
+                            "lemma": "but",
+                            "features": {}
+                        },
+                        {
+                            "text": "he",
+                            "pos": "PRON",
+                            "lemma": "he",
+                            "features": {}
+                        },
+                        {
+                            "text": "also",
+                            "pos": "ADV",
+                            "lemma": "also",
+                            "features": {}
+                        },
+                        {
+                            "text": "walked",
+                            "pos": "VERB",
+                            "lemma": "walked",
+                            "features": {}
+                        },
+                        {
+                            "text": "out",
+                            "pos": "WORD",
+                            "lemma": "out",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "Not only did he refuse",
+                            "tense": "Past",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past",
+                            "evidence": [
+                                "correlative triggers do-support inversion"
+                            ]
+                        },
+                        {
+                            "clause_span": "but he also walked out.",
+                            "tense": "Past",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past",
+                            "evidence": [
+                                "coordinated clause with additive focus"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "past",
+                    "pragmatic_notes": [
+                        "Rhetorical intensification and additive focus."
+                    ]
+                },
+                "lexis": {
+                    "register": "formal/neutral",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": [
+                            "correlative focus construction"
+                        ]
+                    }
+                },
+                "cefr": {
+                    "level": "C1",
+                    "markers": [
+                        "correlative_inversion",
+                        "focus_management"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "He refused and then left, with extra emphasis.",
+                "intermediate": "Correlative emphasis: 'Not only' triggers do-support inversion (did + subject + base verb). The second clause adds another action with 'but ... also'.",
+                "advanced": "C1: information is packaged for rhetorical highlighting; inversion and correlative pairing raise processing load and stylistic force."
+            }
+        },
+        {
+            "id": "C1_02",
+            "cefr_level": "C1",
+            "input": "It is the quality of the evidence that matters most.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": "it-cleft",
+                            "relation": "focus",
+                            "span": "It is the quality of the evidence that matters most."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "It",
+                    "predicate_span": "is",
+                    "post_predicate_span": "the quality of the evidence that matters most."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "NP",
+                        "function": "Dummy subject",
+                        "span": "It"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Focused constituent",
+                        "span": "the quality of the evidence"
+                    },
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Cleft clause",
+                        "span": "that matters most"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "It",
+                            "pos": "PRON",
+                            "lemma": "it",
+                            "features": {}
+                        },
+                        {
+                            "text": "is",
+                            "pos": "AUX",
+                            "lemma": "is",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "quality",
+                            "pos": "WORD",
+                            "lemma": "quality",
+                            "features": {}
+                        },
+                        {
+                            "text": "of",
+                            "pos": "ADP",
+                            "lemma": "of",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "evidence",
+                            "pos": "WORD",
+                            "lemma": "evidence",
+                            "features": {}
+                        },
+                        {
+                            "text": "that",
+                            "pos": "CONJ",
+                            "lemma": "that",
+                            "features": {}
+                        },
+                        {
+                            "text": "matters",
+                            "pos": "WORD",
+                            "lemma": "matters",
+                            "features": {}
+                        },
+                        {
+                            "text": "most",
+                            "pos": "WORD",
+                            "lemma": "most",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "It is the quality of the evidence that matters most.",
+                            "tense": "Present",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "General",
+                            "evidence": [
+                                "it-cleft focus construction"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "general principle",
+                    "pragmatic_notes": [
+                        "Clefting highlights the focused NP as the key point."
+                    ]
+                },
+                "lexis": {
+                    "register": "formal",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": [
+                            "dense NP in academic register"
+                        ]
+                    }
+                },
+                "cefr": {
+                    "level": "C1",
+                    "markers": [
+                        "cleft_sentence_focus",
+                        "dense_nominal_style"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This says what is most important.",
+                "intermediate": "It-cleft: 'It is X that Y' foregrounds X ('the quality of the evidence') as focus; the that-clause supplies the proposition ('matters most').",
+                "advanced": "C1: clefting restructures information for argumentative clarity; dense nominal phrasing supports academic register and focus control."
+            }
+        },
+        {
+            "id": "C1_03",
+            "cefr_level": "C1",
+            "input": "Had I known about the delay, I would have taken an earlier train.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "subordinate",
+                            "marker": "Had",
+                            "relation": "inverted conditional",
+                            "span": "Had I known about the delay"
+                        },
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "I would have taken an earlier train."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "Had I",
+                    "predicate_span": "known",
+                    "post_predicate_span": "about the delay, I would have taken an earlier train."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Inverted if-clause",
+                        "span": "Had I known about the delay"
+                    },
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Main clause",
+                        "span": "I would have taken an earlier train"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "Had",
+                            "pos": "AUX",
+                            "lemma": "had",
+                            "features": {}
+                        },
+                        {
+                            "text": "I",
+                            "pos": "PRON",
+                            "lemma": "i",
+                            "features": {}
+                        },
+                        {
+                            "text": "known",
+                            "pos": "WORD",
+                            "lemma": "known",
+                            "features": {}
+                        },
+                        {
+                            "text": "about",
+                            "pos": "ADP",
+                            "lemma": "about",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "delay",
+                            "pos": "WORD",
+                            "lemma": "delay",
+                            "features": {}
+                        },
+                        {
+                            "text": ",",
+                            "pos": "PUNCT",
+                            "lemma": ",",
+                            "features": {}
+                        },
+                        {
+                            "text": "I",
+                            "pos": "PRON",
+                            "lemma": "i",
+                            "features": {}
+                        },
+                        {
+                            "text": "would",
+                            "pos": "AUX",
+                            "lemma": "would",
+                            "features": {}
+                        },
+                        {
+                            "text": "have",
+                            "pos": "AUX",
+                            "lemma": "have",
+                            "features": {}
+                        },
+                        {
+                            "text": "taken",
+                            "pos": "WORD",
+                            "lemma": "taken",
+                            "features": {}
+                        },
+                        {
+                            "text": "an",
+                            "pos": "DET",
+                            "lemma": "an",
+                            "features": {}
+                        },
+                        {
+                            "text": "earlier",
+                            "pos": "WORD",
+                            "lemma": "earlier",
+                            "features": {}
+                        },
+                        {
+                            "text": "train",
+                            "pos": "WORD",
+                            "lemma": "train",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "Had I known about the delay",
+                            "tense": "Past",
+                            "aspect": "Perfect (implied)",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Counterfactual past",
+                            "evidence": [
+                                "inverted conditional without 'if'"
+                            ]
+                        },
+                        {
+                            "clause_span": "I would have taken an earlier train.",
+                            "tense": "Past (modal)",
+                            "aspect": "Perfect",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": "would",
+                            "time_reference": "Counterfactual past result",
+                            "evidence": [
+                                "would have + past participle"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "counterfactual past",
+                    "pragmatic_notes": [
+                        "Formal inversion increases rhetorical weight."
+                    ]
+                },
+                "lexis": {
+                    "register": "formal",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": [
+                            "inversion in conditional framing"
+                        ]
+                    }
+                },
+                "cefr": {
+                    "level": "C1",
+                    "markers": [
+                        "inverted_conditional",
+                        "modal_perfect"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This talks about a past situation that did not happen.",
+                "intermediate": "Inverted conditional: 'Had I known...' = 'If I had known...' (past perfect). Main clause uses 'would have + past participle' for the unreal past result.",
+                "advanced": "C1: marked inversion is stylistically formal; it compresses the conditional marker and increases syntactic salience."
+            }
+        },
+        {
+            "id": "C1_04",
+            "cefr_level": "C1",
+            "input": "What she said was far more complicated than I expected.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": "what",
+                            "relation": "free relative",
+                            "span": "What she said was far more complicated than I expected."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "What she said",
+                    "predicate_span": "was",
+                    "post_predicate_span": "far more complicated than I expected."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Subject (free relative)",
+                        "span": "What she said"
+                    },
+                    {
+                        "phrase_type": "AdjP",
+                        "function": "Complement",
+                        "span": "far more complicated"
+                    },
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Comparison clause",
+                        "span": "than I expected"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "What",
+                            "pos": "WORD",
+                            "lemma": "what",
+                            "features": {}
+                        },
+                        {
+                            "text": "she",
+                            "pos": "PRON",
+                            "lemma": "she",
+                            "features": {}
+                        },
+                        {
+                            "text": "said",
+                            "pos": "WORD",
+                            "lemma": "said",
+                            "features": {}
+                        },
+                        {
+                            "text": "was",
+                            "pos": "AUX",
+                            "lemma": "was",
+                            "features": {}
+                        },
+                        {
+                            "text": "far",
+                            "pos": "WORD",
+                            "lemma": "far",
+                            "features": {}
+                        },
+                        {
+                            "text": "more",
+                            "pos": "WORD",
+                            "lemma": "more",
+                            "features": {}
+                        },
+                        {
+                            "text": "complicated",
+                            "pos": "VERB",
+                            "lemma": "complicated",
+                            "features": {}
+                        },
+                        {
+                            "text": "than",
+                            "pos": "WORD",
+                            "lemma": "than",
+                            "features": {}
+                        },
+                        {
+                            "text": "I",
+                            "pos": "PRON",
+                            "lemma": "i",
+                            "features": {}
+                        },
+                        {
+                            "text": "expected",
+                            "pos": "VERB",
+                            "lemma": "expected",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "What she said was far more complicated than I expected.",
+                            "tense": "Past",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past evaluation",
+                            "evidence": [
+                                "free relative as subject",
+                                "intensified comparative"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "past evaluation",
+                    "pragmatic_notes": [
+                        "Stance via intensification; comparison to expectations."
+                    ]
+                },
+                "lexis": {
+                    "register": "neutral/formal",
+                    "collocations": [
+                        {
+                            "pair": [
+                                "far",
+                                "more"
+                            ],
+                            "label": "intensified comparative"
+                        }
+                    ],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": [
+                            "clausal subject packaging"
+                        ]
+                    }
+                },
+                "cefr": {
+                    "level": "C1",
+                    "markers": [
+                        "free_relative_clause",
+                        "intensified_comparative"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "It was more complicated than expected.",
+                "intermediate": "Free relative clause ('What she said') functions as a nominal subject. 'Far more' intensifies a comparative evaluation; the than-clause provides the baseline.",
+                "advanced": "C1: clausal subject increases density; stance marking guides interpretation and elevates rhetorical control."
+            }
+        },
+        {
+            "id": "C1_05",
+            "cefr_level": "C1",
+            "input": "The committee rejected the proposal, citing budget constraints.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Simple",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "The committee rejected the proposal, citing budget constraints."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "The committee",
+                    "predicate_span": "rejected",
+                    "post_predicate_span": "the proposal, citing budget constraints."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "The committee"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "rejected"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Object",
+                        "span": "the proposal"
+                    },
+                    {
+                        "phrase_type": "Non-finite clause",
+                        "function": "Supplement",
+                        "span": "citing budget constraints"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "The",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "committee",
+                            "pos": "WORD",
+                            "lemma": "committee",
+                            "features": {}
+                        },
+                        {
+                            "text": "rejected",
+                            "pos": "VERB",
+                            "lemma": "rejected",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "proposal",
+                            "pos": "WORD",
+                            "lemma": "proposal",
+                            "features": {}
+                        },
+                        {
+                            "text": ",",
+                            "pos": "PUNCT",
+                            "lemma": ",",
+                            "features": {}
+                        },
+                        {
+                            "text": "citing",
+                            "pos": "VERB",
+                            "lemma": "citing",
+                            "features": {}
+                        },
+                        {
+                            "text": "budget",
+                            "pos": "WORD",
+                            "lemma": "budget",
+                            "features": {}
+                        },
+                        {
+                            "text": "constraints",
+                            "pos": "WORD",
+                            "lemma": "constraints",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "The committee rejected the proposal, citing budget constraints.",
+                            "tense": "Past",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past",
+                            "evidence": [
+                                "supplementary -ing clause compresses reason"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "statement",
+                    "time_reference": "past",
+                    "pragmatic_notes": [
+                        "Compressed reason via non-finite supplementation."
+                    ]
+                },
+                "lexis": {
+                    "register": "formal",
+                    "collocations": [
+                        {
+                            "pair": [
+                                "budget",
+                                "constraints"
+                            ],
+                            "label": "institutional collocation"
+                        }
+                    ],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": [
+                            "non-finite compression",
+                            "institutional lexis"
+                        ]
+                    }
+                },
+                "cefr": {
+                    "level": "C1",
+                    "markers": [
+                        "supplementary_ing_clause",
+                        "formal_register"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "They rejected it because of budget limits.",
+                "intermediate": "Past Simple main clause + supplementary -ing clause ('citing...') functioning as a compressed reason clause.",
+                "advanced": "C1: discourse compression via non-finite supplementation is typical of formal institutional prose and increases information density."
+            }
+        },
+        {
+            "id": "C2_01",
+            "cefr_level": "C2",
+            "input": "Hardly had the conductor raised his baton when there erupted a cacophony so jarring that it defied harmony.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "subordinate",
+                            "marker": "Hardly",
+                            "relation": "negative-temporal inversion",
+                            "span": "Hardly had the conductor raised his baton"
+                        },
+                        {
+                            "role": "main",
+                            "marker": "when",
+                            "relation": "temporal sequence",
+                            "span": "when there erupted a cacophony so jarring that it defied harmony"
+                        },
+                        {
+                            "role": "subordinate",
+                            "marker": "so...that",
+                            "relation": "result",
+                            "span": "so jarring that it defied harmony"
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "Hardly",
+                    "predicate_span": "had ... raised",
+                    "post_predicate_span": "the conductor raised his baton when there erupted a cacophony so jarring that it defied harmony."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "AdvP",
+                        "function": "Clause-level modifier",
+                        "span": "Hardly"
+                    },
+                    {
+                        "phrase_type": "AUX",
+                        "function": "Inverted auxiliary",
+                        "span": "had"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "the conductor"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "raised"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Object",
+                        "span": "his baton"
+                    },
+                    {
+                        "phrase_type": "SCONJ",
+                        "function": "Subordinator",
+                        "span": "when"
+                    },
+                    {
+                        "phrase_type": "Expl",
+                        "function": "Presentational device",
+                        "span": "there"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "erupted"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Notional subject (postposed)",
+                        "span": "a cacophony"
+                    },
+                    {
+                        "phrase_type": "AdjP",
+                        "function": "Degree/result frame",
+                        "span": "so jarring"
+                    },
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Result clause",
+                        "span": "that it defied harmony"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "Hardly",
+                            "pos": "ADV",
+                            "lemma": "hardly",
+                            "features": {}
+                        },
+                        {
+                            "text": "had",
+                            "pos": "AUX",
+                            "lemma": "had",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "conductor",
+                            "pos": "WORD",
+                            "lemma": "conductor",
+                            "features": {}
+                        },
+                        {
+                            "text": "raised",
+                            "pos": "VERB",
+                            "lemma": "raised",
+                            "features": {}
+                        },
+                        {
+                            "text": "his",
+                            "pos": "DET",
+                            "lemma": "his",
+                            "features": {}
+                        },
+                        {
+                            "text": "baton",
+                            "pos": "WORD",
+                            "lemma": "baton",
+                            "features": {}
+                        },
+                        {
+                            "text": "when",
+                            "pos": "CONJ",
+                            "lemma": "when",
+                            "features": {}
+                        },
+                        {
+                            "text": "there",
+                            "pos": "WORD",
+                            "lemma": "there",
+                            "features": {}
+                        },
+                        {
+                            "text": "erupted",
+                            "pos": "VERB",
+                            "lemma": "erupted",
+                            "features": {}
+                        },
+                        {
+                            "text": "a",
+                            "pos": "DET",
+                            "lemma": "a",
+                            "features": {}
+                        },
+                        {
+                            "text": "cacophony",
+                            "pos": "WORD",
+                            "lemma": "cacophony",
+                            "features": {}
+                        },
+                        {
+                            "text": "so",
+                            "pos": "WORD",
+                            "lemma": "so",
+                            "features": {}
+                        },
+                        {
+                            "text": "jarring",
+                            "pos": "VERB",
+                            "lemma": "jarring",
+                            "features": {}
+                        },
+                        {
+                            "text": "that",
+                            "pos": "CONJ",
+                            "lemma": "that",
+                            "features": {}
+                        },
+                        {
+                            "text": "it",
+                            "pos": "PRON",
+                            "lemma": "it",
+                            "features": {}
+                        },
+                        {
+                            "text": "defied",
+                            "pos": "VERB",
+                            "lemma": "defied",
+                            "features": {}
+                        },
+                        {
+                            "text": "harmony",
+                            "pos": "WORD",
+                            "lemma": "harmony",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "Hardly had the conductor raised his baton",
+                            "tense": "Past",
+                            "aspect": "Perfect (inverted past perfect)",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past trigger",
+                            "evidence": [
+                                "quasi-negative triggers inversion",
+                                "had + past participle"
+                            ]
+                        },
+                        {
+                            "clause_span": "when there erupted a cacophony ...",
+                            "tense": "Past",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past progression",
+                            "evidence": [
+                                "presentational inversion"
+                            ]
+                        },
+                        {
+                            "clause_span": "so jarring that it defied harmony",
+                            "tense": "Past",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past evaluation/result",
+                            "evidence": [
+                                "so...that result construction"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "narrative statement",
+                    "time_reference": "past narrative",
+                    "pragmatic_notes": [
+                        "Marked word order foregrounds the trigger and accelerates event sequencing; evaluation is built into the result frame."
+                    ]
+                },
+                "lexis": {
+                    "register": "literary / high-register narrative",
+                    "collocations": [
+                        {
+                            "pair": [
+                                "raise",
+                                "baton"
+                            ],
+                            "label": "domain collocation (conducting)"
+                        },
+                        {
+                            "pair": [
+                                "defy",
+                                "harmony"
+                            ],
+                            "label": "metaphorical evaluation"
+                        }
+                    ],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": [
+                            "domain lexis",
+                            "metaphorical evaluation",
+                            "marked word order"
+                        ]
+                    }
+                },
+                "cefr": {
+                    "level": "C2",
+                    "markers": [
+                        "negative_inversion",
+                        "presentational_inversion",
+                        "result_clause",
+                        "high_register_lexis"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This tells a dramatic past event that happened almost immediately.",
+                "intermediate": "Negative inversion: 'Hardly had + Subject + past participle' pairs with 'when' for near-immediate sequencing. Presentational inversion ('there erupted...') foregrounds the event before the notional subject. 'So + Adj + that-clause' encodes a result/evaluation frame.",
+                "advanced": "C2 rhetorical packaging: marked syntax manages attention (trigger → eruption → consequence). High-register, metaphorically loaded lexis intensifies appraisal; dense clause chaining yields literary compression."
+            }
+        },
+        {
+            "id": "C2_02",
+            "cefr_level": "C2",
+            "input": "Seldom, if ever, has the issue been framed with such precision.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": "Seldom",
+                            "relation": "negative adverbial inversion",
+                            "span": "Seldom, if ever, has the issue been framed with such precision."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "Seldom, if ever",
+                    "predicate_span": "has ... been framed",
+                    "post_predicate_span": "the issue been framed with such precision."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "AdvP",
+                        "function": "Fronted negative frequency adverbial",
+                        "span": "Seldom, if ever"
+                    },
+                    {
+                        "phrase_type": "AUX",
+                        "function": "Inverted auxiliary",
+                        "span": "has"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "the issue"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "been framed"
+                    },
+                    {
+                        "phrase_type": "PP",
+                        "function": "Adjunct",
+                        "span": "with such precision"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "Seldom",
+                            "pos": "WORD",
+                            "lemma": "seldom",
+                            "features": {}
+                        },
+                        {
+                            "text": ",",
+                            "pos": "PUNCT",
+                            "lemma": ",",
+                            "features": {}
+                        },
+                        {
+                            "text": "if",
+                            "pos": "CONJ",
+                            "lemma": "if",
+                            "features": {}
+                        },
+                        {
+                            "text": "ever",
+                            "pos": "WORD",
+                            "lemma": "ever",
+                            "features": {}
+                        },
+                        {
+                            "text": ",",
+                            "pos": "PUNCT",
+                            "lemma": ",",
+                            "features": {}
+                        },
+                        {
+                            "text": "has",
+                            "pos": "AUX",
+                            "lemma": "has",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "issue",
+                            "pos": "WORD",
+                            "lemma": "issue",
+                            "features": {}
+                        },
+                        {
+                            "text": "been",
+                            "pos": "AUX",
+                            "lemma": "been",
+                            "features": {}
+                        },
+                        {
+                            "text": "framed",
+                            "pos": "WORD",
+                            "lemma": "framed",
+                            "features": {}
+                        },
+                        {
+                            "text": "with",
+                            "pos": "ADP",
+                            "lemma": "with",
+                            "features": {}
+                        },
+                        {
+                            "text": "such",
+                            "pos": "WORD",
+                            "lemma": "such",
+                            "features": {}
+                        },
+                        {
+                            "text": "precision",
+                            "pos": "WORD",
+                            "lemma": "precision",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "Seldom, if ever, has the issue been framed with such precision.",
+                            "tense": "Present",
+                            "aspect": "Perfect",
+                            "voice": "Passive",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "General/experiential",
+                            "evidence": [
+                                "fronted negative adverbial triggers inversion",
+                                "present perfect passive"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "evaluative statement",
+                    "time_reference": "general",
+                    "pragmatic_notes": [
+                        "Rarity claim with parenthetical stance intensifier; evaluation framed as experience-based generalisation."
+                    ]
+                },
+                "lexis": {
+                    "register": "formal/academic",
+                    "collocations": [],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": [
+                            "parenthetical stance",
+                            "topic-centered passive framing"
+                        ]
+                    }
+                },
+                "cefr": {
+                    "level": "C2",
+                    "markers": [
+                        "negative_adverbial_inversion",
+                        "present_perfect_passive",
+                        "stance_intensifier"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "This says it almost never happens.",
+                "intermediate": "Fronted negative-frequency adverbial ('Seldom') triggers auxiliary–subject inversion. Present Perfect passive ('has been framed') expresses experience/relevance up to now; 'if ever' intensifies stance.",
+                "advanced": "C2 stance engineering: inversion + passive voice + parenthetical hedging calibrate rhetorical force while maintaining formal precision."
+            }
+        },
+        {
+            "id": "C2_03",
+            "cefr_level": "C2",
+            "input": "Only after the final audit was completed did the extent of the losses become apparent.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": "Only after",
+                            "relation": "only-inversion",
+                            "span": "Only after the final audit was completed did the extent of the losses become apparent."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "Only after the final audit was completed",
+                    "predicate_span": "did ... become",
+                    "post_predicate_span": "the extent of the losses become apparent."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "PP",
+                        "function": "Fronted restrictive adjunct",
+                        "span": "Only after the final audit was completed"
+                    },
+                    {
+                        "phrase_type": "AUX",
+                        "function": "Inverted auxiliary",
+                        "span": "did"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "the extent of the losses"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "become"
+                    },
+                    {
+                        "phrase_type": "AdjP",
+                        "function": "Complement",
+                        "span": "apparent"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "Only",
+                            "pos": "WORD",
+                            "lemma": "only",
+                            "features": {}
+                        },
+                        {
+                            "text": "after",
+                            "pos": "ADP",
+                            "lemma": "after",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "final",
+                            "pos": "WORD",
+                            "lemma": "final",
+                            "features": {}
+                        },
+                        {
+                            "text": "audit",
+                            "pos": "WORD",
+                            "lemma": "audit",
+                            "features": {}
+                        },
+                        {
+                            "text": "was",
+                            "pos": "AUX",
+                            "lemma": "was",
+                            "features": {}
+                        },
+                        {
+                            "text": "completed",
+                            "pos": "VERB",
+                            "lemma": "completed",
+                            "features": {}
+                        },
+                        {
+                            "text": "did",
+                            "pos": "AUX",
+                            "lemma": "did",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "extent",
+                            "pos": "WORD",
+                            "lemma": "extent",
+                            "features": {}
+                        },
+                        {
+                            "text": "of",
+                            "pos": "ADP",
+                            "lemma": "of",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "losses",
+                            "pos": "WORD",
+                            "lemma": "losses",
+                            "features": {}
+                        },
+                        {
+                            "text": "become",
+                            "pos": "WORD",
+                            "lemma": "become",
+                            "features": {}
+                        },
+                        {
+                            "text": "apparent",
+                            "pos": "WORD",
+                            "lemma": "apparent",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "Only after the final audit was completed did the extent of the losses become apparent.",
+                            "tense": "Past",
+                            "aspect": "Simple",
+                            "voice": "Active (main) + Passive (embedded)",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past (delayed revelation)",
+                            "evidence": [
+                                "only-fronting triggers inversion",
+                                "embedded passive in adjunct"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "argumentative statement",
+                    "time_reference": "past",
+                    "pragmatic_notes": [
+                        "Restrictive fronting frames delayed discovery and guides reader inference."
+                    ]
+                },
+                "lexis": {
+                    "register": "formal/financial",
+                    "collocations": [
+                        {
+                            "pair": [
+                                "become",
+                                "apparent"
+                            ],
+                            "label": "become apparent"
+                        }
+                    ],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": [
+                            "nominalisation ('extent')",
+                            "institutional lexis ('audit','losses')"
+                        ]
+                    }
+                },
+                "cefr": {
+                    "level": "C2",
+                    "markers": [
+                        "only_inversion",
+                        "nominal_style",
+                        "embedded_passive"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "They understood the losses only after the audit.",
+                "intermediate": "Only-inversion: fronted restrictive adjunct ('Only after...') triggers do-support inversion ('did ... become'). The adjunct contains a passive clause ('was completed') that sets the temporal boundary for the main proposition.",
+                "advanced": "C2 information structuring: restrictive frame + inversion emphasize delayed epistemic access; nominal style supports institutional register and argumentative coherence."
+            }
+        },
+        {
+            "id": "C2_04",
+            "cefr_level": "C2",
+            "input": "So intricate were the negotiations that even seasoned diplomats struggled to follow the thread.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "main",
+                            "marker": "So...that",
+                            "relation": "result with inversion",
+                            "span": "So intricate were the negotiations that even seasoned diplomats struggled to follow the thread."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "So intricate",
+                    "predicate_span": "were",
+                    "post_predicate_span": "the negotiations that even seasoned diplomats struggled to follow the thread."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "AdjP",
+                        "function": "Fronted degree phrase",
+                        "span": "So intricate"
+                    },
+                    {
+                        "phrase_type": "AUX",
+                        "function": "Inverted copula",
+                        "span": "were"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "the negotiations"
+                    },
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Result clause",
+                        "span": "that even seasoned diplomats struggled to follow the thread"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "So",
+                            "pos": "WORD",
+                            "lemma": "so",
+                            "features": {}
+                        },
+                        {
+                            "text": "intricate",
+                            "pos": "WORD",
+                            "lemma": "intricate",
+                            "features": {}
+                        },
+                        {
+                            "text": "were",
+                            "pos": "AUX",
+                            "lemma": "were",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "negotiations",
+                            "pos": "WORD",
+                            "lemma": "negotiations",
+                            "features": {}
+                        },
+                        {
+                            "text": "that",
+                            "pos": "CONJ",
+                            "lemma": "that",
+                            "features": {}
+                        },
+                        {
+                            "text": "even",
+                            "pos": "WORD",
+                            "lemma": "even",
+                            "features": {}
+                        },
+                        {
+                            "text": "seasoned",
+                            "pos": "VERB",
+                            "lemma": "seasoned",
+                            "features": {}
+                        },
+                        {
+                            "text": "diplomats",
+                            "pos": "WORD",
+                            "lemma": "diplomats",
+                            "features": {}
+                        },
+                        {
+                            "text": "struggled",
+                            "pos": "VERB",
+                            "lemma": "struggled",
+                            "features": {}
+                        },
+                        {
+                            "text": "to",
+                            "pos": "ADP",
+                            "lemma": "to",
+                            "features": {}
+                        },
+                        {
+                            "text": "follow",
+                            "pos": "WORD",
+                            "lemma": "follow",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "thread",
+                            "pos": "WORD",
+                            "lemma": "thread",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "So intricate were the negotiations that even seasoned diplomats struggled to follow the thread.",
+                            "tense": "Past",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Past evaluation/result",
+                            "evidence": [
+                                "degree fronting triggers inversion",
+                                "result clause"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "evaluative statement",
+                    "time_reference": "past/general",
+                    "pragmatic_notes": [
+                        "Degree inversion intensifies evaluation; result clause encodes consequence; metaphor adds vividness."
+                    ]
+                },
+                "lexis": {
+                    "register": "formal/analytical",
+                    "collocations": [
+                        {
+                            "pair": [
+                                "seasoned",
+                                "diplomats"
+                            ],
+                            "label": "seasoned diplomats"
+                        }
+                    ],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": [
+                            "metaphor ('follow the thread')",
+                            "rhetorical inversion"
+                        ]
+                    }
+                },
+                "cefr": {
+                    "level": "C2",
+                    "markers": [
+                        "degree_inversion",
+                        "result_clause",
+                        "metaphorical_expression"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "The negotiations were very complicated, so people struggled to follow them.",
+                "intermediate": "Degree fronting: 'So + Adj' triggers subject–copula inversion ('were the negotiations'). The that-clause expresses the result/consequence.",
+                "advanced": "C2 rhetorical intensity: marked inversion plus metaphor compress evaluation and consequence into high-impact prose suited to advanced narrative/analytical registers."
+            }
+        },
+        {
+            "id": "C2_05",
+            "cefr_level": "C2",
+            "input": "Be that as it may, the evidence remains inconclusive.",
+            "analysis": {
+                "architecture": {
+                    "sentence_type": "Complex",
+                    "communicative_type": "Declarative",
+                    "clauses": [
+                        {
+                            "role": "subordinate",
+                            "marker": "Be that as it may",
+                            "relation": "formulaic concession",
+                            "span": "Be that as it may"
+                        },
+                        {
+                            "role": "main",
+                            "marker": null,
+                            "relation": null,
+                            "span": "the evidence remains inconclusive."
+                        }
+                    ]
+                },
+                "constituents_heuristic": {
+                    "subject_span": "Be that as it may",
+                    "predicate_span": ", the evidence remains",
+                    "post_predicate_span": "inconclusive."
+                },
+                "constituents": [
+                    {
+                        "phrase_type": "Clause",
+                        "function": "Concessive preface",
+                        "span": "Be that as it may"
+                    },
+                    {
+                        "phrase_type": "NP",
+                        "function": "Subject",
+                        "span": "the evidence"
+                    },
+                    {
+                        "phrase_type": "VP",
+                        "function": "Predicate",
+                        "span": "remains"
+                    },
+                    {
+                        "phrase_type": "AdjP",
+                        "function": "Complement",
+                        "span": "inconclusive"
+                    }
+                ],
+                "morphology": {
+                    "tokens": [
+                        {
+                            "text": "Be",
+                            "pos": "WORD",
+                            "lemma": "be",
+                            "features": {}
+                        },
+                        {
+                            "text": "that",
+                            "pos": "CONJ",
+                            "lemma": "that",
+                            "features": {}
+                        },
+                        {
+                            "text": "as",
+                            "pos": "WORD",
+                            "lemma": "as",
+                            "features": {}
+                        },
+                        {
+                            "text": "it",
+                            "pos": "PRON",
+                            "lemma": "it",
+                            "features": {}
+                        },
+                        {
+                            "text": "may",
+                            "pos": "AUX",
+                            "lemma": "may",
+                            "features": {}
+                        },
+                        {
+                            "text": ",",
+                            "pos": "PUNCT",
+                            "lemma": ",",
+                            "features": {}
+                        },
+                        {
+                            "text": "the",
+                            "pos": "DET",
+                            "lemma": "the",
+                            "features": {}
+                        },
+                        {
+                            "text": "evidence",
+                            "pos": "WORD",
+                            "lemma": "evidence",
+                            "features": {}
+                        },
+                        {
+                            "text": "remains",
+                            "pos": "WORD",
+                            "lemma": "remains",
+                            "features": {}
+                        },
+                        {
+                            "text": "inconclusive",
+                            "pos": "WORD",
+                            "lemma": "inconclusive",
+                            "features": {}
+                        },
+                        {
+                            "text": ".",
+                            "pos": "PUNCT",
+                            "lemma": ".",
+                            "features": {}
+                        }
+                    ]
+                },
+                "verb_system": {
+                    "per_clause": [
+                        {
+                            "clause_span": "Be that as it may",
+                            "tense": "—",
+                            "aspect": "—",
+                            "voice": "Active",
+                            "mood": "Formulaic/archaic",
+                            "modality": null,
+                            "time_reference": "Discourse concession",
+                            "evidence": [
+                                "fixed concessive idiom"
+                            ]
+                        },
+                        {
+                            "clause_span": "the evidence remains inconclusive.",
+                            "tense": "Present",
+                            "aspect": "Simple",
+                            "voice": "Active",
+                            "mood": "Indicative",
+                            "modality": null,
+                            "time_reference": "Present/General",
+                            "evidence": [
+                                "linking verb + adjective complement"
+                            ]
+                        }
+                    ]
+                },
+                "meaning_pragmatics": {
+                    "speech_act": "argumentative statement",
+                    "time_reference": "general conclusion",
+                    "pragmatic_notes": [
+                        "Concedes a prior point, then reasserts the main claim; strong discourse management."
+                    ]
+                },
+                "lexis": {
+                    "register": "formal/argumentative",
+                    "collocations": [
+                        {
+                            "pair": [
+                                "remains",
+                                "inconclusive"
+                            ],
+                            "label": "remains inconclusive"
+                        }
+                    ],
+                    "semantic_precision": {
+                        "issues": [],
+                        "high_precision_signals": [
+                            "formulaic concessive discourse marker"
+                        ]
+                    }
+                },
+                "cefr": {
+                    "level": "C2",
+                    "markers": [
+                        "formulaic_concession",
+                        "discourse_management",
+                        "formal_register"
+                    ]
+                }
+            },
+            "notes": {
+                "elementary": "Even so, the evidence is still not clear.",
+                "intermediate": "Concessive preface 'Be that as it may' functions like 'even so'. Main clause uses 'remains' + adjective complement ('inconclusive') to state an evaluative conclusion.",
+                "advanced": "C2 discourse control: formulaic concessive marker manages alignment while preserving stance; register and lexical choice support precise epistemic evaluation."
+            }
+        }
+    ]
+}

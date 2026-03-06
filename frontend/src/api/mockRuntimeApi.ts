@@ -1,5 +1,6 @@
 import samplePayload from './frontend_contract_sample.json'
 import type {
+  AnalyzeTextPayload,
   BackendJobStatus,
   DocumentArtifact,
   MediaFileRow,
@@ -378,6 +379,57 @@ export class MockRuntimeApi implements RuntimeApi {
   async getVisualizerPayload(_documentId?: string): Promise<VisualizerPayload> {
     if (_documentId) return this.payloadByDocument[_documentId] || {}
     return this.payloadByDocument['doc-1'] || {}
+  }
+
+  async analyzeText(input: { rawText: string; sentences?: string[] }): Promise<AnalyzeTextPayload> {
+    const raw = input.rawText.trim()
+    const sentenceSource = Array.isArray(input.sentences) && input.sentences.length > 0
+      ? input.sentences
+      : raw
+          .split(/(?<=[.!?])\s+/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+    return {
+      raw_text: raw,
+      sentences: sentenceSource,
+      razbor: sentenceSource.map((sentence, idx) => ({
+        id: `mock_${idx + 1}`,
+        input: sentence,
+        analysis: {
+          architecture: {
+            sentence_type: 'Simple',
+            communicative_type: 'Declarative',
+            clauses: [{ role: 'main', marker: null, relation: 'main predication', span: sentence }],
+          },
+          constituents_heuristic: {
+            subject_span: null,
+            predicate_span: null,
+            post_predicate_span: sentence,
+          },
+          constituents: [],
+          morphology: { tokens: [] },
+          verb_system: { per_clause: [] },
+          meaning_pragmatics: {
+            speech_act: 'declarative',
+            time_reference: 'Present/General',
+            pragmatic_notes: [],
+          },
+          lexis: {
+            register: 'neutral',
+            collocations: [],
+            semantic_precision: { issues: [], high_precision_signals: [] },
+          },
+          cefr: { level: 'A1', markers: [] },
+        },
+        notes: {
+          elementary: '',
+          intermediate: '',
+          advanced: '',
+        },
+      })),
+      contract: JSON.parse(JSON.stringify(samplePayload)) as VisualizerPayload,
+      notes_sources: sentenceSource.map(() => 'mock'),
+    }
   }
 
   async applyEdit(input: {

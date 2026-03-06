@@ -91,6 +91,28 @@ export type VisualizerNode = {
 
 export type VisualizerPayload = Record<string, VisualizerNode>
 
+export type RazborNotes = {
+  elementary: string
+  intermediate: string
+  advanced: string
+}
+
+export type RazborItem = {
+  id: string | number
+  input: string
+  analysis: Record<string, unknown>
+  notes: RazborNotes
+  cefr_level?: string
+}
+
+export type AnalyzeTextPayload = {
+  raw_text: string
+  sentences: string[]
+  razbor: RazborItem[]
+  contract: VisualizerPayload
+  notes_sources?: string[]
+}
+
 export type TranslationProviderConfig = {
   id: string
   label: string
@@ -136,6 +158,7 @@ export interface RuntimeApi {
   listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]>
   getBackendJobStatus(jobId: string): Promise<BackendJobStatus>
   getVisualizerPayload(documentId?: string): Promise<VisualizerPayload>
+  analyzeText(input: { rawText: string; sentences?: string[] }): Promise<AnalyzeTextPayload>
   applyEdit(input: {
     sentenceText: string
     nodeId: string

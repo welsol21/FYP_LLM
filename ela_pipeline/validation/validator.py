@@ -893,9 +893,20 @@ def _schema_filename(validation_mode: str) -> str:
     return "linguistic_contract.schema.json"
 
 
+def _razbor_schema_filename() -> str:
+    return "razbor_contract.schema.json"
+
+
 @lru_cache(maxsize=4)
 def _load_json_schema(validation_mode: str) -> dict[str, Any]:
     schema_path = Path(__file__).resolve().parents[2] / "schemas" / _schema_filename(validation_mode)
+    with schema_path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+@lru_cache(maxsize=2)
+def _load_razbor_json_schema() -> dict[str, Any]:
+    schema_path = Path(__file__).resolve().parents[2] / "schemas" / _razbor_schema_filename()
     with schema_path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -905,6 +916,14 @@ def _get_json_schema_validator(validation_mode: str) -> Any:
     from jsonschema import Draft202012Validator
 
     schema = _load_json_schema(validation_mode)
+    return Draft202012Validator(schema)
+
+
+@lru_cache(maxsize=2)
+def _get_razbor_json_schema_validator() -> Any:
+    from jsonschema import Draft202012Validator
+
+    schema = _load_razbor_json_schema()
     return Draft202012Validator(schema)
 
 
@@ -1059,6 +1078,28 @@ def validate_contract(doc: Dict[str, Any], validation_mode: str = "v2_strict") -
                 _expect(sentence_node.get("type") == "Sentence", errors, f"$.{sentence_key}.type", "Top-level value must be Sentence")
                 _expect(sentence_node.get("content") == sentence_key, errors, f"$.{sentence_key}.content", "Sentence content must match top-level key")
 
+    return ValidationResult(ok=not errors, errors=errors)
+
+
+def validate_razbor_contract(doc: Any) -> ValidationResult:
+    errors: list[ValidationErrorItem] = []
+    try:
+        validator = _get_razbor_json_schema_validator()
+    except ModuleNotFoundError:
+        errors.append(
+            ValidationErrorItem(
+                path="$",
+                message="jsonschema package is required for razbor validation. Install dependency: jsonschema",
+            )
+        )
+        return ValidationResult(ok=False, errors=errors)
+
+    schema_errors: list[ValidationErrorItem] = []
+    for item in validator.iter_errors(doc):
+        path = _format_json_path(item.absolute_path)
+        schema_errors.append(ValidationErrorItem(path=path, message=str(item.message)))
+    schema_errors.sort(key=lambda x: (x.path, x.message))
+    errors.extend(schema_errors)
     return ValidationResult(ok=not errors, errors=errors)
 
 

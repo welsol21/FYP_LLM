@@ -128,6 +128,14 @@ def _build_sentence_contract_payload(sentence_text: str, sentence_idx: int) -> d
     )
 
 
+def _build_text_contract_payload(raw_text: str, sentences: list[str] | None) -> dict:
+    return SERVICE.analyze_text_contract(
+        raw_text=raw_text,
+        sentences=sentences,
+        generate_notes=_env_bool("ELA_RAZBOR_GENERATE_NOTES", True),
+    )
+
+
 def _run_sentence_contract_warmup() -> None:
     if not _env_bool("ELA_SENTENCE_CONTRACT_WARMUP", True):
         print("[runtime-api] sentence-contract warmup disabled", flush=True)
@@ -390,6 +398,24 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 return
             try:
                 payload = _build_sentence_contract_payload(sentence_text, sentence_idx)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=400)
+                return
+            self._send_json(payload)
+            return
+
+        if path == "/api/analyze-text":
+            raw_text = str(body.get("rawText") or body.get("raw_text") or body.get("text") or "").strip()
+            sentences_raw = body.get("sentences") or body.get("sentenceTexts") or body.get("sentence_texts")
+            sentences: list[str] | None = None
+            if isinstance(sentences_raw, list):
+                normalized = [str(row or "").strip() for row in sentences_raw if str(row or "").strip()]
+                sentences = normalized if normalized else None
+            if not raw_text and not sentences:
+                self._send_json({"error": "rawText is required"}, status=400)
+                return
+            try:
+                payload = _build_text_contract_payload(raw_text, sentences)
             except Exception as exc:
                 self._send_json({"error": str(exc)}, status=400)
                 return

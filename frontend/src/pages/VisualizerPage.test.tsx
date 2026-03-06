@@ -102,6 +102,7 @@ describe('VisualizerPage', () => {
       getBackendJobStatus: async (jobId: string) => ({ job_id: jobId, status: 'completed_local', message: 'ok', stage_progress: [100, 100, 100, 100, 100] }),
       uploadMedia: async () => ({ fileName: 'uploaded.txt', mediaPath: '/tmp/uploaded.txt', sizeBytes: 12 }),
       getVisualizerPayload,
+      analyzeText: async () => ({ raw_text: '', sentences: [], razbor: [], contract: {} }),
       applyEdit: async () => ({ status: 'ok', message: 'Edit applied.' }),
       getTranslationConfig: async () => ({
         default_provider: 'm2m100',
@@ -188,6 +189,7 @@ describe('VisualizerPage', () => {
       getBackendJobStatus: async (jobId: string) => ({ job_id: jobId, status: 'completed_local', message: 'ok', stage_progress: [100, 100, 100, 100, 100] }),
       uploadMedia: async () => ({ fileName: 'uploaded.txt', mediaPath: '/tmp/uploaded.txt', sizeBytes: 12 }),
       getVisualizerPayload: async () => docPayload,
+      analyzeText: async () => ({ raw_text: '', sentences: [], razbor: [], contract: {} }),
       applyEdit: async () => ({ status: 'ok', message: 'Edit applied.' }),
       getTranslationConfig: async () => ({
         default_provider: 'm2m100',
@@ -269,6 +271,7 @@ describe('VisualizerPage', () => {
       getBackendJobStatus: async (jobId: string) => ({ job_id: jobId, status: 'completed_local', message: 'ok', stage_progress: [100, 100, 100, 100, 100] }),
       uploadMedia: async () => ({ fileName: 'u.txt', mediaPath: '/tmp/u.txt', sizeBytes: 10 }),
       getVisualizerPayload,
+      analyzeText: async () => ({ raw_text: '', sentences: [], razbor: [], contract: {} }),
       applyEdit: async () => ({ status: 'ok', message: 'Edit applied.' }),
       getTranslationConfig: async () => ({
         default_provider: 'm2m100',

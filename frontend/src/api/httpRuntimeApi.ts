@@ -1,4 +1,5 @@
 import type {
+  AnalyzeTextPayload,
   BackendJobStatus,
   DocumentArtifact,
   MediaFileRow,
@@ -126,6 +127,14 @@ export class HttpRuntimeApi implements RuntimeApi {
   async getVisualizerPayload(documentId?: string): Promise<VisualizerPayload> {
     if (!documentId) return {}
     return requestJson<VisualizerPayload>(`/api/visualizer-payload?document_id=${encodeURIComponent(documentId)}`)
+  }
+
+  async analyzeText(input: { rawText: string; sentences?: string[] }): Promise<AnalyzeTextPayload> {
+    return requestJson<AnalyzeTextPayload>('/api/analyze-text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    })
   }
 
   async applyEdit(input: {
