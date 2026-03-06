@@ -905,6 +905,10 @@ class RuntimeMediaService:
             try:
                 pipeline = run_media_pipeline(
                     source_path=media_path,
+                    text_contract_builder=lambda *, raw_text, sentences: self._build_text_contract_from_backend(
+                        raw_text=raw_text,
+                        sentences=sentences,
+                    ),
                     sentence_contract_builder=lambda *, sentence_text, sentence_idx: self._build_sentence_contract_from_backend_and_local_translation(
                         sentence_text=sentence_text,
                         sentence_idx=sentence_idx,
@@ -1363,6 +1367,17 @@ class RuntimeMediaService:
             sentence_idx=sentence_idx,
         )
 
+    def _build_text_contract_from_backend(
+        self,
+        *,
+        raw_text: str,
+        sentences: list[str],
+    ) -> dict[str, Any]:
+        return self._request_text_contract(
+            raw_text=raw_text,
+            sentences=sentences,
+        )
+
     def _persist_media_contract_artifacts(
         self,
         *,
@@ -1815,6 +1830,50 @@ class RuntimeMediaService:
             raise RuntimeError(f"Invalid payload type from backend sentence-contract API: {endpoint}")
         if "sentence_node" not in parsed or "sentence_hash" not in parsed:
             raise RuntimeError(f"Incomplete payload from backend sentence-contract API: {endpoint}")
+        return parsed
+
+    def _request_text_contract(
+        self,
+        *,
+        raw_text: str,
+        sentences: list[str] | None = None,
+    ) -> dict[str, Any]:
+        if not self.sentence_contract_backend_url:
+            raise RuntimeError("ELA_SENTENCE_CONTRACT_BACKEND_URL is required for text contract requests.")
+        endpoint = f"{self.sentence_contract_backend_url.rstrip('/')}/api/analyze-text"
+        payload_dict: dict[str, Any] = {"rawText": str(raw_text or "")}
+        if sentences:
+            payload_dict["sentences"] = [str(x) for x in sentences if str(x).strip()]
+        payload = json.dumps(payload_dict).encode("utf-8")
+        req = urlrequest.Request(endpoint, data=payload, method="POST")
+        req.add_header("Content-Type", "application/json")
+        try:
+            with urlrequest.urlopen(req, timeout=self.sentence_contract_timeout_sec) as resp:  # nosec B310
+                raw = resp.read().decode("utf-8")
+        except TimeoutError as exc:
+            raise RuntimeError(
+                f"Backend analyze-text API timeout after {self.sentence_contract_timeout_sec}s: {endpoint}"
+            ) from exc
+        except urlerror.HTTPError as exc:
+            body = ""
+            try:
+                body = exc.read().decode("utf-8")
+            except Exception:
+                body = ""
+            message = f"Backend analyze-text API error {exc.code}: {endpoint}"
+            if body:
+                message = f"{message}; body={body}"
+            raise RuntimeError(message) from exc
+        except (urlerror.URLError, OSError) as exc:
+            raise RuntimeError(f"Backend analyze-text API unavailable: {endpoint}") from exc
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Invalid JSON from backend analyze-text API: {endpoint}") from exc
+        if not isinstance(parsed, dict):
+            raise RuntimeError(f"Invalid payload type from backend analyze-text API: {endpoint}")
+        if "contract" not in parsed:
+            raise RuntimeError(f"Incomplete payload from backend analyze-text API: {endpoint}")
         return parsed
 
     def apply_document_edit(

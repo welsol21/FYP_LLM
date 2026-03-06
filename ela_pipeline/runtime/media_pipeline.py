@@ -12,6 +12,7 @@ import threading
 import time
 from typing import Any, Callable
 
+from ela_pipeline.client_storage import build_sentence_hash
 from ela_pipeline.parse.spacy_parser import load_nlp
 from ela_pipeline.skeleton.builder import build_skeleton
 from ela_pipeline.translate import M2M100Translator
@@ -606,6 +607,7 @@ def run_media_pipeline(
     source_path: str,
     spacy_model: str = "en_core_web_sm",
     sentence_contract_builder: Callable[..., dict[str, Any]] | None = None,
+    text_contract_builder: Callable[..., dict[str, Any]] | None = None,
     progress_callback: Callable[[str, float | None, str | None], None] | None = None,
 ) -> MediaPipelineResult:
     path = Path(source_path)
@@ -622,7 +624,7 @@ def run_media_pipeline(
     if not full_text:
         raise RuntimeError("Extracted text is empty.")
 
-    if sentence_contract_builder is None:
+    if sentence_contract_builder is None and text_contract_builder is None:
         raise RuntimeError(
             "sentence_contract_builder is required. Local sentence-contract fallback is disabled."
         )
@@ -664,17 +666,57 @@ def run_media_pipeline(
     contract_sentences: list[dict[str, Any]] = []
     time_cursor_sec = 0.0
     total_sentences = max(len(sentence_stream), 1)
+    batched_payloads: list[dict[str, Any]] | None = None
+    if text_contract_builder is not None and sentence_stream:
+        try:
+            batch_result = text_contract_builder(raw_text=full_text, sentences=sentence_stream)
+            contract = batch_result.get("contract") if isinstance(batch_result, dict) else None
+            if isinstance(contract, dict):
+                resolved_payloads: list[dict[str, Any]] = []
+                for idx, sentence_text in enumerate(sentence_stream):
+                    node = contract.get(sentence_text)
+                    if not isinstance(node, dict):
+                        source_norm = " ".join(sentence_text.strip().split()).casefold()
+                        node = None
+                        for key, value in contract.items():
+                            if not isinstance(value, dict):
+                                continue
+                            key_norm = " ".join(str(key or "").strip().split()).casefold()
+                            content_norm = " ".join(str(value.get("content") or "").strip().split()).casefold()
+                            if source_norm and (source_norm == key_norm or source_norm == content_norm):
+                                node = value
+                                break
+                    if not isinstance(node, dict):
+                        raise RuntimeError("text_contract_builder returned incomplete contract")
+                    sentence_text_resolved = str(node.get("content") or sentence_text).strip() or sentence_text
+                    resolved_payloads.append(
+                        {
+                            "sentence_text": sentence_text_resolved,
+                            "sentence_hash": build_sentence_hash(sentence_text_resolved, int(idx)),
+                            "sentence_node": node,
+                        }
+                    )
+                batched_payloads = resolved_payloads
+        except Exception:
+            batched_payloads = None
+
     for idx, sentence_text in enumerate(sentence_stream):
         if progress_callback is not None:
+            batch_mode = "batch" if batched_payloads is not None else "per-sentence"
             progress_callback(
                 "translating_text",
                 idx / total_sentences,
-                f"Building sentence contract {idx + 1}/{total_sentences}",
+                f"Building sentence contract {idx + 1}/{total_sentences} ({batch_mode})",
             )
-        sentence_payload = sentence_contract_builder(
-            sentence_text=sentence_text,
-            sentence_idx=idx,
-        )
+        if batched_payloads is not None:
+            sentence_payload = batched_payloads[idx]
+        else:
+            if sentence_contract_builder is None:
+                raise RuntimeError("sentence_contract_builder is required when batch text contract is unavailable.")
+            sentence_payload = sentence_contract_builder(
+                sentence_text=sentence_text,
+                sentence_idx=idx,
+            )
         sentence_node = sentence_payload["sentence_node"]
         sentence_text_resolved = str(sentence_payload.get("sentence_text") or sentence_text).strip()
         sent_hash = sentence_payload["sentence_hash"]

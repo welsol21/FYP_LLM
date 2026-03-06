@@ -182,6 +182,56 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
             self.assertEqual(result.media_sentences[0]["text_eng"], "She trusted him.")
             self.assertEqual(result.media_sentences[0]["text_ru"], "")
 
+    def test_pipeline_prefers_batch_text_contract_builder_when_available(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "sample.txt"
+            source.write_text("She trusted him. Before making the decision.", encoding="utf-8")
+
+            sentence_builder_calls: list[tuple[str, int]] = []
+            text_builder_calls: list[tuple[str, tuple[str, ...]]] = []
+
+            def sentence_builder(*, sentence_text: str, sentence_idx: int):
+                sentence_builder_calls.append((sentence_text, sentence_idx))
+                return {
+                    "sentence_text": sentence_text,
+                    "sentence_hash": f"h-{sentence_idx}",
+                    "sentence_node": {
+                        "type": "Sentence",
+                        "node_id": f"n-{sentence_idx}",
+                        "content": sentence_text,
+                        "linguistic_elements": [],
+                    },
+                }
+
+            def text_builder(*, raw_text: str, sentences: list[str]):
+                text_builder_calls.append((raw_text, tuple(sentences)))
+                contract = {}
+                for idx, sentence in enumerate(sentences):
+                    contract[sentence] = {
+                        "type": "Sentence",
+                        "node_id": f"b-{idx}",
+                        "content": sentence,
+                        "linguistic_elements": [],
+                        "linguistic_notes": [],
+                        "translations": {"backend_m2m100": {"text": sentence}},
+                    }
+                return {
+                    "raw_text": raw_text,
+                    "sentences": sentences,
+                    "contract": contract,
+                }
+
+            result = run_media_pipeline(
+                source_path=str(source),
+                text_contract_builder=text_builder,
+                sentence_contract_builder=sentence_builder,
+            )
+            self.assertEqual(len(text_builder_calls), 1)
+            self.assertEqual(len(sentence_builder_calls), 0)
+            self.assertEqual(len(result.contract_sentences), 2)
+            self.assertEqual(result.contract_sentences[0]["sentence_node"]["node_id"], "b-0")
+            self.assertEqual(result.contract_sentences[1]["sentence_node"]["node_id"], "b-1")
+
     def test_audio_asr_fails_fast_when_runtime_downloads_disabled_and_model_not_bundled(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             media = Path(tmpdir) / "sample.mp3"
