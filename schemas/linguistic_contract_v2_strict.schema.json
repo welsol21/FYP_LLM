@@ -7,38 +7,231 @@
     "$ref": "#/$defs/sentenceNode"
   },
   "$defs": {
+    "nullableStringStrict": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "not": {
+        "type": "string",
+        "pattern": "^[Nn][Uu][Ll][Ll]$"
+      }
+    },
     "sourceSpan": {
       "type": "object",
-      "required": ["start", "end"],
+      "required": [
+        "start",
+        "end"
+      ],
       "properties": {
-        "start": {"type": "integer", "minimum": 0},
-        "end": {"type": "integer", "minimum": 0}
+        "start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
       "additionalProperties": false
     },
     "typedNote": {
       "type": "object",
-      "required": ["text", "kind", "confidence", "source"],
+      "required": [
+        "text",
+        "kind",
+        "confidence",
+        "source"
+      ],
       "properties": {
-        "text": {"type": "string"},
-        "kind": {"type": "string", "enum": ["semantic", "syntactic", "morphological", "discourse"]},
-        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
-        "source": {"type": "string", "enum": ["model", "rule", "fallback"]}
+        "text": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "semantic",
+            "syntactic",
+            "morphological",
+            "discourse"
+          ]
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "model",
+            "rule",
+            "fallback"
+          ]
+        }
       },
       "additionalProperties": false
     },
     "rejectedCandidateStat": {
       "type": "object",
-      "required": ["text", "count", "reasons"],
+      "required": [
+        "text",
+        "count",
+        "reasons"
+      ],
       "properties": {
-        "text": {"type": "string"},
-        "count": {"type": "integer", "minimum": 1},
+        "text": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        },
         "reasons": {
           "type": "array",
-          "items": {"type": "string"}
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
+    },
+    "translationEntry": {
+      "type": "object",
+      "required": [
+        "source_lang",
+        "target_lang",
+        "text"
+      ],
+      "properties": {
+        "source_lang": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_lang": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "translationsMap": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/translationEntry"
+      }
+    },
+    "cefrLevel": {
+      "type": "string",
+      "enum": [
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+      ]
+    },
+    "grammarClass": {
+      "type": "object",
+      "required": [
+        "class_id",
+        "confidence"
+      ],
+      "properties": {
+        "class_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "scope_span": {
+          "$ref": "#/$defs/sourceSpan"
+        }
+      },
+      "additionalProperties": true
+    },
+    "noteTriplet": {
+      "type": "object",
+      "required": [
+        "elementary_text",
+        "intermediate_text",
+        "advanced_text"
+      ],
+      "properties": {
+        "elementary_text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "intermediate_text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "advanced_text": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": true
+    },
+    "nodeChild": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "Phrase",
+            "Word"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "Phrase"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/phraseNode"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "Word"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "$ref": "#/$defs/wordNode"
+          }
+        }
+      ],
+      "additionalProperties": true
     },
     "wordNode": {
       "type": "object",
@@ -48,6 +241,7 @@
         "tense",
         "linguistic_notes",
         "part_of_speech",
+        "translations",
         "linguistic_elements",
         "node_id",
         "parent_id",
@@ -56,33 +250,184 @@
         "schema_version"
       ],
       "properties": {
-        "type": {"const": "Word"},
-        "content": {"type": "string"},
-        "tense": {"type": ["string", "null"]},
-        "aspect": {"type": ["string", "null"]},
-        "mood": {"type": ["string", "null"]},
-        "voice": {"type": ["string", "null"]},
-        "finiteness": {"type": ["string", "null"]},
-        "tam_construction": {"type": "string", "minLength": 1},
-        "linguistic_notes": {"type": "array", "items": {"type": "string"}},
-        "notes": {"type": "array", "items": {"$ref": "#/$defs/typedNote"}},
-        "quality_flags": {"type": "array", "items": {"type": "string"}},
-        "rejected_candidates": {"type": "array", "items": {"type": "string"}},
-        "rejected_candidate_stats": {"type": "array", "items": {"$ref": "#/$defs/rejectedCandidateStat"}},
-        "reason_codes": {"type": "array", "items": {"type": "string"}},
-        "part_of_speech": {"type": "string"},
-        "linguistic_elements": {"type": "array", "maxItems": 0},
+        "type": {
+          "const": "Word"
+        },
+        "content": {
+          "type": "string"
+        },
+        "tense": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "aspect": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "mood": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "voice": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "finiteness": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "tam_construction": {
+          "type": "string",
+          "minLength": 1
+        },
+        "linguistic_notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/typedNote"
+          }
+        },
+        "quality_flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rejected_candidates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rejected_candidate_stats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rejectedCandidateStat"
+          }
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "part_of_speech": {
+          "type": "string"
+        },
+        "linguistic_elements": {
+          "type": "array",
+          "maxItems": 0
+        },
         "features": {
           "type": "object",
-          "additionalProperties": {"type": ["string", "null"]}
+          "additionalProperties": {
+            "$ref": "#/$defs/nullableStringStrict"
+          }
         },
-        "node_id": {"type": "string"},
-        "parent_id": {"type": "string"},
-        "source_span": {"$ref": "#/$defs/sourceSpan"},
-        "grammatical_role": {"type": "string"},
-        "dep_label": {"type": "string"},
-        "head_id": {"type": ["string", "null"]},
-        "schema_version": {"type": "string", "const": "v2"}
+        "node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_span": {
+          "$ref": "#/$defs/sourceSpan"
+        },
+        "grammatical_role": {
+          "type": "string"
+        },
+        "dep_label": {
+          "type": "string"
+        },
+        "head_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "translations": {
+          "$ref": "#/$defs/translationsMap"
+        },
+        "active_translation_provider": {
+          "type": "string"
+        },
+        "phonetic": {
+          "type": "object",
+          "required": [
+            "uk",
+            "us"
+          ],
+          "properties": {
+            "uk": {
+              "type": "string",
+              "minLength": 1
+            },
+            "us": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "synonyms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "cefr_level": {
+          "$ref": "#/$defs/cefrLevel"
+        },
+        "grammar_classes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/grammarClass"
+          }
+        },
+        "generated_notes": {
+          "$ref": "#/$defs/noteTriplet"
+        },
+        "note_blueprints": {
+          "$ref": "#/$defs/noteTriplet"
+        },
+        "note_generator_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "template_selection": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "backoff_in_subtree": {
+          "type": "boolean"
+        },
+        "backoff_summary": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "backoff_nodes_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "backoff_leaf_nodes_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "backoff_aggregate_nodes_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "backoff_unique_spans_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "schema_version": {
+          "type": "string",
+          "const": "v2"
+        }
       },
       "additionalProperties": true
     },
@@ -94,6 +439,7 @@
         "tense",
         "linguistic_notes",
         "part_of_speech",
+        "translations",
         "linguistic_elements",
         "node_id",
         "parent_id",
@@ -102,45 +448,222 @@
         "schema_version"
       ],
       "properties": {
-        "type": {"const": "Phrase"},
-        "content": {"type": "string"},
-        "tense": {"type": ["string", "null"]},
-        "aspect": {"type": ["string", "null"]},
-        "mood": {"type": ["string", "null"]},
-        "voice": {"type": ["string", "null"]},
-        "finiteness": {"type": ["string", "null"]},
-        "tam_construction": {"type": "string", "minLength": 1},
-        "linguistic_notes": {"type": "array", "items": {"type": "string"}},
-        "notes": {"type": "array", "items": {"$ref": "#/$defs/typedNote"}},
-        "quality_flags": {"type": "array", "items": {"type": "string"}},
-        "rejected_candidates": {"type": "array", "items": {"type": "string"}},
-        "rejected_candidate_stats": {"type": "array", "items": {"$ref": "#/$defs/rejectedCandidateStat"}},
-        "reason_codes": {"type": "array", "items": {"type": "string"}},
-        "part_of_speech": {"type": "string"},
+        "type": {
+          "const": "Phrase"
+        },
+        "content": {
+          "type": "string"
+        },
+        "tense": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "aspect": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "mood": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "voice": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "finiteness": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "tam_construction": {
+          "type": "string",
+          "minLength": 1
+        },
+        "linguistic_notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/typedNote"
+          }
+        },
+        "quality_flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rejected_candidates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rejected_candidate_stats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rejectedCandidateStat"
+          }
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "part_of_speech": {
+          "type": "string"
+        },
         "linguistic_elements": {
           "type": "array",
-          "minItems": 2,
-          "items": {"$ref": "#/$defs/wordNode"}
+          "items": {
+            "$ref": "#/$defs/nodeChild"
+          }
         },
-        "node_id": {"type": "string"},
-        "parent_id": {"type": "string"},
-        "source_span": {"$ref": "#/$defs/sourceSpan"},
-        "grammatical_role": {"type": "string"},
-        "schema_version": {"type": "string", "const": "v2"}
+        "node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_span": {
+          "$ref": "#/$defs/sourceSpan"
+        },
+        "grammatical_role": {
+          "type": "string"
+        },
+        "translations": {
+          "$ref": "#/$defs/translationsMap"
+        },
+        "active_translation_provider": {
+          "type": "string"
+        },
+        "phonetic": {
+          "type": "object",
+          "required": [
+            "uk",
+            "us"
+          ],
+          "properties": {
+            "uk": {
+              "type": "string",
+              "minLength": 1
+            },
+            "us": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "synonyms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "cefr_level": {
+          "$ref": "#/$defs/cefrLevel"
+        },
+        "grammar_classes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/grammarClass"
+          }
+        },
+        "generated_notes": {
+          "$ref": "#/$defs/noteTriplet"
+        },
+        "note_blueprints": {
+          "$ref": "#/$defs/noteTriplet"
+        },
+        "note_generator_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "template_selection": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "backoff_in_subtree": {
+          "type": "boolean"
+        },
+        "backoff_summary": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "backoff_nodes_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "backoff_leaf_nodes_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "backoff_aggregate_nodes_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "backoff_unique_spans_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "schema_version": {
+          "type": "string",
+          "const": "v2"
+        }
       },
       "allOf": [
         {
           "if": {
             "properties": {
-              "tam_construction": {"const": "modal_perfect"}
+              "tam_construction": {
+                "const": "modal_perfect"
+              }
             },
-            "required": ["tam_construction"]
+            "required": [
+              "tam_construction"
+            ]
           },
           "then": {
             "properties": {
-              "mood": {"const": "modal"},
-              "aspect": {"const": "perfect"},
-              "tense": {"type": "null"}
+              "mood": {
+                "const": "modal"
+              },
+              "aspect": {
+                "const": "perfect"
+              },
+              "tense": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mood": {
+                "const": "modal"
+              },
+              "aspect": {
+                "const": "perfect"
+              },
+              "tense": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "mood",
+              "aspect",
+              "tense"
+            ]
+          },
+          "then": {
+            "properties": {
+              "tam_construction": {
+                "const": "modal_perfect"
+              }
             }
           }
         }
@@ -155,6 +678,7 @@
         "tense",
         "linguistic_notes",
         "part_of_speech",
+        "translations",
         "linguistic_elements",
         "node_id",
         "parent_id",
@@ -163,44 +687,221 @@
         "schema_version"
       ],
       "properties": {
-        "type": {"const": "Sentence"},
-        "content": {"type": "string"},
-        "tense": {"type": ["string", "null"]},
-        "aspect": {"type": ["string", "null"]},
-        "mood": {"type": ["string", "null"]},
-        "voice": {"type": ["string", "null"]},
-        "finiteness": {"type": ["string", "null"]},
-        "tam_construction": {"type": "string", "minLength": 1},
-        "linguistic_notes": {"type": "array", "items": {"type": "string"}},
-        "notes": {"type": "array", "items": {"$ref": "#/$defs/typedNote"}},
-        "quality_flags": {"type": "array", "items": {"type": "string"}},
-        "rejected_candidates": {"type": "array", "items": {"type": "string"}},
-        "rejected_candidate_stats": {"type": "array", "items": {"$ref": "#/$defs/rejectedCandidateStat"}},
-        "reason_codes": {"type": "array", "items": {"type": "string"}},
-        "part_of_speech": {"type": "string"},
+        "type": {
+          "const": "Sentence"
+        },
+        "content": {
+          "type": "string"
+        },
+        "tense": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "aspect": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "mood": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "voice": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "finiteness": {
+          "$ref": "#/$defs/nullableStringStrict"
+        },
+        "tam_construction": {
+          "type": "string",
+          "minLength": 1
+        },
+        "linguistic_notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/typedNote"
+          }
+        },
+        "quality_flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rejected_candidates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rejected_candidate_stats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rejectedCandidateStat"
+          }
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "part_of_speech": {
+          "type": "string"
+        },
         "linguistic_elements": {
           "type": "array",
-          "items": {"$ref": "#/$defs/phraseNode"}
+          "items": {
+            "$ref": "#/$defs/nodeChild"
+          }
         },
-        "node_id": {"type": "string"},
-        "parent_id": {"type": "null"},
-        "source_span": {"$ref": "#/$defs/sourceSpan"},
-        "grammatical_role": {"type": "string"},
-        "schema_version": {"type": "string", "const": "v2"}
+        "node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_id": {
+          "type": "null"
+        },
+        "source_span": {
+          "$ref": "#/$defs/sourceSpan"
+        },
+        "grammatical_role": {
+          "type": "string"
+        },
+        "translations": {
+          "$ref": "#/$defs/translationsMap"
+        },
+        "active_translation_provider": {
+          "type": "string"
+        },
+        "phonetic": {
+          "type": "object",
+          "required": [
+            "uk",
+            "us"
+          ],
+          "properties": {
+            "uk": {
+              "type": "string",
+              "minLength": 1
+            },
+            "us": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "synonyms": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "cefr_level": {
+          "$ref": "#/$defs/cefrLevel"
+        },
+        "grammar_classes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/grammarClass"
+          }
+        },
+        "generated_notes": {
+          "$ref": "#/$defs/noteTriplet"
+        },
+        "note_blueprints": {
+          "$ref": "#/$defs/noteTriplet"
+        },
+        "note_generator_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "template_selection": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "backoff_in_subtree": {
+          "type": "boolean"
+        },
+        "backoff_summary": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "backoff_nodes_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "backoff_leaf_nodes_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "backoff_aggregate_nodes_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "backoff_unique_spans_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "schema_version": {
+          "type": "string",
+          "const": "v2"
+        }
       },
       "allOf": [
         {
           "if": {
             "properties": {
-              "tam_construction": {"const": "modal_perfect"}
+              "tam_construction": {
+                "const": "modal_perfect"
+              }
             },
-            "required": ["tam_construction"]
+            "required": [
+              "tam_construction"
+            ]
           },
           "then": {
             "properties": {
-              "mood": {"const": "modal"},
-              "aspect": {"const": "perfect"},
-              "tense": {"type": "null"}
+              "mood": {
+                "const": "modal"
+              },
+              "aspect": {
+                "const": "perfect"
+              },
+              "tense": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mood": {
+                "const": "modal"
+              },
+              "aspect": {
+                "const": "perfect"
+              },
+              "tense": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "mood",
+              "aspect",
+              "tense"
+            ]
+          },
+          "then": {
+            "properties": {
+              "tam_construction": {
+                "const": "modal_perfect"
+              }
             }
           }
         }

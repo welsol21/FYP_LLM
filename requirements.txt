@@ -20,4 +20,5 @@ openai
 deepl
 lara-sdk
 edge-tts
+jsonschema
 pytest

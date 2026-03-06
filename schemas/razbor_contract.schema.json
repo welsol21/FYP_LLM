@@ -1,0 +1,493 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/razbor_contract.schema.json",
+  "title": "ELA Razbor Contract",
+  "description": "Intermediate grammatical-lexical parse contract (CEFR A1-C2).",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/razborDataset"
+    },
+    {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/razborItem"
+      }
+    },
+    {
+      "$ref": "#/$defs/razborItem"
+    }
+  ],
+  "$defs": {
+    "cefrLevel": {
+      "type": "string",
+      "enum": [
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+      ]
+    },
+    "razborDataset": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "examples"
+      ],
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "levels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cefrLevel"
+          }
+        },
+        "examples_per_level": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/razborItem"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "razborItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "input",
+        "analysis",
+        "notes"
+      ],
+      "properties": {
+        "id": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "input": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cefr_level": {
+          "$ref": "#/$defs/cefrLevel"
+        },
+        "analysis": {
+          "$ref": "#/$defs/analysis"
+        },
+        "notes": {
+          "$ref": "#/$defs/notes"
+        }
+      },
+      "additionalProperties": true
+    },
+    "analysis": {
+      "type": "object",
+      "required": [
+        "architecture",
+        "constituents_heuristic",
+        "constituents",
+        "morphology",
+        "verb_system",
+        "meaning_pragmatics",
+        "lexis",
+        "cefr"
+      ],
+      "properties": {
+        "architecture": {
+          "$ref": "#/$defs/architecture"
+        },
+        "constituents_heuristic": {
+          "$ref": "#/$defs/constituentsHeuristic"
+        },
+        "constituents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/constituent"
+          }
+        },
+        "morphology": {
+          "$ref": "#/$defs/morphology"
+        },
+        "verb_system": {
+          "$ref": "#/$defs/verbSystem"
+        },
+        "meaning_pragmatics": {
+          "$ref": "#/$defs/meaningPragmatics"
+        },
+        "lexis": {
+          "$ref": "#/$defs/lexis"
+        },
+        "cefr": {
+          "$ref": "#/$defs/cefr"
+        },
+        "quality": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "architecture": {
+      "type": "object",
+      "required": [
+        "sentence_type",
+        "communicative_type",
+        "clauses"
+      ],
+      "properties": {
+        "sentence_type": {
+          "type": "string"
+        },
+        "communicative_type": {
+          "type": "string"
+        },
+        "clauses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/clause"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "clause": {
+      "type": "object",
+      "required": [
+        "role",
+        "marker",
+        "relation",
+        "span"
+      ],
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "marker": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "relation": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "span": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "constituentsHeuristic": {
+      "type": "object",
+      "required": [
+        "subject_span",
+        "predicate_span",
+        "post_predicate_span"
+      ],
+      "properties": {
+        "subject_span": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "predicate_span": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "post_predicate_span": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "constituent": {
+      "type": "object",
+      "required": [
+        "phrase_type",
+        "function",
+        "span"
+      ],
+      "properties": {
+        "phrase_type": {
+          "type": "string"
+        },
+        "function": {
+          "type": "string"
+        },
+        "span": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "morphology": {
+      "type": "object",
+      "required": [
+        "tokens"
+      ],
+      "properties": {
+        "tokens": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/token"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "token": {
+      "type": "object",
+      "required": [
+        "text",
+        "pos",
+        "lemma",
+        "features"
+      ],
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "pos": {
+          "type": "string"
+        },
+        "lemma": {
+          "type": "string"
+        },
+        "features": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "derivation": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "verbSystem": {
+      "type": "object",
+      "required": [
+        "per_clause"
+      ],
+      "properties": {
+        "per_clause": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/verbClause"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "verbClause": {
+      "type": "object",
+      "required": [
+        "tense",
+        "aspect",
+        "voice",
+        "mood",
+        "time_reference",
+        "evidence"
+      ],
+      "properties": {
+        "clause_span": {
+          "type": "string"
+        },
+        "tense": {
+          "type": "string"
+        },
+        "aspect": {
+          "type": "string"
+        },
+        "voice": {
+          "type": "string"
+        },
+        "mood": {
+          "type": "string"
+        },
+        "modality": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "modality_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "future_form": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "time_reference": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "meaningPragmatics": {
+      "type": "object",
+      "required": [
+        "speech_act",
+        "time_reference",
+        "pragmatic_notes"
+      ],
+      "properties": {
+        "speech_act": {
+          "type": "string"
+        },
+        "time_reference": {
+          "type": "string"
+        },
+        "modality": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "modality_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pragmatic_notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "lexis": {
+      "type": "object",
+      "required": [
+        "register",
+        "collocations",
+        "semantic_precision"
+      ],
+      "properties": {
+        "register": {
+          "type": "string"
+        },
+        "collocations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pair": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "semantic_precision": {
+          "type": "object",
+          "required": [
+            "issues"
+          ],
+          "properties": {
+            "issues": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "high_precision_signals": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "cefr": {
+      "type": "object",
+      "required": [
+        "level",
+        "markers"
+      ],
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/cefrLevel"
+        },
+        "markers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "notes": {
+      "type": "object",
+      "required": [
+        "elementary",
+        "intermediate",
+        "advanced"
+      ],
+      "properties": {
+        "elementary": {
+          "type": "string"
+        },
+        "intermediate": {
+          "type": "string"
+        },
+        "advanced": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

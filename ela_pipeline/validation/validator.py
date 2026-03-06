@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
+import json
+from pathlib import Path
+import re
 from typing import Any, Dict, List, Set
 
 from ela_pipeline.constants import NODE_TYPES, REQUIRED_NODE_FIELDS
@@ -13,6 +17,7 @@ VALIDATION_MODES = {"v1", "v2_strict"}
 STRICT_V2_REQUIRED_FIELDS = {"node_id", "source_span", "grammatical_role", "schema_version"}
 TAM_FIELDS = ("tense", "aspect", "mood", "voice", "finiteness")
 CEFR_LEVELS = {"A1", "A2", "B1", "B2", "C1", "C2"}
+_RE_REQUIRED_PROPERTY = re.compile(r"'([^']+)' is a required property")
 
 
 @dataclass
@@ -882,10 +887,161 @@ def _validate_node(
         )
 
 
+def _schema_filename(validation_mode: str) -> str:
+    if validation_mode == "v2_strict":
+        return "linguistic_contract_v2_strict.schema.json"
+    return "linguistic_contract.schema.json"
+
+
+@lru_cache(maxsize=4)
+def _load_json_schema(validation_mode: str) -> dict[str, Any]:
+    schema_path = Path(__file__).resolve().parents[2] / "schemas" / _schema_filename(validation_mode)
+    with schema_path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+@lru_cache(maxsize=4)
+def _get_json_schema_validator(validation_mode: str) -> Any:
+    from jsonschema import Draft202012Validator
+
+    schema = _load_json_schema(validation_mode)
+    return Draft202012Validator(schema)
+
+
+def _format_json_path(path_parts: Any) -> str:
+    path = "$"
+    for part in path_parts:
+        if isinstance(part, int):
+            path = f"{path}[{part}]"
+            continue
+        if isinstance(part, str) and re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", part):
+            path = f"{path}.{part}"
+            continue
+        path = f"{path}[{part!r}]"
+    return path
+
+
+def _normalize_json_schema_error_message(error: Any, path: str) -> str:
+    message = str(error.message)
+    if error.validator == "required":
+        matched = _RE_REQUIRED_PROPERTY.search(message)
+        if matched:
+            return f"Missing required fields: ['{matched.group(1)}']"
+
+    if error.validator == "not" and isinstance(error.instance, str) and error.instance.lower() == "null":
+        if ".features." in path:
+            return "feature values must use real null, not string 'null', in strict mode"
+        field = path.rsplit(".", 1)[-1] if "." in path else "value"
+        return f"{field} must use real null, not string 'null', in strict mode"
+
+    schema_path = "/".join(str(part) for part in error.absolute_schema_path)
+    if (
+        error.validator == "type"
+        and path.endswith(".tense")
+        and "allOf" in schema_path
+        and "then/properties/tense/type" in schema_path
+    ):
+        return "modal_perfect requires tense=null in strict mode"
+
+    if (
+        error.validator == "const"
+        and path.endswith(".tam_construction")
+        and "allOf" in schema_path
+        and "then/properties/tam_construction/const" in schema_path
+    ):
+        return "modal mood + perfect aspect + tense null requires tam_construction='modal_perfect' in strict mode"
+
+    return message
+
+
+def _validate_with_json_schema(doc: Dict[str, Any], validation_mode: str, errors: List[ValidationErrorItem]) -> None:
+    try:
+        validator = _get_json_schema_validator(validation_mode)
+    except ModuleNotFoundError:
+        errors.append(
+            ValidationErrorItem(
+                path="$",
+                message="jsonschema package is required for contract validation. Install dependency: jsonschema",
+            )
+        )
+        return
+
+    schema_errors: list[ValidationErrorItem] = []
+    for item in validator.iter_errors(doc):
+        path = _format_json_path(item.absolute_path)
+        message = _normalize_json_schema_error_message(item, path)
+        schema_errors.append(ValidationErrorItem(path=path, message=message))
+    schema_errors.sort(key=lambda x: (x.path, x.message))
+    errors.extend(schema_errors)
+
+
+def _validate_node_identity_links(
+    node: Dict[str, Any],
+    path: str,
+    errors: List[ValidationErrorItem],
+    seen_ids: Set[str],
+    expected_parent_id: str | None = None,
+) -> None:
+    if not isinstance(node, dict):
+        return
+
+    node_id = node.get("node_id")
+    if isinstance(node_id, str):
+        _expect(node_id not in seen_ids, errors, f"{path}.node_id", "node_id must be unique")
+        seen_ids.add(node_id)
+
+    parent_id = node.get("parent_id")
+    if expected_parent_id is None:
+        _expect(parent_id is None, errors, f"{path}.parent_id", "Sentence parent_id must be null")
+    else:
+        _expect(parent_id == expected_parent_id, errors, f"{path}.parent_id", "parent_id mismatch")
+
+    head_id = node.get("head_id")
+    if isinstance(head_id, str) and isinstance(node_id, str):
+        _expect(head_id != node_id, errors, f"{path}.head_id", "head_id must not equal node_id")
+
+    children = node.get("linguistic_elements")
+    if not isinstance(children, list):
+        return
+    for idx, child in enumerate(children):
+        if isinstance(child, dict):
+            _validate_node_identity_links(
+                child,
+                f"{path}.linguistic_elements[{idx}]",
+                errors,
+                seen_ids,
+                expected_parent_id=node_id if isinstance(node_id, str) else None,
+            )
+
+
+def _validate_top_level_content_alignment(doc: Dict[str, Any], errors: List[ValidationErrorItem]) -> None:
+    seen_ids: Set[str] = set()
+    for sentence_key, sentence_node in doc.items():
+        if not isinstance(sentence_node, dict):
+            continue
+        _expect(sentence_node.get("content") == sentence_key, errors, f"$.{sentence_key}.content", "Sentence content must match top-level key")
+        _validate_node_identity_links(
+            sentence_node,
+            f"$.{sentence_key}",
+            errors,
+            seen_ids,
+            expected_parent_id=None,
+        )
+
+
 def validate_contract(doc: Dict[str, Any], validation_mode: str = "v2_strict") -> ValidationResult:
     errors: List[ValidationErrorItem] = []
-    seen_ids: Set[str] = set()
     _expect(validation_mode in VALIDATION_MODES, errors, "$.validation_mode", "validation_mode must be v1 or v2_strict")
+    if validation_mode not in VALIDATION_MODES:
+        return ValidationResult(ok=False, errors=errors)
+
+    if validation_mode == "v2_strict":
+        _validate_with_json_schema(doc, validation_mode, errors)
+        if isinstance(doc, dict):
+            _validate_top_level_content_alignment(doc, errors)
+        return ValidationResult(ok=not errors, errors=errors)
+
+    seen_ids: Set[str] = set()
     _expect(isinstance(doc, dict), errors, "$", "Top-level must be an object keyed by sentence content")
 
     if isinstance(doc, dict):
