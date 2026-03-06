@@ -1,0 +1,353 @@
+[
+    {
+        "id": 1,
+        "input": "Jack works and Frank rests.",
+        "analysis": {
+            "architecture": {
+                "sentence_type": "Compound",
+                "communicative_type": "Declarative",
+                "clauses": [
+                    {
+                        "role": "main",
+                        "marker": null,
+                        "relation": null,
+                        "span": "Jack works and Frank rests."
+                    }
+                ]
+            },
+            "constituents_heuristic": {
+                "subject_span": "Jack works and Frank rests.",
+                "predicate_span": null,
+                "post_predicate_span": null
+            },
+            "constituents": [],
+            "morphology": {
+                "tokens": [
+                    {
+                        "text": "Jack",
+                        "pos": "PROPN",
+                        "lemma": "jack",
+                        "derivation": {
+                            "prefixes": [],
+                            "suffixes": []
+                        },
+                        "features": {}
+                    },
+                    {
+                        "text": "works",
+                        "pos": "NOUN",
+                        "lemma": "works",
+                        "derivation": {
+                            "prefixes": [],
+                            "suffixes": [
+                                "s"
+                            ]
+                        },
+                        "features": {
+                            "NumberOrAgreementHint": "Plural/3SG"
+                        }
+                    },
+                    {
+                        "text": "and",
+                        "pos": "NOUN",
+                        "lemma": "and",
+                        "derivation": {
+                            "prefixes": [],
+                            "suffixes": []
+                        },
+                        "features": {}
+                    },
+                    {
+                        "text": "Frank",
+                        "pos": "PROPN",
+                        "lemma": "frank",
+                        "derivation": {
+                            "prefixes": [],
+                            "suffixes": []
+                        },
+                        "features": {}
+                    },
+                    {
+                        "text": "rests",
+                        "pos": "NOUN",
+                        "lemma": "rests",
+                        "derivation": {
+                            "prefixes": [
+                                "re"
+                            ],
+                            "suffixes": [
+                                "s"
+                            ]
+                        },
+                        "features": {
+                            "NumberOrAgreementHint": "Plural/3SG"
+                        }
+                    },
+                    {
+                        "text": ".",
+                        "pos": "PUNCT",
+                        "lemma": ".",
+                        "derivation": {
+                            "prefixes": [],
+                            "suffixes": []
+                        },
+                        "features": {}
+                    }
+                ]
+            },
+            "verb_system": {
+                "per_clause": [
+                    {
+                        "tense": "Present",
+                        "aspect": "Simple",
+                        "voice": "Active",
+                        "mood": "Indicative",
+                        "modality": null,
+                        "modality_type": null,
+                        "future_form": null,
+                        "time_reference": "Present/General",
+                        "evidence": []
+                    }
+                ]
+            },
+            "meaning_pragmatics": {
+                "speech_act": "declarative",
+                "time_reference": "Present/General",
+                "modality": null,
+                "modality_type": null,
+                "pragmatic_notes": []
+            },
+            "lexis": {
+                "register": "neutral",
+                "collocations": [],
+                "semantic_precision": {
+                    "issues": []
+                }
+            },
+            "cefr": {
+                "level": "A1",
+                "markers": [
+                    "simple_clause_basics"
+                ]
+            },
+            "quality": {
+                "flags": [],
+                "confidence": {
+                    "architecture": 0.7,
+                    "constituents": 0.55,
+                    "morphology": 0.6,
+                    "verb_system": 0.75,
+                    "cefr": 0.55,
+                    "lexis": 0.55
+                }
+            }
+        },
+        "notes": {
+            "elementary": "This is a statement. It talks about the present or general facts.",
+            "intermediate": "Compound sentence. Verb pattern: Tense=Present, Aspect=Simple.",
+            "advanced": "CEFR: A1 (markers: simple_clause_basics). Register: neutral."
+        }
+    },
+    {
+        "id": 2,
+        "input": "Mia is at the music room with friends.",
+        "analysis": {
+            "architecture": {
+                "sentence_type": "Simple",
+                "communicative_type": "Declarative",
+                "clauses": [
+                    {
+                        "role": "main",
+                        "marker": null,
+                        "relation": null,
+                        "span": "Mia is at the music room with friends."
+                    }
+                ]
+            },
+            "constituents_heuristic": {
+                "subject_span": "Mia",
+                "predicate_span": "is",
+                "post_predicate_span": "at the music room with friends."
+            },
+            "constituents": [
+                {
+                    "phrase_type": "NP",
+                    "function": "Subject",
+                    "span": "Mia"
+                },
+                {
+                    "phrase_type": "VP",
+                    "function": "Predicate",
+                    "span": "is"
+                },
+                {
+                    "phrase_type": "PP",
+                    "function": "Adjunct",
+                    "span": "at the music room"
+                },
+                {
+                    "phrase_type": "PP",
+                    "function": "Adjunct",
+                    "span": "with friends."
+                }
+            ],
+            "morphology": {
+                "tokens": [
+                    {
+                        "text": "Mia",
+                        "pos": "PROPN",
+                        "lemma": "mia",
+                        "derivation": {
+                            "prefixes": [],
+                            "suffixes": []
+                        },
+                        "features": {}
+                    },
+                    {
+                        "text": "is",
+                        "pos": "AUX",
+                        "lemma": "is",
+                        "derivation": {
+                            "prefixes": [],
+                            "suffixes": []
+                        },
+                        "features": {}
+                    },
+                    {
+                        "text": "at",
+                        "pos": "ADP",
+                        "lemma": "at",
+                        "derivation": {
+                            "prefixes": [],
+                            "suffixes": []
+                        },
+                        "features": {}
+                    },
+                    {
+                        "text": "the",
+                        "pos": "DET",
+                        "lemma": "the",
+                        "derivation": {
+                            "prefixes": [],
+                            "suffixes": []
+                        },
+                        "features": {}
+                    },
+                    {
+                        "text": "music",
+                        "pos": "ADJ",
+                        "lemma": "music",
+                        "derivation": {
+                            "prefixes": [],
+                            "suffixes": []
+                        },
+                        "features": {}
+                    },
+                    {
+                        "text": "room",
+                        "pos": "NOUN",
+                        "lemma": "room",
+                        "derivation": {
+                            "prefixes": [],
+                            "suffixes": []
+                        },
+                        "features": {}
+                    },
+                    {
+                        "text": "with",
+                        "pos": "ADP",
+                        "lemma": "with",
+                        "derivation": {
+                            "prefixes": [],
+                            "suffixes": []
+                        },
+                        "features": {}
+                    },
+                    {
+                        "text": "friends",
+                        "pos": "NOUN",
+                        "lemma": "friends",
+                        "derivation": {
+                            "prefixes": [],
+                            "suffixes": [
+                                "s"
+                            ]
+                        },
+                        "features": {
+                            "NumberOrAgreementHint": "Plural/3SG"
+                        }
+                    },
+                    {
+                        "text": ".",
+                        "pos": "PUNCT",
+                        "lemma": ".",
+                        "derivation": {
+                            "prefixes": [],
+                            "suffixes": []
+                        },
+                        "features": {}
+                    }
+                ]
+            },
+            "verb_system": {
+                "per_clause": [
+                    {
+                        "tense": "Present",
+                        "aspect": "Simple",
+                        "voice": "Active",
+                        "mood": "Indicative",
+                        "modality": null,
+                        "modality_type": null,
+                        "future_form": null,
+                        "time_reference": "Present/General",
+                        "evidence": []
+                    }
+                ]
+            },
+            "meaning_pragmatics": {
+                "speech_act": "declarative",
+                "time_reference": "Present/General",
+                "modality": null,
+                "modality_type": null,
+                "pragmatic_notes": []
+            },
+            "lexis": {
+                "register": "neutral",
+                "collocations": [
+                    {
+                        "pair": [
+                            "music",
+                            "room"
+                        ],
+                        "label": "music room"
+                    }
+                ],
+                "semantic_precision": {
+                    "issues": []
+                }
+            },
+            "cefr": {
+                "level": "A1",
+                "markers": [
+                    "simple_clause_basics"
+                ]
+            },
+            "quality": {
+                "flags": [],
+                "confidence": {
+                    "architecture": 0.7,
+                    "constituents": 0.55,
+                    "morphology": 0.6,
+                    "verb_system": 0.75,
+                    "cefr": 0.55,
+                    "lexis": 0.55
+                }
+            }
+        },
+        "notes": {
+            "elementary": "This is a statement. It talks about the present or general facts.",
+            "intermediate": "Simple sentence. Verb pattern: Tense=Present, Aspect=Simple.",
+            "advanced": "CEFR: A1 (markers: simple_clause_basics). Register: neutral."
+        }
+    },
+]

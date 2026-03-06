@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from functools import lru_cache
 import json
 import os
 from datetime import datetime
@@ -47,6 +48,49 @@ WORD_POS_CEILING = {
     "conjunction": "B1",
     "particle": "B1",
 }
+
+
+@lru_cache(maxsize=8)
+def _get_nlp_cached(spacy_model: str):
+    return load_nlp(spacy_model)
+
+
+@lru_cache(maxsize=4)
+def _get_m2m100_translator_cached(model_name: str, device: str):
+    from ela_pipeline.translate import M2M100Translator
+
+    return M2M100Translator(model_name=model_name, device=device)
+
+
+@lru_cache(maxsize=4)
+def _get_tabular_classifier_cached(model_path: str | None):
+    from ela_pipeline.classifier.tabular_cefr_predictor import TabularProfileClassifier
+
+    return TabularProfileClassifier(model_path=model_path)
+
+
+@lru_cache(maxsize=2)
+def _get_deberta_classifier_cached(model_path: str | None, device: str):
+    from ela_pipeline.classifier.deberta import DebertaProfileClassifier
+
+    return DebertaProfileClassifier(
+        model_path=model_path,
+        device=device,
+    )
+
+
+@lru_cache(maxsize=2)
+def _get_t5_cefr_predictor_cached(model_path: str, device: str):
+    from ela_pipeline.cefr import T5CEFRPredictor
+
+    return T5CEFRPredictor(model_path=model_path, device=device)
+
+
+@lru_cache(maxsize=2)
+def _get_controlled_t5_renderer_cached(model_dir: str):
+    from ela_pipeline.annotate.controlled_renderer import ControlledT5NoteRenderer
+
+    return ControlledT5NoteRenderer(model_dir=model_dir)
 
 
 def _normalize_strict_null_sentinels(node: dict) -> None:
@@ -870,7 +914,7 @@ def run_pipeline(
     classifier_model_path: str | None = None,
     classifier_device: str = "cuda",
 ) -> dict:
-    nlp = load_nlp(spacy_model)
+    nlp = _get_nlp_cached(spacy_model)
 
     skeleton = build_skeleton(text, nlp)
     _apply_strict_null_normalization(skeleton, validation_mode)
@@ -897,12 +941,12 @@ def run_pipeline(
     if enable_translation:
         if translation_provider != "m2m100":
             raise ValueError("translation_provider must be 'm2m100'")
-        from ela_pipeline.translate import M2M100Translator, build_translation_cache_from_env
+        from ela_pipeline.translate import build_translation_cache_from_env
 
         resolved_translation_model = _resolve_translation_model_name(translation_model)
-        translator = M2M100Translator(
-            model_name=resolved_translation_model,
-            device=translation_device,
+        translator = _get_m2m100_translator_cached(
+            resolved_translation_model,
+            translation_device,
         )
         translation_cache = build_translation_cache_from_env()
         translation_cache_ttl_seconds = _resolve_translation_cache_ttl_seconds()
@@ -944,11 +988,9 @@ def run_pipeline(
 
     tabular_supports_joint = False
     if classifier_provider == "deberta":
-        from ela_pipeline.classifier.deberta import DebertaProfileClassifier
-
-        classifier = DebertaProfileClassifier(
-            model_path=classifier_model_path,
-            device=classifier_device,
+        classifier = _get_deberta_classifier_cached(
+            classifier_model_path,
+            classifier_device,
         )
         _attach_classifier_profiles(
             enriched,
@@ -957,9 +999,7 @@ def run_pipeline(
             include_note_blueprints=False,
         )
     elif classifier_provider == "tabular":
-        from ela_pipeline.classifier.tabular_cefr_predictor import TabularProfileClassifier
-
-        classifier = TabularProfileClassifier(model_path=classifier_model_path)
+        classifier = _get_tabular_classifier_cached(classifier_model_path)
         tabular_supports_joint = bool(getattr(classifier, "supports_joint_profiles", False))
         _attach_classifier_profiles(
             enriched,
@@ -974,9 +1014,7 @@ def run_pipeline(
 
                 predictor = RuleBasedCEFRPredictor()
             elif cefr_provider == "t5":
-                from ela_pipeline.cefr import T5CEFRPredictor
-
-                predictor = T5CEFRPredictor(model_path=cefr_model_path, device="cuda")
+                predictor = _get_t5_cefr_predictor_cached(cefr_model_path, "cuda")
             else:
                 raise ValueError("cefr_provider must be one of: rule | t5")
 
@@ -1006,9 +1044,7 @@ def run_pipeline(
         _apply_controlled_notes(enriched)
         note_version = "controlled::classifier_blueprints"
         if model_dir:
-            from ela_pipeline.annotate.controlled_renderer import ControlledT5NoteRenderer
-
-            renderer = ControlledT5NoteRenderer(model_dir=model_dir)
+            renderer = _get_controlled_t5_renderer_cached(model_dir)
             _rewrite_controlled_notes_with_t5(enriched, renderer=renderer)
             _apply_controlled_notes(enriched)
             note_version = "controlled_t5::blueprint_rewrite"

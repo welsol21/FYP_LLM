@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
 import type {
@@ -43,6 +43,7 @@ export function AnalyzePage() {
   const [directProjectId, setDirectProjectId] = useState<string>('')
   const [directFiles, setDirectFiles] = useState<MediaFileRow[]>([])
   const [directFileId, setDirectFileId] = useState<string>('')
+  const pollFailuresRef = useRef<number>(0)
 
   useEffect(() => {
     let stopped = false
@@ -93,7 +94,11 @@ export function AnalyzePage() {
       try {
         const status = await api.getBackendJobStatus(jobId)
         if (stopped) return
+        pollFailuresRef.current = 0
         setJobStatus(status)
+        if (status.document_id) {
+          setActiveMedia((prev) => (prev ? { ...prev, documentId: status.document_id } : prev))
+        }
         if (Array.isArray(status.stage_progress) && status.stage_progress.length === 5) {
           setLiveProgress(status.stage_progress)
         }
@@ -101,7 +106,20 @@ export function AnalyzePage() {
           setJobId(null)
         }
       } catch {
-        if (!stopped) setJobId(null)
+        if (stopped) return
+        pollFailuresRef.current += 1
+        if (pollFailuresRef.current >= 3) {
+          setJobStatus((prev) => ({
+            job_id: prev?.job_id || jobId,
+            status: prev?.status || 'running_local',
+            message: 'Temporary connection issue while polling status. Retrying...',
+            stage_name: prev?.stage_name || 'running_local',
+            stage_log: prev?.stage_log || 'Polling retry in progress...',
+            stage_logs: prev?.stage_logs || ['Polling retry in progress...'],
+            stage_progress: prev?.stage_progress || liveProgress,
+            document_id: prev?.document_id,
+          }))
+        }
       }
     }
     poll()

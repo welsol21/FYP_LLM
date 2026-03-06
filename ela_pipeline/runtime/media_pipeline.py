@@ -277,6 +277,75 @@ def _extract_text_and_sentence_chunks(
     return source_path.read_text(encoding="utf-8", errors="ignore").strip(), []
 
 
+def _sentenceize_timed_chunks(
+    *,
+    chunks: list[dict[str, Any]],
+    nlp: Any,
+) -> tuple[list[str], list[dict[str, float] | None]]:
+    normalized_chunks: list[dict[str, Any]] = []
+    for row in chunks:
+        text = str(row.get("sentence_text") or "").strip()
+        if not text:
+            continue
+        normalized_chunks.append(
+            {
+                "sentence_text": " ".join(text.split()),
+                "start_sec": float(row.get("start_sec") or 0.0),
+                "end_sec": float(row.get("end_sec") or 0.0),
+            }
+        )
+    if not normalized_chunks:
+        return [], []
+
+    merged_parts: list[str] = []
+    char_ranges: list[dict[str, float | int]] = []
+    cursor = 0
+    for row in normalized_chunks:
+        if merged_parts:
+            merged_parts.append(" ")
+            cursor += 1
+        text = str(row["sentence_text"])
+        start_char = cursor
+        merged_parts.append(text)
+        cursor += len(text)
+        char_ranges.append(
+            {
+                "start_char": start_char,
+                "end_char": cursor,
+                "start_sec": float(row["start_sec"]),
+                "end_sec": float(row["end_sec"]),
+            }
+        )
+    merged_text = "".join(merged_parts).strip()
+    if not merged_text:
+        return [], []
+
+    doc = nlp(merged_text)
+    sentence_stream: list[str] = []
+    sentence_timeline: list[dict[str, float] | None] = []
+    for sent in doc.sents:
+        sentence_text = str(sent.text or "").strip()
+        if not sentence_text:
+            continue
+        start_char = int(sent.start_char)
+        end_char = int(sent.end_char)
+        overlaps = [
+            row
+            for row in char_ranges
+            if int(row["end_char"]) > start_char and int(row["start_char"]) < end_char
+        ]
+        if overlaps:
+            start_sec = float(overlaps[0]["start_sec"])
+            end_sec = max(float(item["end_sec"]) for item in overlaps)
+            if end_sec <= start_sec:
+                end_sec = start_sec + _estimate_sentence_duration_seconds(sentence_text)
+            sentence_timeline.append({"start_sec": start_sec, "end_sec": end_sec})
+        else:
+            sentence_timeline.append(None)
+        sentence_stream.append(sentence_text)
+    return sentence_stream, sentence_timeline
+
+
 class _EchoTranslator:
     """Safe translation fallback used when model-based translation is unavailable."""
 
@@ -562,20 +631,23 @@ def run_media_pipeline(
     sentence_stream: list[str] = []
     sentence_timeline: list[dict[str, float] | None] = []
     if extracted_sentence_chunks:
-        for row in extracted_sentence_chunks:
-            text = str(row.get("sentence_text") or "").strip()
-            if not text:
+        sentence_stream, sentence_timeline = _sentenceize_timed_chunks(
+            chunks=extracted_sentence_chunks,
+            nlp=nlp,
+        )
+        filtered_stream: list[str] = []
+        filtered_timeline: list[dict[str, float] | None] = []
+        for idx, text in enumerate(sentence_stream):
+            text_resolved = str(text or "").strip()
+            if not text_resolved:
                 continue
-            doc = nlp(text)
-            if _is_metadata_like_sentence(text, doc):
+            doc = nlp(text_resolved)
+            if _is_metadata_like_sentence(text_resolved, doc):
                 continue
-            sentence_stream.append(text)
-            sentence_timeline.append(
-                {
-                    "start_sec": float(row.get("start_sec") or 0.0),
-                    "end_sec": float(row.get("end_sec") or 0.0),
-                }
-            )
+            filtered_stream.append(text_resolved)
+            filtered_timeline.append(sentence_timeline[idx] if idx < len(sentence_timeline) else None)
+        sentence_stream = filtered_stream
+        sentence_timeline = filtered_timeline
     else:
         skeleton = build_skeleton(full_text, nlp)
         for text in skeleton.keys():

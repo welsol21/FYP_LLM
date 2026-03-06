@@ -209,10 +209,22 @@ def build_note_blueprints(
     primary_class = next((class_id for class_id in class_ids if class_id in PEDAGOGICAL_CLASS_SPECS), "")
     if primary_class:
         spec = PEDAGOGICAL_CLASS_SPECS[primary_class]
+        role = str(grammatical_role or "").strip().lower()
+        role_hint = role.replace("_", " ") if role else "grammar slot"
+        snippet = str(content or "").strip()
+        snippet = " ".join(snippet.split())
+        if len(snippet) > 72:
+            snippet = f"{snippet[:69].rstrip()}..."
+        elementary = str(spec["elementary_text"]).strip()
+        intermediate = str(spec["intermediate_text"]).strip()
+        advanced = str(spec["advanced_text"]).strip()
+        if snippet:
+            intermediate = f"{intermediate} Here, '{snippet}' functions as {role_hint}."
+            advanced = f"{advanced} In this sentence, '{snippet}' fills the {role_hint} role."
         return {
-            "elementary_text": str(spec["elementary_text"]).strip(),
-            "intermediate_text": str(spec["intermediate_text"]).strip(),
-            "advanced_text": str(spec["advanced_text"]).strip(),
+            "elementary_text": elementary,
+            "intermediate_text": intermediate,
+            "advanced_text": advanced,
         }
     return {}
 

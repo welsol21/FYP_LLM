@@ -9,13 +9,14 @@ from typing import Any
 import joblib
 
 from .class_taxonomy import normalize_grammar_class_id
-from .grammar_blueprints import build_note_blueprints
+from .grammar_blueprints import build_note_blueprints, class_cefr_level
 from .grammar_rules import map_pedagogical_grammar_classes
 from .curriculum import validate_per_class_cefr_ladder
 from .train_tabular_cefr_baseline import extract_tabular_features, project_feature_profile
 
 CEFR_ALLOWED = {"A1", "A2", "B1", "B2", "C1", "C2"}
 CEFR_ORDER = ("A1", "A2", "B1", "B2", "C1", "C2")
+CEFR_RANK = {label: idx for idx, label in enumerate(CEFR_ORDER)}
 
 
 def _normalize_cefr(label: Any) -> str:
@@ -210,8 +211,19 @@ class TabularProfileClassifier:
             },
         }
 
-    def _resolve_note_blueprints(self, *, cefr: str, class_id: str) -> dict[str, str]:
-        generated = build_note_blueprints(grammar_classes=[class_id], cefr_level=cefr) if class_id else {}
+    def _resolve_note_blueprints(self, *, cefr: str, class_id: str, node: dict[str, Any]) -> dict[str, str]:
+        generated = (
+            build_note_blueprints(
+                grammar_classes=[class_id],
+                cefr_level=cefr,
+                node_type=str(node.get("type") or ""),
+                content=str(node.get("content") or ""),
+                grammatical_role=str(node.get("grammatical_role") or ""),
+                tam_construction=str(node.get("tam_construction") or ""),
+            )
+            if class_id
+            else {}
+        )
         required_keys = ("elementary_text", "intermediate_text", "advanced_text")
         if all(str(generated.get(k) or "").strip() for k in required_keys):
             return {k: str(generated.get(k) or "").strip() for k in required_keys}
@@ -229,6 +241,13 @@ class TabularProfileClassifier:
             "intermediate_text": f"[{cefr}] explain the grammar pattern and its meaning in context.",
             "advanced_text": f"[{cefr}] analyze the grammar pattern and its discourse function in context.",
         }
+
+    @staticmethod
+    def _max_cefr(*levels: str) -> str:
+        valid = [item for item in levels if item in CEFR_RANK]
+        if not valid:
+            return "B1"
+        return max(valid, key=lambda item: CEFR_RANK[item])
 
     @staticmethod
     def _rule_candidates(node: dict[str, Any], source_text: str) -> list[str]:
@@ -250,19 +269,43 @@ class TabularProfileClassifier:
         row = self._build_runtime_row(node=node, source_text=source_text)
         if self._joint_mode:
             pred_cefr, pred_class = self._predictor.predict_row(row)
-            class_id = normalize_grammar_class_id(str(pred_class or "").strip().lower())
-            cefr = _normalize_cefr(pred_cefr)
             rule_candidates = self._rule_candidates(node=node, source_text=source_text)
-            if rule_candidates and class_id not in set(rule_candidates):
-                class_id = str(rule_candidates[0]).strip().lower()
-            note_blueprints = self._resolve_note_blueprints(cefr=cefr, class_id=class_id)
+            normalized_rules: list[str] = []
+            for item in rule_candidates:
+                normalized = normalize_grammar_class_id(str(item or "").strip().lower())
+                if normalized and normalized not in normalized_rules:
+                    normalized_rules.append(normalized)
+
+            predicted_class = normalize_grammar_class_id(str(pred_class or "").strip().lower())
+            class_candidates = list(normalized_rules)
+            if not class_candidates and predicted_class:
+                class_candidates.append(predicted_class)
+            primary_class = class_candidates[0] if class_candidates else predicted_class
+
+            predicted_cefr = ""
+            try:
+                predicted_cefr = _normalize_cefr(pred_cefr)
+            except ValueError:
+                predicted_cefr = ""
+            class_floor = ""
+            if primary_class:
+                class_floor = str(class_cefr_level(primary_class) or "").strip().upper()
+            node_type = str(node.get("type") or "").strip().lower()
+            if node_type in {"word", "phrase"}:
+                cefr = class_floor or predicted_cefr or "B1"
+            else:
+                cefr = self._max_cefr(predicted_cefr, class_floor)
+
+            note_blueprints = self._resolve_note_blueprints(cefr=cefr, class_id=primary_class, node=node)
+            grammar_classes_payload: list[dict[str, Any]] = []
+            if class_candidates:
+                for idx, cid in enumerate(class_candidates):
+                    grammar_classes_payload.append(
+                        {"class_id": cid, "confidence": round(max(0.4, 0.92 - idx * 0.12), 2)}
+                    )
             return {
                 "cefr_level": cefr,
-                "grammar_classes": (
-                    [{"class_id": class_id, "confidence": 0.5}]
-                    if class_id
-                    else []
-                ),
+                "grammar_classes": grammar_classes_payload,
                 "generated_notes": note_blueprints,
             }
 

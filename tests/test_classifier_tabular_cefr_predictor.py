@@ -206,8 +206,31 @@ class TabularCefrPredictorTests(unittest.TestCase):
                 source_text="She",
                 sentence_text="She came.",
             )
-            self.assertEqual(profile["cefr_level"], "A2")
+            self.assertEqual(profile["cefr_level"], "A1")
             self.assertEqual(profile["grammar_classes"][0]["class_id"], "pronoun_reference")
+
+    def test_tabular_profile_classifier_joint_model_phrase_uses_class_floor_cefr(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model_dir = Path(tmpdir)
+            joblib.dump(_FakeJointModelScalar(), model_dir / "best_tabular_joint_profile.joblib")
+            metadata = {
+                "per_class_cefr_ladder": {"prepositions_time": ["A1", "A2", "B1", "B2", "C1", "C2"]},
+                "grammar_classes_by_cefr": {"A1": [], "A2": ["prepositions_time"], "B1": [], "B2": [], "C1": [], "C2": []},
+                "note_blueprints_by_cefr": {level: {"elementary_text": f"{level} e", "intermediate_text": f"{level} i", "advanced_text": f"{level} a"} for level in ["A1","A2","B1","B2","C1","C2"]},
+            }
+            (model_dir / "classifier_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+            classifier = TabularProfileClassifier(str(model_dir))
+            profile = classifier.classify_node(
+                node={
+                    "type": "Phrase",
+                    "part_of_speech": "prepositional phrase",
+                    "features": {"dep": ["prep", "pobj"], "pos": ["ADP", "NOUN"]},
+                },
+                source_text="towards morning",
+                sentence_text="She came to him towards morning.",
+            )
+            self.assertEqual(profile["cefr_level"], "A2")
+            self.assertEqual(profile["grammar_classes"][0]["class_id"], "prepositional_relation_phrase")
 
     def test_tabular_profile_classifier_joint_model_decodes_numeric_label_id_from_metadata(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -41,6 +41,8 @@ def map_pedagogical_grammar_classes(
     construction = str(tam_construction or "").strip().lower()
     node_kind = str(node_type or "").strip().lower()
     pos_value = str(part_of_speech or "").strip().lower()
+    verb_like_word = pos_value in {"verb", "auxiliary verb"}
+    is_tense_applicable = node_kind in {"", "sentence", "phrase"} or (node_kind == "word" and verb_like_word)
 
     negative = bool(has_neg) if has_neg is not None else (
         "neg" in dep_signature or " not " in f" {text} " or "n't" in text
@@ -53,36 +55,37 @@ def map_pedagogical_grammar_classes(
 
     if relative_clause:
         add_class("relative_clause")
-    if construction == "future_perfect" or ("future" in tense_value and aspect_value == "perfect"):
-        add_class("future_perfect")
-    if construction == "modal_perfect" or (mood_value == "modal" and aspect_value == "perfect"):
-        add_class("modal_perfect")
-    if construction == "past_perfect" or ("past perfect" in tense_value) or (tense_value == "past" and aspect_value == "perfect"):
-        add_class("past_perfect")
-    if passive_signal:
-        add_class("passive_voice")
-    if construction == "modal_should":
-        add_class("modal_should_advice")
-    if construction == "modal_can":
-        add_class("modal_can_ability")
-    if construction == "future_will":
-        add_class("future_will")
-    elif tense_value == "future" and aspect_value in {"simple", ""}:
-        add_class("future_will")
-    if construction == "future_going_to":
-        add_class("future_going_to")
-    if construction == "present_simple" and question:
-        add_class("present_simple_question")
-    if construction == "present_perfect" or "present perfect" in tense_value:
-        add_class("present_perfect_negative" if negative else "present_perfect_affirmative")
-    elif construction == "present_simple" or tense_value == "present":
-        add_class("present_simple_negative" if negative else "present_simple_affirmative")
-    elif construction == "past_simple" or tense_value == "past":
-        add_class("past_simple_negative" if negative else "past_simple_affirmative")
-    elif construction == "present_continuous" or "progressive" in tense_value or aspect_value in {"progressive", "continuous"}:
-        add_class("present_continuous")
-    elif construction == "be_copula" or (node_kind == "phrase" and pos_value == "noun phrase" and "cop" in dep_signature):
-        add_class("copular_clause")
+    if is_tense_applicable:
+        if construction == "future_perfect" or ("future" in tense_value and aspect_value == "perfect"):
+            add_class("future_perfect")
+        if construction == "modal_perfect" or (mood_value == "modal" and aspect_value == "perfect"):
+            add_class("modal_perfect")
+        if construction == "past_perfect" or ("past perfect" in tense_value) or (tense_value == "past" and aspect_value == "perfect"):
+            add_class("past_perfect")
+        if passive_signal:
+            add_class("passive_voice")
+        if construction == "modal_should":
+            add_class("modal_should_advice")
+        if construction == "modal_can":
+            add_class("modal_can_ability")
+        if construction == "future_will":
+            add_class("future_will")
+        elif tense_value == "future" and aspect_value in {"simple", ""}:
+            add_class("future_will")
+        if construction == "future_going_to":
+            add_class("future_going_to")
+        if construction == "present_simple" and question:
+            add_class("present_simple_question")
+        if construction == "present_perfect" or "present perfect" in tense_value:
+            add_class("present_perfect_negative" if negative else "present_perfect_affirmative")
+        elif construction == "present_simple" or tense_value == "present":
+            add_class("present_simple_negative" if negative else "present_simple_affirmative")
+        elif construction == "past_simple" or tense_value == "past":
+            add_class("past_simple_negative" if negative else "past_simple_affirmative")
+        elif construction == "present_continuous" or "progressive" in tense_value or aspect_value in {"progressive", "continuous"}:
+            add_class("present_continuous")
+        elif construction == "be_copula" or (node_kind == "phrase" and pos_value == "noun phrase" and "cop" in dep_signature):
+            add_class("copular_clause")
 
     if node_kind == "phrase":
         if pos_value == "noun phrase":
