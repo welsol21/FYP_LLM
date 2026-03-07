@@ -95,7 +95,7 @@ VP_DIRECT_CHILD_DEPS = {
 }
 VP_SUBTREE_CHILD_DEPS = {"prep", "obl", "xcomp", "ccomp", "advcl"}
 _DEFAULT_CLAUSE_HEAD_DEPS = {
-    "ROOT",
+    "root",
     "conj",
     "advcl",
     "ccomp",
@@ -193,7 +193,7 @@ def _load_phrase_patterns() -> Dict[str, Set]:
         except Exception:
             config = {}
 
-    clause_head_deps = _normalize_string_set(config.get("clause_head_deps"), uppercase=True)
+    clause_head_deps = _normalize_string_set(config.get("clause_head_deps"))
     phrasal_pairs = _normalize_tuple_set(config.get("phrasal_prep_lemma_pairs"), width=2)
     idioms = _normalize_tuple_set(config.get("idiom_patterns"))
     collocations = _normalize_tuple_set(config.get("collocation_verb_object_lemma_pairs"), width=2)
@@ -334,22 +334,23 @@ def _phrase_candidates(sent) -> List[Tuple[int, int, str]]:
             if pair in COLLOCATION_VERB_OBJECT_LEMMA_PAIRS:
                 add_span(min(token.i, child.left_edge.i), max(token.i, child.right_edge.i) + 1, "collocation")
 
-    # 4) Clause-like chunks around verbal clause heads
+    # 4) Verb phrases around verbal heads and local dependents
     for token in sent:
         if token.pos_ not in {"VERB", "AUX"}:
             continue
-        if token.dep_ not in CLAUSE_HEAD_DEPS:
-            continue
-        token_ids = {tok.i for tok in token.subtree if not tok.is_space and not tok.is_punct}
-        if not token_ids:
-            continue
-        add_span(min(token_ids), max(token_ids) + 1, "clause chunk")
+        token_ids = {token.i}
+        for child in token.children:
+            dep = child.dep_.lower()
+            if dep not in VP_DIRECT_CHILD_DEPS:
+                continue
+            if dep in VP_SUBTREE_CHILD_DEPS:
+                token_ids.update(tok.i for tok in child.subtree if not tok.is_space and not tok.is_punct)
+            elif not child.is_space and not child.is_punct:
+                token_ids.add(child.i)
+        if len(token_ids) >= 2:
+            add_span(min(token_ids), max(token_ids) + 1, "verb phrase")
 
-    # 5) Noun chunks
-    for chunk in sent.noun_chunks:
-        add_span(chunk.start, chunk.end, "noun phrase")
-
-    # 6) Prepositional phrases
+    # 5) Prepositional phrases
     for token in sent:
         if token.pos_ == "ADP":
             add_span(token.i, token.right_edge.i + 1, "prepositional phrase")
@@ -408,7 +409,7 @@ def _span_head_token(span):
 
 
 def _phrase_role(span, phrase_pos: str) -> str:
-    if phrase_pos in {"phrasal verb", "idiom", "collocation"}:
+    if phrase_pos in {"verb phrase", "phrasal verb", "idiom", "collocation"}:
         return "predicate"
     if phrase_pos == "clause chunk":
         return "clause"
@@ -430,6 +431,15 @@ def _is_simple_determiner_np(span, phrase_pos: str) -> bool:
 
     allowed_pos = {"DET", "ADJ", "NUM", "NOUN", "PROPN"}
     return all(tok.pos_ in allowed_pos for tok in tokens)
+
+
+def _is_sentence_content_duplicate_span(sent, start: int, end: int, doc) -> bool:
+    """True when a phrase span covers all non-space/non-punct sentence tokens."""
+    sent_token_ids = [tok.i for tok in sent if not tok.is_space and not tok.is_punct]
+    if not sent_token_ids:
+        return False
+    span_token_ids = [tok.i for tok in doc[start:end] if not tok.is_space and not tok.is_punct]
+    return span_token_ids == sent_token_ids
 
 
 def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
@@ -588,8 +598,8 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
             phrase_text = span.text.strip()
             if not phrase_text:
                 continue
-            # Do not create a phrase node that duplicates the whole sentence span.
-            if int(start) == int(sent.start) and int(end) == int(sent.end):
+            # Do not create a phrase node that duplicates the whole sentence content.
+            if _is_sentence_content_duplicate_span(sent, start, end, doc):
                 continue
             if _is_weak_phrase_candidate(span, phrase_pos):
                 continue

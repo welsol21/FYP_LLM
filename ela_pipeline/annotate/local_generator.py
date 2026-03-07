@@ -28,6 +28,7 @@ from ela_pipeline.validation.notes_quality import is_valid_note, sanitize_note
 class LocalT5Annotator:
     _TAM_RELEVANT_POS = {
         "sentence",
+        "verb phrase",
         "clause chunk",
         "phrasal verb",
         "idiom",
