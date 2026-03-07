@@ -678,6 +678,11 @@ Main tested areas:
    - otherwise `rule`.
 8. Even when `classifier_provider=deberta`, runtime grammar classes and note blueprints stay rules-first; `deberta` is CEFR-only in the current architecture.
 9. Local sentence-contract fallback in media pipeline is disabled; media flow requires external sentence-contract builder (backend path).
+10. Sentence `linguistic_notes` runtime policy:
+   - default path is deterministic backend logic (no ChatGPT call),
+   - ChatGPT path is optional/opt-in only via `ELA_SENTENCE_NOTES_USE_CHATGPT=1` plus `OPENAI_API_KEY`,
+   - failed ChatGPT responses are rejected by quality gate and replaced by deterministic fallback.
+11. `Qwen2.5-7B-Instruct` is tracked as a promising local candidate for future notes generation, but is not the current production default.
 
 ## 8. Related Documents
 - `docs/pipeline_cli.md`

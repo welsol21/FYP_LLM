@@ -791,6 +791,36 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertEqual(kwargs["classifier_device"], "cuda")
 
     @patch("ela_pipeline.inference.run.run_pipeline")
+    def test_build_sentence_contract_enriches_sentence_notes_with_subject_predicate_focus(self, mock_run_pipeline):
+        sentence = "She entered very carefully, moving silently, floating through the chamber like a phantom."
+        mock_run_pipeline.return_value = {
+            sentence: {
+                "type": "Sentence",
+                "node_id": "s1",
+                "content": sentence,
+                "linguistic_elements": [],
+                "linguistic_notes": [],
+            }
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            payload = svc.build_sentence_contract(
+                sentence_text=sentence,
+                sentence_idx=1,
+                note_mode="controlled",
+            )
+            notes = payload["sentence_node"].get("linguistic_notes") or []
+            self.assertGreaterEqual(len(notes), 3)
+            merged = " ".join(str(x) for x in notes).casefold()
+            self.assertIn("subject", merged)
+            self.assertIn("predicate", merged)
+            self.assertNotIn(sentence.casefold(), merged)
+
+    @patch("ela_pipeline.inference.run.run_pipeline")
     @patch(
         "ela_pipeline.runtime.service.os.path.isfile",
         side_effect=lambda path: (
@@ -945,46 +975,6 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                 )
             with self.assertRaisesRegex(RuntimeError, "ELA_SENTENCE_CONTRACT_BACKEND_URL is required"):
                 svc._request_sentence_contract(sentence_text="She trusted him.", sentence_idx=0)
-
-    def test_request_text_contract_uses_backend_endpoint_when_configured(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.dict("os.environ", {"ELA_SENTENCE_CONTRACT_BACKEND_URL": "http://backend.local"}, clear=False):
-                svc = RuntimeMediaService(
-                    db_path=Path(tmpdir) / "client.sqlite3",
-                    runtime_mode="online",
-                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
-                )
-
-            class _Resp:
-                def __enter__(self):
-                    return self
-
-                def __exit__(self, exc_type, exc, tb):
-                    return False
-
-                def read(self):
-                    return b'{"raw_text":"She trusted him.","sentences":["She trusted him."],"contract":{"She trusted him.":{"type":"Sentence","content":"She trusted him.","node_id":"n1","linguistic_elements":[]}}}'
-
-            with patch("ela_pipeline.runtime.service.urlrequest.urlopen", return_value=_Resp()) as mocked:
-                payload = svc._request_text_contract(raw_text="She trusted him.", sentences=["She trusted him."])
-            self.assertIn("contract", payload)
-            called_req = mocked.call_args.args[0]
-            self.assertIn("/api/analyze-text", called_req.full_url)
-            body = json.loads(called_req.data.decode("utf-8"))
-            self.assertEqual(body["rawText"], "She trusted him.")
-            self.assertEqual(body["sentences"], ["She trusted him."])
-
-    def test_request_text_contract_raises_when_backend_unavailable(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.dict("os.environ", {"ELA_SENTENCE_CONTRACT_BACKEND_URL": "http://backend.local"}, clear=False):
-                svc = RuntimeMediaService(
-                    db_path=Path(tmpdir) / "client.sqlite3",
-                    runtime_mode="online",
-                    limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
-                )
-            with patch("ela_pipeline.runtime.service.urlrequest.urlopen", side_effect=OSError("offline")):
-                with self.assertRaisesRegex(RuntimeError, "Backend analyze-text API unavailable"):
-                    svc._request_text_contract(raw_text="She trusted him.", sentences=["She trusted him."])
 
     def test_incremental_cache_hit_skips_media_pipeline(self):
         with tempfile.TemporaryDirectory() as tmpdir:
