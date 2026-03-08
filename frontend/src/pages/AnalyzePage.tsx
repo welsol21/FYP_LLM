@@ -62,7 +62,6 @@ export function AnalyzePage() {
   const [selectedProject, setSelectedProject] = useState<SelectedProject>({ project_id: null })
   const [submission, setSubmission] = useState<MediaSubmissionPayload | null>(null)
   const [translationConfig, setTranslationConfig] = useState<TranslationConfig | null>(null)
-  const [artifacts, setArtifacts] = useState<DocumentArtifact[]>([])
   const [historyGroups, setHistoryGroups] = useState<AnalysisHistoryGroup[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState('')
@@ -285,7 +284,6 @@ export function AnalyzePage() {
       const result = await api.deleteAnalysis(docId)
       if (result.status !== 'ok') return
       if (activeDocumentId === docId) {
-        setArtifacts([])
         setSubmission((prev) => {
           if (!prev || prev.result.document_id !== docId) return prev
           return { ...prev, result: { ...prev.result, document_id: undefined } }
@@ -313,33 +311,6 @@ export function AnalyzePage() {
       })
     }
   }
-
-  useEffect(() => {
-    if (!activeDocumentId) {
-      setArtifacts([])
-      return
-    }
-    let stopped = false
-    const fetchArtifacts = async () => {
-      try {
-        const rows = await api.listDocumentArtifacts(activeDocumentId)
-        if (!stopped) setArtifacts(rows)
-      } catch {
-        if (!stopped) setArtifacts([])
-      }
-    }
-    fetchArtifacts()
-    if (jobId) {
-      const timer = window.setInterval(fetchArtifacts, 1200)
-      return () => {
-        stopped = true
-        window.clearInterval(timer)
-      }
-    }
-    return () => {
-      stopped = true
-    }
-  }, [api, activeDocumentId, jobId, jobStatus?.status])
 
   const stageProgress = useMemo(() => {
     if (jobId) return liveProgress
@@ -489,18 +460,6 @@ export function AnalyzePage() {
           >
             {deletingByDocumentId[activeDocumentId] ? 'Deleting...' : 'Delete analysis artifacts'}
           </button>
-          <p className="stage-log-title">Available artifacts</p>
-          <div className="artifact-actions">
-            {artifacts.length > 0 ? (
-              artifacts.map((artifact) => (
-                <a key={artifact.name} className="top-link" href={artifact.download_url} target="_blank" rel="noreferrer">
-                  Download {artifact.name}
-                </a>
-              ))
-            ) : (
-              <span className="muted">Artifacts are not ready yet.</span>
-            )}
-          </div>
         </section>
       ) : null}
       <section className="card compact-card" aria-label="analyze-history">
