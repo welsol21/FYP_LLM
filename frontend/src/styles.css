@@ -647,13 +647,13 @@ button {
 }
 
 .quick-edit-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
 }
 
 .quick-edit-title-btn {
+  width: 100%;
   min-height: var(--touch-min);
   border: 1px solid var(--line);
   background: linear-gradient(180deg, #151b28 0%, #101521 100%);
@@ -661,29 +661,31 @@ button {
   border-radius: 10px;
   padding: 10px 14px;
   font-weight: 800;
-  font-size: 24px;
+  font-size: clamp(20px, 1.8vw, 24px);
   line-height: 1;
+  white-space: nowrap;
 }
 
 .quick-edit-header-actions {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .translation-control-btn {
+  width: 100%;
   min-height: var(--touch-min);
-  min-width: 220px;
   border: 1px solid var(--line);
   background: linear-gradient(180deg, #151b28 0%, #101521 100%);
   color: var(--text);
   border-radius: 10px;
   padding: 10px 14px;
   font-weight: 800;
-  font-size: 24px;
+  font-size: clamp(20px, 1.8vw, 24px);
   line-height: 1;
+  white-space: nowrap;
 }
 
 .quick-edit-translate-panel {
@@ -882,7 +884,7 @@ button {
   }
 
   .visualizer-row {
-    grid-template-columns: 340px minmax(0, 1fr);
+    grid-template-columns: 380px minmax(0, 1fr);
     align-items: start;
   }
 }

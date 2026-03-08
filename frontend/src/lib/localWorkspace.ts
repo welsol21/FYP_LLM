@@ -8,8 +8,16 @@ import type {
   VisualizerNode,
   VisualizerPayload,
 } from '../api/runtimeApi'
+import initSqlJs from 'sql.js'
+import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
 
-const STORAGE_KEY = 'ela_frontend_workspace_v1'
+const STORAGE_KEY = 'ela_frontend_workspace_sqlite_b64_v1'
+const SQLITE_STATE_KEY = 'workspace_state_v1'
+const LEGACY_STORAGE_KEY = 'ela_frontend_workspace_v1'
+const IDB_DB_NAME = 'ela_frontend_workspace'
+const IDB_STORE_NAME = 'kv'
+const IDB_MEDIA_STORE_NAME = 'media_blob'
+const IDB_SQLITE_SNAPSHOT_KEY = 'sqlite_snapshot_b64'
 
 type WorkspaceFile = MediaFileRow & {
   project_id: string
@@ -49,12 +57,236 @@ const DEFAULT_TRANSLATION_CONFIG: TranslationConfig = {
   ],
 }
 
+function emptyWorkspaceState(): WorkspaceState {
+  return {
+    projects: [],
+    selected_project_id: null,
+    files: [],
+    analyses: [],
+    translation_config: null,
+  }
+}
+
+function coerceWorkspaceState(parsed: Partial<WorkspaceState> | null | undefined): WorkspaceState {
+  const state: WorkspaceState = {
+    projects: Array.isArray(parsed?.projects) ? parsed?.projects : [],
+    selected_project_id: typeof parsed?.selected_project_id === 'string' ? parsed.selected_project_id : null,
+    files: Array.isArray(parsed?.files) ? parsed?.files : [],
+    analyses: Array.isArray(parsed?.analyses) ? parsed?.analyses : [],
+    translation_config: parsed?.translation_config ?? null,
+  }
+  return state
+}
+
 function nowIso(): string {
   return new Date().toISOString()
 }
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i])
+  return window.btoa(binary)
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = window.atob(value)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+type SqlDatabase = {
+  run: (sql: string, params?: unknown[] | Record<string, unknown>) => void
+  exec: (sql: string, params?: unknown[] | Record<string, unknown>) => Array<{ columns: string[]; values: unknown[][] }>
+  export: () => Uint8Array
+  close: () => void
+}
+
+type SqlModule = {
+  Database: new (data?: Uint8Array) => SqlDatabase
+}
+
+let sqlModule: SqlModule | null = null
+let sqliteInitPromise: Promise<void> | null = null
+let sqliteBlobSnapshot = ''
+let sqliteDb: SqlDatabase | null = null
+
+function indexedDbAvailable(): boolean {
+  return typeof indexedDB !== 'undefined'
+}
+
+function openWorkspaceIdb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_DB_NAME, 1)
+    req.onupgradeneeded = () => {
+      const db = req.result
+      if (!db.objectStoreNames.contains(IDB_STORE_NAME)) {
+        db.createObjectStore(IDB_STORE_NAME)
+      }
+      if (!db.objectStoreNames.contains(IDB_MEDIA_STORE_NAME)) {
+        db.createObjectStore(IDB_MEDIA_STORE_NAME)
+      }
+    }
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error || new Error('Failed to open IndexedDB'))
+  })
+}
+
+function idbPutBlob(key: string, blob: Blob): Promise<void> {
+  if (!indexedDbAvailable()) return Promise.resolve()
+  return openWorkspaceIdb()
+    .then((db) => (
+      new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(IDB_MEDIA_STORE_NAME, 'readwrite')
+        const store = tx.objectStore(IDB_MEDIA_STORE_NAME)
+        store.put(blob, key)
+        tx.oncomplete = () => {
+          db.close()
+          resolve()
+        }
+        tx.onerror = () => {
+          db.close()
+          reject(tx.error || new Error('IndexedDB blob put failed'))
+        }
+      })
+    ))
+    .catch(() => undefined)
+}
+
+function idbGetBlob(key: string): Promise<Blob | null> {
+  if (!indexedDbAvailable()) return Promise.resolve(null)
+  return openWorkspaceIdb()
+    .then((db) => (
+      new Promise<Blob | null>((resolve, reject) => {
+        const tx = db.transaction(IDB_MEDIA_STORE_NAME, 'readonly')
+        const store = tx.objectStore(IDB_MEDIA_STORE_NAME)
+        const req = store.get(key)
+        req.onsuccess = () => resolve(req.result instanceof Blob ? req.result : null)
+        req.onerror = () => reject(req.error || new Error('IndexedDB blob get failed'))
+        tx.oncomplete = () => db.close()
+        tx.onerror = () => {
+          db.close()
+          reject(tx.error || new Error('IndexedDB blob transaction failed'))
+        }
+      })
+    ))
+    .catch(() => null)
+}
+
+function idbGet(key: string): Promise<string | null> {
+  if (!indexedDbAvailable()) return Promise.resolve(null)
+  return openWorkspaceIdb()
+    .then((db) => (
+      new Promise<string | null>((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE_NAME, 'readonly')
+        const store = tx.objectStore(IDB_STORE_NAME)
+        const req = store.get(key)
+        req.onsuccess = () => resolve(typeof req.result === 'string' ? req.result : null)
+        req.onerror = () => reject(req.error || new Error('IndexedDB get failed'))
+        tx.oncomplete = () => db.close()
+        tx.onerror = () => {
+          db.close()
+          reject(tx.error || new Error('IndexedDB transaction failed'))
+        }
+      })
+    ))
+    .catch(() => null)
+}
+
+function idbSet(key: string, value: string): Promise<void> {
+  if (!indexedDbAvailable()) return Promise.resolve()
+  return openWorkspaceIdb()
+    .then((db) => (
+      new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE_NAME, 'readwrite')
+        const store = tx.objectStore(IDB_STORE_NAME)
+        store.put(value, key)
+        tx.oncomplete = () => {
+          db.close()
+          resolve()
+        }
+        tx.onerror = () => {
+          db.close()
+          reject(tx.error || new Error('IndexedDB put failed'))
+        }
+      })
+    ))
+    .catch(() => undefined)
+}
+
+function openDbFromSnapshot(snapshot: string): SqlDatabase {
+  if (!sqlModule) throw new Error('SQLite module not initialized')
+  const db = snapshot ? new sqlModule.Database(base64ToBytes(snapshot)) : new sqlModule.Database()
+  db.run('CREATE TABLE IF NOT EXISTS kv_store (k TEXT PRIMARY KEY, v TEXT NOT NULL)')
+  return db
+}
+
+async function ensureDbReady(): Promise<void> {
+  if (!sqliteInitPromise) {
+    sqliteInitPromise = (async () => {
+      sqlModule = (await initSqlJs({
+        locateFile: () => {
+          const candidate = String(sqlWasmUrl || 'sql-wasm.wasm')
+          if (typeof process !== 'undefined' && process?.versions?.node && candidate.startsWith('/node_modules/')) {
+            return `${process.cwd()}${candidate}`
+          }
+          return candidate
+        },
+      })) as unknown as SqlModule
+      const idbSnapshot = await idbGet(IDB_SQLITE_SNAPSHOT_KEY)
+      sqliteBlobSnapshot = String(idbSnapshot || window.localStorage.getItem(STORAGE_KEY) || '')
+      sqliteDb = openDbFromSnapshot(sqliteBlobSnapshot)
+
+      // One-time migration from legacy JSON workspace to SQLite snapshot.
+      if (!sqliteBlobSnapshot) {
+        const legacyRaw = String(window.localStorage.getItem(LEGACY_STORAGE_KEY) || '')
+        if (legacyRaw) {
+          try {
+            const parsed = JSON.parse(legacyRaw) as Partial<WorkspaceState>
+            const migrated = coerceWorkspaceState(parsed)
+            sqliteDb.run('INSERT OR REPLACE INTO kv_store (k, v) VALUES (?, ?)', [SQLITE_STATE_KEY, JSON.stringify(migrated)])
+            const exported = sqliteDb.export()
+            const encoded = bytesToBase64(exported)
+            sqliteBlobSnapshot = encoded
+            await idbSet(IDB_SQLITE_SNAPSHOT_KEY, encoded)
+            try {
+              window.localStorage.setItem(STORAGE_KEY, encoded)
+            } catch {
+              // ignore quota errors when sqlite snapshot is large
+            }
+            window.localStorage.removeItem(LEGACY_STORAGE_KEY)
+          } catch {
+            // ignore invalid legacy data
+          }
+        }
+      }
+    })()
+  }
+  await sqliteInitPromise
+}
+
+function reopenDbFromSnapshot(snapshot: string): void {
+  if (sqliteDb) {
+    try {
+      sqliteDb.close()
+    } catch {
+      // ignore
+    }
+  }
+  sqliteBlobSnapshot = String(snapshot || '')
+  sqliteDb = openDbFromSnapshot(sqliteBlobSnapshot)
+}
+
+async function ensureDbFresh(): Promise<void> {
+  if (!sqliteDb) return
+  const current = String((await idbGet(IDB_SQLITE_SNAPSHOT_KEY)) || window.localStorage.getItem(STORAGE_KEY) || '')
+  if (current !== sqliteBlobSnapshot) {
+    reopenDbFromSnapshot(current)
+  }
 }
 
 function fallbackProject(): ProjectRow {
@@ -67,47 +299,49 @@ function fallbackProject(): ProjectRow {
   }
 }
 
-function loadRawState(): WorkspaceState {
-  const empty: WorkspaceState = {
-    projects: [],
-    selected_project_id: null,
-    files: [],
-    analyses: [],
-    translation_config: null,
-  }
+async function loadRawState(): Promise<WorkspaceState> {
+  const empty = emptyWorkspaceState()
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return empty
+    await ensureDbReady()
+    await ensureDbFresh()
+    const rows = sqliteDb?.exec('SELECT v FROM kv_store WHERE k = ?', [SQLITE_STATE_KEY]) || []
+    const raw = rows?.[0]?.values?.[0]?.[0]
+    if (typeof raw !== 'string' || !raw) return empty
     const parsed = JSON.parse(raw) as Partial<WorkspaceState>
-    const state: WorkspaceState = {
-      projects: Array.isArray(parsed.projects) ? parsed.projects : [],
-      selected_project_id: typeof parsed.selected_project_id === 'string' ? parsed.selected_project_id : null,
-      files: Array.isArray(parsed.files) ? parsed.files : [],
-      analyses: Array.isArray(parsed.analyses) ? parsed.analyses : [],
-      translation_config: parsed.translation_config ?? null,
-    }
-    return state
+    return coerceWorkspaceState(parsed)
   } catch {
     return empty
   }
 }
 
-function saveRawState(state: WorkspaceState): void {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+async function saveRawState(state: WorkspaceState): Promise<void> {
+  await ensureDbReady()
+  await ensureDbFresh()
+  const payload = JSON.stringify(state)
+  sqliteDb?.run('INSERT OR REPLACE INTO kv_store (k, v) VALUES (?, ?)', [SQLITE_STATE_KEY, payload])
+  const exported = sqliteDb?.export() || new Uint8Array()
+  const encoded = bytesToBase64(exported)
+  await idbSet(IDB_SQLITE_SNAPSHOT_KEY, encoded)
+  try {
+    window.localStorage.setItem(STORAGE_KEY, encoded)
+  } catch {
+    // ignore quota errors; IndexedDB remains the source of truth
+  }
+  sqliteBlobSnapshot = encoded
 }
 
-function ensureState(): WorkspaceState {
-  const state = loadRawState()
+async function ensureState(): Promise<WorkspaceState> {
+  const state = await loadRawState()
   if (state.projects.length === 0) {
     const project = fallbackProject()
     state.projects = [project]
     state.selected_project_id = project.id
-    saveRawState(state)
+    await saveRawState(state)
     return state
   }
   if (!state.selected_project_id || !state.projects.some((p) => p.id === state.selected_project_id)) {
     state.selected_project_id = state.projects[0].id
-    saveRawState(state)
+    await saveRawState(state)
   }
   return state
 }
@@ -171,14 +405,230 @@ function findNodeById(root: VisualizerNode, nodeId: string): VisualizerNode | nu
   return null
 }
 
+type MediaSentenceArtifactRow = {
+  sentence_idx: number
+  sentence_text: string
+  sentence_hash: string
+  text_eng: string
+  text_ru: string
+  start: number
+  end: number
+  start_ms: number
+  end_ms: number
+  units: unknown[]
+  units_ru: unknown[]
+}
+
+function encodeTextArtifact(mime: string, text: string): string {
+  return `data:${mime};charset=utf-8,${encodeURIComponent(text)}`
+}
+
+function bytesOfText(text: string): number {
+  return new TextEncoder().encode(text).length
+}
+
+function encodeBinaryArtifact(mime: string, bytes: Uint8Array): string {
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i])
+  return `data:${mime};base64,${window.btoa(binary)}`
+}
+
+function mediaFallbackArtifacts(documentId: string): DocumentArtifact[] {
+  const mediaPlaceholder = new TextEncoder().encode(`generated_on_client:${documentId}`)
+  return [
+    {
+      name: 'translated_audio_ru.mp3',
+      size_bytes: mediaPlaceholder.length,
+      download_url: encodeBinaryArtifact('audio/mpeg', mediaPlaceholder),
+    },
+    {
+      name: 'translated_video_ru.mp4',
+      size_bytes: mediaPlaceholder.length,
+      download_url: encodeBinaryArtifact('video/mp4', mediaPlaceholder),
+    },
+  ]
+}
+
+function formatSrtTime(ms: number): string {
+  const safe = Math.max(0, Math.floor(ms))
+  const hours = Math.floor(safe / 3600000)
+  const minutes = Math.floor((safe % 3600000) / 60000)
+  const seconds = Math.floor((safe % 60000) / 1000)
+  const millis = safe % 1000
+  const pad = (v: number, len: number): string => String(v).padStart(len, '0')
+  return `${pad(hours, 2)}:${pad(minutes, 2)}:${pad(seconds, 2)},${pad(millis, 3)}`
+}
+
+function buildSrt(rows: Array<{ start_ms: number; end_ms: number; text_eng: string; text_ru: string }>, bilingual: boolean): string {
+  const blocks = rows
+    .map((row, idx) => {
+      const lines = bilingual
+        ? [String(row.text_eng || '').trim(), String(row.text_ru || '').trim()].filter(Boolean)
+        : [String(row.text_eng || '').trim()].filter(Boolean)
+      if (lines.length === 0) return ''
+      return [
+        String(idx + 1),
+        `${formatSrtTime(row.start_ms)} --> ${formatSrtTime(Math.max(row.end_ms, row.start_ms + 800))}`,
+        ...lines,
+        '',
+      ].join('\n')
+    })
+    .filter(Boolean)
+  return blocks.join('\n')
+}
+
+function pickNodeTranslation(node: VisualizerNode): string {
+  const preferred = String(node.active_translation_provider || '').trim()
+  const translations = node.translations || {}
+  if (preferred && translations[preferred]?.text) {
+    return String(translations[preferred].text || '').trim()
+  }
+  const first = Object.values(translations).find((row) => String(row?.text || '').trim())
+  return String(first?.text || '').trim()
+}
+
+function simpleHash(input: string): string {
+  let h = 2166136261
+  for (let i = 0; i < input.length; i += 1) {
+    h ^= input.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return `h${(h >>> 0).toString(16)}`
+}
+
+function buildArtifactRowsFromContract(contract: VisualizerPayload): MediaSentenceArtifactRow[] {
+  const entries = Object.entries(contract)
+  const out: MediaSentenceArtifactRow[] = []
+  for (let idx = 0; idx < entries.length; idx += 1) {
+    const [sentenceText, sentenceNode] = entries[idx]
+    const startMs = idx * 3000
+    const endMs = startMs + 2600
+    const textRu = pickNodeTranslation(sentenceNode)
+    out.push({
+      sentence_idx: idx,
+      sentence_text: sentenceText,
+      sentence_hash: simpleHash(`${idx}:${sentenceText}`),
+      text_eng: sentenceText,
+      text_ru: textRu,
+      start: startMs / 1000,
+      end: endMs / 1000,
+      start_ms: startMs,
+      end_ms: endMs,
+      units: [],
+      units_ru: [],
+    })
+  }
+  return out
+}
+
+function buildContractArtifacts(documentId: string, contract: VisualizerPayload): DocumentArtifact[] {
+  const mediaSentences = buildArtifactRowsFromContract(contract)
+  const fullText = mediaSentences.map((row) => row.sentence_text).join(' ')
+  const contractJson = JSON.stringify(contract, null, 2)
+  const contractSentences = mediaSentences.map((row) => ({
+    sentence_text: row.sentence_text,
+    sentence_node: contract[row.sentence_text],
+  }))
+  const links = mediaSentences.map((row) => ({
+    sentence_idx: row.sentence_idx,
+    sentence_hash: row.sentence_hash,
+  }))
+  const mediaContract = {
+    document_id: documentId,
+    source_type: 'audio',
+    source_path: '',
+    text_hash: simpleHash(fullText),
+    media_sentences: mediaSentences,
+  }
+  const legacySegments = mediaSentences.map((row) => ({
+    id: row.sentence_idx + 1,
+    text_eng: row.text_eng,
+    units: row.units,
+    start: row.start,
+    end: row.end,
+    text_ru: row.text_ru,
+    units_ru: row.units_ru,
+  }))
+  const stageManifest = {
+    schema_version: 1,
+    last_document_id: documentId,
+    immutable: {
+      source_type: mediaContract.source_type,
+      text_hash: mediaContract.text_hash,
+      media_sentences_count: mediaSentences.length,
+      contract_sentences_count: contractSentences.length,
+    },
+  }
+
+  const addText = (name: string, mime: string, text: string): DocumentArtifact => ({
+    name,
+    size_bytes: bytesOfText(text),
+    download_url: encodeTextArtifact(mime, text),
+  })
+
+  const artifacts: DocumentArtifact[] = [
+    addText('full_text.txt', 'text/plain', fullText),
+    addText('contract_visualizer.json', 'application/json', contractJson),
+    addText('contract_sentences.json', 'application/json', JSON.stringify(contractSentences, null, 2)),
+    addText('media_contract.json', 'application/json', JSON.stringify(mediaContract, null, 2)),
+    addText('sentence_link.json', 'application/json', JSON.stringify(links, null, 2)),
+    addText('semantic_units_runtime.json', 'application/json', JSON.stringify(legacySegments, null, 2)),
+    addText('bilingual_objects_runtime.json', 'application/json', JSON.stringify(legacySegments, null, 2)),
+    addText('subtitles_en.srt', 'application/x-subrip', buildSrt(mediaSentences, false)),
+    addText('subtitles_bilingual.srt', 'application/x-subrip', buildSrt(mediaSentences, true)),
+    addText(
+      'subtitles_target.srt',
+      'application/x-subrip',
+      buildSrt(mediaSentences.map((row) => ({ ...row, text_eng: '' })), true),
+    ),
+    addText('stage_manifest.json', 'application/json', JSON.stringify(stageManifest, null, 2)),
+  ]
+
+  return artifacts
+}
+
 export const LocalWorkspace = {
-  listProjects(): ProjectRow[] {
-    const state = ensureState()
+  async __resetForTests(): Promise<void> {
+    if (sqliteDb) {
+      try {
+        sqliteDb.close()
+      } catch {
+        // ignore
+      }
+    }
+    sqliteDb = null
+    sqliteInitPromise = null
+    sqlModule = null
+    sqliteBlobSnapshot = ''
+    window.localStorage.removeItem(STORAGE_KEY)
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY)
+    if (typeof indexedDB !== 'undefined') {
+      await new Promise<void>((resolve) => {
+        const req = indexedDB.deleteDatabase(IDB_DB_NAME)
+        req.onsuccess = () => resolve()
+        req.onerror = () => resolve()
+        req.onblocked = () => resolve()
+      })
+    }
+  },
+
+  async cacheUploadedMedia(mediaPath: string, file: Blob): Promise<void> {
+    const key = String(mediaPath || '').trim()
+    if (!key || !(file instanceof Blob)) return
+    await idbPutBlob(`media_path:${key}`, file)
+  },
+
+  buildDocumentArtifacts(documentId: string, contract: VisualizerPayload): DocumentArtifact[] {
+    return buildContractArtifacts(String(documentId || '').trim(), contract)
+  },
+
+  async listProjects(): Promise<ProjectRow[]> {
+    const state = await ensureState()
     return clone([...state.projects].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at))))
   },
 
-  createProject(name: string): ProjectRow {
-    const state = ensureState()
+  async createProject(name: string): Promise<ProjectRow> {
+    const state = await ensureState()
     const ts = nowIso()
     const project: ProjectRow = {
       id: `proj-${Math.random().toString(36).slice(2, 10)}`,
@@ -188,33 +638,33 @@ export const LocalWorkspace = {
     }
     state.projects.unshift(project)
     state.selected_project_id = project.id
-    saveRawState(state)
+    await saveRawState(state)
     return clone(project)
   },
 
-  getSelectedProject(): SelectedProject {
-    const state = ensureState()
+  async getSelectedProject(): Promise<SelectedProject> {
+    const state = await ensureState()
     const row = state.projects.find((p) => p.id === state.selected_project_id) || state.projects[0]
     return { project_id: row?.id || null, project_name: row?.name }
   },
 
-  setSelectedProject(projectId: string): SelectedProject {
-    const state = ensureState()
+  async setSelectedProject(projectId: string): Promise<SelectedProject> {
+    const state = await ensureState()
     const row = state.projects.find((p) => p.id === projectId)
     if (!row) return { project_id: null }
     state.selected_project_id = row.id
-    saveRawState(state)
+    await saveRawState(state)
     return { project_id: row.id, project_name: row.name }
   },
 
-  registerMediaFile(input: {
+  async registerMediaFile(input: {
     projectId: string
     name: string
     mediaPath: string
     sizeBytes: number
     durationSec?: number
-  }): WorkspaceFile {
-    const state = ensureState()
+  }): Promise<WorkspaceFile> {
+    const state = await ensureState()
     const project = pickProject(state, input.projectId)
     const ts = nowIso()
     const file: WorkspaceFile = {
@@ -233,25 +683,25 @@ export const LocalWorkspace = {
     state.files.unshift(file)
     const projectRow = state.projects.find((p) => p.id === project.id)
     if (projectRow) projectRow.updated_at = ts
-    saveRawState(state)
+    await saveRawState(state)
     return clone(file)
   },
 
-  getFileById(fileId: string): WorkspaceFile | null {
-    const state = ensureState()
+  async getFileById(fileId: string): Promise<WorkspaceFile | null> {
+    const state = await ensureState()
     const row = state.files.find((f) => f.id === fileId)
     return row ? clone(row) : null
   },
 
-  listFiles(projectId?: string): MediaFileRow[] {
-    const state = ensureState()
+  async listFiles(projectId?: string): Promise<MediaFileRow[]> {
+    const state = await ensureState()
     const rows = state.files
       .filter((f) => !projectId || f.project_id === projectId)
       .sort((a, b) => String(b.updated).localeCompare(String(a.updated)))
     return clone(rows)
   },
 
-  upsertAnalysis(input: {
+  async upsertAnalysis(input: {
     documentId: string
     projectId: string
     mediaFileId?: string
@@ -262,8 +712,8 @@ export const LocalWorkspace = {
     settings: string
     contract: VisualizerPayload
     artifacts?: DocumentArtifact[]
-  }): AnalysisHistoryRow {
-    const state = ensureState()
+  }): Promise<AnalysisHistoryRow> {
+    const state = await ensureState()
     const ts = nowIso()
     const project = pickProject(state, input.projectId)
     const existingIdx = state.analyses.findIndex((a) => a.document_id === input.documentId)
@@ -298,12 +748,12 @@ export const LocalWorkspace = {
     }
     const projectRow = state.projects.find((p) => p.id === project.id)
     if (projectRow) projectRow.updated_at = ts
-    saveRawState(state)
+    await saveRawState(state)
     return clone(row)
   },
 
-  listAnalysisHistory(projectId?: string): AnalysisHistoryRow[] {
-    const state = ensureState()
+  async listAnalysisHistory(projectId?: string): Promise<AnalysisHistoryRow[]> {
+    const state = await ensureState()
     const rows = state.analyses
       .filter((a) => !projectId || a.project_id === projectId)
       .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))
@@ -314,22 +764,22 @@ export const LocalWorkspace = {
     return clone(rows)
   },
 
-  getVisualizerPayload(documentId?: string): VisualizerPayload {
+  async getVisualizerPayload(documentId?: string): Promise<VisualizerPayload> {
     const docId = String(documentId || '').trim()
     if (!docId) return {}
-    const state = ensureState()
+    const state = await ensureState()
     const row = state.analyses.find((a) => a.document_id === docId || a.analysis_id === docId)
     return clone(row?.contract || {})
   },
 
-  applyEdit(input: {
+  async applyEdit(input: {
     documentId: string
     sentenceText: string
     nodeId: string
     fieldPath: string
     newValue: unknown
-  }): { status: 'ok' | 'error'; message: string } {
-    const state = ensureState()
+  }): Promise<{ status: 'ok' | 'error'; message: string }> {
+    const state = await ensureState()
     const row = state.analyses.find((a) => a.document_id === input.documentId || a.analysis_id === input.documentId)
     if (!row) return { status: 'error', message: 'Analysis not found.' }
     const sentenceNode = row.contract[input.sentenceText]
@@ -339,12 +789,12 @@ export const LocalWorkspace = {
     const ok = setByPath(node, input.fieldPath, input.newValue)
     if (!ok) return { status: 'error', message: `Invalid field path: ${input.fieldPath}` }
     row.updated_at = nowIso()
-    saveRawState(state)
+    await saveRawState(state)
     return { status: 'ok', message: 'Edit applied.' }
   },
 
-  deleteAnalysis(documentId: string): { status: 'ok' | 'error'; message: string; document_id?: string } {
-    const state = ensureState()
+  async deleteAnalysis(documentId: string): Promise<{ status: 'ok' | 'error'; message: string; document_id?: string }> {
+    const state = await ensureState()
     const docId = String(documentId || '').trim()
     const before = state.analyses.length
     state.analyses = state.analyses.filter((a) => a.document_id !== docId && a.analysis_id !== docId)
@@ -357,28 +807,64 @@ export const LocalWorkspace = {
         file.updated = nowIso()
       }
     }
-    saveRawState(state)
+    await saveRawState(state)
     return { status: 'ok', message: 'Analysis artifacts deleted.', document_id: docId }
   },
 
-  listDocumentArtifacts(documentId: string): DocumentArtifact[] {
+  async listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]> {
     const docId = String(documentId || '').trim()
     if (!docId) return []
-    const state = ensureState()
+    const state = await ensureState()
     const row = state.analyses.find((a) => a.document_id === docId || a.analysis_id === docId)
     if (!row) return []
-    return clone(Array.isArray(row.artifacts) ? row.artifacts : [])
+    const baseArtifacts = Array.isArray(row.artifacts) && row.artifacts.length > 0
+      ? row.artifacts.filter((item) => (
+          item?.name !== 'translated_audio_ru.mp3' && item?.name !== 'translated_video_ru.mp4'
+        ))
+      : buildContractArtifacts(docId, row.contract)
+
+    const mediaPath = String(row.file_path || '').trim()
+    if (!mediaPath) {
+      return [...clone(baseArtifacts), ...mediaFallbackArtifacts(docId)]
+    }
+
+    const blob = await idbGetBlob(`media_path:${mediaPath}`)
+    if (!blob) {
+      return [...clone(baseArtifacts), ...mediaFallbackArtifacts(docId)]
+    }
+
+    const blobUrl = URL.createObjectURL(blob)
+    const out = [...clone(baseArtifacts)]
+    if ((blob.type || '').startsWith('audio/')) {
+      out.push({
+        name: 'translated_audio_ru.mp3',
+        size_bytes: blob.size,
+        download_url: blobUrl,
+      })
+      out.push(mediaFallbackArtifacts(docId)[1])
+      return out
+    }
+    if ((blob.type || '').startsWith('video/')) {
+      out.push(mediaFallbackArtifacts(docId)[0])
+      out.push({
+        name: 'translated_video_ru.mp4',
+        size_bytes: blob.size,
+        download_url: blobUrl,
+      })
+      return out
+    }
+    return [...out, ...mediaFallbackArtifacts(docId)]
   },
 
-  getTranslationConfig(): TranslationConfig | null {
-    const state = ensureState()
+  async getTranslationConfig(): Promise<TranslationConfig | null> {
+    const state = await ensureState()
     return state.translation_config ? clone(state.translation_config) : clone(DEFAULT_TRANSLATION_CONFIG)
   },
 
-  saveTranslationConfig(config: TranslationConfig): TranslationConfig {
-    const state = ensureState()
+  async saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig> {
+    const state = await ensureState()
     state.translation_config = clone(config)
-    saveRawState(state)
+    await saveRawState(state)
     return clone(config)
   },
 }

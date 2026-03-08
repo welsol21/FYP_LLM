@@ -32,6 +32,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     durationSec?: number
     settings: string
     fileName: string
+    finalizeAttempts: number
   }>()
 
   private readonly finalizedDocuments = new Set<string>()
@@ -41,19 +42,19 @@ export class HttpRuntimeApi implements RuntimeApi {
   }
 
   async listProjects(): Promise<ProjectRow[]> {
-    return LocalWorkspace.listProjects()
+    return await LocalWorkspace.listProjects()
   }
 
   async createProject(name: string): Promise<ProjectRow> {
-    return LocalWorkspace.createProject(name)
+    return await LocalWorkspace.createProject(name)
   }
 
   async getSelectedProject(): Promise<SelectedProject> {
-    return LocalWorkspace.getSelectedProject()
+    return await LocalWorkspace.getSelectedProject()
   }
 
   async setSelectedProject(projectId: string): Promise<SelectedProject> {
-    return LocalWorkspace.setSelectedProject(projectId)
+    return await LocalWorkspace.setSelectedProject(projectId)
   }
 
   async uploadMedia(file: File): Promise<{ fileName: string; mediaPath: string; sizeBytes: number }> {
@@ -67,7 +68,9 @@ export class HttpRuntimeApi implements RuntimeApi {
       const text = await res.text()
       throw new Error(`HTTP ${res.status}: ${text}`)
     }
-    return (await res.json()) as { fileName: string; mediaPath: string; sizeBytes: number }
+    const uploaded = (await res.json()) as { fileName: string; mediaPath: string; sizeBytes: number }
+    await LocalWorkspace.cacheUploadedMedia(uploaded.mediaPath, file)
+    return uploaded
   }
 
   async registerMediaFile(input: {
@@ -77,7 +80,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     sizeBytes: number
     durationSec?: number
   }): Promise<{ id: string; project_id: string; name: string; path: string; size_bytes?: number; duration_seconds?: number }> {
-    const row = LocalWorkspace.registerMediaFile(input)
+    const row = await LocalWorkspace.registerMediaFile(input)
     return {
       id: row.id,
       project_id: row.project_id,
@@ -99,9 +102,10 @@ export class HttpRuntimeApi implements RuntimeApi {
     voiceChoice?: string
     forceFullReprocess?: boolean
   }): Promise<MediaSubmissionPayload> {
-    const selected = LocalWorkspace.getSelectedProject()
-    const effectiveProjectId = input.projectId || selected.project_id || LocalWorkspace.listProjects()[0]?.id || ''
-    const localFile = input.mediaFileId ? LocalWorkspace.getFileById(input.mediaFileId) : null
+    const selected = await LocalWorkspace.getSelectedProject()
+    const projects = await LocalWorkspace.listProjects()
+    const effectiveProjectId = input.projectId || selected.project_id || projects[0]?.id || ''
+    const localFile = input.mediaFileId ? await LocalWorkspace.getFileById(input.mediaFileId) : null
     const fileName = localFile?.name || input.mediaPath.split('/').pop() || input.mediaPath
     const settings = `Transl: ${input.translationProvider || 'm2m100'} / Subs: ${input.subtitlesMode || 'bilingual'} / Voice: ${input.voiceChoice || 'male'}`
 
@@ -128,6 +132,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         durationSec: input.durationSec,
         settings,
         fileName,
+        finalizeAttempts: 0,
       })
     }
     const immediateDocId = String(payload?.result?.document_id || '').trim()
@@ -146,29 +151,29 @@ export class HttpRuntimeApi implements RuntimeApi {
   }
 
   async getTranslationConfig(): Promise<TranslationConfig> {
-    return LocalWorkspace.getTranslationConfig() as TranslationConfig
+    return (await LocalWorkspace.getTranslationConfig()) as TranslationConfig
   }
 
   async saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig> {
-    return LocalWorkspace.saveTranslationConfig(config)
+    return await LocalWorkspace.saveTranslationConfig(config)
   }
 
   async listFiles(projectId?: string): Promise<MediaFileRow[]> {
-    return LocalWorkspace.listFiles(projectId)
+    return await LocalWorkspace.listFiles(projectId)
   }
 
   async listAnalysisHistory(projectId?: string): Promise<AnalysisHistoryRow[]> {
-    return LocalWorkspace.listAnalysisHistory(projectId)
+    return await LocalWorkspace.listAnalysisHistory(projectId)
   }
 
   async listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]> {
     const docId = String(documentId || '').trim()
     if (!docId) return []
-    return LocalWorkspace.listDocumentArtifacts(docId)
+    return await LocalWorkspace.listDocumentArtifacts(docId)
   }
 
   async getBackendJobStatus(jobId: string): Promise<BackendJobStatus> {
-    const status = await requestJson<BackendJobStatus>(`/api/backend-job-status?job_id=${encodeURIComponent(jobId)}`)
+    let status = await requestJson<BackendJobStatus>(`/api/backend-job-status?job_id=${encodeURIComponent(jobId)}`)
     const docId = String(status.document_id || '').trim()
     if (docId && (status.status === 'completed_local' || status.status === 'running_local')) {
       const context = this.pendingJobs.get(jobId)
@@ -177,7 +182,32 @@ export class HttpRuntimeApi implements RuntimeApi {
           retries: status.status === 'completed_local' ? 4 : 1,
           retryDelayMs: 180,
         })
-        if (status.status === 'completed_local' && finalized) this.pendingJobs.delete(jobId)
+        if (status.status === 'completed_local' && finalized) {
+          this.pendingJobs.delete(jobId)
+        } else if (status.status === 'completed_local' && !finalized) {
+          context.finalizeAttempts += 1
+          this.pendingJobs.set(jobId, context)
+          const maxAttempts = 30
+          if (context.finalizeAttempts < maxAttempts) {
+            const logs = [...(status.stage_logs || [])]
+            logs.push(`Finalizing client artifacts (${context.finalizeAttempts}/${maxAttempts - 1})...`)
+            status = {
+              ...status,
+              status: 'running_local',
+              stage_name: 'finalizing_client_artifacts',
+              message: 'Finalizing client artifacts...',
+              stage_logs: logs.slice(-20),
+              stage_log: logs.slice(-10).join('\n'),
+            }
+          } else {
+            this.pendingJobs.delete(jobId)
+            status = {
+              ...status,
+              status: 'error',
+              message: 'Backend completed, but frontend could not finalize artifacts from contract.',
+            }
+          }
+        }
       }
     } else if (status.status === 'rejected' || status.status === 'error' || status.status === 'not_found') {
       this.pendingJobs.delete(jobId)
@@ -187,7 +217,7 @@ export class HttpRuntimeApi implements RuntimeApi {
 
   async getVisualizerPayload(documentId?: string): Promise<VisualizerPayload> {
     if (!documentId) return {}
-    const local = LocalWorkspace.getVisualizerPayload(documentId)
+    const local = await LocalWorkspace.getVisualizerPayload(documentId)
     if (Object.keys(local).length > 0) return local
     return requestJson<VisualizerPayload>(`/api/visualizer-payload?document_id=${encodeURIComponent(documentId)}`)
   }
@@ -210,7 +240,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     const documentId = String(input.documentId || '').trim()
     if (!documentId) return { status: 'error', message: 'documentId is required.' }
     const value = input.newValue === '__NULL__' ? null : input.newValue
-    return LocalWorkspace.applyEdit({
+    return await LocalWorkspace.applyEdit({
       documentId,
       sentenceText: input.sentenceText,
       nodeId: input.nodeId,
@@ -220,7 +250,7 @@ export class HttpRuntimeApi implements RuntimeApi {
   }
 
   async deleteAnalysis(documentId: string): Promise<{ status: 'ok' | 'error'; message: string; document_id?: string }> {
-    return LocalWorkspace.deleteAnalysis(documentId)
+    return await LocalWorkspace.deleteAnalysis(documentId)
   }
 
   private async finalizeCompletedAnalysis(
@@ -255,10 +285,8 @@ export class HttpRuntimeApi implements RuntimeApi {
       }
     }
     if (Object.keys(contract).length === 0) return false
-    const artifacts = await requestJson<DocumentArtifact[]>(
-      `/api/document-artifacts?document_id=${encodeURIComponent(documentId)}`,
-    ).catch(() => [])
-    LocalWorkspace.upsertAnalysis({
+    const artifacts = LocalWorkspace.buildDocumentArtifacts(documentId, contract)
+    await LocalWorkspace.upsertAnalysis({
       documentId,
       projectId: context.projectId,
       mediaFileId: context.mediaFileId,

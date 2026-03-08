@@ -84,6 +84,8 @@ export function AnalyzePage() {
   const [directFileId, setDirectFileId] = useState<string>('')
   const pollFailuresRef = useRef<number>(0)
   const currentMediaFileId = String(activeMedia?.mediaFileId || '').trim()
+  const currentMediaFileName = String(activeMedia?.fileName || '').trim().toLowerCase()
+  const currentMediaPath = String(activeMedia?.mediaPath || '').trim()
 
   useEffect(() => {
     let stopped = false
@@ -113,7 +115,7 @@ export function AnalyzePage() {
   }, [selectedMediaFromRoute])
 
   useEffect(() => {
-    if (!currentMediaFileId) {
+    if (!currentMediaFileId && !currentMediaFileName && !currentMediaPath) {
       setHistoryGroups([])
       setHistoryLoading(false)
       setHistoryError('')
@@ -125,7 +127,15 @@ export function AnalyzePage() {
       setHistoryError('')
       try {
         const historyRows = await api.listAnalysisHistory(selectedProject.project_id || undefined)
-        const fileRows = historyRows.filter((row) => String(row.media_file_id || '').trim() === currentMediaFileId)
+        const fileRows = historyRows.filter((row) => {
+          const rowFileId = String(row.media_file_id || '').trim()
+          const rowFileName = String(row.file_name || '').trim().toLowerCase()
+          const rowFilePath = String(row.file_path || '').trim()
+          const matchId = currentMediaFileId ? rowFileId === currentMediaFileId : true
+          const matchName = currentMediaFileName ? rowFileName === currentMediaFileName : true
+          const matchPath = currentMediaPath ? rowFilePath === currentMediaPath : true
+          return matchId && matchName && matchPath
+        })
         const resolved = await Promise.all(
           fileRows.map(async (row) => {
             const documentId = String(row.document_id || '')
@@ -178,7 +188,15 @@ export function AnalyzePage() {
     return () => {
       stopped = true
     }
-  }, [api, selectedProject.project_id, jobStatus?.status, historyReloadKey, currentMediaFileId])
+  }, [
+    api,
+    selectedProject.project_id,
+    jobStatus?.status,
+    historyReloadKey,
+    currentMediaFileId,
+    currentMediaFileName,
+    currentMediaPath,
+  ])
 
   useEffect(() => {
     if (showDirectSelector) {

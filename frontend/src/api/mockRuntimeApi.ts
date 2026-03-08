@@ -368,26 +368,34 @@ export class MockRuntimeApi implements RuntimeApi {
 
   async listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]> {
     if (!documentId || !this.payloadByDocument[documentId]) return []
+    const payload = this.payloadByDocument[documentId] || {}
+    const fullText = Object.keys(payload).join(' ')
+    const subtitles = Object.keys(payload)
+      .map((row, idx) => `${idx + 1}\n00:00:${String(idx * 3).padStart(2, '0')},000 --> 00:00:${String(idx * 3 + 2).padStart(2, '0')},000\n${row}\n`)
+      .join('\n')
+    const contractSentences = Object.entries(payload).map(([sentence_text, sentence_node]) => ({ sentence_text, sentence_node }))
+    const encode = (mime: string, text: string): string => `data:${mime};charset=utf-8,${encodeURIComponent(text)}`
+    const sizeOf = (text: string): number => new TextEncoder().encode(text).length
     return [
       {
         name: 'full_text.txt',
-        size_bytes: 2048,
-        download_url: `/api/document-artifact-download?document_id=${encodeURIComponent(documentId)}&name=full_text.txt`,
+        size_bytes: sizeOf(fullText),
+        download_url: encode('text/plain', fullText),
       },
       {
         name: 'subtitles_en.srt',
-        size_bytes: 1024,
-        download_url: `/api/document-artifact-download?document_id=${encodeURIComponent(documentId)}&name=subtitles_en.srt`,
+        size_bytes: sizeOf(subtitles),
+        download_url: encode('application/x-subrip', subtitles),
       },
       {
         name: 'subtitles_bilingual.srt',
-        size_bytes: 2048,
-        download_url: `/api/document-artifact-download?document_id=${encodeURIComponent(documentId)}&name=subtitles_bilingual.srt`,
+        size_bytes: sizeOf(subtitles),
+        download_url: encode('application/x-subrip', subtitles),
       },
       {
         name: 'contract_sentences.json',
-        size_bytes: 8192,
-        download_url: `/api/document-artifact-download?document_id=${encodeURIComponent(documentId)}&name=contract_sentences.json`,
+        size_bytes: sizeOf(JSON.stringify(contractSentences)),
+        download_url: encode('application/json', JSON.stringify(contractSentences, null, 2)),
       },
     ]
   }
