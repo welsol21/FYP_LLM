@@ -352,7 +352,7 @@ export function VisualizerPage() {
   const hasPrev = activeSentenceIndex > 0
   const hasNext = activeSentenceIndex < rows.length - 1
 
-  function selectNodeForEdit(node: VisualizerNode) {
+  function selectNodeForEdit(node: VisualizerNode, options?: { openEditor?: boolean }) {
     setNodeId(node.node_id)
     setSelectedNodeLabel(node.part_of_speech)
     setSelectedNode(node)
@@ -360,17 +360,19 @@ export function VisualizerPage() {
     setBasicField('content')
     setNewValue(serializeEditValue(getValueByPath(node, 'content')))
     setEditStatus('')
-    setEditorMode('quick')
+    if (options?.openEditor ?? true) {
+      setEditorMode('quick')
+    }
   }
 
   useEffect(() => {
     if (!activeRow?.tree) return
     if (nodeId) return
-    selectNodeForEdit(activeRow.tree)
+    selectNodeForEdit(activeRow.tree, { openEditor: false })
   }, [activeRow?.tree, nodeId])
 
   function onSelectNode(node: VisualizerNode) {
-    selectNodeForEdit(node)
+    selectNodeForEdit(node, { openEditor: true })
   }
 
   function onChangeBasicField(path: string) {

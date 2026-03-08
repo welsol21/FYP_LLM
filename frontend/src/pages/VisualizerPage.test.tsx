@@ -160,11 +160,17 @@ describe('VisualizerPage', () => {
     expect(getVisualizerPayload).toHaveBeenCalledWith('doc-42')
     expect(screen.getByText('1 / 2')).toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.getByRole('button', { name: 'toggle-quick-edit' })).toBeInTheDocument()
+    expect(screen.queryByText(/Selected Node:/i)).not.toBeInTheDocument()
+
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     await waitFor(() => {
       expect(screen.getAllByText('Sentence two.').length).toBeGreaterThan(0)
     })
     expect(screen.getByText('2 / 2')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'toggle-quick-edit' })).toBeInTheDocument()
+    expect(screen.queryByText(/Selected Node:/i)).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Prev' }))
     await waitFor(() => {
