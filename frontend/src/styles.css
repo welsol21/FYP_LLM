@@ -10,6 +10,7 @@
   --warn: #ffd166;
   --err: #ff6b6b;
   --touch-min: 44px;
+  --layout-max: 1080px;
 }
 
 * { box-sizing: border-box; }
@@ -38,7 +39,7 @@ body {
   padding: 12px;
   background: rgba(10, 12, 18, 0.9);
   border-bottom: 1px solid var(--line);
-  width: min(100%, 1080px);
+  width: min(100%, var(--layout-max));
   margin: 0 auto;
 }
 
@@ -96,6 +97,8 @@ button {
 }
 
 .screen {
+  width: min(100%, var(--layout-max));
+  margin: 0 auto;
   padding: 0;
   overflow: auto;
 }
@@ -145,7 +148,7 @@ button {
   padding: 10px 12px 14px;
   border-top: 1px solid var(--line);
   background: rgba(9, 12, 18, 0.95);
-  width: min(100%, 1080px);
+  width: min(100%, var(--layout-max));
   margin: 0 auto;
 }
 
@@ -410,7 +413,7 @@ button {
 .visualizer-root {
   display: grid;
   gap: 14px;
-  width: min(100%, 1080px);
+  width: min(100%, var(--layout-max));
   margin: 0 auto;
 }
 
