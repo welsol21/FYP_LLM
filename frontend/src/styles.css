@@ -372,6 +372,37 @@ button {
   margin-top: 10px;
 }
 
+.analysis-history {
+  display: grid;
+  gap: 12px;
+}
+
+.analysis-history-group {
+  border: 1px solid #2f3d54;
+  border-radius: 10px;
+  padding: 10px;
+  background: #101725;
+}
+
+.analysis-history-time {
+  margin: 0 0 8px;
+  color: #8fd6ff;
+  font-weight: 700;
+}
+
+.analysis-history-item + .analysis-history-item {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #3c4a61;
+}
+
+.analysis-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .visualizer-root {
   display: grid;
   gap: 14px;

@@ -663,10 +663,12 @@ def run_media_pipeline(
     sentence_stream: list[str] = []
     sentence_timeline: list[dict[str, float] | None] = []
     if extracted_sentence_chunks:
-        sentence_stream, sentence_timeline = _sentenceize_timed_chunks(
+        raw_sentence_stream, raw_sentence_timeline = _sentenceize_timed_chunks(
             chunks=extracted_sentence_chunks,
             nlp=nlp,
         )
+        sentence_stream = list(raw_sentence_stream)
+        sentence_timeline = list(raw_sentence_timeline)
         filtered_stream: list[str] = []
         filtered_timeline: list[dict[str, float] | None] = []
         for idx, text in enumerate(sentence_stream):
@@ -680,8 +682,17 @@ def run_media_pipeline(
             filtered_timeline.append(sentence_timeline[idx] if idx < len(sentence_timeline) else None)
         sentence_stream = filtered_stream
         sentence_timeline = filtered_timeline
+        if not sentence_stream:
+            fallback_stream = [str(text or "").strip() for text in raw_sentence_stream if str(text or "").strip()]
+            if fallback_stream:
+                sentence_stream = fallback_stream
+                sentence_timeline = list(raw_sentence_timeline)[: len(sentence_stream)]
+            elif full_text:
+                sentence_stream = [full_text]
+                sentence_timeline = [None]
     else:
         skeleton = build_skeleton(full_text, nlp)
+        fallback_stream = [str(text or "").strip() for text in skeleton.keys() if str(text or "").strip()]
         for text in skeleton.keys():
             text_resolved = str(text).strip()
             if not text_resolved:
@@ -691,6 +702,13 @@ def run_media_pipeline(
                 continue
             sentence_stream.append(text_resolved)
             sentence_timeline.append(None)
+        if not sentence_stream:
+            if fallback_stream:
+                sentence_stream = fallback_stream
+                sentence_timeline = [None for _ in fallback_stream]
+            elif full_text:
+                sentence_stream = [full_text]
+                sentence_timeline = [None]
 
     if progress_callback is not None:
         progress_callback("translating_text", 0.08, f"Prepared {len(sentence_stream)} sentences")

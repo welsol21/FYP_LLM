@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import cgi
 import json
-import mimetypes
 import os
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -197,19 +196,6 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
         if path == "/api/ui-state":
             self._send_json(SERVICE.get_ui_state())
             return
-        if path == "/api/projects":
-            self._send_json(SERVICE.list_projects())
-            return
-        if path == "/api/translation-config":
-            self._send_json(SERVICE.get_translation_config())
-            return
-        if path == "/api/selected-project":
-            self._send_json(SERVICE.get_selected_project())
-            return
-        if path == "/api/files":
-            project_id = (query.get("project_id") or [None])[0]
-            self._send_json(SERVICE.list_files(project_id=project_id))
-            return
         if path == "/api/visualizer-payload":
             document_id = (query.get("document_id") or [""])[0]
             if not document_id:
@@ -217,39 +203,12 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(SERVICE.get_visualizer_payload(document_id=document_id))
             return
-        if path == "/api/document-artifacts":
-            document_id = (query.get("document_id") or [""])[0]
-            if not document_id:
-                self._send_json([], status=200)
-                return
-            self._send_json(SERVICE.list_document_artifacts(document_id=document_id))
-            return
         if path == "/api/backend-job-status":
             job_id = (query.get("job_id") or [""])[0]
             if not job_id:
                 self._send_json({"error": "job_id is required"}, status=400)
                 return
             self._send_json(SERVICE.get_backend_job_status(job_id=job_id))
-            return
-        if path == "/api/document-artifact-download":
-            document_id = (query.get("document_id") or [""])[0]
-            name = (query.get("name") or [""])[0]
-            if not document_id or not name:
-                self._send_json({"error": "document_id and name are required"}, status=400)
-                return
-            base = Path(os.getenv("MEDIA_CONTRACT_ARTIFACTS_DIR", "artifacts/media_contracts")).resolve()
-            target = (base / document_id / Path(name).name).resolve()
-            if not str(target).startswith(str(base)) or not target.exists() or not target.is_file():
-                self._send_json({"error": "artifact not found"}, status=404)
-                return
-            data = target.read_bytes()
-            content_type = mimetypes.guess_type(target.name)[0] or "application/octet-stream"
-            self.send_response(200)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(data)))
-            self.send_header("Content-Disposition", f'attachment; filename="{target.name}"')
-            self.end_headers()
-            self.wfile.write(data)
             return
 
         self._send_json({"error": "Not found"}, status=404)
@@ -319,78 +278,6 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(payload)
             return
-        if path == "/api/translation-config":
-            cfg = body.get("config")
-            if not isinstance(cfg, dict):
-                self._send_json({"error": "config object is required"}, status=400)
-                return
-            self._send_json(SERVICE.save_translation_config(cfg))
-            return
-        if path == "/api/projects":
-            name = str(body.get("name") or "").strip()
-            if not name:
-                self._send_json({"error": "name is required"}, status=400)
-                return
-            self._send_json(SERVICE.create_project(name=name))
-            return
-
-        if path == "/api/selected-project":
-            project_id = str(body.get("projectId") or body.get("project_id") or "").strip()
-            if not project_id:
-                self._send_json({"error": "projectId is required"}, status=400)
-                return
-            selected = SERVICE.set_selected_project(project_id=project_id)
-            if not selected.get("project_id"):
-                self._send_json({"error": "project not found"}, status=404)
-                return
-            self._send_json(selected)
-            return
-        if path == "/api/register-media":
-            project_id = str(body.get("projectId") or body.get("project_id") or "").strip()
-            media_path = str(body.get("mediaPath") or body.get("media_path") or "").strip()
-            name = str(body.get("name") or "").strip()
-            size = int(body.get("sizeBytes") or body.get("size_bytes") or 0)
-            duration = body.get("durationSec")
-            if not project_id:
-                self._send_json({"error": "projectId is required"}, status=400)
-                return
-            if not name:
-                self._send_json({"error": "name is required"}, status=400)
-                return
-            if not media_path:
-                self._send_json({"error": "mediaPath is required"}, status=400)
-                return
-            created = SERVICE.register_media_file(
-                project_id=project_id,
-                name=name,
-                media_path=media_path,
-                size_bytes=size,
-                duration_seconds=int(duration) if duration is not None else None,
-            )
-            if created.get("error") == "project_not_found":
-                self._send_json({"error": "project not found"}, status=404)
-                return
-            self._send_json(created)
-            return
-
-        if path == "/api/apply-edit":
-            document_id = str(body.get("documentId") or "")
-            sentence_text = str(body.get("sentenceText") or "")
-            node_id = str(body.get("nodeId") or "")
-            field_path = str(body.get("fieldPath") or "")
-            if not document_id:
-                self._send_json({"status": "error", "message": "documentId is required."}, status=400)
-                return
-            result = SERVICE.apply_document_edit(
-                document_id=document_id,
-                sentence_text=sentence_text,
-                node_id=node_id,
-                field_path=field_path,
-                new_value=body.get("newValue"),
-            )
-            self._send_json(result, status=200 if result.get("status") == "ok" else 400)
-            return
-
         if path == "/api/sentence-contract":
             sentence_text = str(body.get("sentenceText") or body.get("sentence_text") or "").strip()
             if not sentence_text:

@@ -59,7 +59,14 @@ export function MediaSubmitForm({
   const voiceOptions = ['Male', 'Female']
 
   useEffect(() => {
-    if (!initialMedia) return
+    if (!initialMedia) {
+      setMediaPath('')
+      setDurationSec(600)
+      setSizeBytes(100 * 1024 * 1024)
+      setMediaFileId(undefined)
+      setSelectedFileName('')
+      return
+    }
     if (initialMedia.mediaPath) setMediaPath(initialMedia.mediaPath)
     if (typeof initialMedia.durationSec === 'number') setDurationSec(initialMedia.durationSec)
     if (typeof initialMedia.sizeBytes === 'number') setSizeBytes(initialMedia.sizeBytes)

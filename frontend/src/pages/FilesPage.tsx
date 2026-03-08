@@ -40,6 +40,7 @@ export function FilesPage() {
   function openAnalyze(row: MediaFileRow) {
     navigate('/analyze', {
       state: {
+        analyzeEntry: 'files',
         selectedMedia: {
           mediaFileId: row.id,
           documentId: row.document_id,

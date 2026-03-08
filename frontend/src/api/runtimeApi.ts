@@ -64,6 +64,22 @@ export type MediaFileRow = {
   document_id?: string
 }
 
+export type AnalysisHistoryRow = {
+  analysis_id: string
+  document_id: string
+  project_id: string
+  project_name: string
+  media_file_id?: string | null
+  file_name: string
+  file_path?: string
+  size_bytes?: number
+  duration_seconds?: number
+  settings: string
+  updated_at: string
+  created_at: string
+  contract_current?: boolean
+}
+
 export type VisualizerNode = {
   node_id: string
   type: string
@@ -159,6 +175,8 @@ export interface RuntimeApi {
   getTranslationConfig(): Promise<TranslationConfig>
   saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig>
   listFiles(projectId?: string): Promise<MediaFileRow[]>
+  listAnalysisHistory(projectId?: string): Promise<AnalysisHistoryRow[]>
+  deleteAnalysis(documentId: string): Promise<{ status: 'ok' | 'error'; message: string; document_id?: string }>
   listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]>
   getBackendJobStatus(jobId: string): Promise<BackendJobStatus>
   getVisualizerPayload(documentId?: string): Promise<VisualizerPayload>

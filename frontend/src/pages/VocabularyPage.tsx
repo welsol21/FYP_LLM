@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
-import type { VisualizerNode, VisualizerPayload } from '../api/runtimeApi'
+import type { AnalysisHistoryRow, VisualizerNode, VisualizerPayload } from '../api/runtimeApi'
 import { normalizeLinguisticNotes } from '../lib/linguisticNotes'
 import { resolveNodeTranslation } from '../lib/translationContract'
 
@@ -71,6 +71,18 @@ function parseTranslationProvider(settings: string): string {
   return match?.[1]?.trim().toLowerCase() || 'backend_m2m100'
 }
 
+function formatAnalysisTime(value: string): string {
+  const ts = Date.parse(String(value || ''))
+  if (!Number.isFinite(ts)) return String(value || '')
+  return new Date(ts).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 function notesToExportText(node: VisualizerNode): string {
   const notes = normalizeLinguisticNotes(node.linguistic_notes)
   const out: string[] = []
@@ -78,6 +90,25 @@ function notesToExportText(node: VisualizerNode): string {
   if (notes.elementary) out.push(`elementary: ${notes.elementary}`)
   if (notes.advanced) out.push(`advanced: ${notes.advanced}`)
   return out.join(' | ')
+}
+
+async function sleepMs(ms: number): Promise<void> {
+  await new Promise((resolve) => window.setTimeout(resolve, ms))
+}
+
+async function withRetry<T>(fn: () => Promise<T>, attempts: number, baseDelayMs: number): Promise<T> {
+  let lastErr: unknown = null
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastErr = err
+      if (i < attempts - 1) {
+        await sleepMs(baseDelayMs * (i + 1))
+      }
+    }
+  }
+  throw lastErr
 }
 
 export function toExportRows(row: VocabRow): ExportRow[] {
@@ -164,47 +195,168 @@ export function VocabularyPage() {
   const navigate = useNavigate()
   const [rows, setRows] = useState<VocabRow[]>([])
   const [checked, setChecked] = useState<Record<string, boolean>>({})
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const [deleting, setDeleting] = useState(false)
+
+  const fetchPayloadByDocumentId = useCallback(async (documentId: string): Promise<VisualizerPayload | null> => {
+    try {
+      return await withRetry(() => api.getVisualizerPayload(documentId), 2, 300)
+    } catch {
+      return null
+    }
+  }, [api])
+
+  const enrichRowsWithPayload = useCallback(async (documentIds: string[]) => {
+    const unique = Array.from(new Set(documentIds.filter(Boolean)))
+    for (const documentId of unique) {
+      let shouldFetch = false
+      setRows((prev) => {
+        const hasPayload = prev.some((row) => row.documentId === documentId && row.payload)
+        if (!hasPayload) shouldFetch = true
+        return prev
+      })
+      if (!shouldFetch) continue
+      const payload = await fetchPayloadByDocumentId(documentId)
+      setRows((prev) => prev.map((row) => (
+        row.documentId === documentId
+          ? { ...row, payload, items: countPayloadElements(payload) }
+          : row
+      )))
+    }
+  }, [fetchPayloadByDocumentId])
+
+  const resolveRowsForExport = useCallback(async (selected: VocabRow[]): Promise<VocabRow[]> => {
+    return Promise.all(selected.map(async (row) => {
+      if (row.payload || !row.documentId) return row
+      const payload = await fetchPayloadByDocumentId(row.documentId)
+      return { ...row, payload, items: countPayloadElements(payload) }
+    }))
+  }, [fetchPayloadByDocumentId])
 
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const projects = await api.listProjects()
-      const grouped = await Promise.all(
-        projects.map(async (p) => {
-          const files = await api.listFiles(p.id)
-          const analyzed = files.filter((f) => f.analyzed)
-          return Promise.all(
-            analyzed.map(async (f) => {
-              const payload = f.document_id ? await api.getVisualizerPayload(f.document_id) : null
-              return {
-                id: `${p.id}:${f.id}`,
-                project: p.name,
-                file: f.name,
-                items: countPayloadElements(payload),
-                created: new Date(f.updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                documentId: f.document_id ?? null,
-                payload,
-                translationProvider: parseTranslationProvider(f.settings),
-              }
-            }),
-          )
-        }),
-      )
-      if (alive) setRows(grouped.flat().flat())
+      setLoading(true)
+      setLoadError('')
+      const mapHistoryRow = (row: AnalysisHistoryRow): VocabRow => {
+        return {
+          id: String(row.analysis_id || row.document_id),
+          project: String(row.project_name || row.project_id || '-'),
+          file: String(row.file_name || row.media_file_id || row.document_id || 'Unknown'),
+          items: 0,
+          created: formatAnalysisTime(row.updated_at),
+          documentId: row.document_id ?? null,
+          payload: null,
+          translationProvider: parseTranslationProvider(row.settings),
+        }
+      }
+
+      const loadFromHistory = async (): Promise<VocabRow[]> => {
+        const history = await withRetry(() => api.listAnalysisHistory(), 5, 600)
+        return history.map((row) => mapHistoryRow(row))
+      }
+
+      const loadLegacy = async (): Promise<VocabRow[]> => {
+        const projects = await withRetry(() => api.listProjects(), 4, 500)
+        const grouped = await Promise.all(
+          projects.map(async (p) => {
+            const files = await withRetry(() => api.listFiles(p.id), 3, 400)
+            const analyzed = files.filter((f) => f.analyzed)
+            return Promise.all(
+              analyzed.map(async (f) => {
+                return {
+                  id: `${p.id}:${f.id}`,
+                  project: p.name,
+                  file: f.name,
+                  items: 0,
+                  created: formatAnalysisTime(f.updated),
+                  documentId: f.document_id ?? null,
+                  payload: null,
+                  translationProvider: parseTranslationProvider(f.settings),
+                }
+              }),
+            )
+          }),
+        )
+        return grouped.flat().flat()
+      }
+
+      let loaded: VocabRow[] = []
+      try {
+        loaded = await loadFromHistory()
+      } catch {
+        try {
+          loaded = await loadLegacy()
+        } catch {
+          loaded = []
+          if (alive) setLoadError('Failed to load analysis history. Retry in a few seconds.')
+        }
+      }
+      if (alive) {
+        setRows(loaded)
+        setLoading(false)
+      }
     })()
     return () => {
       alive = false
     }
   }, [api])
 
+  useEffect(() => {
+    const docIds = Object.entries(checked)
+      .filter(([, isChecked]) => isChecked)
+      .map(([rowId]) => rows.find((row) => row.id === rowId)?.documentId || '')
+      .filter((v): v is string => Boolean(v))
+    if (!docIds.length) return
+    void enrichRowsWithPayload(docIds)
+  }, [checked, rows, enrichRowsWithPayload])
+
   const selectedCount = useMemo(() => Object.values(checked).filter(Boolean).length, [checked])
   const selectedRows = useMemo(() => rows.filter((row) => checked[row.id]), [rows, checked])
-  const exportRows = useMemo(() => selectedRows.flatMap((row) => toExportRows(row)), [selectedRows])
   const selectedDocumentId = selectedRows.find((row) => row.documentId)?.documentId ?? null
   const selectedDocumentIds = useMemo(
     () => Array.from(new Set(selectedRows.map((row) => row.documentId).filter((v): v is string => Boolean(v)))),
     [selectedRows],
   )
+
+  const deleteSelectedAnalyses = useCallback(async () => {
+    if (!selectedDocumentIds.length) return
+    const shouldDelete = window.confirm(`Delete ${selectedDocumentIds.length} selected analysis artifact set(s)?`)
+    if (!shouldDelete) return
+    setDeleting(true)
+    try {
+      const results = await Promise.all(selectedDocumentIds.map(async (docId) => {
+        try {
+          return await api.deleteAnalysis(docId)
+        } catch {
+          return { status: 'error' as const, message: 'delete failed', document_id: docId }
+        }
+      }))
+      const deletedIds = new Set(
+        results
+          .filter((row) => row.status === 'ok')
+          .map((row) => String(row.document_id || ''))
+          .filter(Boolean),
+      )
+      if (deletedIds.size > 0) {
+        setRows((prev) => prev.filter((row) => !row.documentId || !deletedIds.has(row.documentId)))
+        setChecked((prev) => {
+          const next: Record<string, boolean> = {}
+          for (const row of rows) {
+            if (deletedIds.has(String(row.documentId || ''))) continue
+            if (prev[row.id]) next[row.id] = true
+          }
+          return next
+        })
+      }
+      if (deletedIds.size !== selectedDocumentIds.length) {
+        setLoadError('Some selected analyses were not deleted. Reload page and retry.')
+      }
+    } finally {
+      setDeleting(false)
+    }
+  }, [api, rows, selectedDocumentIds])
 
   return (
     <section className="screen-block">
@@ -239,13 +391,15 @@ export function VocabularyPage() {
             type="button"
             className="secondary-btn"
             disabled={selectedCount === 0}
-            onClick={() =>
+            onClick={async () => {
+              const freshRows = await resolveRowsForExport(selectedRows)
+              const freshExportRows = freshRows.flatMap((row) => toExportRows(row))
               downloadTextFile(
                 `vocabulary_export_${Date.now()}.json`,
-                JSON.stringify(exportRows, null, 2),
+                JSON.stringify(freshExportRows, null, 2),
                 'application/json;charset=utf-8',
               )
-            }
+            }}
           >
             Export JSON
           </button>
@@ -253,12 +407,29 @@ export function VocabularyPage() {
             type="button"
             className="secondary-btn"
             disabled={selectedCount === 0}
-            onClick={() => downloadTextFile(`vocabulary_export_${Date.now()}.csv`, toCsv(exportRows), 'text/csv;charset=utf-8')}
+            onClick={async () => {
+              const freshRows = await resolveRowsForExport(selectedRows)
+              const freshExportRows = freshRows.flatMap((row) => toExportRows(row))
+              downloadTextFile(`vocabulary_export_${Date.now()}.csv`, toCsv(freshExportRows), 'text/csv;charset=utf-8')
+            }}
           >
             Export CSV
           </button>
+          <button
+            type="button"
+            className="secondary-btn"
+            disabled={selectedDocumentIds.length === 0 || deleting}
+            onClick={() => {
+              void deleteSelectedAnalyses()
+            }}
+          >
+            {deleting ? 'Deleting...' : 'Delete Analyses'}
+          </button>
         </div>
       </div>
+      {loading ? <p className="muted">Loading analysis history...</p> : null}
+      {!loading && loadError ? <p style={{ color: '#ff8a8a' }}>{loadError}</p> : null}
+      {!loading && !loadError && rows.length === 0 ? <p className="muted">No analyzed history yet.</p> : null}
 
       <table>
         <thead>

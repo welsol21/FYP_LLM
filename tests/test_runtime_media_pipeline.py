@@ -95,6 +95,30 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
             self.assertEqual(len(result.media_sentences), 1)
             self.assertEqual(result.media_sentences[0]["sentence_text"], "She trusted him.")
 
+    def test_audio_pipeline_fallbacks_when_metadata_filter_removes_all_sentences(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media = Path(tmpdir) / "sample.mp3"
+            media.write_bytes(b"fake-audio")
+            with patch(
+                "ela_pipeline.runtime.media_pipeline._extract_text_and_sentence_chunks",
+                return_value=(
+                    "The Last Wish, translated by Danusia Stock.",
+                    [
+                        {
+                            "sentence_text": "The Last Wish, translated by Danusia Stock.",
+                            "start_sec": 0.0,
+                            "end_sec": 1.2,
+                        },
+                    ],
+                ),
+            ):
+                result = run_media_pipeline(source_path=str(media), sentence_contract_builder=self._builder)
+            self.assertEqual(len(result.media_sentences), 1)
+            self.assertEqual(
+                result.media_sentences[0]["sentence_text"],
+                "The Last Wish, translated by Danusia Stock.",
+            )
+
     def test_audio_pipeline_uses_asr_extraction_chunks(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             media = Path(tmpdir) / "sample.mp3"

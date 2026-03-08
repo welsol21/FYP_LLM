@@ -1,21 +1,9 @@
-import { fireEvent, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
 import { toExportRows, VocabularyPage, type VocabRow } from './VocabularyPage'
 import { renderWithProviders } from '../test/testUtils'
 import { MockRuntimeApi } from '../api/mockRuntimeApi'
 import type { VisualizerNode, VisualizerPayload } from '../api/runtimeApi'
-
-function countElements(node: VisualizerNode): number {
-  let total = 0
-  const stack = [...(node.linguistic_elements || [])]
-  while (stack.length) {
-    const current = stack.shift()
-    if (!current) continue
-    total += 1
-    for (const child of current.linguistic_elements || []) stack.push(child)
-  }
-  return total
-}
 
 describe('VocabularyPage', () => {
   it('shows only analyzed files', async () => {
@@ -34,13 +22,50 @@ describe('VocabularyPage', () => {
     expect(visualizerBtn).toBeEnabled()
   })
 
-  it('shows items count from contract linguistic elements', async () => {
+  it('shows row with default items count before lazy payload hydration', async () => {
+    renderWithProviders(<VocabularyPage />)
+    expect(await screen.findByText('sample.mp4')).toBeInTheDocument()
+    expect(await screen.findByText('0')).toBeInTheDocument()
+  })
+
+  it('shows all analysis history versions for the same file', async () => {
     const api = new MockRuntimeApi()
-    const payload = await api.getVisualizerPayload('doc-1')
-    const expected = Object.values(payload).reduce((acc, root) => acc + countElements(root), 0)
+    vi.spyOn(api, 'listAnalysisHistory').mockResolvedValue([
+      {
+        analysis_id: 'doc-new',
+        document_id: 'doc-1',
+        project_id: 'proj-1',
+        project_name: 'Demo Project',
+        media_file_id: 'file-1',
+        file_name: 'sample.mp4',
+        file_path: '/uploads/sample.mp4',
+        size_bytes: 104857600,
+        duration_seconds: 600,
+        settings: 'Transl: m2m100 / Subs: bilingual / Voice: male',
+        updated_at: '2026-03-08T12:25:33Z',
+        created_at: '2026-03-08T12:24:32Z',
+        contract_current: true,
+      },
+      {
+        analysis_id: 'doc-old',
+        document_id: 'doc-old',
+        project_id: 'proj-1',
+        project_name: 'Demo Project',
+        media_file_id: 'file-1',
+        file_name: 'sample.mp4',
+        file_path: '/uploads/sample.mp4',
+        size_bytes: 104857600,
+        duration_seconds: 600,
+        settings: 'Transl: m2m100 / Subs: bilingual / Voice: male',
+        updated_at: '2026-03-08T11:57:42Z',
+        created_at: '2026-03-08T11:56:40Z',
+        contract_current: true,
+      },
+    ])
 
     renderWithProviders(<VocabularyPage />, api)
-    expect(await screen.findByText(String(expected))).toBeInTheDocument()
+    const rows = await screen.findAllByText('sample.mp4')
+    expect(rows.length).toBe(2)
   })
 
   it('exports selected provider translation rows', async () => {
@@ -87,5 +112,20 @@ describe('VocabularyPage', () => {
     expect(rows[0].translation).toBe('Она (GPT)')
     expect(rows[0].translation_backend_m2m100).toBe('Она')
     expect(rows[0].translation_gpt).toBe('Она (GPT)')
+  })
+
+  it('deletes selected analyses from vocabulary table', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderWithProviders(<VocabularyPage />)
+    expect(await screen.findByText('sample.mp4')).toBeInTheDocument()
+
+    const checkboxes = await screen.findAllByRole('checkbox')
+    fireEvent.click(checkboxes[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Analyses' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('sample.mp4')).not.toBeInTheDocument()
+    })
+    confirmSpy.mockRestore()
   })
 })

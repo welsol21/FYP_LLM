@@ -335,6 +335,62 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertTrue(snapshots)
             self.assertTrue((snapshots[0] / "media_contract.json").exists())
 
+    def test_process_media_now_falls_back_to_internal_project_on_stale_fk(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media_path = Path(tmpdir) / "short.txt"
+            media_path.write_text("She trusted him.", encoding="utf-8")
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            mocked_pipeline = MediaPipelineResult(
+                source_type="text",
+                full_text="She trusted him.",
+                text_hash="h-text",
+                media_sentences=[
+                    {
+                        "sentence_idx": 0,
+                        "sentence_text": "She trusted him.",
+                        "sentence_hash": "h1",
+                        "start_ms": 0,
+                        "end_ms": 1000,
+                        "id": 1,
+                        "text_eng": "She trusted him.",
+                        "units": [],
+                        "start": 0.0,
+                        "end": 1.0,
+                        "text_ru": "Она доверяла ему.",
+                        "units_ru": [],
+                    }
+                ],
+                contract_sentences=[
+                    {
+                        "sentence_idx": 0,
+                        "sentence_hash": "h1",
+                        "sentence_node": {
+                            "type": "Sentence",
+                            "node_id": "s-1",
+                            "content": "She trusted him.",
+                            "linguistic_elements": [],
+                        },
+                    }
+                ],
+            )
+
+            with patch("ela_pipeline.runtime.service.run_media_pipeline", return_value=mocked_pipeline):
+                result = svc.process_media_now(
+                    media_path=str(media_path),
+                    project_id="ghost-project",
+                    media_file_id="ghost-file",
+                )
+
+            self.assertEqual(result["status"], "completed")
+            doc = svc.repo.get_document(str(result.get("document_id") or ""))
+            self.assertIsNotNone(doc)
+            self.assertEqual(str(doc.get("project_id") or ""), "_frontend_internal_project")
+            self.assertIsNone(doc.get("media_file_id"))
+
     def test_non_default_provider_applies_ui_overlay_without_mutating_canonical_contract(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             media_path = Path(tmpdir) / "short.txt"

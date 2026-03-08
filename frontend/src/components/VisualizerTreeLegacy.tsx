@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { VisualizerNode } from '../api/runtimeApi'
 import { normalizeLinguisticNotes } from '../lib/linguisticNotes'
-import { listAlternativeTranslations, resolveNodeTranslation } from '../lib/translationContract'
+import { listAlternativeTranslations, resolveNodeTranslationVariant } from '../lib/translationContract'
 
 const colorMap: Record<string, string> = {
   sentence: '#fdf6e3',
@@ -76,6 +76,13 @@ function textColorForBg(hexColor: string): string {
   const b = parseInt(hex.slice(4, 6), 16)
   const yiq = (r * 299 + g * 587 + b * 114) / 1000
   return yiq >= 150 ? '#0b1220' : '#f8fbff'
+}
+
+function providerLabel(provider: string | undefined): string {
+  const normalized = String(provider || '').trim()
+  if (!normalized) return '-'
+  if (normalized.startsWith('client_')) return normalized
+  return `client_${normalized}`
 }
 
 function nodeTokens(node: VisualizerNode, level: number): Token[] {
@@ -169,7 +176,9 @@ export function VisualizerTreeLegacy({
   const notes = normalizeLinguisticNotes(node.linguistic_notes)
   const fallbackNotes = node.notes?.map((note) => note?.text?.trim()).filter(Boolean).join(' ') || ''
   const intermediateText = notes.intermediate || fallbackNotes || '-'
-  const translationText = resolveNodeTranslation(node, preferredTranslationProvider)
+  const translationVariant = resolveNodeTranslationVariant(node, preferredTranslationProvider)
+  const translationText = translationVariant.text
+  const translationProvider = providerLabel(translationVariant.provider)
   const alternativeTranslations = useMemo(
     () => listAlternativeTranslations(node, preferredTranslationProvider),
     [node, preferredTranslationProvider],
@@ -238,7 +247,7 @@ export function VisualizerTreeLegacy({
             {showAdvanced ? <div>{notes.advanced}</div> : null}
           </div>
         ) : null}
-        <div><strong>Translation:</strong> {translationText}</div>
+        <div><strong>Translation ({translationProvider}):</strong> {translationText}</div>
         {alternativeTranslations.length > 0 ? (
           <div className="lv-more-translations">
             {!showAllTranslations ? (
@@ -254,7 +263,7 @@ export function VisualizerTreeLegacy({
               <div className="lv-more-translations-list">
                 {alternativeTranslations.map((item) => (
                   <div key={`${node.node_id}-${item.provider}`}>
-                    <strong>{item.provider}:</strong> {item.text}
+                    <strong>{providerLabel(item.provider)}:</strong> {item.text}
                   </div>
                 ))}
               </div>

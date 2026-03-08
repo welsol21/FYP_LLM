@@ -20,6 +20,18 @@ describe('VisualizerPage', () => {
     expect(screen.getAllByText(/CEFR:/).length).toBeGreaterThan(0)
   })
 
+  it('auto-selects root sentence node and pre-fills content editor', async () => {
+    renderWithProviders(<VisualizerPage />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'select-node-n1' })).toBeInTheDocument()
+    })
+
+    expect(screen.getByText(/Selected Node:\s*sentence/i)).toBeInTheDocument()
+    const editorInput = screen.getByLabelText('New Content') as HTMLInputElement | HTMLTextAreaElement
+    expect(editorInput.value).toBe('She should have trusted her instincts before making the decision.')
+  })
+
   it('applies node edit from label selection and updates rendered content', async () => {
     renderWithProviders(<VisualizerPage />)
 
@@ -35,6 +47,25 @@ describe('VisualizerPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Edit applied.')).toBeInTheDocument()
     })
+  })
+
+  it('resets quick editor to content on node select and exposes all note levels', async () => {
+    renderWithProviders(<VisualizerPage />)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'toggle-children-n1' })).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('button', { name: 'Linguistic Notes (Elementary)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Linguistic Notes (Intermediate)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Linguistic Notes (Advanced)' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'CEFR' }))
+    fireEvent.click(screen.getByRole('button', { name: 'toggle-children-n1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'select-node-n4' }))
+
+    const editorInput = screen.getByLabelText('New Content') as HTMLInputElement
+    expect(editorInput.value).toBe('should have trusted her instincts')
   })
 
   it('loads document-scoped payload and navigates within selected document', async () => {
@@ -98,6 +129,8 @@ describe('VisualizerPage', () => {
         ui_feedback: { severity: 'info', title: '', message: '' },
       }),
       listFiles: async () => [],
+      listAnalysisHistory: async () => [],
+      deleteAnalysis: async () => ({ status: 'ok', message: 'deleted' }),
       listDocumentArtifacts: async () => [],
       getBackendJobStatus: async (jobId: string) => ({ job_id: jobId, status: 'completed_local', message: 'ok', stage_progress: [100, 100, 100, 100, 100] }),
       uploadMedia: async () => ({ fileName: 'uploaded.txt', mediaPath: '/tmp/uploaded.txt', sizeBytes: 12 }),
@@ -185,6 +218,8 @@ describe('VisualizerPage', () => {
         ui_feedback: { severity: 'info', title: '', message: '' },
       }),
       listFiles: async () => [],
+      listAnalysisHistory: async () => [],
+      deleteAnalysis: async () => ({ status: 'ok', message: 'deleted' }),
       listDocumentArtifacts: async () => [],
       getBackendJobStatus: async (jobId: string) => ({ job_id: jobId, status: 'completed_local', message: 'ok', stage_progress: [100, 100, 100, 100, 100] }),
       uploadMedia: async () => ({ fileName: 'uploaded.txt', mediaPath: '/tmp/uploaded.txt', sizeBytes: 12 }),
@@ -216,7 +251,7 @@ describe('VisualizerPage', () => {
     })
     expect(screen.getByRole('button', { name: 'More translations (1)' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'More translations (1)' }))
-    expect(screen.getByText('gpt:')).toBeInTheDocument()
+    expect(screen.getByText('client_gpt:')).toBeInTheDocument()
     expect(screen.getByText('GPT translation')).toBeInTheDocument()
   })
 
@@ -267,6 +302,8 @@ describe('VisualizerPage', () => {
       registerMediaFile: async () => ({ id: 'f', project_id: 'p', name: 'x', path: '/tmp/x' }),
       submitMedia: async () => ({ result: { route: 'local', message: '' }, ui_feedback: { severity: 'info', title: '', message: '' } }),
       listFiles: async () => [],
+      listAnalysisHistory: async () => [],
+      deleteAnalysis: async () => ({ status: 'ok', message: 'deleted' }),
       listDocumentArtifacts: async () => [],
       getBackendJobStatus: async (jobId: string) => ({ job_id: jobId, status: 'completed_local', message: 'ok', stage_progress: [100, 100, 100, 100, 100] }),
       uploadMedia: async () => ({ fileName: 'u.txt', mediaPath: '/tmp/u.txt', sizeBytes: 10 }),

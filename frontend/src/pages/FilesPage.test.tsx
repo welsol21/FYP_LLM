@@ -21,6 +21,7 @@ describe('FilesPage', () => {
     fireEvent.click(analyzedRow)
     expect(mockNavigate).toHaveBeenCalledWith('/analyze', {
       state: {
+        analyzeEntry: 'files',
         selectedMedia: {
           mediaFileId: 'file-1',
           documentId: 'doc-1',

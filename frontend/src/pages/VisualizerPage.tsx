@@ -8,7 +8,9 @@ const BASIC_EDIT_FIELDS: Array<{ key: string; label: string }> = [
   { key: 'content', label: 'Content' },
   { key: 'cefr_level', label: 'CEFR' },
   { key: 'tense', label: 'Tense' },
+  { key: 'linguistic_notes.elementary', label: 'Linguistic Notes (Elementary)' },
   { key: 'linguistic_notes.intermediate', label: 'Linguistic Notes (Intermediate)' },
+  { key: 'linguistic_notes.advanced', label: 'Linguistic Notes (Advanced)' },
   { key: 'translations.backend_m2m100.text', label: 'Translation' },
   { key: 'phonetic.uk', label: 'Phonetic (UK)' },
   { key: 'phonetic.us', label: 'Phonetic (US)' },
@@ -350,19 +352,25 @@ export function VisualizerPage() {
   const hasPrev = activeSentenceIndex > 0
   const hasNext = activeSentenceIndex < rows.length - 1
 
-  function onSelectNode(node: VisualizerNode) {
+  function selectNodeForEdit(node: VisualizerNode) {
     setNodeId(node.node_id)
     setSelectedNodeLabel(node.part_of_speech)
     setSelectedNode(node)
-    const path = advancedOpen ? advancedField : basicField
-    const serialized = serializeEditValue(getValueByPath(node, path))
-    if (advancedOpen) {
-      setNewValue(normalizeAdvancedFieldValue(path, serialized))
-    } else {
-      setNewValue(serialized)
-    }
+    setAdvancedOpen(false)
+    setBasicField('content')
+    setNewValue(serializeEditValue(getValueByPath(node, 'content')))
     setEditStatus('')
     setEditorMode('quick')
+  }
+
+  useEffect(() => {
+    if (!activeRow?.tree) return
+    if (nodeId) return
+    selectNodeForEdit(activeRow.tree)
+  }, [activeRow?.tree, nodeId])
+
+  function onSelectNode(node: VisualizerNode) {
+    selectNodeForEdit(node)
   }
 
   function onChangeBasicField(path: string) {

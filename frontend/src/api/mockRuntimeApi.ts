@@ -1,5 +1,6 @@
 import samplePayload from './frontend_contract_sample.json'
 import type {
+  AnalysisHistoryRow,
   AnalyzeTextPayload,
   BackendJobStatus,
   DocumentArtifact,
@@ -315,8 +316,58 @@ export class MockRuntimeApi implements RuntimeApi {
     return this.files.filter((row) => this.fileProjectId[row.id] === projectId)
   }
 
+  async listAnalysisHistory(projectId?: string): Promise<AnalysisHistoryRow[]> {
+    const projectRows = this.projects.reduce<Record<string, string>>((acc, row) => {
+      acc[row.id] = row.name
+      return acc
+    }, {})
+    const candidates = this.files.filter((row) => {
+      if (!row.analyzed || !row.document_id) return false
+      const fileProjectId = this.fileProjectId[row.id]
+      if (projectId && fileProjectId !== projectId) return false
+      return true
+    })
+    return candidates
+      .map((row) => {
+        const pid = this.fileProjectId[row.id] || ''
+        return {
+          analysis_id: String(row.document_id || row.id),
+          document_id: String(row.document_id || ''),
+          project_id: pid,
+          project_name: projectRows[pid] || pid,
+          media_file_id: row.id,
+          file_name: row.name,
+          file_path: row.path,
+          size_bytes: row.size_bytes,
+          duration_seconds: row.duration_seconds,
+          settings: row.settings,
+          updated_at: row.updated,
+          created_at: row.updated,
+          contract_current: true,
+        }
+      })
+      .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))
+  }
+
+  async deleteAnalysis(documentId: string): Promise<{ status: 'ok' | 'error'; message: string; document_id?: string }> {
+    const docId = String(documentId || '').trim()
+    if (!docId) {
+      return { status: 'error', message: 'documentId is required.' }
+    }
+    const existed = Boolean(this.payloadByDocument[docId])
+    delete this.payloadByDocument[docId]
+    this.files = this.files.map((row) => (
+      row.document_id === docId
+        ? { ...row, analyzed: false, document_id: undefined }
+        : row
+    ))
+    return existed
+      ? { status: 'ok', message: 'Analysis artifacts deleted.', document_id: docId }
+      : { status: 'error', message: 'analysis not found', document_id: docId }
+  }
+
   async listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]> {
-    if (!documentId) return []
+    if (!documentId || !this.payloadByDocument[documentId]) return []
     return [
       {
         name: 'full_text.txt',

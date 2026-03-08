@@ -602,6 +602,30 @@ class LocalSQLiteRepository:
             for row in rows
         ]
 
+    def get_media_file(self, media_file_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT id, project_id, name, path, duration_seconds, size_bytes, created_at, updated_at
+                FROM media_files
+                WHERE id = ?
+                LIMIT 1
+                """,
+                (media_file_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "id": row[0],
+            "project_id": row[1],
+            "name": row[2],
+            "path": row[3],
+            "duration_seconds": row[4],
+            "size_bytes": row[5],
+            "created_at": row[6],
+            "updated_at": row[7],
+        }
+
     def list_media_files_with_analysis(self, project_id: str | None = None) -> list[dict[str, Any]]:
         params: list[Any] = []
         where_sql = ""
@@ -652,6 +676,52 @@ class LocalSQLiteRepository:
             )
         return out
 
+    def list_analysis_history(self, project_id: str | None = None) -> list[dict[str, Any]]:
+        params: list[Any] = []
+        where_sql = "WHERE d.status = 'completed'"
+        if project_id:
+            where_sql += " AND d.project_id = ?"
+            params.append(project_id)
+        sql = f"""
+            SELECT
+                d.id,
+                d.project_id,
+                p.name,
+                d.media_file_id,
+                mf.name,
+                COALESCE(mf.path, d.source_path),
+                mf.duration_seconds,
+                mf.size_bytes,
+                d.source_path,
+                d.created_at,
+                d.updated_at
+            FROM documents d
+            LEFT JOIN projects p ON p.id = d.project_id
+            LEFT JOIN media_files mf ON mf.id = d.media_file_id
+            {where_sql}
+            ORDER BY d.updated_at DESC, d.id DESC
+        """
+        with self._connect() as conn:
+            rows = conn.execute(sql, tuple(params)).fetchall()
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            out.append(
+                {
+                    "document_id": row[0],
+                    "project_id": row[1],
+                    "project_name": row[2],
+                    "media_file_id": row[3],
+                    "file_name": row[4],
+                    "file_path": row[5],
+                    "duration_seconds": row[6],
+                    "size_bytes": row[7],
+                    "source_path": row[8],
+                    "created_at": row[9],
+                    "updated_at": row[10],
+                }
+            )
+        return out
+
     def set_workspace_state(self, state_key: str, state_value: dict[str, Any]) -> None:
         now = _utc_now()
         payload = json.dumps(state_value, ensure_ascii=False, sort_keys=True)
@@ -681,6 +751,18 @@ class LocalSQLiteRepository:
         if row is None:
             return None
         return json.loads(row[0])
+
+    def delete_workspace_state(self, state_key: str) -> bool:
+        with self._connect() as conn:
+            cur = conn.execute("DELETE FROM workspace_state WHERE state_key = ?", (state_key,))
+            conn.commit()
+        return int(cur.rowcount or 0) > 0
+
+    def delete_document(self, document_id: str) -> bool:
+        with self._connect() as conn:
+            cur = conn.execute("DELETE FROM documents WHERE id = ?", (document_id,))
+            conn.commit()
+        return int(cur.rowcount or 0) > 0
 
     def add_local_edit(
         self,

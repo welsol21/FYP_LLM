@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import sqlite3
 import subprocess
 import tempfile
 import threading
@@ -33,6 +34,8 @@ MEDIA_FILE_SETTINGS_PREFIX = "media_file_settings:"
 BACKEND_TRANSLATION_PROVIDER_KEY = "backend_m2m100"
 MEDIA_STAGE_MANIFEST_PREFIX = "media_stage_manifest:"
 CONTRACT_BUILD_VERSION = "2026-03-04-rulesfirst-v1"
+FRONTEND_INTERNAL_PROJECT_ID = "_frontend_internal_project"
+FRONTEND_INTERNAL_PROJECT_NAME = "Frontend Internal Project"
 
 
 def _normalize_provider_key(value: str | None) -> str:
@@ -475,6 +478,15 @@ class RuntimeMediaService:
         self.set_selected_project(project_id=created["id"])
         return created
 
+    def _ensure_internal_project(self) -> str:
+        existing = next((p for p in self.repo.list_projects() if p["id"] == FRONTEND_INTERNAL_PROJECT_ID), None)
+        if existing is None:
+            self.repo.create_project(
+                name=FRONTEND_INTERNAL_PROJECT_NAME,
+                project_id=FRONTEND_INTERNAL_PROJECT_ID,
+            )
+        return FRONTEND_INTERNAL_PROJECT_ID
+
     def get_selected_project(self) -> dict[str, Any]:
         state = self.repo.get_workspace_state("selected_project")
         if not state:
@@ -532,29 +544,18 @@ class RuntimeMediaService:
         selected_provider = str(translation_provider or translation_cfg.get("default_provider") or "m2m100").strip().lower()
         provider_credentials = self._provider_credentials(provider_id=selected_provider, config=translation_cfg)
         selected = self.get_selected_project()
-        effective_project_id = project_id or selected.get("project_id")
-        if not effective_project_id:
-            raw = {
-                "route": "reject",
-                "status": "rejected",
-                "message": "Create/select project first.",
-                "job_id": None,
-            }
-            return {
-                "result": raw,
-                "ui_feedback": build_submission_ui_feedback(raw),
-            }
-        if not any(p["id"] == effective_project_id for p in self.repo.list_projects()):
-            raw = {
-                "route": "reject",
-                "status": "rejected",
-                "message": f"Project '{effective_project_id}' not found.",
-                "job_id": None,
-            }
-            return {
-                "result": raw,
-                "ui_feedback": build_submission_ui_feedback(raw),
-            }
+        requested_project_id = str(project_id or selected.get("project_id") or "").strip()
+        if requested_project_id and any(p["id"] == requested_project_id for p in self.repo.list_projects()):
+            effective_project_id = requested_project_id
+        else:
+            # Keep backend stateless from frontend perspective: always have internal project for processing.
+            effective_project_id = self._ensure_internal_project()
+
+        # Guard against stale/foreign media_file_id from client-side workspace.
+        if media_file_id is not None:
+            known_media_file = self.repo.get_media_file(str(media_file_id))
+            if known_media_file is None:
+                media_file_id = None
 
         if media_file_id is None:
             media_file_id = f"file-{uuid.uuid4().hex[:12]}"
@@ -766,6 +767,93 @@ class RuntimeMediaService:
             )
         return out
 
+    def list_analysis_history(self, *, project_id: str | None = None) -> list[dict[str, Any]]:
+        rows = self.repo.list_analysis_history(project_id=project_id)
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            media_file_id = str(row.get("media_file_id") or "").strip()
+            settings_state = self.repo.get_workspace_state(f"{MEDIA_FILE_SETTINGS_PREFIX}{media_file_id}") if media_file_id else {}
+            settings_state = settings_state if isinstance(settings_state, dict) else {}
+            tp = str(settings_state.get("translation_provider") or "m2m100")
+            subs = str(settings_state.get("subtitles_mode") or "bilingual")
+            voice = str(settings_state.get("voice_choice") or "male")
+            file_name = str(row.get("file_name") or "").strip()
+            if not file_name:
+                source_path = str(row.get("source_path") or "").strip()
+                file_name = Path(source_path).name if source_path else "Unknown"
+            document_id = str(row.get("document_id") or "").strip()
+            out.append(
+                {
+                    "analysis_id": document_id,
+                    "document_id": document_id,
+                    "project_id": str(row.get("project_id") or ""),
+                    "project_name": str(row.get("project_name") or row.get("project_id") or ""),
+                    "media_file_id": media_file_id or None,
+                    "file_name": file_name,
+                    "file_path": str(row.get("file_path") or row.get("source_path") or ""),
+                    "size_bytes": row.get("size_bytes"),
+                    "duration_seconds": row.get("duration_seconds"),
+                    "settings": f"Transl: {tp} / Subs: {subs} / Voice: {voice}",
+                    "updated_at": str(row.get("updated_at") or ""),
+                    "created_at": str(row.get("created_at") or ""),
+                    "contract_current": self._is_current_document_contract(document_id),
+                }
+            )
+        return out
+
+    def delete_analysis(self, *, document_id: str) -> dict[str, Any]:
+        doc_id = str(document_id or "").strip()
+        if not doc_id:
+            return {"status": "error", "message": "document_id is required"}
+
+        document = self.repo.get_document(doc_id)
+        media_file_id = str((document or {}).get("media_file_id") or "").strip() if isinstance(document, dict) else ""
+        source_path = str((document or {}).get("source_path") or "").strip() if isinstance(document, dict) else ""
+
+        # Remove analysis artifact folder.
+        removed_artifacts_dirs = 0
+        removed_archive_dirs = 0
+        doc_dir = self._doc_artifacts_dir(document_id=doc_id)
+        if doc_dir.exists() and doc_dir.is_dir():
+            shutil.rmtree(doc_dir, ignore_errors=True)
+            removed_artifacts_dirs += 1
+
+        # Remove archived snapshots for this concrete analysis id.
+        archive_base = Path(os.getenv("MEDIA_CONTRACT_ARCHIVE_DIR", "artifacts/media_contract_archive"))
+        if archive_base.exists() and archive_base.is_dir():
+            for candidate in archive_base.glob(f"**/*_{doc_id}"):
+                if candidate.is_dir():
+                    shutil.rmtree(candidate, ignore_errors=True)
+                    removed_archive_dirs += 1
+
+        # Remove DB state for the analysis itself.
+        deleted_from_db = self.repo.delete_document(doc_id)
+
+        # Clear stage-manifest pointers when they reference deleted analysis.
+        manifest_keys: set[str] = set()
+        if media_file_id or source_path:
+            manifest_keys.add(self._manifest_state_key(media_file_id=media_file_id or None, media_path=source_path))
+        if source_path:
+            manifest_keys.add(self._manifest_state_key(media_file_id=None, media_path=source_path))
+        for key in manifest_keys:
+            state = self.repo.get_workspace_state(key)
+            if not isinstance(state, dict):
+                continue
+            if str(state.get("last_document_id") or "").strip() == doc_id:
+                self.repo.delete_workspace_state(key)
+
+        if not deleted_from_db and removed_artifacts_dirs == 0 and removed_archive_dirs == 0:
+            return {"status": "error", "message": "analysis not found", "document_id": doc_id}
+
+        return {
+            "status": "ok",
+            "message": "Analysis artifacts deleted.",
+            "document_id": doc_id,
+            "deleted_from_db": bool(deleted_from_db),
+            "removed_artifacts_dirs": int(removed_artifacts_dirs),
+            "removed_archive_dirs": int(removed_archive_dirs),
+        }
+
     def _is_current_document_contract(self, document_id: str) -> bool:
         doc_id = str(document_id or "").strip()
         if not doc_id:
@@ -962,10 +1050,22 @@ class RuntimeMediaService:
         stage_callback: Callable[[str, float | None, str | None], None] | None = None,
     ) -> dict[str, Any]:
         started = time.monotonic()
-        if media_file_id is not None:
-            current_settings = self.repo.get_workspace_state(f"{MEDIA_FILE_SETTINGS_PREFIX}{media_file_id}") or {}
+        requested_project_id = str(project_id or "").strip()
+        if requested_project_id and any(p["id"] == requested_project_id for p in self.repo.list_projects()):
+            effective_project_id = requested_project_id
+        else:
+            effective_project_id = self._ensure_internal_project()
+
+        effective_media_file_id = str(media_file_id or "").strip() or None
+        if effective_media_file_id is not None:
+            known_media_file = self.repo.get_media_file(effective_media_file_id)
+            if known_media_file is None:
+                effective_media_file_id = None
+
+        if effective_media_file_id is not None:
+            current_settings = self.repo.get_workspace_state(f"{MEDIA_FILE_SETTINGS_PREFIX}{effective_media_file_id}") or {}
             self.repo.set_workspace_state(
-                f"{MEDIA_FILE_SETTINGS_PREFIX}{media_file_id}",
+                f"{MEDIA_FILE_SETTINGS_PREFIX}{effective_media_file_id}",
                 {
                     "translation_provider": str(
                         translation_provider
@@ -977,7 +1077,7 @@ class RuntimeMediaService:
                 },
             )
         effective_translation_provider = str(translation_provider or "").strip().lower() or "m2m100"
-        manifest_key = self._manifest_state_key(media_file_id=media_file_id, media_path=media_path)
+        manifest_key = self._manifest_state_key(media_file_id=effective_media_file_id, media_path=media_path)
         media_signature = self._build_media_signature(media_path=media_path)
         immutable_signature = self._build_immutable_signature(media_signature=media_signature)
         variant_signature = self._build_variant_signature(
@@ -1033,6 +1133,13 @@ class RuntimeMediaService:
         if stage_callback is not None:
             stage_callback("translating_text", 1.0, "Sentence contract build completed")
 
+        if len(pipeline.media_sentences) == 0:
+            return {
+                "job_id": None,
+                "status": "error",
+                "message": "No sentences detected after transcription/parsing.",
+            }
+
         selected_provider = effective_translation_provider
         if selected_provider and selected_provider not in {"m2m100", "our", "backend", "default"}:
             normalized_selected_provider = _normalize_provider_key(selected_provider) or "overlay_provider"
@@ -1083,15 +1190,29 @@ class RuntimeMediaService:
         document_id = document_id or f"doc-{uuid.uuid4().hex[:12]}"
         existing_doc = self.repo.get_document(document_id)
         if existing_doc is None:
-            self.repo.create_document(
-                document_id=document_id,
-                project_id=project_id,
-                media_file_id=media_file_id,
-                source_type=pipeline.source_type,
-                source_path=media_path,
-                media_hash=f"local:{media_file_id or 'media'}",
-                status="processing",
-            )
+            try:
+                self.repo.create_document(
+                    document_id=document_id,
+                    project_id=effective_project_id,
+                    media_file_id=effective_media_file_id,
+                    source_type=pipeline.source_type,
+                    source_path=media_path,
+                    media_hash=f"local:{effective_media_file_id or 'media'}",
+                    status="processing",
+                )
+            except sqlite3.IntegrityError:
+                # Stale FK references must not break processing in frontend-local mode.
+                effective_project_id = self._ensure_internal_project()
+                effective_media_file_id = None
+                self.repo.create_document(
+                    document_id=document_id,
+                    project_id=effective_project_id,
+                    media_file_id=effective_media_file_id,
+                    source_type=pipeline.source_type,
+                    source_path=media_path,
+                    media_hash="local:media",
+                    status="processing",
+                )
         self.repo.upsert_document_text(
             document_id=document_id,
             full_text=pipeline.full_text,
@@ -1116,7 +1237,7 @@ class RuntimeMediaService:
             stage_callback("generating_media", 0.25, "Persisting contract artifacts")
         self._persist_media_contract_artifacts(
             document_id=document_id,
-            media_file_id=media_file_id,
+            media_file_id=effective_media_file_id,
             media_path=media_path,
             source_type=pipeline.source_type,
             full_text=pipeline.full_text,
