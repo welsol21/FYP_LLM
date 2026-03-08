@@ -38,6 +38,8 @@ body {
   padding: 12px;
   background: rgba(10, 12, 18, 0.9);
   border-bottom: 1px solid var(--line);
+  width: min(100%, 1080px);
+  margin: 0 auto;
 }
 
 .top-actions {
@@ -143,6 +145,8 @@ button {
   padding: 10px 12px 14px;
   border-top: 1px solid var(--line);
   background: rgba(9, 12, 18, 0.95);
+  width: min(100%, 1080px);
+  margin: 0 auto;
 }
 
 .card {
@@ -406,6 +410,8 @@ button {
 .visualizer-root {
   display: grid;
   gap: 14px;
+  width: min(100%, 1080px);
+  margin: 0 auto;
 }
 
 .visualizer-row {
@@ -881,10 +887,5 @@ button {
 @media (min-width: 1000px) {
   .screen {
     padding: 18px;
-  }
-
-  .visualizer-row {
-    grid-template-columns: 380px minmax(0, 1fr);
-    align-items: start;
   }
 }
