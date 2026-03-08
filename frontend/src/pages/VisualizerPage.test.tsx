@@ -27,9 +27,11 @@ describe('VisualizerPage', () => {
       expect(screen.getByRole('button', { name: 'select-node-n1' })).toBeInTheDocument()
     })
 
-    expect(screen.getByText(/Selected Node:\s*sentence/i)).toBeInTheDocument()
-    const editorInput = screen.getByLabelText('New Content') as HTMLInputElement | HTMLTextAreaElement
-    expect(editorInput.value).toBe('She should have trusted her instincts before making the decision.')
+    await waitFor(() => {
+      expect(screen.getByText(/Selected Node:\s*sentence/i)).toBeInTheDocument()
+      const editorInput = screen.getByLabelText('New Content') as HTMLInputElement | HTMLTextAreaElement
+      expect(editorInput.value).toBe('She should have trusted her instincts before making the decision.')
+    })
   })
 
   it('applies node edit from label selection and updates rendered content', async () => {

@@ -652,34 +652,22 @@ button {
   gap: 10px;
 }
 
-.quick-edit-header {
+.quick-edit-switches {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.quick-edit-title-btn {
-  width: 100%;
-  min-height: var(--touch-min);
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, #151b28 0%, #101521 100%);
+.quick-edit-section-title {
+  margin: 0 0 8px;
+  padding: 0 2px;
   color: var(--text);
-  border-radius: 10px;
-  padding: 10px 14px;
   font-weight: 800;
-  font-size: clamp(20px, 1.8vw, 24px);
-  line-height: 1;
-  white-space: nowrap;
+  font-size: clamp(20px, 1.8vw, 22px);
+  line-height: 1.15;
 }
 
-.quick-edit-header-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 8px;
-  margin-left: 0;
-}
-
+.quick-edit-title-btn,
 .translation-control-btn {
   width: 100%;
   min-height: var(--touch-min);
@@ -688,10 +676,18 @@ button {
   color: var(--text);
   border-radius: 10px;
   padding: 10px 14px;
+  font-family: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
   font-weight: 800;
   font-size: clamp(20px, 1.8vw, 24px);
   line-height: 1;
   white-space: nowrap;
+}
+
+.quick-edit-section {
+  border: 1px solid #2f3d54;
+  border-radius: 10px;
+  padding: 10px;
+  background: #101725;
 }
 
 .quick-edit-translate-panel {
@@ -844,6 +840,10 @@ button {
 
 @media (max-width: 860px) {
   .touch-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-edit-switches {
     grid-template-columns: 1fr;
   }
 

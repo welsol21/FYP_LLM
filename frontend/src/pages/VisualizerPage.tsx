@@ -408,16 +408,18 @@ export function VisualizerPage() {
     <section className="visualizer-root">
       <section className="visualizer-row">
         <form onSubmit={onApplyEdit} className="card quick-edit-grid" aria-label="edit-form">
-          <div className="quick-edit-header">
-            <button
-              type="button"
-              className="quick-edit-title-btn"
-              onClick={() => setEditorMode('quick')}
-              aria-label="toggle-quick-edit"
-            >
-              Quick Node Edit
-            </button>
-            <div className="quick-edit-header-actions">
+          <div className="quick-edit-switches">
+            {!quickEditOpen ? (
+              <button
+                type="button"
+                className="quick-edit-title-btn"
+                onClick={() => setEditorMode('quick')}
+                aria-label="toggle-quick-edit"
+              >
+                Quick Node Edit
+              </button>
+            ) : null}
+            {!translateOpen ? (
               <button
                 type="button"
                 className="translation-control-btn"
@@ -426,10 +428,12 @@ export function VisualizerPage() {
               >
                 Translate
               </button>
-            </div>
+            ) : null}
           </div>
           {translateOpen ? (
-            <div className="quick-edit-translate-panel">
+            <section className="quick-edit-section quick-edit-section-translate">
+              <h2 className="quick-edit-section-title">Translate</h2>
+              <div className="quick-edit-translate-panel">
               <label className="quick-edit-translate-label">Translation provider</label>
               <div className="touch-options-grid translation-provider-options">
                 {translationProviderOptions.map((provider) => (
@@ -469,10 +473,12 @@ export function VisualizerPage() {
                   Close
                 </button>
               </div>
-            </div>
+              </div>
+            </section>
           ) : null}
           {quickEditOpen ? (
-            <>
+            <section className="quick-edit-section quick-edit-section-edit">
+              <h2 className="quick-edit-section-title">Quick Node Edit</h2>
               <p className="quick-edit-help">
                 Select a node by tapping/clicking its label (<code>sentence</code>, <code>noun phrase</code>, etc.).
                 Edit visible fields in Basic mode, or use Advanced mode for linguist-only fields.
@@ -573,7 +579,7 @@ export function VisualizerPage() {
                 </button>
                 {editStatus ? <p className="quick-edit-status">{editStatus}</p> : null}
               </div>
-            </>
+            </section>
           ) : null}
         </form>
         <section className="card">
