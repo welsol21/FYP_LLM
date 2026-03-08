@@ -179,6 +179,111 @@ describe('VisualizerPage', () => {
     expect(screen.getByText('1 / 2')).toBeInTheDocument()
   })
 
+  it('keeps quick edit and translate forms open across sentence navigation', async () => {
+    const docPayload: VisualizerPayload = {
+      'Sentence one.': {
+        node_id: 's1',
+        type: 'Sentence',
+        content: 'Sentence one.',
+        tense: 'null',
+        linguistic_notes: [],
+        part_of_speech: 'sentence',
+        translations: {
+          backend_m2m100: { text: 'Sentence one.' },
+        },
+        linguistic_elements: [],
+      },
+      'Sentence two.': {
+        node_id: 's2',
+        type: 'Sentence',
+        content: 'Sentence two.',
+        tense: 'null',
+        linguistic_notes: [],
+        part_of_speech: 'sentence',
+        translations: {
+          backend_m2m100: { text: 'Sentence two.' },
+        },
+        linguistic_elements: [],
+      },
+    }
+    const getVisualizerPayload = vi.fn(async (documentId?: string) => {
+      if (documentId === 'doc-42') return docPayload
+      return {}
+    })
+    const api: RuntimeApi = {
+      getUiState: async () => ({
+        runtime_mode: 'online',
+        deployment_mode: 'local',
+        badges: {},
+        features: {
+          phonetic: { enabled: true, reason_if_disabled: '' },
+          db_persistence: { enabled: true, reason_if_disabled: '' },
+        },
+      }),
+      listProjects: async () => [{ id: 'proj-1', name: 'Demo', created_at: '2026-02-18T00:00:00Z', updated_at: '2026-02-18T00:00:00Z' }],
+      createProject: async (name: string) => ({
+        id: 'proj-2',
+        name,
+        created_at: '2026-02-18T00:00:00Z',
+        updated_at: '2026-02-18T00:00:00Z',
+      }),
+      getSelectedProject: async () => ({ project_id: 'proj-1', project_name: 'Demo' }),
+      setSelectedProject: async () => ({ project_id: 'proj-1', project_name: 'Demo' }),
+      registerMediaFile: async () => ({
+        id: 'file-1',
+        project_id: 'proj-1',
+        name: 'demo.mp3',
+        path: '/tmp/demo.mp3',
+      }),
+      submitMedia: async () => ({
+        result: { route: 'local', message: '' },
+        ui_feedback: { severity: 'info', title: '', message: '' },
+      }),
+      listFiles: async () => [],
+      listAnalysisHistory: async () => [],
+      deleteAnalysis: async () => ({ status: 'ok', message: 'deleted' }),
+      listDocumentArtifacts: async () => [],
+      getBackendJobStatus: async (jobId: string) => ({ job_id: jobId, status: 'completed_local', message: 'ok', stage_progress: [100, 100, 100, 100, 100] }),
+      uploadMedia: async () => ({ fileName: 'uploaded.txt', mediaPath: '/tmp/uploaded.txt', sizeBytes: 12 }),
+      getVisualizerPayload,
+      analyzeText: async () => ({ raw_text: '', sentences: [], razbor: [], contract: {} }),
+      applyEdit: async () => ({ status: 'ok', message: 'Edit applied.' }),
+      getTranslationConfig: async () => ({
+        default_provider: 'm2m100',
+        providers: [{ id: 'm2m100', label: 'Our Translator (M2M100)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} }],
+      }),
+      saveTranslationConfig: async (config) => config,
+    }
+
+    render(
+      <ApiContext.Provider value={api}>
+        <MemoryRouter initialEntries={[{ pathname: '/visualizer', state: { documentId: 'doc-42' } }]}>
+          <VisualizerPage />
+        </MemoryRouter>
+      </ApiContext.Provider>,
+    )
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Sentence one.').length).toBeGreaterThan(0)
+    })
+    expect(screen.getByText(/Selected Node:/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await waitFor(() => {
+      expect(screen.getAllByText('Sentence two.').length).toBeGreaterThan(0)
+    })
+    expect(screen.getByText(/Selected Node:/i)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'toggle-translate-controls' }))
+    expect(screen.getByText('Translation provider')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Prev' }))
+    await waitFor(() => {
+      expect(screen.getAllByText('Sentence one.').length).toBeGreaterThan(0)
+    })
+    expect(screen.getByText('Translation provider')).toBeInTheDocument()
+  })
+
   it('switches translation provider with backend fallback', async () => {
     const docPayload: VisualizerPayload = {
       'Sentence one.': {
