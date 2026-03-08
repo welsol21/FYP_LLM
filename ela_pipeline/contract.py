@@ -18,7 +18,11 @@ def blank_node(node_type: str, content: str, part_of_speech: str, tense: str = "
         "mood": "null",
         "voice": "null",
         "finiteness": "null",
-        "linguistic_notes": [],
+        "linguistic_notes": {
+            "elementary": "",
+            "intermediate": "",
+            "advanced": "",
+        },
         "schema_version": "v2",
         "part_of_speech": part_of_speech,
         "translations": {

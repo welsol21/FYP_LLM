@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { VisualizerNode } from '../api/runtimeApi'
+import { normalizeLinguisticNotes } from '../lib/linguisticNotes'
 import { resolveNodeTranslation } from '../lib/translationContract'
 
 type Props = {
@@ -39,14 +40,16 @@ function toneForLabel(label: string): string {
 export function VisualizerTree({ node, depth = 0 }: Props) {
   const [expanded, setExpanded] = useState(true)
   const [showDetails, setShowDetails] = useState(depth === 0)
+  const [showElementary, setShowElementary] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const label = resolveLabel(node)
   const borderColor = useMemo(() => toneForLabel(label), [label])
   const hasChildren = node.linguistic_elements.length > 0
   const cefrText = node.cefr_level ?? '-'
   const tenseText = node.tense == null || node.tense === '' ? '-' : node.tense
-  const notesText = node.linguistic_notes.length
-    ? node.linguistic_notes.join(' ')
-    : (node.notes?.map((note) => note?.text?.trim()).filter(Boolean).join(' ') || '-')
+  const notes = normalizeLinguisticNotes(node.linguistic_notes)
+  const fallbackNotes = node.notes?.map((note) => note?.text?.trim()).filter(Boolean).join(' ') || ''
+  const intermediateText = notes.intermediate || fallbackNotes || '-'
   const translationText = resolveNodeTranslation(node)
   const phoneticText =
     node.phonetic?.uk || node.phonetic?.us
@@ -104,7 +107,23 @@ export function VisualizerTree({ node, depth = 0 }: Props) {
         <div className="node-details">
           <div><strong>CEFR:</strong> {cefrText}</div>
           <div><strong>Tense:</strong> {tenseText}</div>
-          <div><strong>Linguistic Notes:</strong> {notesText}</div>
+          <div><strong>Linguistic Notes (Intermediate):</strong> {intermediateText}</div>
+          {notes.elementary ? (
+            <div>
+              <button type="button" className="tree-toggle" onClick={() => setShowElementary((prev) => !prev)}>
+                {showElementary ? 'Hide Elementary' : 'Show Elementary'}
+              </button>
+              {showElementary ? <div>{notes.elementary}</div> : null}
+            </div>
+          ) : null}
+          {notes.advanced ? (
+            <div>
+              <button type="button" className="tree-toggle" onClick={() => setShowAdvanced((prev) => !prev)}>
+                {showAdvanced ? 'Hide Advanced' : 'Show Advanced'}
+              </button>
+              {showAdvanced ? <div>{notes.advanced}</div> : null}
+            </div>
+          ) : null}
           <div><strong>Translation:</strong> {translationText}</div>
           <div><strong>Phonetic:</strong> {phoneticText}</div>
         </div>

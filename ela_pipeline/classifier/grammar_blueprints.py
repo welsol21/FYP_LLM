@@ -192,6 +192,32 @@ def humanize_grammar_class_id(class_id: str) -> str:
     return raw.replace("_", " ")
 
 
+def _node_subject_label(node_type: str | None) -> str:
+    normalized = str(node_type or "").strip().lower()
+    if normalized == "sentence":
+        return "This sentence"
+    if normalized == "phrase":
+        return "This phrase"
+    if normalized == "word":
+        return "This word"
+    return "This node"
+
+
+def _instruction_to_explanation(text: str, *, subject: str) -> str:
+    src = str(text or "").strip()
+    if not src:
+        return src
+    for prefix in ("Identify ", "Explain ", "Describe "):
+        if src.startswith(prefix):
+            tail = src[len(prefix) :].strip()
+            if tail.endswith("."):
+                tail = tail[:-1].rstrip()
+            if tail and tail[0].isalpha():
+                tail = tail[0].lower() + tail[1:]
+            return f"{subject} shows {tail}."
+    return src
+
+
 def build_note_blueprints(
     *,
     grammar_classes: list[str] | None,
@@ -209,15 +235,16 @@ def build_note_blueprints(
     primary_class = next((class_id for class_id in class_ids if class_id in PEDAGOGICAL_CLASS_SPECS), "")
     if primary_class:
         spec = PEDAGOGICAL_CLASS_SPECS[primary_class]
+        subject = _node_subject_label(node_type)
         role = str(grammatical_role or "").strip().lower()
         role_hint = role.replace("_", " ") if role else "grammar slot"
         snippet = str(content or "").strip()
         snippet = " ".join(snippet.split())
         if len(snippet) > 72:
             snippet = f"{snippet[:69].rstrip()}..."
-        elementary = str(spec["elementary_text"]).strip()
-        intermediate = str(spec["intermediate_text"]).strip()
-        advanced = str(spec["advanced_text"]).strip()
+        elementary = _instruction_to_explanation(str(spec["elementary_text"]).strip(), subject=subject)
+        intermediate = _instruction_to_explanation(str(spec["intermediate_text"]).strip(), subject=subject)
+        advanced = _instruction_to_explanation(str(spec["advanced_text"]).strip(), subject=subject)
         if snippet:
             intermediate = f"{intermediate} Here, '{snippet}' functions as {role_hint}."
             advanced = f"{advanced} In this sentence, '{snippet}' fills the {role_hint} role."

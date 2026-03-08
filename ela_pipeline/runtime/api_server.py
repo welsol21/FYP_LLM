@@ -10,6 +10,7 @@ from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from .media_pipeline import warmup_media_models
 from .service import RuntimeMediaService
 
 
@@ -148,6 +149,19 @@ def _run_sentence_contract_warmup() -> None:
     except Exception as exc:
         # Keep API boot alive even if warmup failed; requests will return runtime error details.
         print(f"[runtime-api] sentence-contract warmup failed: {exc}", flush=True)
+
+
+def _run_media_pipeline_warmup() -> None:
+    if not _env_bool("ELA_MEDIA_PIPELINE_WARMUP", True):
+        print("[runtime-api] media warmup disabled", flush=True)
+        return
+    warmup_asr = _env_bool("ELA_MEDIA_WARMUP_ASR", True)
+    print(f"[runtime-api] media warmup started (asr={str(warmup_asr).lower()})", flush=True)
+    try:
+        warmup_media_models(spacy_model="en_core_web_sm", warmup_asr=warmup_asr)
+        print("[runtime-api] media warmup completed", flush=True)
+    except Exception as exc:
+        print(f"[runtime-api] media warmup failed: {exc}", flush=True)
 
 
 class RuntimeApiHandler(BaseHTTPRequestHandler):
@@ -403,6 +417,7 @@ def main() -> None:
     host = os.getenv("ELA_RUNTIME_HTTP_HOST", "0.0.0.0")
     port = _env_int("ELA_RUNTIME_HTTP_PORT", 8000)
     _run_sentence_contract_warmup()
+    _run_media_pipeline_warmup()
     server = ThreadingHTTPServer((host, port), RuntimeApiHandler)
     print(f"[runtime-api] serving on http://{host}:{port}", flush=True)
     server.serve_forever()

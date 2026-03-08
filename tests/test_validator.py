@@ -752,6 +752,28 @@ class ValidatorTests(unittest.TestCase):
         result = validate_contract(data, validation_mode="v2_strict")
         self.assertTrue(result.ok, msg=str(result.errors))
 
+    def test_rejects_empty_intermediate_linguistic_note_in_v2_strict(self):
+        with open("docs/sample.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+        sentence_key = next(iter(data))
+        sentence = data[sentence_key]
+        self._inject_minimal_v2_fields(sentence, None, [1])
+        self._normalize_strict_tam_nulls(sentence)
+        self._normalize_strict_feature_nulls(sentence)
+
+        sentence["linguistic_notes"] = {
+            "elementary": "",
+            "intermediate": "",
+            "advanced": "",
+        }
+
+        result = validate_contract(data, validation_mode="v2_strict")
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any(".linguistic_notes.intermediate" in err.path for err in result.errors),
+            msg=str(result.errors),
+        )
+
     def test_rejects_real_null_tam_values_in_v1(self):
         with open("docs/sample.json", "r", encoding="utf-8") as f:
             data = json.load(f)

@@ -70,7 +70,11 @@ export type VisualizerNode = {
   content: string
   source_span?: { start: number; end: number }
   tense: string
-  linguistic_notes: string[]
+  linguistic_notes: {
+    elementary: string
+    intermediate: string
+    advanced: string
+  } | string[]
   notes?: Array<{ text?: string }>
   part_of_speech: string
   linguistic_elements: VisualizerNode[]

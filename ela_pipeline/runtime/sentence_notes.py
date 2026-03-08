@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from functools import lru_cache
 from typing import Any
 
 from ela_pipeline.parse.spacy_parser import load_nlp
@@ -13,6 +14,11 @@ _SUBJECT_DEPS = {"nsubj", "nsubjpass", "csubj", "csubjpass", "expl"}
 _FINITE_CLAUSE_DEPS = {"root", "conj", "advcl", "ccomp", "xcomp", "acl", "relcl", "parataxis"}
 _PREDICATE_COMPLEMENT_DEPS = {"obj", "dobj", "iobj", "attr", "acomp", "oprd", "xcomp", "ccomp"}
 _PREDICATE_ADVERBIAL_DEPS = {"advmod", "obl", "npadvmod", "prep", "mark"}
+
+
+@lru_cache(maxsize=4)
+def _get_nlp_cached(model_name: str):
+    return load_nlp(model_name)
 
 
 def _normalize_spaces(text: str) -> str:
@@ -181,7 +187,7 @@ def _predicate_profile(sent: Any) -> dict[str, Any]:
 
 
 def build_core_syntax(sentence_text: str, *, spacy_model: str = "en_core_web_sm") -> dict[str, Any]:
-    nlp = load_nlp(spacy_model)
+    nlp = _get_nlp_cached(spacy_model)
     doc = nlp(str(sentence_text or "").strip())
     sent = next(iter(doc.sents), None)
     if sent is None:
@@ -374,10 +380,10 @@ def _chatgpt_notes(
     return notes
 
 
-def build_sentence_notes(sentence_text: str) -> list[str]:
+def build_sentence_notes(sentence_text: str) -> dict[str, str]:
     text = _normalize_spaces(sentence_text)
     if not text:
-        return []
+        return {"elementary": "", "intermediate": "", "advanced": ""}
 
     core_syntax = build_core_syntax(text)
     notes = _fallback_notes(core_syntax=core_syntax)
@@ -398,5 +404,8 @@ def build_sentence_notes(sentence_text: str) -> list[str]:
     if not _quality_gate(notes=notes, sentence_text=text):
         notes = _fallback_notes(core_syntax=core_syntax)
 
-    out = [notes.get("elementary", ""), notes.get("intermediate", ""), notes.get("advanced", "")]
-    return [item for item in out if _normalize_spaces(item)]
+    return {
+        "elementary": _normalize_spaces(notes.get("elementary", "")),
+        "intermediate": _normalize_spaces(notes.get("intermediate", "")),
+        "advanced": _normalize_spaces(notes.get("advanced", "")),
+    }

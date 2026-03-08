@@ -17,7 +17,7 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
                 "node_id": f"n-{sentence_idx}",
                 "content": sentence_text,
                 "linguistic_elements": [],
-                "linguistic_notes": [],
+                "linguistic_notes": {"elementary": "", "intermediate": "", "advanced": ""},
                 "translations": {"backend_m2m100": {"text": sentence_text}},
                 "phonetic": {"uk": "", "us": ""},
             },
@@ -42,7 +42,7 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
             self.assertEqual(len(result.contract_sentences), 2)
             self.assertEqual(result.contract_sentences[0]["sentence_node"]["type"], "Sentence")
             sentence_node = result.contract_sentences[0]["sentence_node"]
-            self.assertIsInstance(sentence_node.get("linguistic_notes"), list)
+            self.assertIsInstance(sentence_node.get("linguistic_notes"), dict)
             self.assertTrue(sentence_node.get("translations", {}).get("backend_m2m100", {}).get("text"))
             self.assertIn("phonetic", sentence_node)
             media_row = result.media_sentences[0]

@@ -7,6 +7,17 @@
     "$ref": "#/$defs/sentenceNode"
   },
   "$defs": {
+    "linguisticNotesLevels": {
+      "type": "object",
+      "required": ["elementary", "intermediate", "advanced"],
+      "properties": {
+        "elementary": {"type": "string"},
+        "intermediate": {"type": "string"},
+        "advanced": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "linguisticNotesLegacy": {"type": "array", "items": {"type": "string"}},
     "wordNode": {
       "type": "object",
       "required": ["type", "content", "tense", "linguistic_notes", "part_of_speech", "linguistic_elements"],
@@ -14,7 +25,12 @@
         "type": {"const": "Word"},
         "content": {"type": "string"},
         "tense": {"type": "string"},
-        "linguistic_notes": {"type": "array", "items": {"type": "string"}},
+        "linguistic_notes": {
+          "oneOf": [
+            {"$ref": "#/$defs/linguisticNotesLevels"},
+            {"$ref": "#/$defs/linguisticNotesLegacy"}
+          ]
+        },
         "part_of_speech": {"type": "string"},
         "linguistic_elements": {"type": "array", "maxItems": 0}
       },
@@ -27,7 +43,12 @@
         "type": {"const": "Phrase"},
         "content": {"type": "string"},
         "tense": {"type": "string"},
-        "linguistic_notes": {"type": "array", "items": {"type": "string"}},
+        "linguistic_notes": {
+          "oneOf": [
+            {"$ref": "#/$defs/linguisticNotesLevels"},
+            {"$ref": "#/$defs/linguisticNotesLegacy"}
+          ]
+        },
         "part_of_speech": {"type": "string"},
         "linguistic_elements": {
           "type": "array",
@@ -43,7 +64,12 @@
         "type": {"const": "Sentence"},
         "content": {"type": "string"},
         "tense": {"type": "string"},
-        "linguistic_notes": {"type": "array", "items": {"type": "string"}},
+        "linguistic_notes": {
+          "oneOf": [
+            {"$ref": "#/$defs/linguisticNotesLevels"},
+            {"$ref": "#/$defs/linguisticNotesLegacy"}
+          ]
+        },
         "part_of_speech": {"type": "string"},
         "linguistic_elements": {
           "type": "array",

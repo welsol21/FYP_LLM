@@ -61,6 +61,13 @@ def _get_m2m100_translator_cached(model_name: str, device: str):
     return M2M100Translator(model_name=model_name, device=device)
 
 
+@lru_cache(maxsize=1)
+def _get_in_memory_translation_cache():
+    from ela_pipeline.translate import InMemoryTranslationCache
+
+    return InMemoryTranslationCache()
+
+
 @lru_cache(maxsize=4)
 def _get_tabular_classifier_cached(model_path: str | None):
     from ela_pipeline.classifier.tabular_cefr_predictor import TabularProfileClassifier
@@ -83,6 +90,19 @@ def _get_t5_cefr_predictor_cached(model_path: str, device: str):
     from ela_pipeline.cefr import T5CEFRPredictor
 
     return T5CEFRPredictor(model_path=model_path, device=device)
+
+
+@lru_cache(maxsize=2)
+def _get_espeak_transcriber_cached(binary: str):
+    from ela_pipeline.phonetic import EspeakPhoneticTranscriber
+
+    return EspeakPhoneticTranscriber(binary=binary)
+
+
+@lru_cache(maxsize=65536)
+def _phonetic_transcribe_cached(binary: str, text: str, accent: str) -> str:
+    transcriber = _get_espeak_transcriber_cached(binary)
+    return str(transcriber.transcribe_text(text, accent=accent) or "").strip()
 
 
 @lru_cache(maxsize=2)
@@ -130,6 +150,75 @@ def _node_source_text(node: dict, sentence_text: str) -> str:
             if 0 <= start <= end <= len(sentence_text):
                 return sentence_text[start:end]
     return str(node.get("content") or "")
+
+
+def _empty_linguistic_notes() -> dict[str, str]:
+    return {"elementary": "", "intermediate": "", "advanced": ""}
+
+
+def _coerce_linguistic_notes(
+    notes_value: Any,
+    *,
+    note_blueprints: dict[str, Any] | None = None,
+) -> dict[str, str]:
+    out = _empty_linguistic_notes()
+
+    if isinstance(note_blueprints, dict):
+        out["elementary"] = str(note_blueprints.get("elementary_text") or "").strip()
+        out["intermediate"] = str(note_blueprints.get("intermediate_text") or "").strip()
+        out["advanced"] = str(note_blueprints.get("advanced_text") or "").strip()
+
+    if isinstance(notes_value, dict):
+        for key in ("elementary", "intermediate", "advanced"):
+            value = str(notes_value.get(key) or "").strip()
+            if value:
+                out[key] = value
+        for legacy_key, target in (
+            ("elementary_text", "elementary"),
+            ("intermediate_text", "intermediate"),
+            ("advanced_text", "advanced"),
+        ):
+            value = str(notes_value.get(legacy_key) or "").strip()
+            if value and not out[target]:
+                out[target] = value
+        return out
+
+    if isinstance(notes_value, list):
+        notes = [str(item).strip() for item in notes_value if isinstance(item, str) and str(item).strip()]
+        if len(notes) >= 3:
+            if not out["elementary"]:
+                out["elementary"] = notes[0]
+            if not out["intermediate"]:
+                out["intermediate"] = notes[1]
+            if not out["advanced"]:
+                out["advanced"] = notes[2]
+        elif len(notes) == 2:
+            if not out["elementary"]:
+                out["elementary"] = notes[0]
+            if not out["intermediate"]:
+                out["intermediate"] = notes[1]
+        elif len(notes) == 1:
+            if not out["intermediate"]:
+                out["intermediate"] = notes[0]
+
+    if not out["intermediate"]:
+        out["intermediate"] = out["elementary"] or out["advanced"] or ""
+    return out
+
+
+def _normalize_linguistic_notes_shape(doc: dict) -> None:
+    def walk(node: dict[str, Any]) -> None:
+        node["linguistic_notes"] = _coerce_linguistic_notes(
+            node.get("linguistic_notes"),
+            note_blueprints=node.get("note_blueprints") if isinstance(node.get("note_blueprints"), dict) else None,
+        )
+        for child in node.get("linguistic_elements", []) or []:
+            if isinstance(child, dict):
+                walk(child)
+
+    for sentence_node in doc.values():
+        if isinstance(sentence_node, dict):
+            walk(sentence_node)
 
 
 def _cefr_clamp(level: str, *, low: str | None = None, high: str | None = None) -> str:
@@ -315,10 +404,15 @@ def _attach_phonetic(
     transcriber: Any,
     include_node_phonetic: bool = True,
 ) -> None:
+    transcriber_binary = str(getattr(transcriber, "binary", "") or "").strip()
+
     def safe_transcribe(text: str, accent: str) -> str:
         source = str(text or "").strip()
         try:
-            value = str(transcriber.transcribe_text(source, accent=accent) or "").strip()
+            if transcriber_binary:
+                value = str(_phonetic_transcribe_cached(transcriber_binary, source, accent) or "").strip()
+            else:
+                value = str(transcriber.transcribe_text(source, accent=accent) or "").strip()
         except Exception:
             value = ""
         # Contract validator requires non-empty uk/us when phonetic exists.
@@ -671,13 +765,13 @@ def _attach_note_blueprints(doc: dict) -> None:
         generated = build_notes(node)
         if isinstance(generated, dict) and generated:
             node["note_blueprints"] = dict(generated)
-            existing_notes = node.get("linguistic_notes")
-            if isinstance(existing_notes, list) and len(existing_notes) == 0:
-                intermediate = str(generated.get("intermediate_text") or "").strip()
-                node["linguistic_notes"] = [intermediate] if intermediate else []
+            node["linguistic_notes"] = _coerce_linguistic_notes(
+                node.get("linguistic_notes"),
+                note_blueprints=generated,
+            )
         else:
             node.pop("note_blueprints", None)
-            node["linguistic_notes"] = []
+            node["linguistic_notes"] = _empty_linguistic_notes()
         for child in node.get("linguistic_elements", []) or []:
             if isinstance(child, dict):
                 walk(child)
@@ -693,10 +787,7 @@ def _apply_controlled_notes(doc: dict) -> None:
     def walk(node: dict) -> None:
         blueprints = node.get("note_blueprints")
         if isinstance(blueprints, dict):
-            preferred = str(blueprints.get("intermediate_text") or "").strip()
-            fallback = str(blueprints.get("elementary_text") or "").strip()
-            note = preferred or fallback
-            node["linguistic_notes"] = [note] if note else []
+            node["linguistic_notes"] = _coerce_linguistic_notes({}, note_blueprints=blueprints)
         for child in node.get("linguistic_elements", []) or []:
             if isinstance(child, dict):
                 walk(child)
@@ -791,11 +882,10 @@ def _attach_classifier_profiles(
         generated_notes = profile.get("generated_notes")
         if include_note_blueprints and isinstance(generated_notes, dict):
             node["note_blueprints"] = dict(generated_notes)
-            existing_notes = node.get("linguistic_notes")
-            if isinstance(existing_notes, list) and len(existing_notes) == 0:
-                intermediate = str(generated_notes.get("intermediate_text") or "").strip()
-                if intermediate:
-                    node["linguistic_notes"] = [intermediate]
+            node["linguistic_notes"] = _coerce_linguistic_notes(
+                node.get("linguistic_notes"),
+                note_blueprints=generated_notes,
+            )
         for child in node.get("linguistic_elements", []) or []:
             if isinstance(child, dict):
                 walk(child, sentence_text)
@@ -947,6 +1037,10 @@ def run_pipeline(
             translation_device,
         )
         translation_cache = build_translation_cache_from_env()
+        if translation_cache is None:
+            # Keep a process-wide in-memory cache by default to avoid re-translating
+            # identical node strings across sentence-contract requests.
+            translation_cache = _get_in_memory_translation_cache()
         translation_cache_ttl_seconds = _resolve_translation_cache_ttl_seconds()
         _attach_translation(
             enriched,
@@ -962,9 +1056,7 @@ def run_pipeline(
     if enable_phonetic:
         if phonetic_provider != "espeak":
             raise ValueError("phonetic_provider must be 'espeak'")
-        from ela_pipeline.phonetic import EspeakPhoneticTranscriber
-
-        transcriber = EspeakPhoneticTranscriber(binary=phonetic_binary)
+        transcriber = _get_espeak_transcriber_cached(phonetic_binary)
         _attach_phonetic(
             enriched,
             transcriber=transcriber,
@@ -1052,6 +1144,7 @@ def run_pipeline(
         )
         _prune_unused_legacy_fields(enriched)
 
+    _normalize_linguistic_notes_shape(enriched)
     raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
     _enforce_linguistic_elements_last(enriched)
     return enriched

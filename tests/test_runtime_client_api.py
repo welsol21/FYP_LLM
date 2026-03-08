@@ -219,7 +219,31 @@ class RuntimeClientAPITests(unittest.TestCase):
             repo.upsert_contract_sentence(
                 document_id="doc-1",
                 sentence_hash=h0,
-                sentence_node={"type": "Sentence", "node_id": "s1", "content": "She trusted him.", "linguistic_elements": []},
+                sentence_node={
+                    "type": "Sentence",
+                    "node_id": "s1",
+                    "content": "She trusted him.",
+                    "tense": "past",
+                    "part_of_speech": "sentence",
+                    "grammatical_role": "clause",
+                    "parent_id": None,
+                    "source_span": {"start": 0, "end": 16},
+                    "schema_version": "v2",
+                    "translations": {
+                        "backend_m2m100": {
+                            "text": "Она доверяла ему.",
+                            "source_lang": "en",
+                            "target_lang": "ru",
+                            "origin": "provider",
+                        }
+                    },
+                    "linguistic_notes": {
+                        "elementary": "Sentence note.",
+                        "intermediate": "Sentence note.",
+                        "advanced": "Sentence note.",
+                    },
+                    "linguistic_elements": [],
+                },
             )
             repo.replace_sentence_links(
                 document_id="doc-1",
@@ -297,7 +321,7 @@ class RuntimeClientAPITests(unittest.TestCase):
             payload = json.loads(buf.getvalue())
             self.assertIn("sentence_hash", payload)
             self.assertEqual(payload["sentence_node"]["type"], "Sentence")
-            self.assertIsInstance(payload["sentence_node"].get("linguistic_notes"), list)
+            self.assertIsInstance(payload["sentence_node"].get("linguistic_notes"), dict)
 
 
 if __name__ == "__main__":

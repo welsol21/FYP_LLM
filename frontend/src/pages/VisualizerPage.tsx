@@ -8,7 +8,7 @@ const BASIC_EDIT_FIELDS: Array<{ key: string; label: string }> = [
   { key: 'content', label: 'Content' },
   { key: 'cefr_level', label: 'CEFR' },
   { key: 'tense', label: 'Tense' },
-  { key: 'linguistic_notes', label: 'Linguistic Notes' },
+  { key: 'linguistic_notes.intermediate', label: 'Linguistic Notes (Intermediate)' },
   { key: 'translations.backend_m2m100.text', label: 'Translation' },
   { key: 'phonetic.uk', label: 'Phonetic (UK)' },
   { key: 'phonetic.us', label: 'Phonetic (US)' },
@@ -394,7 +394,7 @@ export function VisualizerPage() {
     visibleAdvancedOptions.length > 0
       ? visibleAdvancedOptions
       : advancedOptions.slice(0, Math.min(maxPreviewItems, advancedOptions.length))
-  const showTextarea = activeFieldPath === 'linguistic_notes' || newValue.includes('\n') || newValue.length > 80
+  const showTextarea = activeFieldPath.startsWith('linguistic_notes') || newValue.includes('\n') || newValue.length > 80
 
   return (
     <section className="visualizer-root">

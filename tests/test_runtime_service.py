@@ -690,6 +690,135 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertEqual(payload["She trusted him."]["node_id"], "s1")
             self.assertEqual(payload["She trusted him. #2"]["node_id"], "s2")
 
+    def test_visualizer_payload_normalizes_linguistic_notes_recursively(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            svc = RuntimeMediaService(
+                db_path=Path(tmpdir) / "client.sqlite3",
+                runtime_mode="online",
+                limits=MediaPolicyLimits(max_duration_min=15, max_size_local_mb=250, max_size_backend_mb=2048),
+            )
+            svc.repo.create_project("Project A", project_id="proj-1")
+            svc.repo.create_media_file(
+                project_id="proj-1",
+                media_file_id="file-1",
+                name="lesson.mp3",
+                path="/tmp/lesson.mp3",
+            )
+            svc.repo.create_document(
+                document_id="doc-1",
+                project_id="proj-1",
+                media_file_id="file-1",
+                source_type="audio",
+                source_path="/tmp/lesson.mp3",
+                media_hash="mh-1",
+                status="completed",
+            )
+            h0 = build_sentence_hash("She trusted him.", 0)
+            svc.repo.replace_media_sentences(
+                document_id="doc-1",
+                sentences=[
+                    {
+                        "sentence_idx": 0,
+                        "sentence_text": "She trusted him.",
+                        "sentence_hash": h0,
+                    }
+                ],
+            )
+            svc.repo.upsert_contract_sentence(
+                document_id="doc-1",
+                sentence_hash=h0,
+                sentence_node={
+                    "type": "Sentence",
+                    "content": "She trusted him.",
+                    "tense": "past",
+                    "part_of_speech": "sentence",
+                    "grammatical_role": "clause",
+                    "node_id": "s1",
+                    "parent_id": None,
+                    "source_span": {"start": 0, "end": 16},
+                    "schema_version": "v2",
+                    "translations": {
+                        "backend_m2m100": {
+                            "text": "Она доверяла ему.",
+                            "source_lang": "en",
+                            "target_lang": "ru",
+                            "origin": "provider",
+                        }
+                    },
+                    "linguistic_notes": {"intermediate_text": "Sentence legacy intermediate."},
+                    "linguistic_elements": [
+                        {
+                            "type": "Phrase",
+                            "content": "trusted him",
+                            "tense": "past",
+                            "part_of_speech": "verb phrase",
+                            "grammatical_role": "predicate",
+                            "node_id": "p1",
+                            "parent_id": "s1",
+                            "source_span": {"start": 4, "end": 15},
+                            "schema_version": "v2",
+                            "translations": {
+                                "backend_m2m100": {
+                                    "text": "доверяла ему",
+                                    "source_lang": "en",
+                                    "target_lang": "ru",
+                                    "origin": "provider",
+                                }
+                            },
+                            "linguistic_notes": [],
+                            "note_blueprints": {
+                                "elementary_text": "Phrase elementary.",
+                                "intermediate_text": "Phrase intermediate.",
+                                "advanced_text": "Phrase advanced.",
+                            },
+                            "linguistic_elements": [
+                                {
+                                    "type": "Word",
+                                    "content": "trusted",
+                                    "tense": "past",
+                                    "part_of_speech": "verb",
+                                    "grammatical_role": "predicate",
+                                    "node_id": "w1",
+                                    "parent_id": "p1",
+                                    "source_span": {"start": 4, "end": 11},
+                                    "schema_version": "v2",
+                                    "translations": {
+                                        "backend_m2m100": {
+                                            "text": "доверяла",
+                                            "source_lang": "en",
+                                            "target_lang": "ru",
+                                            "origin": "provider",
+                                        }
+                                    },
+                                    "linguistic_notes": ["Word intermediate legacy."],
+                                    "linguistic_elements": [],
+                                }
+                            ],
+                        }
+                    ],
+                },
+            )
+            svc.repo.replace_sentence_links(
+                document_id="doc-1",
+                links=[{"sentence_idx": 0, "sentence_hash": h0}],
+            )
+
+            payload = svc.get_visualizer_payload(document_id="doc-1")
+            sentence_node = payload["She trusted him."]
+            sentence_notes = sentence_node.get("linguistic_notes") or {}
+            self.assertIsInstance(sentence_notes, dict)
+            self.assertEqual(sentence_notes.get("intermediate"), "Sentence legacy intermediate.")
+
+            phrase = sentence_node["linguistic_elements"][0]
+            phrase_notes = phrase.get("linguistic_notes") or {}
+            self.assertIsInstance(phrase_notes, dict)
+            self.assertEqual(phrase_notes.get("intermediate"), "Phrase intermediate.")
+
+            word = phrase["linguistic_elements"][0]
+            word_notes = word.get("linguistic_notes") or {}
+            self.assertIsInstance(word_notes, dict)
+            self.assertEqual(word_notes.get("intermediate"), "Word intermediate legacy.")
+
     def test_document_processing_status(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             svc = RuntimeMediaService(
@@ -755,7 +884,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                 self.assertTrue(payload["sentence_hash"])
                 node = payload["sentence_node"]
                 self.assertEqual(node["type"], "Sentence")
-                self.assertIsInstance(node.get("linguistic_notes"), list)
+                self.assertIsInstance(node.get("linguistic_notes"), dict)
 
     @patch("ela_pipeline.inference.run.run_pipeline")
     def test_build_sentence_contract_forwards_controlled_classifier_params(self, mock_run_pipeline):
@@ -813,9 +942,18 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                 sentence_idx=1,
                 note_mode="controlled",
             )
-            notes = payload["sentence_node"].get("linguistic_notes") or []
-            self.assertGreaterEqual(len(notes), 3)
-            merged = " ".join(str(x) for x in notes).casefold()
+            notes = payload["sentence_node"].get("linguistic_notes") or {}
+            self.assertIsInstance(notes, dict)
+            self.assertTrue(notes.get("elementary"))
+            self.assertTrue(notes.get("intermediate"))
+            self.assertTrue(notes.get("advanced"))
+            merged = " ".join(
+                [
+                    str(notes.get("elementary") or ""),
+                    str(notes.get("intermediate") or ""),
+                    str(notes.get("advanced") or ""),
+                ]
+            ).casefold()
             self.assertIn("subject", merged)
             self.assertIn("predicate", merged)
             self.assertNotIn(sentence.casefold(), merged)

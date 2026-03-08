@@ -849,10 +849,43 @@ def _validate_node(
     _validate_optional_ids(node, path, errors, seen_ids, expected_parent_id)
 
     notes = node.get("linguistic_notes")
-    _expect(isinstance(notes, list), errors, f"{path}.linguistic_notes", "linguistic_notes must be list")
-    if isinstance(notes, list):
+    is_list = isinstance(notes, list)
+    is_triplet = isinstance(notes, dict)
+    strict_requires_non_empty = validation_mode == "v2_strict" and str(node.get("type") or "") in {"Sentence", "Phrase"}
+    _expect(
+        is_list or is_triplet,
+        errors,
+        f"{path}.linguistic_notes",
+        "linguistic_notes must be list or {elementary,intermediate,advanced} object",
+    )
+    if is_list:
         for idx, note in enumerate(notes):
             _expect(isinstance(note, str), errors, f"{path}.linguistic_notes[{idx}]", "note must be string")
+        if strict_requires_non_empty:
+            non_empty = [str(note).strip() for note in notes if isinstance(note, str) and str(note).strip()]
+            _expect(
+                bool(non_empty),
+                errors,
+                f"{path}.linguistic_notes",
+                "at least one linguistic note must be non-empty in strict mode",
+            )
+    elif is_triplet:
+        for key in ("elementary", "intermediate", "advanced"):
+            value = notes.get(key)
+            _expect(
+                isinstance(value, str),
+                errors,
+                f"{path}.linguistic_notes.{key}",
+                f"{key} must be string",
+            )
+        if strict_requires_non_empty:
+            intermediate = str(notes.get("intermediate") or "").strip()
+            _expect(
+                intermediate != "",
+                errors,
+                f"{path}.linguistic_notes.intermediate",
+                "intermediate must be non-empty in strict mode",
+            )
 
     children = node.get("linguistic_elements")
     _expect(isinstance(children, list), errors, f"{path}.linguistic_elements", "linguistic_elements must be list")
@@ -1056,9 +1089,6 @@ def validate_contract(doc: Dict[str, Any], validation_mode: str = "v2_strict") -
 
     if validation_mode == "v2_strict":
         _validate_with_json_schema(doc, validation_mode, errors)
-        if isinstance(doc, dict):
-            _validate_top_level_content_alignment(doc, errors)
-        return ValidationResult(ok=not errors, errors=errors)
 
     seen_ids: Set[str] = set()
     _expect(isinstance(doc, dict), errors, "$", "Top-level must be an object keyed by sentence content")

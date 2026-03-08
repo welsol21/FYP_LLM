@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
 import type { VisualizerNode, VisualizerPayload } from '../api/runtimeApi'
+import { normalizeLinguisticNotes } from '../lib/linguisticNotes'
 import { resolveNodeTranslation } from '../lib/translationContract'
 
 export type VocabRow = {
@@ -70,6 +71,15 @@ function parseTranslationProvider(settings: string): string {
   return match?.[1]?.trim().toLowerCase() || 'backend_m2m100'
 }
 
+function notesToExportText(node: VisualizerNode): string {
+  const notes = normalizeLinguisticNotes(node.linguistic_notes)
+  const out: string[] = []
+  if (notes.intermediate) out.push(`intermediate: ${notes.intermediate}`)
+  if (notes.elementary) out.push(`elementary: ${notes.elementary}`)
+  if (notes.advanced) out.push(`advanced: ${notes.advanced}`)
+  return out.join(' | ')
+}
+
 export function toExportRows(row: VocabRow): ExportRow[] {
   if (!row.payload || !row.documentId) return []
   const out: ExportRow[] = []
@@ -87,7 +97,7 @@ export function toExportRows(row: VocabRow): ExportRow[] {
         content: String(node.content || ''),
         cefr_level: String(node.cefr_level || ''),
         tense: String(node.tense || ''),
-        linguistic_notes: Array.isArray(node.linguistic_notes) ? node.linguistic_notes.join(' | ') : '',
+        linguistic_notes: notesToExportText(node),
         translation_provider: row.translationProvider,
         translation: resolveNodeTranslation(node, row.translationProvider),
         translations_json: JSON.stringify(node.translations || {}),

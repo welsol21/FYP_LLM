@@ -20,6 +20,7 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 
 from ela_pipeline.client_storage import LocalSQLiteRepository, build_sentence_hash
+from ela_pipeline.validation.validator import raise_if_invalid, validate_contract
 
 from .capabilities import build_runtime_capabilities, resolve_deployment_mode, resolve_runtime_mode
 from .media_policy import MediaPolicyLimits, load_media_policy_limits_from_env
@@ -39,6 +40,118 @@ def _normalize_provider_key(value: str | None) -> str:
     if not raw:
         return ""
     return raw.replace(" ", "_").replace("-", "_")
+
+
+def _empty_linguistic_notes() -> dict[str, str]:
+    return {"elementary": "", "intermediate": "", "advanced": ""}
+
+
+def _node_subject_label(node_type: str | None) -> str:
+    normalized = str(node_type or "").strip().lower()
+    if normalized == "sentence":
+        return "This sentence"
+    if normalized == "phrase":
+        return "This phrase"
+    if normalized == "word":
+        return "This word"
+    return "This node"
+
+
+def _instruction_to_explanation(text: str, *, node_type: str | None = None) -> str:
+    src = str(text or "").strip()
+    if not src:
+        return src
+    subject = _node_subject_label(node_type)
+    for prefix in ("Identify ", "Explain ", "Describe "):
+        if src.startswith(prefix):
+            tail = src[len(prefix) :].strip()
+            if tail.endswith("."):
+                tail = tail[:-1].rstrip()
+            if tail and tail[0].isalpha():
+                tail = tail[0].lower() + tail[1:]
+            return f"{subject} shows {tail}."
+    return src
+
+
+def _coerce_linguistic_notes(
+    notes_value: Any,
+    *,
+    note_blueprints: dict[str, Any] | None = None,
+    node_type: str | None = None,
+) -> dict[str, str]:
+    out = _empty_linguistic_notes()
+
+    if isinstance(note_blueprints, dict):
+        out["elementary"] = str(note_blueprints.get("elementary_text") or "").strip()
+        out["intermediate"] = str(note_blueprints.get("intermediate_text") or "").strip()
+        out["advanced"] = str(note_blueprints.get("advanced_text") or "").strip()
+
+    if isinstance(notes_value, dict):
+        for key in ("elementary", "intermediate", "advanced"):
+            value = str(notes_value.get(key) or "").strip()
+            if value:
+                out[key] = value
+        for legacy_key, target in (
+            ("elementary_text", "elementary"),
+            ("intermediate_text", "intermediate"),
+            ("advanced_text", "advanced"),
+        ):
+            value = str(notes_value.get(legacy_key) or "").strip()
+            if value and not out[target]:
+                out[target] = value
+    elif isinstance(notes_value, list):
+        notes = [str(item).strip() for item in notes_value if str(item).strip()]
+        if len(notes) >= 3:
+            if not out["elementary"]:
+                out["elementary"] = notes[0]
+            if not out["intermediate"]:
+                out["intermediate"] = notes[1]
+            if not out["advanced"]:
+                out["advanced"] = notes[2]
+        elif len(notes) == 2:
+            if not out["elementary"]:
+                out["elementary"] = notes[0]
+            if not out["intermediate"]:
+                out["intermediate"] = notes[1]
+        elif len(notes) == 1 and not out["intermediate"]:
+            out["intermediate"] = notes[0]
+    elif isinstance(notes_value, str):
+        value = notes_value.strip()
+        if value and not out["intermediate"]:
+            out["intermediate"] = value
+
+    if not out["intermediate"]:
+        out["intermediate"] = out["elementary"] or out["advanced"] or ""
+    for key in ("elementary", "intermediate", "advanced"):
+        out[key] = _instruction_to_explanation(out[key], node_type=node_type)
+    return out
+
+
+def _normalize_node_linguistic_notes(node: dict[str, Any]) -> None:
+    if not isinstance(node, dict):
+        return
+    node["linguistic_notes"] = _coerce_linguistic_notes(
+        node.get("linguistic_notes"),
+        note_blueprints=node.get("note_blueprints") if isinstance(node.get("note_blueprints"), dict) else None,
+        node_type=str(node.get("type") or ""),
+    )
+    children = node.get("linguistic_elements")
+    if isinstance(children, list):
+        for child in children:
+            if isinstance(child, dict):
+                _normalize_node_linguistic_notes(child)
+
+
+def _validate_frontend_contract_payload(payload: dict[str, Any], *, context: str) -> None:
+    if not isinstance(payload, dict):
+        raise ValueError(f"{context}: frontend payload must be an object")
+    for sentence_text, sentence_node in payload.items():
+        scoped_key = str(sentence_text or "").strip() or "__sentence__"
+        scoped_payload = {scoped_key: sentence_node}
+        try:
+            raise_if_invalid(validate_contract(scoped_payload, validation_mode="v2_strict"))
+        except Exception as exc:
+            raise ValueError(f"{context}: invalid frontend sentence payload for key={scoped_key}: {exc}") from exc
 
 
 def _ensure_node_translations_map(
@@ -580,6 +693,7 @@ class RuntimeMediaService:
             node = row["sentence_node"]
             text_ru = str(row.get("text_ru") or "").strip()
             if isinstance(node, dict):
+                _normalize_node_linguistic_notes(node)
                 _ensure_node_translations_map(node, canonical_provider=BACKEND_TRANSLATION_PROVIDER_KEY)
                 normalized_selected_provider = _normalize_provider_key(selected_provider)
                 effective_provider = normalized_selected_provider
@@ -605,6 +719,7 @@ class RuntimeMediaService:
                 if active is not None and normalized_selected_provider:
                     node["active_translation_provider"] = normalized_selected_provider
             payload[key] = node
+        _validate_frontend_contract_payload(payload, context=f"get_visualizer_payload(document_id={document_id})")
         return payload
 
     def get_document_processing_status(self, *, document_id: str) -> dict[str, Any]:
@@ -797,16 +912,19 @@ class RuntimeMediaService:
             enable_grammar_classes=enable_grammar_classes,
         )
         sentence_node = self._select_sentence_node_from_contract(contract=contract, sentence_text=text)
+        _normalize_node_linguistic_notes(sentence_node)
         sentence_text_resolved = str(sentence_node.get("content") or text).strip() or text
         try:
             from .sentence_notes import build_sentence_notes
 
             focused_notes = build_sentence_notes(sentence_text_resolved)
-            if focused_notes:
+            if isinstance(focused_notes, dict):
                 sentence_node["linguistic_notes"] = focused_notes
         except Exception:
             # Keep contract build resilient even if sentence-note enrichment fails.
             pass
+        _normalize_node_linguistic_notes(sentence_node)
+        _validate_frontend_contract_payload({sentence_text_resolved: sentence_node}, context="build_sentence_contract")
         return {
             "sentence_text": sentence_text_resolved,
             "sentence_hash": build_sentence_hash(sentence_text_resolved, int(sentence_idx)),
@@ -1352,6 +1470,47 @@ class RuntimeMediaService:
         sentence_text: str,
         sentence_idx: int,
     ) -> dict[str, Any]:
+        backend_url = str(self.sentence_contract_backend_url or "").strip().lower()
+        bypass_local_backend = str(os.getenv("ELA_SENTENCE_CONTRACT_LOCAL_BYPASS", "1")).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        if bypass_local_backend and backend_url in {
+            "",
+            "http://127.0.0.1:8000",
+            "http://localhost:8000",
+            "http://0.0.0.0:8000",
+        }:
+            controlled_model_dir = str(os.getenv("ELA_CONTROLLED_T5_MODEL_DIR", "")).strip()
+            classifier_provider, classifier_model_path = self._resolve_classifier_defaults(
+                classifier_provider="rule",
+                classifier_model_path=None,
+            )
+            return self.build_sentence_contract(
+                sentence_text=sentence_text,
+                sentence_idx=sentence_idx,
+                note_mode="controlled",
+                model_dir=controlled_model_dir or None,
+                validation_mode="v2_strict",
+                enable_translation=True,
+                translation_model="artifacts/models/m2m100_418M",
+                translation_source_lang="en",
+                translation_target_lang="ru",
+                translation_device="cpu",
+                enable_phonetic=True,
+                phonetic_binary="auto",
+                enable_synonyms=False,
+                synonyms_top_k=5,
+                enable_cefr=(classifier_provider == "rule"),
+                cefr_provider="rule",
+                cefr_model_path="artifacts/models/t5_cefr/best_model",
+                classifier_provider=classifier_provider,
+                classifier_model_path=classifier_model_path,
+                classifier_device="cuda",
+                enable_grammar_classes=True,
+            )
         return self._request_sentence_contract(
             sentence_text=sentence_text,
             sentence_idx=sentence_idx,

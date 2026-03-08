@@ -602,9 +602,10 @@ class PipelineTests(unittest.TestCase):
         classes = sentence.get("grammar_classes") or []
         class_ids = {str(item.get("class_id")) for item in classes if isinstance(item, dict)}
         self.assertIn("modal_perfect", class_ids)
-        self.assertEqual(
-            sentence.get("note_blueprints", {}).get("intermediate_text"),
-            "Explain how modal + have + past participle evaluates a past event.",
+        intermediate_text = str(sentence.get("note_blueprints", {}).get("intermediate_text") or "")
+        self.assertIn(
+            "This sentence shows how modal + have + past participle evaluates a past event.",
+            intermediate_text,
         )
 
     def test_pipeline_attaches_note_blueprints_and_populates_linguistic_notes(self):
@@ -620,8 +621,8 @@ class PipelineTests(unittest.TestCase):
         self.assertNotIn("tam::", str(blueprints.get("intermediate_text")))
         self.assertNotIn("tense_table::", str(blueprints.get("intermediate_text")))
         notes = sentence.get("linguistic_notes")
-        self.assertIsInstance(notes, list)
-        self.assertGreater(len(notes), 0)
+        self.assertIsInstance(notes, dict)
+        self.assertTrue(str(notes.get("intermediate") or notes.get("elementary") or notes.get("advanced") or "").strip())
 
     def test_pipeline_controlled_mode_uses_classifier_blueprints_for_notes(self):
         out = run_pipeline(
@@ -634,7 +635,11 @@ class PipelineTests(unittest.TestCase):
         self.assertIsInstance(blueprints, dict)
         self.assertEqual(
             sentence.get("linguistic_notes"),
-            [blueprints.get("intermediate_text")],
+            {
+                "elementary": blueprints.get("elementary_text"),
+                "intermediate": blueprints.get("intermediate_text"),
+                "advanced": blueprints.get("advanced_text"),
+            },
         )
         self.assertEqual(sentence.get("note_generator_version"), "controlled::classifier_blueprints")
 
@@ -645,7 +650,11 @@ class PipelineTests(unittest.TestCase):
         self.assertIsInstance(blueprints, dict)
         self.assertEqual(
             sentence.get("linguistic_notes"),
-            [blueprints.get("intermediate_text")],
+            {
+                "elementary": blueprints.get("elementary_text"),
+                "intermediate": blueprints.get("intermediate_text"),
+                "advanced": blueprints.get("advanced_text"),
+            },
         )
 
     def test_pipeline_keeps_uncovered_sentence_words_when_phrase_nodes_exist(self):
@@ -678,7 +687,14 @@ class PipelineTests(unittest.TestCase):
         for phrase in phrases:
             class_ids = {str(item.get("class_id")) for item in phrase.get("grammar_classes", []) if isinstance(item, dict)}
             self.assertIn("prepositional_relation_phrase", class_ids)
-            notes = " ".join(phrase.get("linguistic_notes") or [])
+            note_payload = phrase.get("linguistic_notes") or {}
+            notes = " ".join(
+                [
+                    str(note_payload.get("elementary") or ""),
+                    str(note_payload.get("intermediate") or ""),
+                    str(note_payload.get("advanced") or ""),
+                ]
+            )
             self.assertNotIn("Main grammar focus: phrase structure", notes)
             self.assertNotIn("This phrase is used as modifier", notes)
 
@@ -732,7 +748,11 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(str(blueprints.get("elementary_text")).startswith("rendered::elementary::"))
         self.assertTrue(str(blueprints.get("intermediate_text")).startswith("rendered::intermediate::"))
         self.assertTrue(str(blueprints.get("advanced_text")).startswith("rendered::advanced::"))
-        self.assertEqual(sentence.get("linguistic_notes"), [blueprints.get("intermediate_text")])
+        self.assertEqual(sentence.get("linguistic_notes"), {
+            "elementary": blueprints.get("elementary_text"),
+            "intermediate": blueprints.get("intermediate_text"),
+            "advanced": blueprints.get("advanced_text"),
+        })
 
     @patch("ela_pipeline.classifier.deberta.DebertaProfileClassifier")
     def test_pipeline_uses_deberta_classifier_provider(self, mock_classifier_cls):
@@ -755,7 +775,11 @@ class PipelineTests(unittest.TestCase):
         self.assertIsInstance(sentence.get("grammar_classes"), list)
         self.assertGreater(len(sentence.get("grammar_classes")), 0)
         self.assertTrue(sentence.get("note_blueprints", {}).get("intermediate_text"))
-        self.assertEqual(sentence.get("linguistic_notes"), [sentence.get("note_blueprints", {}).get("intermediate_text")])
+        self.assertEqual(sentence.get("linguistic_notes"), {
+            "elementary": sentence.get("note_blueprints", {}).get("elementary_text"),
+            "intermediate": sentence.get("note_blueprints", {}).get("intermediate_text"),
+            "advanced": sentence.get("note_blueprints", {}).get("advanced_text"),
+        })
         self.assertGreaterEqual(fake_classifier.classify_node.call_count, 1)
 
     @patch("ela_pipeline.classifier.tabular_cefr_predictor.TabularProfileClassifier")
@@ -779,7 +803,11 @@ class PipelineTests(unittest.TestCase):
         self.assertIsInstance(sentence.get("grammar_classes"), list)
         self.assertGreater(len(sentence.get("grammar_classes")), 0)
         self.assertTrue(sentence.get("note_blueprints", {}).get("intermediate_text"))
-        self.assertEqual(sentence.get("linguistic_notes"), [sentence.get("note_blueprints", {}).get("intermediate_text")])
+        self.assertEqual(sentence.get("linguistic_notes"), {
+            "elementary": sentence.get("note_blueprints", {}).get("elementary_text"),
+            "intermediate": sentence.get("note_blueprints", {}).get("intermediate_text"),
+            "advanced": sentence.get("note_blueprints", {}).get("advanced_text"),
+        })
         self.assertGreaterEqual(fake_classifier.classify_node.call_count, 1)
 
     @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.annotate")
@@ -826,7 +854,11 @@ class PipelineTests(unittest.TestCase):
         sentence = out[next(iter(out))]
         for phrase in self._iter_by_type(sentence, "Phrase"):
             self.assertGreater(len(phrase.get("grammar_classes") or []), 0)
-            self.assertGreater(len(phrase.get("linguistic_notes") or []), 0)
+            notes = phrase.get("linguistic_notes") or {}
+            self.assertIsInstance(notes, dict)
+            self.assertTrue(
+                str(notes.get("intermediate") or notes.get("elementary") or notes.get("advanced") or "").strip()
+            )
 
     def test_pipeline_attaches_word_level_notes_for_pronouns(self):
         out = run_pipeline("She trusted him.", model_dir=None)
@@ -838,7 +870,9 @@ class PipelineTests(unittest.TestCase):
         )
         class_ids = {str(item.get("class_id")) for item in pronoun.get("grammar_classes", []) if isinstance(item, dict)}
         self.assertIn("pronoun_reference", class_ids)
-        self.assertGreater(len(pronoun.get("linguistic_notes") or []), 0)
+        notes = pronoun.get("linguistic_notes") or {}
+        self.assertIsInstance(notes, dict)
+        self.assertTrue(str(notes.get("intermediate") or notes.get("elementary") or notes.get("advanced") or "").strip())
 
     def test_pipeline_adds_node_metadata(self):
         text = "She should have trusted her instincts before making the decision."

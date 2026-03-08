@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 import hashlib
 import os
 from pathlib import Path
@@ -22,6 +23,39 @@ DEFAULT_LOCAL_TRANSLATION_MODEL_DIR = "artifacts/models/m2m100_418M"
 def _runtime_downloads_disabled() -> bool:
     value = str(os.getenv("ELA_MEDIA_DISABLE_RUNTIME_DOWNLOADS", "0")).strip().lower()
     return value in {"1", "true", "yes", "on"}
+
+
+@lru_cache(maxsize=4)
+def _get_spacy_nlp_cached(model_name: str):
+    return load_nlp(model_name)
+
+
+@lru_cache(maxsize=3)
+def _get_whisper_model_cached(model_name: str, asr_cache_dir: str):
+    try:
+        import whisper  # type: ignore[import-not-found]
+    except Exception as exc:  # pragma: no cover
+        raise RuntimeError("Audio/video ASR component is unavailable in this build.") from exc
+    return whisper.load_model(model_name, download_root=asr_cache_dir)
+
+
+def warmup_media_models(*, spacy_model: str = "en_core_web_sm", warmup_asr: bool = True) -> None:
+    """Preload runtime media models so first user request avoids cold starts."""
+    _get_spacy_nlp_cached(spacy_model)
+    if not warmup_asr:
+        return
+    model_name = os.getenv("ELA_MEDIA_ASR_MODEL", "base").strip() or "base"
+    asr_cache_dir = Path(
+        os.getenv("ELA_MEDIA_ASR_CACHE_DIR", "artifacts/models/whisper")
+    ).resolve()
+    asr_cache_dir.mkdir(parents=True, exist_ok=True)
+    if _runtime_downloads_disabled():
+        expected_model_path = asr_cache_dir / f"{model_name}.pt"
+        if not expected_model_path.is_file():
+            raise RuntimeError(
+                f"ASR model '{model_name}' is not bundled. Expected local file: {expected_model_path}."
+            )
+    _get_whisper_model_cached(model_name, str(asr_cache_dir))
 
 
 @dataclass(frozen=True)
@@ -210,15 +244,9 @@ def _extract_text_and_sentence_chunks(
                     f"Expected local file: {expected_model_path}. "
                     "Runtime downloads are disabled."
                 )
-        try:
-            import whisper  # type: ignore[import-not-found]
-        except Exception as exc:  # pragma: no cover
-            raise RuntimeError(
-                "Audio/video ASR component is unavailable in this build."
-            ) from exc
         if progress_callback is not None:
             progress_callback("transcribing_audio", 0.05, f"Loading ASR model: {model_name}")
-        model = whisper.load_model(model_name, download_root=str(asr_cache_dir))
+        model = _get_whisper_model_cached(model_name, str(asr_cache_dir))
         media_duration_sec = _probe_media_duration_seconds(source_path)
         result_holder: dict[str, Any] = {}
         error_holder: dict[str, Exception] = {}
@@ -246,7 +274,7 @@ def _extract_text_and_sentence_chunks(
                 ratio = min(0.92, 0.08 + (elapsed / max(media_duration_sec * 1.25, 8.0)) * 0.84)
             else:
                 ratio = min(0.92, 0.08 + min(elapsed / 90.0, 1.0) * 0.84)
-            progress_callback("transcribing_audio", ratio, f"ASR running ({int(ratio * 100)}%)")
+            progress_callback("transcribing_audio", ratio, "ASR running...")
 
         if "error" in error_holder:
             raise RuntimeError(str(error_holder["error"])) from error_holder["error"]
@@ -627,7 +655,11 @@ def run_media_pipeline(
             "sentence_contract_builder is required. Local sentence-contract fallback is disabled."
         )
 
-    nlp = load_nlp(spacy_model)
+    if progress_callback is not None:
+        progress_callback("translating_text", 0.02, "Preparing linguistic parsing")
+    nlp = _get_spacy_nlp_cached(spacy_model)
+    if progress_callback is not None:
+        progress_callback("translating_text", 0.04, "Splitting transcript into sentences")
     sentence_stream: list[str] = []
     sentence_timeline: list[dict[str, float] | None] = []
     if extracted_sentence_chunks:
@@ -659,6 +691,9 @@ def run_media_pipeline(
                 continue
             sentence_stream.append(text_resolved)
             sentence_timeline.append(None)
+
+    if progress_callback is not None:
+        progress_callback("translating_text", 0.08, f"Prepared {len(sentence_stream)} sentences")
 
     media_sentences: list[dict[str, Any]] = []
     contract_sentences: list[dict[str, Any]] = []
