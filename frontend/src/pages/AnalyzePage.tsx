@@ -429,7 +429,7 @@ export function AnalyzePage() {
         }}
         onSubmittingChange={() => {}}
         projectId={selectedProject.project_id ?? null}
-        projectLabel={activeMedia ? (selectedProject.project_name ?? selectedProject.project_id ?? 'Project') : '-'}
+        projectLabel={activeMedia ? (selectedProject.project_name ?? selectedProject.project_id ?? 'Project') : ''}
         stageProgress={stageProgress}
         activeStageIndex={activeStageIndex}
         initialMedia={activeMedia ?? undefined}

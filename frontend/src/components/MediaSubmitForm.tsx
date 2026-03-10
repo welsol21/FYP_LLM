@@ -57,6 +57,10 @@ export function MediaSubmitForm({
     { label: 'Source only', value: 'source only' },
   ]
   const voiceOptions = ['Male', 'Female']
+  const normalizedProjectLabel = String(projectLabel || '').trim()
+  const showProjectLine = normalizedProjectLabel.length > 0 && normalizedProjectLabel !== '-'
+  const normalizedFileLabel = String(selectedFileName || '').trim()
+  const showFileLine = normalizedFileLabel.length > 0 && normalizedFileLabel !== '-'
 
   useEffect(() => {
     if (!initialMedia) {
@@ -109,8 +113,8 @@ export function MediaSubmitForm({
 
   return (
     <form onSubmit={handleSubmit} className="analyze-panel" aria-label="media-submit-form">
-      <div className="project-line">{projectLabel}</div>
-      <div className="file-line">{selectedFileName || '-'}</div>
+      {showProjectLine ? <div className="project-line">{normalizedProjectLabel}</div> : null}
+      {showFileLine ? <div className="file-line">{normalizedFileLabel}</div> : null}
 
       <div className="analyze-grid">
         <label className="analyze-label">Translator:</label>
