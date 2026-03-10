@@ -278,6 +278,14 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(payload)
             return
+        if path == "/api/cancel-job":
+            job_id = str(body.get("job_id") or body.get("jobId") or "").strip()
+            if not job_id:
+                self._send_json({"error": "job_id is required"}, status=400)
+                return
+            payload = SERVICE.cancel_backend_job(job_id=job_id)
+            self._send_json(payload, status=200 if payload.get("status") == "ok" else 404)
+            return
         if path == "/api/sentence-contract":
             sentence_text = str(body.get("sentenceText") or body.get("sentence_text") or "").strip()
             if not sentence_text:

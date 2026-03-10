@@ -178,6 +178,7 @@ export interface RuntimeApi {
   listFiles(projectId?: string): Promise<MediaFileRow[]>
   listAnalysisHistory(projectId?: string): Promise<AnalysisHistoryRow[]>
   deleteAnalysis(documentId: string): Promise<{ status: 'ok' | 'error'; message: string; document_id?: string }>
+  cancelJob(jobId: string): Promise<{ status: 'ok' | 'error'; message: string; job_id?: string }>
   listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]>
   getBackendJobStatus(jobId: string): Promise<BackendJobStatus>
   getVisualizerPayload(documentId?: string): Promise<VisualizerPayload>

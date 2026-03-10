@@ -253,6 +253,20 @@ export class HttpRuntimeApi implements RuntimeApi {
     return await LocalWorkspace.deleteAnalysis(documentId)
   }
 
+  async cancelJob(jobId: string): Promise<{ status: 'ok' | 'error'; message: string; job_id?: string }> {
+    const jid = String(jobId || '').trim()
+    if (!jid) return { status: 'error', message: 'jobId is required.' }
+    const payload = await requestJson<{ status: 'ok' | 'error'; message: string; job_id?: string }>('/api/cancel-job', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: jid }),
+    }).catch(() => ({ status: 'error' as const, message: 'Failed to cancel running analysis.', job_id: jid }))
+    if (payload.status === 'ok') {
+      this.pendingJobs.delete(jid)
+    }
+    return payload
+  }
+
   private async finalizeCompletedAnalysis(
     documentId: string,
     context: {

@@ -38,6 +38,10 @@ FRONTEND_INTERNAL_PROJECT_ID = "_frontend_internal_project"
 FRONTEND_INTERNAL_PROJECT_NAME = "Frontend Internal Project"
 
 
+class LocalJobCanceled(Exception):
+    """Raised to stop local processing when user requests cancellation."""
+
+
 def _normalize_provider_key(value: str | None) -> str:
     raw = str(value or "").strip().lower()
     if not raw:
@@ -423,6 +427,7 @@ class RuntimeMediaService:
     limits: MediaPolicyLimits | None = None
     _local_jobs: dict[str, dict[str, Any]] = field(default_factory=dict, init=False, repr=False)
     _local_jobs_lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
+    _local_jobs_canceled: set[str] = field(default_factory=set, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.repo = LocalSQLiteRepository(self.db_path)
@@ -638,6 +643,26 @@ class RuntimeMediaService:
                 "stage_progress": [0, 0, 0, 0, 0],
             }
         return dict(row)
+
+    def cancel_backend_job(self, *, job_id: str) -> dict[str, Any]:
+        jid = str(job_id or "").strip()
+        if not jid:
+            return {"status": "error", "message": "job_id is required", "job_id": jid}
+        with self._local_jobs_lock:
+            row = dict(self._local_jobs.get(jid) or {})
+            if not row:
+                return {"status": "error", "message": "Job not found.", "job_id": jid}
+            self._local_jobs_canceled.add(jid)
+        document_id = str(row.get("document_id") or "").strip() or None
+        self._set_local_job_state(
+            job_id=jid,
+            status="canceled",
+            message="Analysis canceled by user.",
+            stage_name="canceled",
+            document_id=document_id,
+            stage_log="Analysis canceled by user.",
+        )
+        return {"status": "ok", "message": "Analysis canceled by user.", "job_id": jid}
 
     def list_document_sentences(self, *, document_id: str) -> list[dict[str, Any]]:
         rows = self.repo.list_document_visualizer_rows(document_id=document_id)
@@ -1480,6 +1505,10 @@ class RuntimeMediaService:
         progress_ratio: float | None = None,
         stage_log: str | None = None,
     ) -> None:
+        with self._local_jobs_lock:
+            existing = dict(self._local_jobs.get(job_id) or {})
+        if existing.get("status") == "canceled" and status != "canceled":
+            return
         stage_progress = self._stage_progress(stage_name or status, progress_ratio)
         stage_name_resolved = stage_name or str(status or "")
         message_resolved = str(message or "")
@@ -1512,6 +1541,8 @@ class RuntimeMediaService:
             payload["document_id"] = previous.get("document_id")
         with self._local_jobs_lock:
             self._local_jobs[job_id] = payload
+            if status in {"completed_local", "rejected", "error", "canceled", "not_found"}:
+                self._local_jobs_canceled.discard(job_id)
 
     def _start_local_processing_job(
         self,
@@ -1536,6 +1567,9 @@ class RuntimeMediaService:
         def _runner() -> None:
             document_id = f"doc-{uuid.uuid4().hex[:12]}"
             try:
+                with self._local_jobs_lock:
+                    if job_id in self._local_jobs_canceled:
+                        raise LocalJobCanceled("Analysis canceled by user.")
                 result = self.process_media_now(
                     media_path=media_path,
                     project_id=project_id,
@@ -1546,16 +1580,23 @@ class RuntimeMediaService:
                     voice_choice=voice_choice,
                     force_full_reprocess=force_full_reprocess,
                     document_id=document_id,
-                    stage_callback=lambda stage, ratio, log_line: self._set_local_job_state(
-                        job_id=job_id,
-                        status="running_local",
-                        message=f"Stage: {stage.replace('_', ' ')}",
-                        stage_name=stage,
-                        document_id=document_id,
-                        progress_ratio=ratio,
-                        stage_log=log_line,
+                    stage_callback=lambda stage, ratio, log_line: (
+                        (_ for _ in ()).throw(LocalJobCanceled("Analysis canceled by user."))
+                        if job_id in self._local_jobs_canceled
+                        else self._set_local_job_state(
+                            job_id=job_id,
+                            status="running_local",
+                            message=f"Stage: {stage.replace('_', ' ')}",
+                            stage_name=stage,
+                            document_id=document_id,
+                            progress_ratio=ratio,
+                            stage_log=log_line,
+                        )
                     ),
                 )
+                with self._local_jobs_lock:
+                    if job_id in self._local_jobs_canceled:
+                        raise LocalJobCanceled("Analysis canceled by user.")
                 if result.get("status") == "completed":
                     self._set_local_job_state(
                         job_id=job_id,
@@ -1573,6 +1614,15 @@ class RuntimeMediaService:
                         stage_name="error",
                         document_id=document_id,
                     )
+            except LocalJobCanceled:
+                self._set_local_job_state(
+                    job_id=job_id,
+                    status="canceled",
+                    message="Analysis canceled by user.",
+                    stage_name="canceled",
+                    document_id=document_id,
+                    stage_log="Analysis canceled by user.",
+                )
             except Exception as exc:
                 self._set_local_job_state(
                     job_id=job_id,

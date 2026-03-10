@@ -71,6 +71,7 @@ export function AnalyzePage() {
   const [deletingByDocumentId, setDeletingByDocumentId] = useState<Record<string, boolean>>({})
   const [jobId, setJobId] = useState<string | null>(null)
   const [jobStatus, setJobStatus] = useState<BackendJobStatus | null>(null)
+  const [cancelingJob, setCancelingJob] = useState(false)
   const [liveProgress, setLiveProgress] = useState<number[]>([0, 0, 0, 0, 0])
   const [analysisStartedAt, setAnalysisStartedAt] = useState<number | null>(null)
   const [nowTs, setNowTs] = useState<number>(Date.now())
@@ -247,7 +248,13 @@ export function AnalyzePage() {
         if (Array.isArray(status.stage_progress) && status.stage_progress.length === 5) {
           setLiveProgress(status.stage_progress)
         }
-        if (status.status === 'completed_local' || status.status === 'rejected' || status.status === 'error' || status.status === 'not_found') {
+        if (
+          status.status === 'completed_local'
+          || status.status === 'rejected'
+          || status.status === 'error'
+          || status.status === 'not_found'
+          || status.status === 'canceled'
+        ) {
           setJobId(null)
         }
       } catch {
@@ -313,6 +320,57 @@ export function AnalyzePage() {
         delete next[docId]
         return next
       })
+    }
+  }
+
+  async function cancelAnalysis() {
+    const activeJobId = String(jobId || '').trim()
+    if (!activeJobId) return
+    setCancelingJob(true)
+    try {
+      const result = await api.cancelJob(activeJobId)
+      const canceledMessage = String(result.message || '').trim() || 'Analysis canceled by user.'
+      if (result.status === 'ok') {
+        setJobStatus((prev) => ({
+          job_id: activeJobId,
+          status: 'canceled',
+          message: canceledMessage,
+          stage_name: 'canceled',
+          stage_log: canceledMessage,
+          stage_logs: [...(prev?.stage_logs || []), canceledMessage].slice(-10),
+          stage_progress: [100, 100, 100, 100, 100],
+          document_id: prev?.document_id || activeDocumentId || undefined,
+        }))
+        setSubmission((prev) => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            result: {
+              ...prev.result,
+              status: 'canceled',
+            },
+            ui_feedback: {
+              severity: 'warning',
+              title: 'Analysis canceled',
+              message: canceledMessage,
+            },
+          }
+        })
+      } else {
+        setJobStatus((prev) => ({
+          job_id: activeJobId,
+          status: 'error',
+          message: canceledMessage,
+          stage_name: 'error',
+          stage_log: canceledMessage,
+          stage_logs: [...(prev?.stage_logs || []), canceledMessage].slice(-10),
+          stage_progress: prev?.stage_progress || liveProgress,
+          document_id: prev?.document_id || activeDocumentId || undefined,
+        }))
+      }
+    } finally {
+      setJobId(null)
+      setCancelingJob(false)
     }
   }
 
@@ -441,10 +499,15 @@ export function AnalyzePage() {
           }
         }}
         onSubmittingChange={() => {}}
+        onCancelAnalysis={() => {
+          void cancelAnalysis()
+        }}
         projectId={selectedProject.project_id ?? null}
         projectLabel={activeMedia ? (selectedProject.project_name ?? selectedProject.project_id ?? 'Project') : ''}
         stageProgress={stageProgress}
         activeStageIndex={activeStageIndex}
+        isAnalyzing={Boolean(jobId)}
+        isCanceling={cancelingJob}
         initialMedia={activeMedia ?? undefined}
         translatorOptions={translationConfig?.providers || []}
         defaultTranslator={translationConfig?.default_provider || 'm2m100'}

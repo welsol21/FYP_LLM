@@ -130,4 +130,41 @@ describe('AnalyzePage', () => {
     })
     confirmSpy.mockRestore()
   })
+
+  it('switches Start pipeline to Cancel while analysis is running and cancels on tap', async () => {
+    const api = new MockRuntimeApi()
+    const cancelSpy = vi.spyOn(api, 'cancelJob')
+    render(
+      <ApiContext.Provider value={api}>
+        <MemoryRouter
+          initialEntries={[
+            {
+              pathname: '/analyze',
+              state: {
+                analyzeEntry: 'files',
+                selectedMedia: {
+                  mediaFileId: 'file-1',
+                  fileName: 'sample.mp4',
+                  mediaPath: '/uploads/sample.mp4',
+                  sizeBytes: 104857600,
+                  durationSec: 600,
+                },
+              },
+            },
+          ]}
+        >
+          <AnalyzePage />
+        </MemoryRouter>
+      </ApiContext.Provider>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Start pipeline' }))
+    const cancelBtn = await screen.findByRole('button', { name: 'cancel-analysis' })
+    expect(cancelBtn).toBeInTheDocument()
+    fireEvent.click(cancelBtn)
+    await waitFor(() => {
+      expect(cancelSpy).toHaveBeenCalledTimes(1)
+      expect(screen.getByRole('button', { name: 'Start pipeline' })).toBeInTheDocument()
+    })
+  })
 })

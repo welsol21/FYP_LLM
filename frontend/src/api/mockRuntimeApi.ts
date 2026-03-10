@@ -124,7 +124,7 @@ function countPayloadElements(payload: VisualizerPayload | null | undefined): nu
 }
 
 export class MockRuntimeApi implements RuntimeApi {
-  private localJobs: Record<string, { ticks: number; document_id: string }> = {}
+  private localJobs: Record<string, { ticks: number; document_id: string; canceled?: boolean }> = {}
   private translationConfig: TranslationConfig = {
     default_provider: 'm2m100',
     providers: [
@@ -381,6 +381,15 @@ export class MockRuntimeApi implements RuntimeApi {
       : { status: 'error', message: 'analysis not found', document_id: docId }
   }
 
+  async cancelJob(jobId: string): Promise<{ status: 'ok' | 'error'; message: string; job_id?: string }> {
+    const jid = String(jobId || '').trim()
+    if (!jid) return { status: 'error', message: 'jobId is required.' }
+    const row = this.localJobs[jid]
+    if (!row) return { status: 'error', message: 'Job not found.', job_id: jid }
+    row.canceled = true
+    return { status: 'ok', message: 'Analysis canceled by user.', job_id: jid }
+  }
+
   async listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]> {
     if (!documentId || !this.payloadByDocument[documentId]) return []
     const payload = this.payloadByDocument[documentId] || {}
@@ -423,6 +432,15 @@ export class MockRuntimeApi implements RuntimeApi {
         status: 'not_found',
         message: 'Job not found.',
         stage_progress: [0, 0, 0, 0, 0],
+      }
+    }
+    if (row.canceled) {
+      return {
+        job_id: jobId,
+        status: 'canceled',
+        message: 'Analysis canceled by user.',
+        stage_progress: [100, 100, 100, 100, 100],
+        document_id: row.document_id,
       }
     }
     row.ticks += 1

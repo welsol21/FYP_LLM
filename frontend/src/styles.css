@@ -331,6 +331,12 @@ textarea {
   color: #f2f2f2;
 }
 
+.start-btn.cancel-btn {
+  background: linear-gradient(180deg, #5b1f1f 0%, #3f1111 100%);
+  border-color: #a04848;
+  color: #ffdede;
+}
+
 button {
   cursor: pointer;
 }
