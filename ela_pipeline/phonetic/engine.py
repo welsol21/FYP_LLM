@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from typing import Protocol
@@ -25,18 +26,28 @@ class EspeakPhoneticTranscriber:
 
     @staticmethod
     def _resolve_binary(binary: str) -> str:
-        b = (binary or "auto").strip().lower()
-        if b in {"espeak", "espeak-ng"}:
-            path = shutil.which(b)
+        raw = (binary or "auto").strip()
+        normalized = raw.lower()
+
+        if normalized in {"espeak", "espeak-ng"}:
+            path = shutil.which(normalized)
             if path is None:
-                raise FileNotFoundError(f"phonetic binary not found: {b}")
+                raise FileNotFoundError(f"phonetic binary not found: {normalized}")
             return path
-        if b == "auto":
+
+        if normalized == "auto":
             for candidate in ("espeak-ng", "espeak"):
                 path = shutil.which(candidate)
                 if path is not None:
                     return path
             raise FileNotFoundError("phonetic binary not found: expected espeak-ng or espeak in PATH")
+
+        # Accept absolute/relative executable paths (e.g. '/usr/bin/espeak-ng').
+        if os.path.isabs(raw) or "/" in raw:
+            if os.path.isfile(raw) and os.access(raw, os.X_OK):
+                return raw
+            raise FileNotFoundError(f"phonetic binary not found or not executable: {raw}")
+
         raise ValueError("phonetic_binary must be one of: auto | espeak | espeak-ng")
 
     @staticmethod
