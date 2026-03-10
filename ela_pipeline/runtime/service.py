@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import datetime as dt
 import hashlib
 import json
@@ -13,7 +13,6 @@ import shutil
 import sqlite3
 import subprocess
 import tempfile
-import threading
 import time
 import uuid
 from typing import Any, Callable, Iterable
@@ -36,10 +35,6 @@ MEDIA_STAGE_MANIFEST_PREFIX = "media_stage_manifest:"
 CONTRACT_BUILD_VERSION = "2026-03-04-rulesfirst-v1"
 FRONTEND_INTERNAL_PROJECT_ID = "_frontend_internal_project"
 FRONTEND_INTERNAL_PROJECT_NAME = "Frontend Internal Project"
-
-
-class LocalJobCanceled(Exception):
-    """Raised to stop local processing when user requests cancellation."""
 
 
 def _normalize_provider_key(value: str | None) -> str:
@@ -425,9 +420,6 @@ class RuntimeMediaService:
     runtime_mode: str = "auto"
     deployment_mode: str = "auto"
     limits: MediaPolicyLimits | None = None
-    _local_jobs: dict[str, dict[str, Any]] = field(default_factory=dict, init=False, repr=False)
-    _local_jobs_lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
-    _local_jobs_canceled: set[str] = field(default_factory=set, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.repo = LocalSQLiteRepository(self.db_path)
@@ -543,7 +535,6 @@ class RuntimeMediaService:
         subtitles_mode: str | None = None,
         voice_choice: str | None = None,
         force_full_reprocess: bool = False,
-        async_local_processing: bool = False,
     ) -> dict[str, Any]:
         translation_cfg = self.get_translation_config()
         selected_provider = str(translation_provider or translation_cfg.get("default_provider") or "m2m100").strip().lower()
@@ -593,76 +584,26 @@ class RuntimeMediaService:
             prefer_backend_for_enrichment=False,
         )
         if raw.get("route") == "local":
-            if async_local_processing:
-                job_id = self._start_local_processing_job(
-                    media_path=media_path,
-                    project_id=effective_project_id,
-                    media_file_id=media_file_id,
-                    translation_provider=selected_provider,
-                    provider_credentials=provider_credentials,
-                    subtitles_mode=str(subtitles_mode or "bilingual"),
-                    voice_choice=str(voice_choice or "male"),
-                    force_full_reprocess=bool(force_full_reprocess),
-                )
-                raw["job_id"] = job_id
-                raw["status"] = "accepted_local"
-                raw["message"] = "Local processing started."
-            else:
-                synced = self.process_media_now(
-                    media_path=media_path,
-                    project_id=effective_project_id,
-                    media_file_id=media_file_id,
-                    translation_provider=selected_provider,
-                    provider_credentials=provider_credentials,
-                    subtitles_mode=str(subtitles_mode or "bilingual"),
-                    voice_choice=str(voice_choice or "male"),
-                    force_full_reprocess=bool(force_full_reprocess),
-                )
-                raw["document_id"] = synced.get("document_id")
-                raw["status"] = "completed_local" if synced.get("status") == "completed" else raw.get("status")
-                if synced.get("status") != "completed":
-                    raw["route"] = "reject"
-                    raw["status"] = "rejected"
-                    raw["message"] = str(synced.get("message") or "Local media processing failed.")
+            synced = self.process_media_now(
+                media_path=media_path,
+                project_id=effective_project_id,
+                media_file_id=media_file_id,
+                translation_provider=selected_provider,
+                provider_credentials=provider_credentials,
+                subtitles_mode=str(subtitles_mode or "bilingual"),
+                voice_choice=str(voice_choice or "male"),
+                force_full_reprocess=bool(force_full_reprocess),
+            )
+            raw["document_id"] = synced.get("document_id")
+            raw["status"] = "completed_local" if synced.get("status") == "completed" else raw.get("status")
+            if synced.get("status") != "completed":
+                raw["route"] = "reject"
+                raw["status"] = "rejected"
+                raw["message"] = str(synced.get("message") or "Local media processing failed.")
         return {
             "result": raw,
             "ui_feedback": build_submission_ui_feedback(raw),
         }
-
-    def get_backend_job_status(self, *, job_id: str) -> dict[str, Any]:
-        with self._local_jobs_lock:
-            row = self._local_jobs.get(job_id)
-        if row is None:
-            return {
-                "job_id": job_id,
-                "status": "not_found",
-                "message": "Job not found.",
-                "stage_name": "not_found",
-                "stage_log": "Job not found.",
-                "stage_logs": ["Job not found."],
-                "stage_progress": [0, 0, 0, 0, 0],
-            }
-        return dict(row)
-
-    def cancel_backend_job(self, *, job_id: str) -> dict[str, Any]:
-        jid = str(job_id or "").strip()
-        if not jid:
-            return {"status": "error", "message": "job_id is required", "job_id": jid}
-        with self._local_jobs_lock:
-            row = dict(self._local_jobs.get(jid) or {})
-            if not row:
-                return {"status": "error", "message": "Job not found.", "job_id": jid}
-            self._local_jobs_canceled.add(jid)
-        document_id = str(row.get("document_id") or "").strip() or None
-        self._set_local_job_state(
-            job_id=jid,
-            status="canceled",
-            message="Analysis canceled by user.",
-            stage_name="canceled",
-            document_id=document_id,
-            stage_log="Analysis canceled by user.",
-        )
-        return {"status": "ok", "message": "Analysis canceled by user.", "job_id": jid}
 
     def list_document_sentences(self, *, document_id: str) -> list[dict[str, Any]]:
         rows = self.repo.list_document_visualizer_rows(document_id=document_id)
@@ -1464,176 +1405,6 @@ class RuntimeMediaService:
             media_sentences=media_sentences,
             contract_sentences=contract_sentences,
         )
-
-    @staticmethod
-    def _stage_progress(stage_name: str, ratio: float | None = None) -> list[int]:
-        def clamp(v: float) -> int:
-            return max(0, min(100, int(round(v))))
-
-        if ratio is not None:
-            r = max(0.0, min(1.0, float(ratio)))
-            if stage_name == "loading_file":
-                return [clamp(5 + 95 * r), 0, 0, 0, 0]
-            if stage_name == "transcribing_audio":
-                return [100, clamp(5 + 95 * r), 0, 0, 0]
-            if stage_name == "translating_text":
-                return [100, 100, clamp(5 + 95 * r), 0, 0]
-            if stage_name == "generating_media":
-                return [100, 100, 100, clamp(5 + 95 * r), 0]
-            if stage_name == "exporting_files":
-                return [100, 100, 100, 100, clamp(5 + 95 * r)]
-        mapping = {
-            "queued": [2, 0, 0, 0, 0],
-            "loading_file": [25, 0, 0, 0, 0],
-            "transcribing_audio": [100, 45, 0, 0, 0],
-            "translating_text": [100, 100, 65, 0, 0],
-            "generating_media": [100, 100, 100, 75, 0],
-            "exporting_files": [100, 100, 100, 100, 85],
-            "completed": [100, 100, 100, 100, 100],
-            "error": [100, 100, 100, 100, 100],
-        }
-        return list(mapping.get(stage_name, [0, 0, 0, 0, 0]))
-
-    def _set_local_job_state(
-        self,
-        *,
-        job_id: str,
-        status: str,
-        message: str,
-        stage_name: str | None = None,
-        document_id: str | None = None,
-        progress_ratio: float | None = None,
-        stage_log: str | None = None,
-    ) -> None:
-        with self._local_jobs_lock:
-            existing = dict(self._local_jobs.get(job_id) or {})
-        if existing.get("status") == "canceled" and status != "canceled":
-            return
-        stage_progress = self._stage_progress(stage_name or status, progress_ratio)
-        stage_name_resolved = stage_name or str(status or "")
-        message_resolved = str(message or "")
-        stage_log_resolved = str(stage_log or "").strip() or None
-        with self._local_jobs_lock:
-            previous = dict(self._local_jobs.get(job_id) or {})
-            logs = list(previous.get("stage_logs") or [])
-            if stage_log_resolved:
-                if not logs or logs[-1] != stage_log_resolved:
-                    logs.append(stage_log_resolved)
-            elif message_resolved:
-                if not logs or logs[-1] != message_resolved:
-                    logs.append(message_resolved)
-            logs = logs[-80:]
-
-        payload: dict[str, Any] = {
-            "job_id": job_id,
-            "status": status,
-            "message": message_resolved,
-            "stage_name": stage_name_resolved,
-            "stage_log": stage_log_resolved or (logs[-1] if logs else ""),
-            "stage_logs": logs,
-            "stage_progress": stage_progress,
-        }
-        if document_id:
-            payload["document_id"] = document_id
-        elif previous.get("document_id"):
-            payload["document_id"] = previous.get("document_id")
-        if previous.get("document_id") and "document_id" not in payload:
-            payload["document_id"] = previous.get("document_id")
-        with self._local_jobs_lock:
-            self._local_jobs[job_id] = payload
-            if status in {"completed_local", "rejected", "error", "canceled", "not_found"}:
-                self._local_jobs_canceled.discard(job_id)
-
-    def _start_local_processing_job(
-        self,
-        *,
-        media_path: str,
-        project_id: str,
-        media_file_id: str | None,
-        translation_provider: str | None,
-        provider_credentials: dict[str, str] | None,
-        subtitles_mode: str,
-        voice_choice: str,
-        force_full_reprocess: bool,
-    ) -> str:
-        job_id = f"local-{uuid.uuid4().hex[:12]}"
-        self._set_local_job_state(
-            job_id=job_id,
-            status="accepted_local",
-            message="Local processing started.",
-            stage_name="queued",
-        )
-
-        def _runner() -> None:
-            document_id = f"doc-{uuid.uuid4().hex[:12]}"
-            try:
-                with self._local_jobs_lock:
-                    if job_id in self._local_jobs_canceled:
-                        raise LocalJobCanceled("Analysis canceled by user.")
-                result = self.process_media_now(
-                    media_path=media_path,
-                    project_id=project_id,
-                    media_file_id=media_file_id,
-                    translation_provider=translation_provider,
-                    provider_credentials=provider_credentials,
-                    subtitles_mode=subtitles_mode,
-                    voice_choice=voice_choice,
-                    force_full_reprocess=force_full_reprocess,
-                    document_id=document_id,
-                    stage_callback=lambda stage, ratio, log_line: (
-                        (_ for _ in ()).throw(LocalJobCanceled("Analysis canceled by user."))
-                        if job_id in self._local_jobs_canceled
-                        else self._set_local_job_state(
-                            job_id=job_id,
-                            status="running_local",
-                            message=f"Stage: {stage.replace('_', ' ')}",
-                            stage_name=stage,
-                            document_id=document_id,
-                            progress_ratio=ratio,
-                            stage_log=log_line,
-                        )
-                    ),
-                )
-                with self._local_jobs_lock:
-                    if job_id in self._local_jobs_canceled:
-                        raise LocalJobCanceled("Analysis canceled by user.")
-                if result.get("status") == "completed":
-                    self._set_local_job_state(
-                        job_id=job_id,
-                        status="completed_local",
-                        message="Local processing completed.",
-                        stage_name="completed",
-                        document_id=document_id,
-                        stage_log=f"Total duration: {int(result.get('processing_duration_ms') or 0)} ms",
-                    )
-                else:
-                    self._set_local_job_state(
-                        job_id=job_id,
-                        status="rejected",
-                        message=str(result.get("message") or "Local processing failed."),
-                        stage_name="error",
-                        document_id=document_id,
-                    )
-            except LocalJobCanceled:
-                self._set_local_job_state(
-                    job_id=job_id,
-                    status="canceled",
-                    message="Analysis canceled by user.",
-                    stage_name="canceled",
-                    document_id=document_id,
-                    stage_log="Analysis canceled by user.",
-                )
-            except Exception as exc:
-                self._set_local_job_state(
-                    job_id=job_id,
-                    status="error",
-                    message=str(exc),
-                    stage_name="error",
-                    document_id=document_id,
-                )
-
-        threading.Thread(target=_runner, daemon=True).start()
-        return job_id
 
     def _build_sentence_contract_from_backend_and_local_translation(
         self,

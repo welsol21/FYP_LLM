@@ -1,6 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { vi } from 'vitest'
 import { AnalyzePage } from './AnalyzePage'
 import { ApiContext } from '../api/apiContext'
 import { MockRuntimeApi } from '../api/mockRuntimeApi'
@@ -40,7 +39,7 @@ describe('AnalyzePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start pipeline' }))
 
     await waitFor(() => {
-      expect(screen.getByText(/File accepted for local processing/i)).toBeInTheDocument()
+      expect(screen.getByText(/Local processing completed/i)).toBeInTheDocument()
     })
   })
 
@@ -131,40 +130,4 @@ describe('AnalyzePage', () => {
     confirmSpy.mockRestore()
   })
 
-  it('switches Start pipeline to Cancel while analysis is running and cancels on tap', async () => {
-    const api = new MockRuntimeApi()
-    const cancelSpy = vi.spyOn(api, 'cancelJob')
-    render(
-      <ApiContext.Provider value={api}>
-        <MemoryRouter
-          initialEntries={[
-            {
-              pathname: '/analyze',
-              state: {
-                analyzeEntry: 'files',
-                selectedMedia: {
-                  mediaFileId: 'file-1',
-                  fileName: 'sample.mp4',
-                  mediaPath: '/uploads/sample.mp4',
-                  sizeBytes: 104857600,
-                  durationSec: 600,
-                },
-              },
-            },
-          ]}
-        >
-          <AnalyzePage />
-        </MemoryRouter>
-      </ApiContext.Provider>,
-    )
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Start pipeline' }))
-    const cancelBtn = await screen.findByRole('button', { name: 'cancel-analysis' })
-    expect(cancelBtn).toBeInTheDocument()
-    fireEvent.click(cancelBtn)
-    await waitFor(() => {
-      expect(cancelSpy).toHaveBeenCalledTimes(1)
-      expect(screen.getByRole('button', { name: 'Start pipeline' })).toBeInTheDocument()
-    })
-  })
 })

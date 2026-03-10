@@ -27,6 +27,11 @@ export type MediaSubmissionPayload = {
     job_id?: string
     document_id?: string
     status?: string
+    stage_name?: string
+    stage_log?: string
+    stage_logs?: string[]
+    stage_progress?: number[]
+    processing_duration_ms?: number
   }
   ui_feedback: {
     severity: 'info' | 'warning' | 'error'
@@ -39,17 +44,6 @@ export type DocumentArtifact = {
   name: string
   size_bytes: number
   download_url: string
-}
-
-export type BackendJobStatus = {
-  job_id: string
-  status: string
-  message: string
-  stage_name?: string
-  stage_log?: string
-  stage_logs?: string[]
-  stage_progress: number[]
-  document_id?: string
 }
 
 export type MediaFileRow = {
@@ -178,9 +172,7 @@ export interface RuntimeApi {
   listFiles(projectId?: string): Promise<MediaFileRow[]>
   listAnalysisHistory(projectId?: string): Promise<AnalysisHistoryRow[]>
   deleteAnalysis(documentId: string): Promise<{ status: 'ok' | 'error'; message: string; document_id?: string }>
-  cancelJob(jobId: string): Promise<{ status: 'ok' | 'error'; message: string; job_id?: string }>
   listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]>
-  getBackendJobStatus(jobId: string): Promise<BackendJobStatus>
   getVisualizerPayload(documentId?: string): Promise<VisualizerPayload>
   analyzeText(input: { rawText: string; sentences?: string[] }): Promise<AnalyzeTextPayload>
   applyEdit(input: {

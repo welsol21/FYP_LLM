@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
 import { buildAnalysisFeatureBadges } from '../lib/analysisSettings'
 import type {
-  BackendJobStatus,
   DocumentArtifact,
   MediaFileRow,
   MediaSubmissionPayload,
@@ -69,12 +68,7 @@ export function AnalyzePage() {
   const [historyError, setHistoryError] = useState('')
   const [historyReloadKey, setHistoryReloadKey] = useState(0)
   const [deletingByDocumentId, setDeletingByDocumentId] = useState<Record<string, boolean>>({})
-  const [jobId, setJobId] = useState<string | null>(null)
-  const [jobStatus, setJobStatus] = useState<BackendJobStatus | null>(null)
-  const [cancelingJob, setCancelingJob] = useState(false)
-  const [liveProgress, setLiveProgress] = useState<number[]>([0, 0, 0, 0, 0])
-  const [analysisStartedAt, setAnalysisStartedAt] = useState<number | null>(null)
-  const [nowTs, setNowTs] = useState<number>(Date.now())
+  const [isSubmittingPipeline, setIsSubmittingPipeline] = useState(false)
   const routeState = (location.state as AnalyzeRouteState | null | undefined) || null
   const selectedMediaFromRoute = routeState?.selectedMedia
   const analyzeEntry = routeState?.analyzeEntry || (selectedMediaFromRoute ? 'files' : 'direct')
@@ -84,7 +78,6 @@ export function AnalyzePage() {
   const [directProjectId, setDirectProjectId] = useState<string>('')
   const [directFiles, setDirectFiles] = useState<MediaFileRow[]>([])
   const [directFileId, setDirectFileId] = useState<string>('')
-  const pollFailuresRef = useRef<number>(0)
   const currentMediaFileId = String(activeMedia?.mediaFileId || '').trim()
   const currentMediaFileName = String(activeMedia?.fileName || '').trim().toLowerCase()
   const currentMediaPath = String(activeMedia?.mediaPath || '').trim()
@@ -195,7 +188,6 @@ export function AnalyzePage() {
   }, [
     api,
     selectedProject.project_id,
-    jobStatus?.status,
     historyReloadKey,
     currentMediaFileId,
     currentMediaFileName,
@@ -227,63 +219,8 @@ export function AnalyzePage() {
     }
   }, [api, directProjectId])
 
-  useEffect(() => {
-    if (!jobId) return
-    const ticker = window.setInterval(() => setNowTs(Date.now()), 1000)
-    return () => window.clearInterval(ticker)
-  }, [jobId])
-
-  useEffect(() => {
-    if (!jobId) return
-    let stopped = false
-    const poll = async () => {
-      try {
-        const status = await api.getBackendJobStatus(jobId)
-        if (stopped) return
-        pollFailuresRef.current = 0
-        setJobStatus(status)
-        if (status.document_id) {
-          setActiveMedia((prev) => (prev ? { ...prev, documentId: status.document_id } : prev))
-        }
-        if (Array.isArray(status.stage_progress) && status.stage_progress.length === 5) {
-          setLiveProgress(status.stage_progress)
-        }
-        if (
-          status.status === 'completed_local'
-          || status.status === 'rejected'
-          || status.status === 'error'
-          || status.status === 'not_found'
-          || status.status === 'canceled'
-        ) {
-          setJobId(null)
-        }
-      } catch {
-        if (stopped) return
-        pollFailuresRef.current += 1
-        if (pollFailuresRef.current >= 3) {
-          setJobStatus((prev) => ({
-            job_id: prev?.job_id || jobId,
-            status: prev?.status || 'running_local',
-            message: 'Temporary connection issue while polling status. Retrying...',
-            stage_name: prev?.stage_name || 'running_local',
-            stage_log: prev?.stage_log || 'Polling retry in progress...',
-            stage_logs: prev?.stage_logs || ['Polling retry in progress...'],
-            stage_progress: prev?.stage_progress || liveProgress,
-            document_id: prev?.document_id,
-          }))
-        }
-      }
-    }
-    poll()
-    const timer = window.setInterval(poll, 800)
-    return () => {
-      stopped = true
-      window.clearInterval(timer)
-    }
-  }, [api, jobId])
-
-  const activeDocumentId = jobStatus?.document_id || submission?.result.document_id || activeMedia?.documentId
-  const stageLogLines = (jobStatus?.stage_logs || []).slice(-10)
+  const activeDocumentId = submission?.result.document_id || activeMedia?.documentId
+  const stageLogLines = (submission?.result.stage_logs || []).slice(-10)
 
   async function deleteAnalysis(documentId: string) {
     const docId = String(documentId || '').trim()
@@ -298,10 +235,6 @@ export function AnalyzePage() {
         setSubmission((prev) => {
           if (!prev || prev.result.document_id !== docId) return prev
           return { ...prev, result: { ...prev.result, document_id: undefined } }
-        })
-        setJobStatus((prev) => {
-          if (!prev || prev.document_id !== docId) return prev
-          return { ...prev, document_id: undefined }
         })
         setActiveMedia((prev) => {
           if (!prev || prev.documentId !== docId) return prev
@@ -323,97 +256,22 @@ export function AnalyzePage() {
     }
   }
 
-  async function cancelAnalysis() {
-    const activeJobId = String(jobId || '').trim()
-    if (!activeJobId) return
-    setCancelingJob(true)
-    try {
-      const result = await api.cancelJob(activeJobId)
-      const canceledMessage = String(result.message || '').trim() || 'Analysis canceled by user.'
-      if (result.status === 'ok') {
-        setJobStatus((prev) => ({
-          job_id: activeJobId,
-          status: 'canceled',
-          message: canceledMessage,
-          stage_name: 'canceled',
-          stage_log: canceledMessage,
-          stage_logs: [...(prev?.stage_logs || []), canceledMessage].slice(-10),
-          stage_progress: [100, 100, 100, 100, 100],
-          document_id: prev?.document_id || activeDocumentId || undefined,
-        }))
-        setSubmission((prev) => {
-          if (!prev) return prev
-          return {
-            ...prev,
-            result: {
-              ...prev.result,
-              status: 'canceled',
-            },
-            ui_feedback: {
-              severity: 'warning',
-              title: 'Analysis canceled',
-              message: canceledMessage,
-            },
-          }
-        })
-      } else {
-        setJobStatus((prev) => ({
-          job_id: activeJobId,
-          status: 'error',
-          message: canceledMessage,
-          stage_name: 'error',
-          stage_log: canceledMessage,
-          stage_logs: [...(prev?.stage_logs || []), canceledMessage].slice(-10),
-          stage_progress: prev?.stage_progress || liveProgress,
-          document_id: prev?.document_id || activeDocumentId || undefined,
-        }))
-      }
-    } finally {
-      setJobId(null)
-      setCancelingJob(false)
-    }
-  }
-
   const stageProgress = useMemo(() => {
-    if (jobId) return liveProgress
+    if (Array.isArray(submission?.result.stage_progress) && submission.result.stage_progress.length === 5) {
+      return submission.result.stage_progress
+    }
     if (!submission) return [0, 0, 0, 0, 0]
     if (submission.result.route === 'reject') return [100, 0, 0, 0, 0]
     if (submission.result.route === 'local') return [100, 100, 100, 100, 100]
     return [0, 0, 0, 0, 0]
-  }, [submission, jobId, liveProgress])
+  }, [submission])
 
-  const activeStageIndex = useMemo(() => {
-    if (!jobId) return null
-    for (let i = stageProgress.length - 1; i >= 0; i -= 1) {
-      const value = Number(stageProgress[i] ?? 0)
-      if (value > 0 && value < 100) return i
-    }
-    return null
-  }, [jobId, stageProgress])
-  const elapsedSec = useMemo(() => {
-    if (!analysisStartedAt) return 0
-    return Math.max(0, Math.floor((nowTs - analysisStartedAt) / 1000))
-  }, [analysisStartedAt, nowTs])
-  const estimatedSec = useMemo(() => {
-    const progressValues = stageProgress.map((value) => {
-      const n = Number(value)
-      if (!Number.isFinite(n)) return 0
-      return Math.max(0, Math.min(100, n))
-    })
-    const progressFraction = progressValues.reduce((acc, value) => acc + value, 0) / (progressValues.length * 100)
-    if (elapsedSec > 0 && progressFraction >= 0.03) {
-      return Math.max(elapsedSec + 1, Math.round(elapsedSec / Math.max(progressFraction, 0.03)))
-    }
-    const src = Number(activeMedia?.durationSec ?? 0)
-    if (src > 0) return Math.max(20, Math.round(src * 1.8))
-    return 60
-  }, [elapsedSec, stageProgress, activeMedia?.durationSec])
   const stageTitle = useMemo(() => {
-    const value = String(jobStatus?.stage_name || '').trim().toLowerCase()
+    const value = String(submission?.result.stage_name || '').trim().toLowerCase()
     if (!value) return ''
     if (value === 'translating_text') return 'linguistic parsing'
     return value.replace(/_/g, ' ')
-  }, [jobStatus?.stage_name])
+  }, [submission?.result.stage_name])
 
   return (
     <section className="screen-block analyze-stack">
@@ -487,35 +345,30 @@ export function AnalyzePage() {
       <MediaSubmitForm
         onSubmitted={(payload) => {
           setSubmission(payload)
-          setJobStatus(null)
-          setAnalysisStartedAt(Date.now())
-          setNowTs(Date.now())
-          if (payload.result.route === 'local' && payload.result.status === 'accepted_local' && payload.result.job_id) {
-            setJobId(payload.result.job_id)
-            setLiveProgress([2, 0, 0, 0, 0])
-          } else {
-            setJobId(null)
-            setLiveProgress(payload.result.route === 'local' ? [100, 100, 100, 100, 100] : [100, 0, 0, 0, 0])
+          setIsSubmittingPipeline(false)
+          if (payload.result.document_id) {
+            setActiveMedia((prev) => (prev ? { ...prev, documentId: payload.result.document_id } : prev))
+            setHistoryReloadKey((prev) => prev + 1)
           }
         }}
-        onSubmittingChange={() => {}}
-        onCancelAnalysis={() => {
-          void cancelAnalysis()
-        }}
+        onSubmittingChange={(value) => setIsSubmittingPipeline(value)}
         projectId={selectedProject.project_id ?? null}
         projectLabel={activeMedia ? (selectedProject.project_name ?? selectedProject.project_id ?? 'Project') : ''}
         stageProgress={stageProgress}
-        activeStageIndex={activeStageIndex}
-        isAnalyzing={Boolean(jobId)}
-        isCanceling={cancelingJob}
+        activeStageIndex={null}
+        isAnalyzing={isSubmittingPipeline}
         initialMedia={activeMedia ?? undefined}
         translatorOptions={translationConfig?.providers || []}
         defaultTranslator={translationConfig?.default_provider || 'm2m100'}
       />
       {submission ? (
         <section className={`card feedback ${submission.ui_feedback.severity}`} aria-label="submission-feedback">
-          <p>{jobStatus?.message || submission.ui_feedback.message}</p>
-          <p className="stage-log-title">Elapsed: {elapsedSec}s / Estimated: {estimatedSec}s</p>
+          <p>{submission.ui_feedback.message}</p>
+          {typeof submission.result.processing_duration_ms === 'number' ? (
+            <p className="stage-log-title">
+              Total duration: {Math.max(0, Math.round(submission.result.processing_duration_ms / 1000))}s
+            </p>
+          ) : null}
           {stageTitle ? (
             <p className="stage-log-title">Stage: {stageTitle}</p>
           ) : null}

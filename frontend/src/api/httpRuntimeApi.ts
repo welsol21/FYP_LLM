@@ -1,7 +1,6 @@
 import type {
   AnalysisHistoryRow,
   AnalyzeTextPayload,
-  BackendJobStatus,
   DocumentArtifact,
   MediaFileRow,
   MediaSubmissionPayload,
@@ -13,6 +12,13 @@ import type {
   VisualizerPayload,
 } from './runtimeApi'
 import { LocalWorkspace } from '../lib/localWorkspace'
+import { transcribeMediaBlob } from '../lib/clientAsr'
+
+type SentenceContractPayload = {
+  sentence_text?: string
+  sentence_hash?: string
+  sentence_node?: VisualizerPayload[string]
+}
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init)
@@ -23,20 +29,57 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T
 }
 
+function inferSourceKind(mediaPath: string, mimeType?: string): 'text' | 'audio' | 'video' | 'other' {
+  const ext = String(mediaPath || '').toLowerCase()
+  const mime = String(mimeType || '').toLowerCase()
+  if (mime.startsWith('text/')) return 'text'
+  if (mime.startsWith('audio/')) return 'audio'
+  if (mime.startsWith('video/')) return 'video'
+  if (ext.endsWith('.txt') || ext.endsWith('.md') || ext.endsWith('.srt') || ext.endsWith('.vtt') || ext.endsWith('.json')) return 'text'
+  if (ext.endsWith('.mp3') || ext.endsWith('.wav') || ext.endsWith('.m4a') || ext.endsWith('.flac') || ext.endsWith('.ogg')) return 'audio'
+  if (ext.endsWith('.mp4') || ext.endsWith('.mkv') || ext.endsWith('.mov') || ext.endsWith('.avi') || ext.endsWith('.webm')) return 'video'
+  return 'other'
+}
+
+function normalizeText(raw: string): string {
+  return String(raw || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function stripSubtitleMarkup(raw: string): string {
+  const lines = raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => !/^\d+$/.test(line))
+    .filter((line) => !/^\d{2}:\d{2}:\d{2}[,.]\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}[,.]\d{3}/.test(line))
+    .filter((line) => line.toUpperCase() !== 'WEBVTT')
+  return lines.join(' ')
+}
+
+function splitIntoSentences(rawText: string): string[] {
+  return normalizeText(rawText)
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+async function extractRawTextFromBlob(blob: Blob, mediaPath: string): Promise<string> {
+  const kind = inferSourceKind(mediaPath, blob.type)
+  if (kind !== 'text') return ''
+  const text = typeof (blob as Blob & { text?: () => Promise<string> }).text === 'function'
+    ? await (blob as Blob & { text: () => Promise<string> }).text()
+    : await new Response(blob).text()
+  if (mediaPath.toLowerCase().endsWith('.srt') || mediaPath.toLowerCase().endsWith('.vtt')) {
+    return normalizeText(stripSubtitleMarkup(text))
+  }
+  return normalizeText(text)
+}
+
 export class HttpRuntimeApi implements RuntimeApi {
-  private readonly pendingJobs = new Map<string, {
-    projectId: string
-    mediaFileId?: string
-    mediaPath: string
-    sizeBytes?: number
-    durationSec?: number
-    settings: string
-    fileName: string
-    finalizeAttempts: number
-  }>()
-
-  private readonly finalizedDocuments = new Set<string>()
-
   async getUiState(): Promise<RuntimeUiState> {
     return requestJson<RuntimeUiState>('/api/ui-state')
   }
@@ -58,17 +101,12 @@ export class HttpRuntimeApi implements RuntimeApi {
   }
 
   async uploadMedia(file: File): Promise<{ fileName: string; mediaPath: string; sizeBytes: number }> {
-    const form = new FormData()
-    form.append('file', file, file.name)
-    const res = await fetch('/api/upload', { method: 'POST', body: form })
-    if (!res.ok) {
-      if (res.status === 413) {
-        throw new Error('Upload rejected: file is too large for current upload limit.')
-      }
-      const text = await res.text()
-      throw new Error(`HTTP ${res.status}: ${text}`)
-    }
-    const uploaded = (await res.json()) as { fileName: string; mediaPath: string; sizeBytes: number }
+    const fileName = String(file.name || 'uploaded.bin')
+    const localId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const mediaPath = `/client-media/${localId}/${fileName}`
+    const uploaded = { fileName, mediaPath, sizeBytes: file.size }
     await LocalWorkspace.cacheUploadedMedia(uploaded.mediaPath, file)
     return uploaded
   }
@@ -108,46 +146,186 @@ export class HttpRuntimeApi implements RuntimeApi {
     const localFile = input.mediaFileId ? await LocalWorkspace.getFileById(input.mediaFileId) : null
     const fileName = localFile?.name || input.mediaPath.split('/').pop() || input.mediaPath
     const settings = `Transl: ${input.translationProvider || 'm2m100'} / Subs: ${input.subtitlesMode || 'bilingual'} / Voice: ${input.voiceChoice || 'male'} / Proc: ${input.forceFullReprocess ? 'force' : 'incremental'}`
+    const startedAt = Date.now()
+    const stageLogs: string[] = []
+    const progress: number[] = [0, 0, 0, 0, 0]
+    const log = (stage: number, text: string, pct: number): void => {
+      progress[stage] = Math.max(progress[stage], Math.max(0, Math.min(100, Math.round(pct))))
+      stageLogs.push(text)
+    }
 
-    const payload = await requestJson<MediaSubmissionPayload>('/api/submit-media', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        mediaPath: input.mediaPath,
-        durationSec: input.durationSec,
-        sizeBytes: input.sizeBytes,
-        translationProvider: input.translationProvider,
-        subtitlesMode: input.subtitlesMode,
-        voiceChoice: input.voiceChoice,
-        forceFullReprocess: input.forceFullReprocess,
-      }),
+    const finish = (payload: MediaSubmissionPayload): MediaSubmissionPayload => ({
+      ...payload,
+      result: {
+        ...payload.result,
+        stage_logs: stageLogs.slice(-30),
+        stage_log: stageLogs.slice(-10).join('\n'),
+        stage_progress: [...progress],
+        processing_duration_ms: Math.max(0, Date.now() - startedAt),
+      },
     })
-    const jobId = String(payload?.result?.job_id || '').trim()
-    if (jobId) {
-      this.pendingJobs.set(jobId, {
-        projectId: effectiveProjectId,
-        mediaFileId: input.mediaFileId,
-        mediaPath: input.mediaPath,
-        sizeBytes: input.sizeBytes,
-        durationSec: input.durationSec,
-        settings,
-        fileName,
-        finalizeAttempts: 0,
+
+    const mediaBlob = await LocalWorkspace.getCachedUploadedMedia(input.mediaPath)
+    if (!(mediaBlob instanceof Blob)) {
+      return finish({
+        result: {
+          route: 'reject',
+          status: 'rejected',
+          message: 'Client media blob not found in local cache.',
+        },
+        ui_feedback: {
+          severity: 'error',
+          title: 'Processing failed',
+          message: 'Client media blob not found in local cache.',
+        },
       })
     }
-    const immediateDocId = String(payload?.result?.document_id || '').trim()
-    if (immediateDocId) {
-      await this.finalizeCompletedAnalysis(immediateDocId, {
-        projectId: effectiveProjectId,
-        mediaFileId: input.mediaFileId,
-        mediaPath: input.mediaPath,
-        sizeBytes: input.sizeBytes,
-        durationSec: input.durationSec,
-        settings,
-        fileName,
+
+    log(0, 'Loading source file', 100)
+
+    const sourceKind = inferSourceKind(input.mediaPath, mediaBlob.type)
+    if ((sourceKind === 'audio' || sourceKind === 'video') && !input.forceFullReprocess) {
+      const fallbackFile = input.mediaFileId ? await LocalWorkspace.getFileById(input.mediaFileId) : null
+      const fallbackDocId = String(fallbackFile?.document_id || '').trim()
+      if (fallbackDocId) {
+        log(2, 'Incremental reuse: reusing last client analysis for this media file', 100)
+        return finish({
+          result: {
+            route: 'local',
+            status: 'completed_local',
+            document_id: fallbackDocId,
+            message: 'Incremental reuse: existing client analysis loaded.',
+            stage_name: 'completed',
+          },
+          ui_feedback: {
+            severity: 'info',
+            title: 'Local processing completed',
+            message: 'Incremental reuse: existing client analysis loaded.',
+          },
+        })
+      }
+    }
+
+    let rawText = ''
+    if (sourceKind === 'text') {
+      rawText = await extractRawTextFromBlob(mediaBlob, input.mediaPath)
+      log(1, 'Text extracted on client', 100)
+    } else if (sourceKind === 'audio' || sourceKind === 'video') {
+      try {
+        rawText = normalizeText(
+          await transcribeMediaBlob(mediaBlob, {
+            onProgress: ({ message, progress }) => log(1, message, progress),
+          }),
+        )
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        return finish({
+          result: {
+            route: 'reject',
+            status: 'rejected',
+            message,
+            stage_name: 'transcribing_audio',
+          },
+          ui_feedback: {
+            severity: 'error',
+            title: 'Processing failed',
+            message,
+          },
+        })
+      }
+    } else {
+      rawText = await extractRawTextFromBlob(mediaBlob, input.mediaPath)
+    }
+
+    if (!rawText) {
+      const reason = sourceKind === 'audio' || sourceKind === 'video'
+        ? 'Client ASR returned empty transcript.'
+        : 'Client could not extract text from source.'
+      return finish({
+        result: {
+          route: 'reject',
+          status: 'rejected',
+          message: reason,
+          stage_name: 'transcribing_audio',
+        },
+        ui_feedback: {
+          severity: 'error',
+          title: 'Processing failed',
+          message: reason,
+        },
       })
     }
-    return payload
+    const sentences = splitIntoSentences(rawText)
+    if (sentences.length === 0) {
+      return finish({
+        result: {
+          route: 'reject',
+          status: 'rejected',
+          message: 'No sentences detected after client text extraction.',
+          stage_name: 'translating_text',
+        },
+        ui_feedback: {
+          severity: 'error',
+          title: 'Processing failed',
+          message: 'No sentences detected after client text extraction.',
+        },
+      })
+    }
+
+    log(2, `Prepared ${sentences.length} sentences`, 15)
+    const contract: VisualizerPayload = {}
+    const duplicateCounter = new Map<string, number>()
+    for (let idx = 0; idx < sentences.length; idx += 1) {
+      const sentenceText = sentences[idx]
+      const payload = await requestJson<SentenceContractPayload>('/api/sentence-contract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sentenceText, sentenceIdx: idx }),
+      })
+      const baseKey = String(payload?.sentence_text || sentenceText).trim() || `sentence_${idx + 1}`
+      const seen = duplicateCounter.get(baseKey) || 0
+      duplicateCounter.set(baseKey, seen + 1)
+      const key = seen === 0 ? baseKey : `${baseKey} #${seen + 1}`
+      if (payload?.sentence_node && typeof payload.sentence_node === 'object') {
+        contract[key] = payload.sentence_node
+      }
+      log(2, `Built sentence contract ${idx + 1}/${sentences.length}`, 15 + Math.round(((idx + 1) / sentences.length) * 85))
+    }
+
+    log(3, 'Generating client artifacts', 100)
+    log(4, 'Exporting client artifacts', 100)
+
+    const documentId = `doc-${typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID().replace(/-/g, '').slice(0, 12)
+      : `${Date.now()}${Math.random().toString(16).slice(2, 8)}`}`
+    const artifacts = LocalWorkspace.buildDocumentArtifacts(documentId, contract)
+    await LocalWorkspace.upsertAnalysis({
+      documentId,
+      projectId: effectiveProjectId,
+      mediaFileId: input.mediaFileId,
+      fileName,
+      filePath: input.mediaPath,
+      sizeBytes: input.sizeBytes,
+      durationSeconds: input.durationSec,
+      settings,
+      contract,
+      artifacts,
+    })
+
+    return finish({
+      result: {
+        route: 'local',
+        status: 'completed_local',
+        document_id: documentId,
+        message: 'Local processing completed.',
+        stage_name: 'completed',
+      },
+      ui_feedback: {
+        severity: 'info',
+        title: 'Local processing completed',
+        message: 'Local processing completed.',
+      },
+    })
   }
 
   async getTranslationConfig(): Promise<TranslationConfig> {
@@ -172,54 +350,9 @@ export class HttpRuntimeApi implements RuntimeApi {
     return await LocalWorkspace.listDocumentArtifacts(docId)
   }
 
-  async getBackendJobStatus(jobId: string): Promise<BackendJobStatus> {
-    let status = await requestJson<BackendJobStatus>(`/api/backend-job-status?job_id=${encodeURIComponent(jobId)}`)
-    const docId = String(status.document_id || '').trim()
-    if (docId && (status.status === 'completed_local' || status.status === 'running_local')) {
-      const context = this.pendingJobs.get(jobId)
-      if (context) {
-        const finalized = await this.finalizeCompletedAnalysis(docId, context, {
-          retries: status.status === 'completed_local' ? 4 : 1,
-          retryDelayMs: 180,
-        })
-        if (status.status === 'completed_local' && finalized) {
-          this.pendingJobs.delete(jobId)
-        } else if (status.status === 'completed_local' && !finalized) {
-          context.finalizeAttempts += 1
-          this.pendingJobs.set(jobId, context)
-          const maxAttempts = 30
-          if (context.finalizeAttempts < maxAttempts) {
-            const logs = [...(status.stage_logs || [])]
-            logs.push(`Finalizing client artifacts (${context.finalizeAttempts}/${maxAttempts - 1})...`)
-            status = {
-              ...status,
-              status: 'running_local',
-              stage_name: 'finalizing_client_artifacts',
-              message: 'Finalizing client artifacts...',
-              stage_logs: logs.slice(-20),
-              stage_log: logs.slice(-10).join('\n'),
-            }
-          } else {
-            this.pendingJobs.delete(jobId)
-            status = {
-              ...status,
-              status: 'error',
-              message: 'Backend completed, but frontend could not finalize artifacts from contract.',
-            }
-          }
-        }
-      }
-    } else if (status.status === 'rejected' || status.status === 'error' || status.status === 'not_found') {
-      this.pendingJobs.delete(jobId)
-    }
-    return status
-  }
-
   async getVisualizerPayload(documentId?: string): Promise<VisualizerPayload> {
     if (!documentId) return {}
-    const local = await LocalWorkspace.getVisualizerPayload(documentId)
-    if (Object.keys(local).length > 0) return local
-    return requestJson<VisualizerPayload>(`/api/visualizer-payload?document_id=${encodeURIComponent(documentId)}`)
+    return await LocalWorkspace.getVisualizerPayload(documentId)
   }
 
   async analyzeText(input: { rawText: string; sentences?: string[] }): Promise<AnalyzeTextPayload> {
@@ -251,68 +384,5 @@ export class HttpRuntimeApi implements RuntimeApi {
 
   async deleteAnalysis(documentId: string): Promise<{ status: 'ok' | 'error'; message: string; document_id?: string }> {
     return await LocalWorkspace.deleteAnalysis(documentId)
-  }
-
-  async cancelJob(jobId: string): Promise<{ status: 'ok' | 'error'; message: string; job_id?: string }> {
-    const jid = String(jobId || '').trim()
-    if (!jid) return { status: 'error', message: 'jobId is required.' }
-    const payload = await requestJson<{ status: 'ok' | 'error'; message: string; job_id?: string }>('/api/cancel-job', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_id: jid }),
-    }).catch(() => ({ status: 'error' as const, message: 'Failed to cancel running analysis.', job_id: jid }))
-    if (payload.status === 'ok') {
-      this.pendingJobs.delete(jid)
-    }
-    return payload
-  }
-
-  private async finalizeCompletedAnalysis(
-    documentId: string,
-    context: {
-      projectId: string
-      mediaFileId?: string
-      mediaPath: string
-      sizeBytes?: number
-      durationSec?: number
-      settings: string
-      fileName: string
-    },
-    options?: {
-      retries?: number
-      retryDelayMs?: number
-    },
-  ): Promise<boolean> {
-    if (this.finalizedDocuments.has(documentId)) return true
-    const retries = Math.max(1, Number(options?.retries || 1))
-    const retryDelayMs = Math.max(0, Number(options?.retryDelayMs || 0))
-    let contract: VisualizerPayload = {}
-    for (let attempt = 1; attempt <= retries; attempt += 1) {
-      contract = await requestJson<VisualizerPayload>(
-        `/api/visualizer-payload?document_id=${encodeURIComponent(documentId)}`,
-      ).catch(() => ({}))
-      if (Object.keys(contract).length > 0) break
-      if (attempt < retries && retryDelayMs > 0) {
-        await new Promise<void>((resolve) => {
-          window.setTimeout(resolve, retryDelayMs)
-        })
-      }
-    }
-    if (Object.keys(contract).length === 0) return false
-    const artifacts = LocalWorkspace.buildDocumentArtifacts(documentId, contract)
-    await LocalWorkspace.upsertAnalysis({
-      documentId,
-      projectId: context.projectId,
-      mediaFileId: context.mediaFileId,
-      fileName: context.fileName,
-      filePath: context.mediaPath,
-      sizeBytes: context.sizeBytes,
-      durationSeconds: context.durationSec,
-      settings: context.settings,
-      contract,
-      artifacts,
-    })
-    this.finalizedDocuments.add(documentId)
-    return true
   }
 }

@@ -9,49 +9,27 @@ describe('HttpRuntimeApi', () => {
     vi.restoreAllMocks()
   })
 
-  it('persists analysis history when completed_local payload appears after short delay', async () => {
+  it('builds and persists analysis from client media blob using sentence-contract endpoint', async () => {
     const api = new HttpRuntimeApi()
-    let visualizerCalls = 0
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url.includes('/api/submit-media')) {
-        return new Response(
-          JSON.stringify({
-            result: { route: 'local', status: 'accepted_local', message: 'accepted', job_id: 'job-1' },
-            ui_feedback: { severity: 'info', title: 'ok', message: 'accepted' },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        )
-      }
-      if (url.includes('/api/backend-job-status')) {
-        return new Response(
-          JSON.stringify({
-            job_id: 'job-1',
-            status: 'completed_local',
-            message: 'done',
-            stage_progress: [100, 100, 100, 100, 100],
-            document_id: 'doc-1',
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        )
-      }
-      if (url.includes('/api/visualizer-payload')) {
-        visualizerCalls += 1
-        const payload =
-          visualizerCalls < 3
-            ? {}
-            : {
-                'She trusted him.': {
-                  node_id: 's-1',
-                  type: 'Sentence',
-                  content: 'She trusted him.',
-                  tense: 'past',
-                  linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
-                  part_of_speech: 'sentence',
-                  linguistic_elements: [],
-                  translations: { backend_m2m100: { text: 'Она доверяла ему.' } },
-                },
-              }
+      if (url.includes('/api/sentence-contract')) {
+        const body = JSON.parse(String(init?.body || '{}'))
+        const sentenceText = String(body.sentenceText || '').trim() || 'She trusted him.'
+        const payload = {
+          sentence_text: sentenceText,
+          sentence_hash: 'h-1',
+          sentence_node: {
+            node_id: 's-1',
+            type: 'Sentence',
+            content: sentenceText,
+            tense: 'past',
+            linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
+            part_of_speech: 'sentence',
+            linguistic_elements: [],
+            translations: { backend_m2m100: { text: 'Она доверяла ему.' } },
+          },
+        }
         return new Response(JSON.stringify(payload), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
@@ -61,84 +39,71 @@ describe('HttpRuntimeApi', () => {
     })
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch)
 
-    await api.submitMedia({
-      mediaPath: '/uploads/01.Intro.mp3',
+    const uploaded = await api.uploadMedia(new File(['She trusted him.'], '01.Intro.txt', { type: 'text/plain' }))
+    const submit = await api.submitMedia({
+      mediaPath: uploaded.mediaPath,
       durationSec: 10,
-      sizeBytes: 1024,
+      sizeBytes: uploaded.sizeBytes,
     })
-    await api.getBackendJobStatus('job-1')
 
     const project = await api.getSelectedProject()
     const history = await api.listAnalysisHistory(project.project_id || undefined)
-    const artifacts = await api.listDocumentArtifacts('doc-1')
-    expect(visualizerCalls).toBeGreaterThanOrEqual(3)
+    const documentId = String(submit.result.document_id || '')
+    const artifacts = await api.listDocumentArtifacts(documentId)
+    expect(documentId).not.toBe('')
     expect(history.length).toBe(1)
-    expect(history[0].document_id).toBe('doc-1')
+    expect(history[0].document_id).toBe(documentId)
     expect(artifacts.some((row) => row.name === 'contract_sentences.json')).toBe(true)
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/api/sentence-contract'))).toBe(true)
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/api/submit-media'))).toBe(false)
   })
 
-  it('generates downloadable contract artifacts locally without backend artifacts endpoint', async () => {
+  it('keeps visualizer payload and artifacts fully local after submit', async () => {
     const api = new HttpRuntimeApi()
+    let sentenceContractCalls = 0
     let visualizerCalls = 0
-    let artifactCalls = 0
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url.includes('/api/submit-media')) {
-        return new Response(
-          JSON.stringify({
-            result: { route: 'local', status: 'accepted_local', message: 'accepted', job_id: 'job-2' },
-            ui_feedback: { severity: 'info', title: 'ok', message: 'accepted' },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        )
-      }
-      if (url.includes('/api/backend-job-status')) {
-        return new Response(
-          JSON.stringify({
-            job_id: 'job-2',
-            status: 'completed_local',
-            message: 'done',
-            stage_progress: [100, 100, 100, 100, 100],
-            document_id: 'doc-2',
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        )
-      }
-      if (url.includes('/api/visualizer-payload')) {
-        visualizerCalls += 1
-        const payload =
-          visualizerCalls < 2
-            ? {}
-            : {
-                'She trusted him.': {
-                  node_id: 's-2',
-                  type: 'Sentence',
-                  content: 'She trusted him.',
-                  tense: 'past',
-                  linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
-                  part_of_speech: 'sentence',
-                  linguistic_elements: [],
-                  translations: { backend_m2m100: { text: 'Она доверяла ему.' } },
-                },
-              }
+      if (url.includes('/api/sentence-contract')) {
+        sentenceContractCalls += 1
+        const body = JSON.parse(String(init?.body || '{}'))
+        const sentenceText = String(body.sentenceText || '').trim() || 'She trusted him.'
+        const payload = {
+          sentence_text: sentenceText,
+          sentence_hash: 'h-2',
+          sentence_node: {
+            node_id: 's-2',
+            type: 'Sentence',
+            content: sentenceText,
+            tense: 'past',
+            linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
+            part_of_speech: 'sentence',
+            linguistic_elements: [],
+            translations: { backend_m2m100: { text: 'Она доверяла ему.' } },
+          },
+        }
         return new Response(JSON.stringify(payload), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
       }
-      if (url.includes('/api/document-artifacts')) artifactCalls += 1
+      if (url.includes('/api/visualizer-payload')) visualizerCalls += 1
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
     })
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch)
 
-    await api.submitMedia({
-      mediaPath: '/uploads/02.The Voice of Reason - I.mp3',
+    const uploaded = await api.uploadMedia(new File(['She trusted him.'], '02.The Voice of Reason - I.txt', { type: 'text/plain' }))
+    const submit = await api.submitMedia({
+      mediaPath: uploaded.mediaPath,
       durationSec: 10,
-      sizeBytes: 1024,
+      sizeBytes: uploaded.sizeBytes,
     })
-    await api.getBackendJobStatus('job-2')
-    const artifacts = await api.listDocumentArtifacts('doc-2')
-    expect(artifactCalls).toBe(0)
+    const documentId = String(submit.result.document_id || '')
+    const artifacts = await api.listDocumentArtifacts(documentId)
+    const payload = await api.getVisualizerPayload(documentId)
+    expect(Object.keys(payload).length).toBeGreaterThan(0)
+    expect(sentenceContractCalls).toBe(1)
+    expect(visualizerCalls).toBe(0)
     expect(artifacts.some((row) => row.name === 'full_text.txt')).toBe(true)
     expect(artifacts.some((row) => row.name === 'contract_visualizer.json')).toBe(true)
     expect(artifacts.some((row) => row.name === 'contract_sentences.json')).toBe(true)
@@ -157,7 +122,7 @@ describe('HttpRuntimeApi', () => {
     const apiReloaded = new HttpRuntimeApi()
     const project = await apiReloaded.getSelectedProject()
     const history = await apiReloaded.listAnalysisHistory(project.project_id || undefined)
-    expect(history.some((row) => row.document_id === 'doc-2')).toBe(true)
+    expect(history.some((row) => row.document_id === documentId)).toBe(true)
   })
 
   it('keeps file analysis flags in sync when analysis versions are deleted', async () => {

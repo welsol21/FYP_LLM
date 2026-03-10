@@ -114,6 +114,7 @@ let sqlModule: SqlModule | null = null
 let sqliteInitPromise: Promise<void> | null = null
 let sqliteBlobSnapshot = ''
 let sqliteDb: SqlDatabase | null = null
+const volatileMediaCache = new Map<string, Blob>()
 
 function indexedDbAvailable(): boolean {
   return typeof indexedDB !== 'undefined'
@@ -137,6 +138,7 @@ function openWorkspaceIdb(): Promise<IDBDatabase> {
 }
 
 function idbPutBlob(key: string, blob: Blob): Promise<void> {
+  volatileMediaCache.set(key, blob)
   if (!indexedDbAvailable()) return Promise.resolve()
   return openWorkspaceIdb()
     .then((db) => (
@@ -158,7 +160,7 @@ function idbPutBlob(key: string, blob: Blob): Promise<void> {
 }
 
 function idbGetBlob(key: string): Promise<Blob | null> {
-  if (!indexedDbAvailable()) return Promise.resolve(null)
+  if (!indexedDbAvailable()) return Promise.resolve(volatileMediaCache.get(key) || null)
   return openWorkspaceIdb()
     .then((db) => (
       new Promise<Blob | null>((resolve, reject) => {
@@ -174,7 +176,7 @@ function idbGetBlob(key: string): Promise<Blob | null> {
         }
       })
     ))
-    .catch(() => null)
+    .catch(() => volatileMediaCache.get(key) || null)
 }
 
 function idbGet(key: string): Promise<string | null> {
@@ -477,6 +479,17 @@ function encodeBinaryArtifact(mime: string, bytes: Uint8Array): string {
   return `data:${mime};base64,${window.btoa(binary)}`
 }
 
+async function encodeBlobArtifact(blob: Blob): Promise<string> {
+  const urlApi = globalThis.URL as { createObjectURL?: (value: Blob) => string }
+  if (typeof urlApi?.createObjectURL === 'function') {
+    return urlApi.createObjectURL(blob)
+  }
+  const arrayBuffer = typeof (blob as Blob & { arrayBuffer?: () => Promise<ArrayBuffer> }).arrayBuffer === 'function'
+    ? await (blob as Blob & { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer()
+    : await new Response(blob).arrayBuffer()
+  return encodeBinaryArtifact(blob.type || 'application/octet-stream', new Uint8Array(arrayBuffer))
+}
+
 function mediaFallbackArtifacts(documentId: string): DocumentArtifact[] {
   const mediaPlaceholder = new TextEncoder().encode(`generated_on_client:${documentId}`)
   return [
@@ -644,6 +657,7 @@ export const LocalWorkspace = {
     sqliteInitPromise = null
     sqlModule = null
     sqliteBlobSnapshot = ''
+    volatileMediaCache.clear()
     window.localStorage.removeItem(STORAGE_KEY)
     window.localStorage.removeItem(LEGACY_STORAGE_KEY)
     if (typeof indexedDB !== 'undefined') {
@@ -660,6 +674,12 @@ export const LocalWorkspace = {
     const key = String(mediaPath || '').trim()
     if (!key || !(file instanceof Blob)) return
     await idbPutBlob(`media_path:${key}`, file)
+  },
+
+  async getCachedUploadedMedia(mediaPath: string): Promise<Blob | null> {
+    const key = String(mediaPath || '').trim()
+    if (!key) return null
+    return await idbGetBlob(`media_path:${key}`)
   },
 
   buildDocumentArtifacts(documentId: string, contract: VisualizerPayload): DocumentArtifact[] {
@@ -877,7 +897,7 @@ export const LocalWorkspace = {
       return [...clone(baseArtifacts), ...mediaFallbackArtifacts(docId)]
     }
 
-    const blobUrl = URL.createObjectURL(blob)
+    const blobUrl = await encodeBlobArtifact(blob)
     const out = [...clone(baseArtifacts)]
     if ((blob.type || '').startsWith('audio/')) {
       out.push({

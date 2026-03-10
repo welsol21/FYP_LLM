@@ -2,7 +2,6 @@ import samplePayload from './frontend_contract_sample.json'
 import type {
   AnalysisHistoryRow,
   AnalyzeTextPayload,
-  BackendJobStatus,
   DocumentArtifact,
   MediaFileRow,
   MediaSubmissionPayload,
@@ -124,7 +123,6 @@ function countPayloadElements(payload: VisualizerPayload | null | undefined): nu
 }
 
 export class MockRuntimeApi implements RuntimeApi {
-  private localJobs: Record<string, { ticks: number; document_id: string; canceled?: boolean }> = {}
   private translationConfig: TranslationConfig = {
     default_provider: 'm2m100',
     providers: [
@@ -295,14 +293,12 @@ export class MockRuntimeApi implements RuntimeApi {
         analyzed: true,
         document_id: docId,
       })
-      const jobId = `local-${Date.now()}`
-      this.localJobs[jobId] = { ticks: 0, document_id: docId }
       return {
-        result: { route: 'local', message: 'File accepted for local processing.', status: 'accepted_local', job_id: jobId },
+        result: { route: 'local', message: 'Local processing completed.', status: 'completed_local', document_id: docId },
         ui_feedback: {
           severity: 'info',
-          title: 'Local processing started',
-          message: 'File accepted for local processing.',
+          title: 'Local processing completed',
+          message: 'Local processing completed.',
         },
       }
     }
@@ -381,15 +377,6 @@ export class MockRuntimeApi implements RuntimeApi {
       : { status: 'error', message: 'analysis not found', document_id: docId }
   }
 
-  async cancelJob(jobId: string): Promise<{ status: 'ok' | 'error'; message: string; job_id?: string }> {
-    const jid = String(jobId || '').trim()
-    if (!jid) return { status: 'error', message: 'jobId is required.' }
-    const row = this.localJobs[jid]
-    if (!row) return { status: 'error', message: 'Job not found.', job_id: jid }
-    row.canceled = true
-    return { status: 'ok', message: 'Analysis canceled by user.', job_id: jid }
-  }
-
   async listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]> {
     if (!documentId || !this.payloadByDocument[documentId]) return []
     const payload = this.payloadByDocument[documentId] || {}
@@ -422,50 +409,6 @@ export class MockRuntimeApi implements RuntimeApi {
         download_url: encode('application/json', JSON.stringify(contractSentences, null, 2)),
       },
     ]
-  }
-
-  async getBackendJobStatus(jobId: string): Promise<BackendJobStatus> {
-    const row = this.localJobs[jobId]
-    if (!row) {
-      return {
-        job_id: jobId,
-        status: 'not_found',
-        message: 'Job not found.',
-        stage_progress: [0, 0, 0, 0, 0],
-      }
-    }
-    if (row.canceled) {
-      return {
-        job_id: jobId,
-        status: 'canceled',
-        message: 'Analysis canceled by user.',
-        stage_progress: [100, 100, 100, 100, 100],
-        document_id: row.document_id,
-      }
-    }
-    row.ticks += 1
-    if (row.ticks >= 4) {
-      return {
-        job_id: jobId,
-        status: 'completed_local',
-        message: 'Local processing completed.',
-        stage_progress: [100, 100, 100, 100, 100],
-        document_id: row.document_id,
-      }
-    }
-    const progressByTick = [
-      [25, 0, 0, 0, 0],
-      [100, 50, 0, 0, 0],
-      [100, 100, 65, 0, 0],
-      [100, 100, 100, 80, 0],
-    ] as number[][]
-    return {
-      job_id: jobId,
-      status: 'running_local',
-      message: 'Local processing in progress.',
-      stage_progress: progressByTick[row.ticks - 1] ?? [100, 100, 100, 100, 95],
-      document_id: row.document_id,
-    }
   }
 
   async getVisualizerPayload(_documentId?: string): Promise<VisualizerPayload> {

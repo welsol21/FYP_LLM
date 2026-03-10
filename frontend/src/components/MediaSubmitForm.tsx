@@ -4,14 +4,12 @@ import type { MediaSubmissionPayload, TranslationProviderConfig } from '../api/r
 
 type Props = {
   onSubmitted: (payload: MediaSubmissionPayload) => void
-  onCancelAnalysis?: () => void
   onSubmittingChange?: (value: boolean) => void
   projectId: string | null
   projectLabel: string
   stageProgress: number[]
   activeStageIndex?: number | null
   isAnalyzing?: boolean
-  isCanceling?: boolean
   initialMedia?: {
     mediaFileId?: string
     mediaPath?: string
@@ -32,14 +30,12 @@ function hasRequiredCredentials(provider: TranslationProviderConfig): boolean {
 
 export function MediaSubmitForm({
   onSubmitted,
-  onCancelAnalysis,
   onSubmittingChange,
   projectId,
   projectLabel,
   stageProgress,
   activeStageIndex = null,
   isAnalyzing = false,
-  isCanceling = false,
   initialMedia,
   translatorOptions,
   defaultTranslator,
@@ -198,21 +194,9 @@ export function MediaSubmitForm({
         ))}
       </div>
 
-      {!isAnalyzing ? (
-        <button type="submit" className="start-btn" disabled={submitting || !mediaPath || !projectId}>
-          {submitting ? 'Starting...' : 'Start pipeline'}
-        </button>
-      ) : (
-        <button
-          type="button"
-          className="start-btn cancel-btn"
-          disabled={isCanceling}
-          onClick={() => onCancelAnalysis?.()}
-          aria-label="cancel-analysis"
-        >
-          {isCanceling ? 'Canceling...' : 'Cancel'}
-        </button>
-      )}
+      <button type="submit" className="start-btn" disabled={submitting || isAnalyzing || !mediaPath || !projectId}>
+        {submitting || isAnalyzing ? 'Starting...' : 'Start pipeline'}
+      </button>
     </form>
   )
 }
