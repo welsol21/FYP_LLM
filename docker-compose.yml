@@ -25,10 +25,9 @@ services:
         TORCH_VERSION: ${TORCH_VERSION:-2.6.0}
     container_name: ela-app
     restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
+      ELA_DB_BACKEND: ${ELA_DB_BACKEND:-sqlite}
+      ELA_SQLITE_DB_PATH: ${ELA_SQLITE_DB_PATH:-/app/artifacts/backend_state.sqlite3}
       ELA_DATABASE_URL: ${ELA_DATABASE_URL:-postgresql://ela_user:ela_pass@postgres:5432/ela}
       HF_HOME: /opt/hf-cache
       ELA_CLIENT_DB_PATH: /app/artifacts/client_state.sqlite3

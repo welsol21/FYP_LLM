@@ -32,4 +32,15 @@ describe('ProjectsPage', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/files')
     })
   })
+
+  it('deletes project with cascade action button', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderWithProviders(<ProjectsPage />)
+    const deleteBtn = await screen.findByRole('button', { name: 'delete-project-proj-1' })
+    fireEvent.click(deleteBtn)
+    await waitFor(() => {
+      expect(screen.queryByLabelText('project-row-proj-1')).not.toBeInTheDocument()
+    })
+    confirmSpy.mockRestore()
+  })
 })

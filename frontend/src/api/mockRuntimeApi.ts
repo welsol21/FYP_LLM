@@ -4,6 +4,7 @@ import type {
   AnalyzeTextPayload,
   DocumentArtifact,
   MediaFileRow,
+  MediaProgressPayload,
   MediaSubmissionPayload,
   ProjectRow,
   RuntimeApi,
@@ -206,6 +207,31 @@ export class MockRuntimeApi implements RuntimeApi {
     return row
   }
 
+  async deleteProject(projectId: string): Promise<{ status: 'ok' | 'error'; message: string; project_id?: string }> {
+    const id = String(projectId || '').trim()
+    if (!id) return { status: 'error', message: 'project id is required' }
+    const existed = this.projects.some((p) => p.id === id)
+    if (!existed) return { status: 'error', message: 'project not found', project_id: id }
+    this.projects = this.projects.filter((p) => p.id !== id)
+    const removedFileIds = new Set(
+      this.files
+        .filter((f) => this.fileProjectId[f.id] === id)
+        .map((f) => f.id),
+    )
+    this.files = this.files.filter((f) => !removedFileIds.has(f.id))
+    for (const fileId of removedFileIds) {
+      delete this.fileProjectId[fileId]
+    }
+    for (const [docId, payload] of Object.entries(this.payloadByDocument)) {
+      const linked = this.files.some((f) => f.document_id === docId)
+      if (!linked || !payload) delete this.payloadByDocument[docId]
+    }
+    if (this.selectedProjectId === id) {
+      this.selectedProjectId = this.projects[0]?.id ?? null
+    }
+    return { status: 'ok', message: 'Project and related data deleted.', project_id: id }
+  }
+
   async getSelectedProject(): Promise<SelectedProject> {
     if (!this.selectedProjectId) return { project_id: null }
     const row = this.projects.find((p) => p.id === this.selectedProjectId)
@@ -265,6 +291,7 @@ export class MockRuntimeApi implements RuntimeApi {
     subtitlesMode?: string
     voiceChoice?: string
     forceFullReprocess?: boolean
+    onProgress?: (payload: MediaProgressPayload) => void
   }): Promise<MediaSubmissionPayload> {
     if (!input.projectId) {
       return {
@@ -293,7 +320,7 @@ export class MockRuntimeApi implements RuntimeApi {
         analyzed: true,
         document_id: docId,
       })
-      return {
+      const response: MediaSubmissionPayload = {
         result: { route: 'local', message: 'Local processing completed.', status: 'completed_local', document_id: docId },
         ui_feedback: {
           severity: 'info',
@@ -301,8 +328,15 @@ export class MockRuntimeApi implements RuntimeApi {
           message: 'Local processing completed.',
         },
       }
+      input.onProgress?.({
+        stage_name: 'completed',
+        message: response.ui_feedback.message,
+        stage_logs: ['Local processing completed.'],
+        stage_progress: [100, 100, 100, 100, 100],
+      })
+      return response
     }
-    return {
+    const response: MediaSubmissionPayload = {
       result: { route: 'reject', message: 'File exceeds local processing limits.' },
       ui_feedback: {
         severity: 'error',
@@ -310,6 +344,13 @@ export class MockRuntimeApi implements RuntimeApi {
         message: 'File exceeds local processing limits.',
       },
     }
+    input.onProgress?.({
+      stage_name: 'rejected',
+      message: response.ui_feedback.message,
+      stage_logs: [response.ui_feedback.message],
+      stage_progress: [100, 0, 0, 0, 0],
+    })
+    return response
   }
 
   async getTranslationConfig(): Promise<TranslationConfig> {
@@ -324,6 +365,18 @@ export class MockRuntimeApi implements RuntimeApi {
   async listFiles(projectId?: string): Promise<MediaFileRow[]> {
     if (!projectId) return this.files
     return this.files.filter((row) => this.fileProjectId[row.id] === projectId)
+  }
+
+  async deleteFile(fileId: string): Promise<{ status: 'ok' | 'error'; message: string; file_id?: string }> {
+    const id = String(fileId || '').trim()
+    if (!id) return { status: 'error', message: 'fileId is required.' }
+    const row = this.files.find((item) => item.id === id)
+    if (!row) return { status: 'error', message: 'file not found', file_id: id }
+    const docId = String(row.document_id || '').trim()
+    if (docId) delete this.payloadByDocument[docId]
+    this.files = this.files.filter((item) => item.id !== id)
+    delete this.fileProjectId[id]
+    return { status: 'ok', message: 'File and related analyses deleted.', file_id: id }
   }
 
   async listAnalysisHistory(projectId?: string): Promise<AnalysisHistoryRow[]> {

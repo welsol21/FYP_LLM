@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useApi } from '../api/apiContext'
-import type { MediaSubmissionPayload, TranslationProviderConfig } from '../api/runtimeApi'
+import type { MediaProgressPayload, MediaSubmissionPayload, TranslationProviderConfig } from '../api/runtimeApi'
 
 type Props = {
   onSubmitted: (payload: MediaSubmissionPayload) => void
+  onProgress?: (payload: MediaProgressPayload) => void
   onSubmittingChange?: (value: boolean) => void
   projectId: string | null
   projectLabel: string
@@ -30,6 +31,7 @@ function hasRequiredCredentials(provider: TranslationProviderConfig): boolean {
 
 export function MediaSubmitForm({
   onSubmitted,
+  onProgress,
   onSubmittingChange,
   projectId,
   projectLabel,
@@ -105,6 +107,7 @@ export function MediaSubmitForm({
         subtitlesMode: subtitleOptions.find((option) => option.label === subtitles)?.value || 'bilingual_sequential',
         voiceChoice: voice.toLowerCase(),
         forceFullReprocess: processingMode === 'force',
+        onProgress,
       })
       onSubmitted(payload)
     } finally {

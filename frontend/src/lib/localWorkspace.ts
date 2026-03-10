@@ -14,10 +14,7 @@ import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
 const STORAGE_KEY = 'ela_frontend_workspace_sqlite_b64_v1'
 const SQLITE_STATE_KEY = 'workspace_state_v1'
 const LEGACY_STORAGE_KEY = 'ela_frontend_workspace_v1'
-const IDB_DB_NAME = 'ela_frontend_workspace'
-const IDB_STORE_NAME = 'kv'
-const IDB_MEDIA_STORE_NAME = 'media_blob'
-const IDB_SQLITE_SNAPSHOT_KEY = 'sqlite_snapshot_b64'
+const SQLITE_MEDIA_TABLE = 'media_blob_store'
 
 type WorkspaceFile = MediaFileRow & {
   project_id: string
@@ -99,6 +96,10 @@ function base64ToBytes(value: string): Uint8Array {
   return bytes
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+}
+
 type SqlDatabase = {
   run: (sql: string, params?: unknown[] | Record<string, unknown>) => void
   exec: (sql: string, params?: unknown[] | Record<string, unknown>) => Array<{ columns: string[]; values: unknown[][] }>
@@ -114,117 +115,85 @@ let sqlModule: SqlModule | null = null
 let sqliteInitPromise: Promise<void> | null = null
 let sqliteBlobSnapshot = ''
 let sqliteDb: SqlDatabase | null = null
-const volatileMediaCache = new Map<string, Blob>()
-
-function indexedDbAvailable(): boolean {
-  return typeof indexedDB !== 'undefined'
-}
-
-function openWorkspaceIdb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(IDB_DB_NAME, 1)
-    req.onupgradeneeded = () => {
-      const db = req.result
-      if (!db.objectStoreNames.contains(IDB_STORE_NAME)) {
-        db.createObjectStore(IDB_STORE_NAME)
-      }
-      if (!db.objectStoreNames.contains(IDB_MEDIA_STORE_NAME)) {
-        db.createObjectStore(IDB_MEDIA_STORE_NAME)
-      }
-    }
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error || new Error('Failed to open IndexedDB'))
-  })
-}
-
-function idbPutBlob(key: string, blob: Blob): Promise<void> {
-  volatileMediaCache.set(key, blob)
-  if (!indexedDbAvailable()) return Promise.resolve()
-  return openWorkspaceIdb()
-    .then((db) => (
-      new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(IDB_MEDIA_STORE_NAME, 'readwrite')
-        const store = tx.objectStore(IDB_MEDIA_STORE_NAME)
-        store.put(blob, key)
-        tx.oncomplete = () => {
-          db.close()
-          resolve()
-        }
-        tx.onerror = () => {
-          db.close()
-          reject(tx.error || new Error('IndexedDB blob put failed'))
-        }
-      })
-    ))
-    .catch(() => undefined)
-}
-
-function idbGetBlob(key: string): Promise<Blob | null> {
-  if (!indexedDbAvailable()) return Promise.resolve(volatileMediaCache.get(key) || null)
-  return openWorkspaceIdb()
-    .then((db) => (
-      new Promise<Blob | null>((resolve, reject) => {
-        const tx = db.transaction(IDB_MEDIA_STORE_NAME, 'readonly')
-        const store = tx.objectStore(IDB_MEDIA_STORE_NAME)
-        const req = store.get(key)
-        req.onsuccess = () => resolve(req.result instanceof Blob ? req.result : null)
-        req.onerror = () => reject(req.error || new Error('IndexedDB blob get failed'))
-        tx.oncomplete = () => db.close()
-        tx.onerror = () => {
-          db.close()
-          reject(tx.error || new Error('IndexedDB blob transaction failed'))
-        }
-      })
-    ))
-    .catch(() => volatileMediaCache.get(key) || null)
-}
-
-function idbGet(key: string): Promise<string | null> {
-  if (!indexedDbAvailable()) return Promise.resolve(null)
-  return openWorkspaceIdb()
-    .then((db) => (
-      new Promise<string | null>((resolve, reject) => {
-        const tx = db.transaction(IDB_STORE_NAME, 'readonly')
-        const store = tx.objectStore(IDB_STORE_NAME)
-        const req = store.get(key)
-        req.onsuccess = () => resolve(typeof req.result === 'string' ? req.result : null)
-        req.onerror = () => reject(req.error || new Error('IndexedDB get failed'))
-        tx.oncomplete = () => db.close()
-        tx.onerror = () => {
-          db.close()
-          reject(tx.error || new Error('IndexedDB transaction failed'))
-        }
-      })
-    ))
-    .catch(() => null)
-}
-
-function idbSet(key: string, value: string): Promise<void> {
-  if (!indexedDbAvailable()) return Promise.resolve()
-  return openWorkspaceIdb()
-    .then((db) => (
-      new Promise<void>((resolve, reject) => {
-        const tx = db.transaction(IDB_STORE_NAME, 'readwrite')
-        const store = tx.objectStore(IDB_STORE_NAME)
-        store.put(value, key)
-        tx.oncomplete = () => {
-          db.close()
-          resolve()
-        }
-        tx.onerror = () => {
-          db.close()
-          reject(tx.error || new Error('IndexedDB put failed'))
-        }
-      })
-    ))
-    .catch(() => undefined)
-}
 
 function openDbFromSnapshot(snapshot: string): SqlDatabase {
   if (!sqlModule) throw new Error('SQLite module not initialized')
   const db = snapshot ? new sqlModule.Database(base64ToBytes(snapshot)) : new sqlModule.Database()
   db.run('CREATE TABLE IF NOT EXISTS kv_store (k TEXT PRIMARY KEY, v TEXT NOT NULL)')
+  db.run(`
+    CREATE TABLE IF NOT EXISTS ${SQLITE_MEDIA_TABLE} (
+      k TEXT PRIMARY KEY,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      data_b64 TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `)
   return db
+}
+
+function readCell(rows: Array<{ values: unknown[][] }>, rowIndex = 0, colIndex = 0): unknown {
+  return rows?.[0]?.values?.[rowIndex]?.[colIndex]
+}
+
+async function persistDbSnapshot(): Promise<void> {
+  const exported = sqliteDb?.export() || new Uint8Array()
+  const encoded = bytesToBase64(exported)
+  window.localStorage.setItem(STORAGE_KEY, encoded)
+  sqliteBlobSnapshot = encoded
+}
+
+async function sqlitePutBlob(key: string, blob: Blob): Promise<void> {
+  await ensureDbReady()
+  await ensureDbFresh()
+  const arrayBuffer = typeof (blob as Blob & { arrayBuffer?: () => Promise<ArrayBuffer> }).arrayBuffer === 'function'
+    ? await (blob as Blob & { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer()
+    : await new Response(blob).arrayBuffer()
+  const bytes = new Uint8Array(arrayBuffer)
+  sqliteDb?.run(
+    `INSERT OR REPLACE INTO ${SQLITE_MEDIA_TABLE} (k, mime_type, size_bytes, data_b64, updated_at) VALUES (?, ?, ?, ?, ?)`,
+    [key, String(blob.type || 'application/octet-stream'), bytes.length, bytesToBase64(bytes), nowIso()],
+  )
+  await persistDbSnapshot()
+}
+
+async function sqliteGetBlob(key: string): Promise<Blob | null> {
+  await ensureDbReady()
+  await ensureDbFresh()
+  const rows = sqliteDb?.exec(`SELECT mime_type, data_b64 FROM ${SQLITE_MEDIA_TABLE} WHERE k = ? LIMIT 1`, [key]) || []
+  const mimeType = String(readCell(rows, 0, 0) || '')
+  const dataB64 = String(readCell(rows, 0, 1) || '')
+  if (!dataB64) return null
+  const bytes = base64ToBytes(dataB64)
+  return new Blob([toArrayBuffer(bytes)], { type: mimeType || 'application/octet-stream' })
+}
+
+async function sqliteDeleteBlob(key: string): Promise<void> {
+  await ensureDbReady()
+  await ensureDbFresh()
+  sqliteDb?.run(`DELETE FROM ${SQLITE_MEDIA_TABLE} WHERE k = ?`, [key])
+  await persistDbSnapshot()
+}
+
+async function sqliteFindBlobByKeySuffix(suffix: string): Promise<{ key: string; blob: Blob } | null> {
+  if (!suffix) return null
+  await ensureDbReady()
+  await ensureDbFresh()
+  const rows = sqliteDb?.exec(`SELECT k, mime_type, data_b64 FROM ${SQLITE_MEDIA_TABLE}`) || []
+  const values = rows?.[0]?.values || []
+  for (const row of values) {
+    const key = String(row?.[0] || '')
+    if (!key.endsWith(suffix)) continue
+    const mimeType = String(row?.[1] || '')
+    const dataB64 = String(row?.[2] || '')
+    if (!dataB64) continue
+    const bytes = base64ToBytes(dataB64)
+    return {
+      key,
+      blob: new Blob([toArrayBuffer(bytes)], { type: mimeType || 'application/octet-stream' }),
+    }
+  }
+  return null
 }
 
 async function ensureDbReady(): Promise<void> {
@@ -239,8 +208,7 @@ async function ensureDbReady(): Promise<void> {
           return candidate
         },
       })) as unknown as SqlModule
-      const idbSnapshot = await idbGet(IDB_SQLITE_SNAPSHOT_KEY)
-      sqliteBlobSnapshot = String(idbSnapshot || window.localStorage.getItem(STORAGE_KEY) || '')
+      sqliteBlobSnapshot = String(window.localStorage.getItem(STORAGE_KEY) || '')
       sqliteDb = openDbFromSnapshot(sqliteBlobSnapshot)
 
       // One-time migration from legacy JSON workspace to SQLite snapshot.
@@ -251,15 +219,7 @@ async function ensureDbReady(): Promise<void> {
             const parsed = JSON.parse(legacyRaw) as Partial<WorkspaceState>
             const migrated = coerceWorkspaceState(parsed)
             sqliteDb.run('INSERT OR REPLACE INTO kv_store (k, v) VALUES (?, ?)', [SQLITE_STATE_KEY, JSON.stringify(migrated)])
-            const exported = sqliteDb.export()
-            const encoded = bytesToBase64(exported)
-            sqliteBlobSnapshot = encoded
-            await idbSet(IDB_SQLITE_SNAPSHOT_KEY, encoded)
-            try {
-              window.localStorage.setItem(STORAGE_KEY, encoded)
-            } catch {
-              // ignore quota errors when sqlite snapshot is large
-            }
+            await persistDbSnapshot()
             window.localStorage.removeItem(LEGACY_STORAGE_KEY)
           } catch {
             // ignore invalid legacy data
@@ -285,19 +245,9 @@ function reopenDbFromSnapshot(snapshot: string): void {
 
 async function ensureDbFresh(): Promise<void> {
   if (!sqliteDb) return
-  const current = String((await idbGet(IDB_SQLITE_SNAPSHOT_KEY)) || window.localStorage.getItem(STORAGE_KEY) || '')
+  const current = String(window.localStorage.getItem(STORAGE_KEY) || '')
   if (current !== sqliteBlobSnapshot) {
     reopenDbFromSnapshot(current)
-  }
-}
-
-function fallbackProject(): ProjectRow {
-  const ts = nowIso()
-  return {
-    id: `proj-${Math.random().toString(36).slice(2, 10)}`,
-    name: 'New Project 1',
-    created_at: ts,
-    updated_at: ts,
   }
 }
 
@@ -321,37 +271,24 @@ async function saveRawState(state: WorkspaceState): Promise<void> {
   await ensureDbFresh()
   const payload = JSON.stringify(state)
   sqliteDb?.run('INSERT OR REPLACE INTO kv_store (k, v) VALUES (?, ?)', [SQLITE_STATE_KEY, payload])
-  const exported = sqliteDb?.export() || new Uint8Array()
-  const encoded = bytesToBase64(exported)
-  await idbSet(IDB_SQLITE_SNAPSHOT_KEY, encoded)
-  try {
-    window.localStorage.setItem(STORAGE_KEY, encoded)
-  } catch {
-    // ignore quota errors; IndexedDB remains the source of truth
-  }
-  sqliteBlobSnapshot = encoded
+  await persistDbSnapshot()
 }
 
 async function ensureState(): Promise<WorkspaceState> {
   const state = await loadRawState()
-  if (state.projects.length === 0) {
-    const project = fallbackProject()
-    state.projects = [project]
-    state.selected_project_id = project.id
-    await saveRawState(state)
-    return state
-  }
-  if (!state.selected_project_id || !state.projects.some((p) => p.id === state.selected_project_id)) {
-    state.selected_project_id = state.projects[0].id
+  const hasSelected = Boolean(state.selected_project_id && state.projects.some((p) => p.id === state.selected_project_id))
+  const nextSelected = hasSelected ? state.selected_project_id : (state.projects[0]?.id || null)
+  if (state.selected_project_id !== nextSelected) {
+    state.selected_project_id = nextSelected
     await saveRawState(state)
   }
   return state
 }
 
-function pickProject(state: WorkspaceState, projectId?: string): ProjectRow {
+function pickProject(state: WorkspaceState, projectId?: string): ProjectRow | null {
   const requested = String(projectId || '').trim()
   const found = requested ? state.projects.find((p) => p.id === requested) : null
-  return found || state.projects.find((p) => p.id === state.selected_project_id) || state.projects[0]
+  return found || state.projects.find((p) => p.id === state.selected_project_id) || state.projects[0] || null
 }
 
 function normalizeSettings(settings: string | undefined): string {
@@ -664,29 +601,29 @@ export const LocalWorkspace = {
     sqliteInitPromise = null
     sqlModule = null
     sqliteBlobSnapshot = ''
-    volatileMediaCache.clear()
     window.localStorage.removeItem(STORAGE_KEY)
     window.localStorage.removeItem(LEGACY_STORAGE_KEY)
-    if (typeof indexedDB !== 'undefined') {
-      await new Promise<void>((resolve) => {
-        const req = indexedDB.deleteDatabase(IDB_DB_NAME)
-        req.onsuccess = () => resolve()
-        req.onerror = () => resolve()
-        req.onblocked = () => resolve()
-      })
-    }
   },
 
   async cacheUploadedMedia(mediaPath: string, file: Blob): Promise<void> {
     const key = String(mediaPath || '').trim()
     if (!key || !(file instanceof Blob)) return
-    await idbPutBlob(`media_path:${key}`, file)
+    await sqlitePutBlob(`media_path:${key}`, file)
   },
 
   async getCachedUploadedMedia(mediaPath: string): Promise<Blob | null> {
     const key = String(mediaPath || '').trim()
     if (!key) return null
-    return await idbGetBlob(`media_path:${key}`)
+    const blob = await sqliteGetBlob(`media_path:${key}`)
+    if (blob instanceof Blob) return blob
+    const fileName = key.split('/').pop() || ''
+    if (!fileName) return null
+    const fallback = await sqliteFindBlobByKeySuffix(`/${fileName}`)
+    if (!fallback?.blob) return null
+    if (fallback.key !== `media_path:${key}`) {
+      await sqlitePutBlob(`media_path:${key}`, fallback.blob)
+    }
+    return fallback.blob
   },
 
   buildDocumentArtifacts(documentId: string, contract: VisualizerPayload): DocumentArtifact[] {
@@ -713,6 +650,46 @@ export const LocalWorkspace = {
     return clone(project)
   },
 
+  async deleteProject(projectId: string): Promise<{ status: 'ok' | 'error'; message: string; project_id?: string }> {
+    const state = await ensureState()
+    const id = String(projectId || '').trim()
+    if (!id) return { status: 'error', message: 'project id is required' }
+    const project = state.projects.find((row) => row.id === id)
+    if (!project) return { status: 'error', message: 'project not found', project_id: id }
+
+    const removedFiles = state.files.filter((row) => row.project_id === id)
+    const removedPaths = new Set(
+      removedFiles
+        .map((row) => String(row.media_path || row.path || '').trim())
+        .filter(Boolean),
+    )
+
+    state.files = state.files.filter((row) => row.project_id !== id)
+    state.analyses = state.analyses.filter((row) => row.project_id !== id)
+    state.projects = state.projects.filter((row) => row.id !== id)
+
+    if (state.projects.length === 0) {
+      state.selected_project_id = null
+    } else if (!state.selected_project_id || state.selected_project_id === id || !state.projects.some((p) => p.id === state.selected_project_id)) {
+      state.selected_project_id = state.projects[0].id
+    }
+
+    syncFileAnalysisFlags(state)
+    await saveRawState(state)
+
+    const stillUsedPaths = new Set(
+      state.files
+        .map((row) => String(row.media_path || row.path || '').trim())
+        .filter(Boolean),
+    )
+    for (const mediaPath of removedPaths) {
+      if (stillUsedPaths.has(mediaPath)) continue
+      await sqliteDeleteBlob(`media_path:${mediaPath}`)
+    }
+
+    return { status: 'ok', message: 'Project and all related data deleted.', project_id: id }
+  },
+
   async getSelectedProject(): Promise<SelectedProject> {
     const state = await ensureState()
     const row = state.projects.find((p) => p.id === state.selected_project_id) || state.projects[0]
@@ -737,6 +714,7 @@ export const LocalWorkspace = {
   }): Promise<WorkspaceFile> {
     const state = await ensureState()
     const project = pickProject(state, input.projectId)
+    if (!project) throw new Error('Project is required to register media file.')
     const ts = nowIso()
     const file: WorkspaceFile = {
       id: `file-${Math.random().toString(36).slice(2, 10)}`,
@@ -772,6 +750,21 @@ export const LocalWorkspace = {
     return clone(rows)
   },
 
+  async deleteFile(fileId: string): Promise<{ status: 'ok' | 'error'; message: string; file_id?: string }> {
+    const state = await ensureState()
+    const id = String(fileId || '').trim()
+    if (!id) return { status: 'error', message: 'file id is required' }
+    const file = state.files.find((row) => row.id === id)
+    if (!file) return { status: 'error', message: 'file not found', file_id: id }
+    state.files = state.files.filter((row) => row.id !== id)
+    state.analyses = state.analyses.filter((row) => row.media_file_id !== id)
+    syncFileAnalysisFlags(state)
+    await saveRawState(state)
+    const mediaPath = String(file.media_path || file.path || '').trim()
+    if (mediaPath) await sqliteDeleteBlob(`media_path:${mediaPath}`)
+    return { status: 'ok', message: 'File deleted.', file_id: id }
+  },
+
   async upsertAnalysis(input: {
     documentId: string
     projectId: string
@@ -788,6 +781,7 @@ export const LocalWorkspace = {
     const state = await ensureState()
     const ts = nowIso()
     const project = pickProject(state, input.projectId)
+    if (!project) throw new Error('Project is required to save analysis.')
     const existingIdx = state.analyses.findIndex((a) => a.document_id === input.documentId)
     const existing = existingIdx >= 0 ? state.analyses[existingIdx] : null
     const row: WorkspaceAnalysis = {
@@ -901,7 +895,7 @@ export const LocalWorkspace = {
       return [...clone(baseArtifacts), ...mediaFallbackArtifacts(docId)]
     }
 
-    const blob = await idbGetBlob(`media_path:${mediaPath}`)
+    const blob = await sqliteGetBlob(`media_path:${mediaPath}`)
     if (!blob) {
       return [...clone(baseArtifacts), ...mediaFallbackArtifacts(docId)]
     }
@@ -914,7 +908,11 @@ export const LocalWorkspace = {
         size_bytes: blob.size,
         download_url: blobUrl,
       })
-      out.push(mediaFallbackArtifacts(docId)[1])
+      out.push({
+        name: 'translated_video_ru.mp4',
+        size_bytes: blob.size,
+        download_url: blobUrl,
+      })
       return out
     }
     if ((blob.type || '').startsWith('video/')) {

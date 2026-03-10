@@ -29,7 +29,6 @@ type AnalysisHistoryItem = {
   file_id: string
   file_name: string
   document_id: string
-  contract_current: boolean
   analyzed_at: string
   settings: string
   artifacts: DocumentArtifact[]
@@ -150,7 +149,6 @@ export function AnalyzePage() {
               analyzed_at: String(row.updated_at || row.created_at || ''),
               settings: String(row.settings || ''),
               documentId,
-              contractCurrent: row.contract_current !== false,
               artifacts: docArtifacts,
             }
           }),
@@ -165,11 +163,10 @@ export function AnalyzePage() {
             file_id: item.file_id,
             file_name: item.file_name,
             document_id: item.documentId,
-              analyzed_at: item.analyzed_at,
-              settings: item.settings,
-              artifacts: item.artifacts,
-              contract_current: item.contractCurrent,
-            })
+            analyzed_at: item.analyzed_at,
+            settings: item.settings,
+            artifacts: item.artifacts,
+          })
           grouped.set(timeKey, bucket)
         }
         if (!stopped) {
@@ -356,6 +353,31 @@ export function AnalyzePage() {
           }
           setHistoryReloadKey((prev) => prev + 1)
         }}
+        onProgress={(payload) => {
+          setSubmission((prev) => {
+            const prevResult = prev?.result
+            const logs = payload.stage_logs || prevResult?.stage_logs || []
+            return {
+              result: {
+                route: prevResult?.route || 'local',
+                message: payload.message || prevResult?.message || 'Processing...',
+                status: prevResult?.status || 'running_local',
+                stage_name: payload.stage_name || prevResult?.stage_name || '',
+                stage_log: logs.slice(-10).join('\n'),
+                stage_logs: logs,
+                stage_progress: payload.stage_progress || prevResult?.stage_progress || [0, 0, 0, 0, 0],
+                processing_duration_ms: prevResult?.processing_duration_ms,
+                document_id: prevResult?.document_id,
+                job_id: prevResult?.job_id,
+              },
+              ui_feedback: prev?.ui_feedback || {
+                severity: 'info',
+                title: 'Local processing',
+                message: payload.message || 'Processing...',
+              },
+            }
+          })
+        }}
         onSubmittingChange={(value) => setIsSubmittingPipeline(value)}
         projectId={selectedProject.project_id ?? null}
         projectLabel={activeMedia ? (selectedProject.project_name ?? selectedProject.project_id ?? 'Project') : ''}
@@ -419,7 +441,7 @@ export function AnalyzePage() {
                     <div className="analysis-history-head">
                       <strong>{item.file_name}</strong>
                       <div className="actions-row">
-                        {item.document_id && item.contract_current ? (
+                        {item.document_id ? (
                           <button
                             type="button"
                             onClick={() => navigate('/visualizer', { state: { documentId: item.document_id } })}
@@ -453,12 +475,9 @@ export function AnalyzePage() {
                       </div>
                     ) : null}
                     <div className="artifact-actions">
-                      {!item.contract_current ? (
-                        <span className="muted">Visualizer unavailable: backend contract was not received.</span>
-                      ) : null}
                       {item.artifacts.length > 0 ? (
                         item.artifacts.map((artifact) => (
-                          <a key={`${item.file_id}-${artifact.name}`} className="top-link" href={artifact.download_url} target="_blank" rel="noreferrer">
+                          <a key={`${item.file_id}-${artifact.name}`} className="top-link" href={artifact.download_url} download={artifact.name}>
                             Download {artifact.name}
                           </a>
                         ))

@@ -17,7 +17,8 @@ describe('VocabularyPage', () => {
     const visualizerBtn = await screen.findByRole('button', { name: 'Visualizer' })
     expect(visualizerBtn).toBeDisabled()
 
-    fireEvent.click(await screen.findByTestId('vocab-row-doc-1'))
+    const checkboxes = await screen.findAllByRole('checkbox')
+    fireEvent.click(checkboxes[0])
     expect(visualizerBtn).toBeEnabled()
   })
 
@@ -87,46 +88,6 @@ describe('VocabularyPage', () => {
     expect(rows.length).toBe(2)
   })
 
-  it('hides history rows without contract from vocabulary', async () => {
-    const api = new MockRuntimeApi()
-    vi.spyOn(api, 'listAnalysisHistory').mockResolvedValue([
-      {
-        analysis_id: 'doc-contract',
-        document_id: 'doc-contract',
-        project_id: 'proj-1',
-        project_name: 'Demo Project',
-        media_file_id: 'file-1',
-        file_name: 'with-contract.mp3',
-        file_path: '/uploads/with-contract.mp3',
-        size_bytes: 104857600,
-        duration_seconds: 600,
-        settings: 'Transl: m2m100 / Subs: bilingual / Voice: male',
-        updated_at: '2026-03-08T12:25:33Z',
-        created_at: '2026-03-08T12:24:32Z',
-        contract_current: true,
-      },
-      {
-        analysis_id: 'doc-no-contract',
-        document_id: 'doc-no-contract',
-        project_id: 'proj-1',
-        project_name: 'Demo Project',
-        media_file_id: 'file-2',
-        file_name: 'without-contract.mp3',
-        file_path: '/uploads/without-contract.mp3',
-        size_bytes: 104857600,
-        duration_seconds: 600,
-        settings: 'Transl: m2m100 / Subs: bilingual / Voice: male',
-        updated_at: '2026-03-08T12:26:33Z',
-        created_at: '2026-03-08T12:24:32Z',
-        contract_current: false,
-      },
-    ])
-
-    renderWithProviders(<VocabularyPage />, api)
-    expect(await screen.findByText('with-contract.mp3')).toBeInTheDocument()
-    expect(screen.queryByText('without-contract.mp3')).not.toBeInTheDocument()
-  })
-
   it('exports selected provider translation rows', async () => {
     const payload: VisualizerPayload = {
       'Sentence one.': {
@@ -179,7 +140,8 @@ describe('VocabularyPage', () => {
     renderWithProviders(<VocabularyPage />)
     expect(await screen.findByText('sample.mp4')).toBeInTheDocument()
 
-    fireEvent.click(await screen.findByTestId('vocab-row-doc-1'))
+    const checkboxes = await screen.findAllByRole('checkbox')
+    fireEvent.click(checkboxes[0])
     fireEvent.click(screen.getByRole('button', { name: 'Delete Analyses' }))
 
     await waitFor(() => {

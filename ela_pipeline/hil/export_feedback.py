@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from ela_pipeline.db.repository import PostgresContractRepository
+from ela_pipeline.db.repository import build_contract_repository
 from ela_pipeline.hil.review_schema import is_allowed_review_field_path, review_field_root
 
 VALID_CEFR_LEVELS = {"A1", "A2", "B1", "B2", "C1", "C2"}
@@ -85,10 +85,11 @@ def export_feedback_to_jsonl(
     *,
     db_url: str,
     output_path: str,
+    db_backend: str | None = None,
     reviewed_by: str | None = None,
     limit: int | None = None,
 ) -> int:
-    repo = PostgresContractRepository(db_url=db_url)
+    repo = build_contract_repository(db_url=db_url, backend=db_backend)
     rows = repo.export_feedback_rows(reviewed_by=reviewed_by, limit=limit)
     filtered = apply_feedback_quality_gates(rows)
     return write_feedback_rows_to_jsonl(filtered, output_path)

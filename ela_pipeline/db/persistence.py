@@ -1,4 +1,4 @@
-"""Helpers to persist inference output into PostgreSQL."""
+"""Helpers to persist inference output into configured DB backend."""
 
 from __future__ import annotations
 
@@ -7,20 +7,21 @@ import uuid
 from typing import Any
 
 from .keys import HASH_VERSION, build_sentence_key, canonicalize_text
-from .repository import PostgresContractRepository
+from .repository import build_contract_repository
 
 
 def persist_inference_result(
     *,
     result: dict[str, Any],
     db_url: str,
+    db_backend: str | None = None,
     source_lang: str,
     target_lang: str,
     pipeline_context: dict[str, Any],
     run_id: str | None = None,
     connect_fn=None,
 ) -> dict[str, str]:
-    repo = PostgresContractRepository(db_url=db_url, connect_fn=connect_fn)
+    repo = build_contract_repository(db_url=db_url, backend=db_backend, connect_fn=connect_fn)
     repo.ensure_schema()
 
     rid = run_id or str(uuid.uuid4())

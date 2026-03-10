@@ -20,6 +20,7 @@ export function FilesPage() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
   const [expandedVersionsByFileId, setExpandedVersionsByFileId] = useState<Record<string, boolean>>({})
+  const [deletingByFileId, setDeletingByFileId] = useState<Record<string, boolean>>({})
   const inputRef = useRef<HTMLInputElement | null>(null)
   const tapRef = useRef<{ rowId: string; ts: number } | null>(null)
 
@@ -110,6 +111,30 @@ export function FilesPage() {
     tapRef.current = { rowId: row.id, ts: now }
   }
 
+  async function deleteFile(fileId: string) {
+    const id = String(fileId || '').trim()
+    if (!id) return
+    const shouldDelete = window.confirm('Delete this file and all related analyses/artifacts?')
+    if (!shouldDelete) return
+    setDeletingByFileId((prev) => ({ ...prev, [id]: true }))
+    try {
+      const result = await api.deleteFile(id)
+      if (result.status !== 'ok') return
+      setExpandedVersionsByFileId((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+      await refreshProjectData(selectedProject.project_id)
+    } finally {
+      setDeletingByFileId((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+    }
+  }
+
   return (
     <section className="screen-block">
       <div className="page-head">
@@ -160,6 +185,7 @@ export function FilesPage() {
             <th>Updated</th>
             <th>Analyzed</th>
             <th>Versions</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -184,10 +210,24 @@ export function FilesPage() {
                       {expanded ? `Hide versions (${versions.length})` : `Show versions (${versions.length})`}
                     </button>
                   </td>
+                  <td>
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void deleteFile(row.id)
+                      }}
+                      disabled={Boolean(deletingByFileId[row.id])}
+                      aria-label={`delete-file-${row.id}`}
+                    >
+                      {deletingByFileId[row.id] ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </td>
                 </tr>
                 {expanded ? (
                   <tr className="file-versions-row">
-                    <td colSpan={4}>
+                    <td colSpan={5}>
                       {versions.length > 0 ? (
                         <div className="file-versions-list">
                           {versions.map((version) => (

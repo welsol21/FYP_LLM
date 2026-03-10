@@ -40,6 +40,13 @@ export type MediaSubmissionPayload = {
   }
 }
 
+export type MediaProgressPayload = {
+  stage_name?: string
+  message?: string
+  stage_logs?: string[]
+  stage_progress?: number[]
+}
+
 export type DocumentArtifact = {
   name: string
   size_bytes: number
@@ -146,6 +153,7 @@ export interface RuntimeApi {
   getUiState(): Promise<RuntimeUiState>
   listProjects(): Promise<ProjectRow[]>
   createProject(name: string): Promise<ProjectRow>
+  deleteProject?(projectId: string): Promise<{ status: 'ok' | 'error'; message: string; project_id?: string }>
   getSelectedProject(): Promise<SelectedProject>
   setSelectedProject(projectId: string): Promise<SelectedProject>
   uploadMedia(file: File): Promise<{ fileName: string; mediaPath: string; sizeBytes: number }>
@@ -166,10 +174,12 @@ export interface RuntimeApi {
     subtitlesMode?: string
     voiceChoice?: string
     forceFullReprocess?: boolean
+    onProgress?: (payload: MediaProgressPayload) => void
   }): Promise<MediaSubmissionPayload>
   getTranslationConfig(): Promise<TranslationConfig>
   saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig>
   listFiles(projectId?: string): Promise<MediaFileRow[]>
+  deleteFile(fileId: string): Promise<{ status: 'ok' | 'error'; message: string; file_id?: string }>
   listAnalysisHistory(projectId?: string): Promise<AnalysisHistoryRow[]>
   deleteAnalysis(documentId: string): Promise<{ status: 'ok' | 'error'; message: string; document_id?: string }>
   listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]>

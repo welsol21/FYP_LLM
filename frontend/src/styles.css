@@ -178,15 +178,6 @@ table { width: 100%; border-collapse: collapse; }
 th, td { border: 1px solid var(--line); padding: 10px; text-align: left; }
 th { color: var(--accent); }
 
-.vocab-row {
-  cursor: pointer;
-}
-
-.vocab-row.is-selected td {
-  background: rgba(143, 214, 255, 0.14);
-  box-shadow: inset 0 0 0 1px rgba(143, 214, 255, 0.45);
-}
-
 input,
 select,
 textarea {

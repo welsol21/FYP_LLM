@@ -1,4 +1,4 @@
-"""PostgreSQL repository for inference contracts."""
+"""Repository selection and PostgreSQL implementation for inference contracts."""
 
 from __future__ import annotations
 
@@ -6,6 +6,8 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Callable
+
+from .sqlite_repository import SQLiteContractRepository
 
 
 class PostgresContractRepository:
@@ -336,3 +338,35 @@ class PostgresContractRepository:
             "created_at": str(row[2]),
             "updated_at": str(row[3]),
         }
+
+
+def resolve_db_backend(backend: str | None = None, db_url: str | None = None) -> str:
+    value = (backend or os.getenv("ELA_DB_BACKEND", "")).strip().lower()
+    if value:
+        return value
+    raw = str(db_url or "").strip().lower()
+    if raw.startswith("postgresql://") or raw.startswith("postgres://"):
+        return "postgres"
+    return "sqlite"
+
+
+def resolve_sqlite_path(db_url: str | None = None) -> str:
+    raw = (db_url or "").strip() or os.getenv("ELA_SQLITE_DB_PATH", "").strip() or "artifacts/backend_state.sqlite3"
+    if raw.startswith("sqlite:///"):
+        raw = raw[len("sqlite:///"):]
+        if not raw:
+            raw = "artifacts/backend_state.sqlite3"
+    return raw
+
+
+def build_contract_repository(
+    *,
+    db_url: str | None = None,
+    backend: str | None = None,
+    connect_fn: Callable[[str], Any] | None = None,
+):
+    selected = resolve_db_backend(backend, db_url)
+    if selected == "postgres":
+        return PostgresContractRepository(db_url=db_url or "", connect_fn=connect_fn)
+    sqlite_path = resolve_sqlite_path(db_url)
+    return SQLiteContractRepository(sqlite_path)

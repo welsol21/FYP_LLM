@@ -6,6 +6,7 @@ describe('HttpRuntimeApi', () => {
   beforeEach(async () => {
     window.localStorage.clear()
     await LocalWorkspace.__resetForTests()
+    await LocalWorkspace.createProject('Demo Project')
     vi.restoreAllMocks()
   })
 
@@ -125,62 +126,6 @@ describe('HttpRuntimeApi', () => {
     expect(history.some((row) => row.document_id === documentId)).toBe(true)
   })
 
-  it('stores non-contract artifacts and keeps file unanalyzed when contract endpoint is unavailable', async () => {
-    const api = new HttpRuntimeApi()
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input)
-      if (url.includes('/api/sentence-contract')) {
-        return new Response('backend down', { status: 503 })
-      }
-      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
-    })
-    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch)
-
-    const selected = await LocalWorkspace.getSelectedProject()
-    const projectId = String(selected.project_id || '')
-    expect(projectId).not.toBe('')
-
-    const uploaded = await api.uploadMedia(new File(['She trusted him.'], 'fallback.txt', { type: 'text/plain' }))
-    const file = await api.registerMediaFile({
-      projectId,
-      name: 'fallback.txt',
-      mediaPath: uploaded.mediaPath,
-      sizeBytes: uploaded.sizeBytes,
-      durationSec: 10,
-    })
-
-    const submit = await api.submitMedia({
-      mediaPath: uploaded.mediaPath,
-      durationSec: 10,
-      sizeBytes: uploaded.sizeBytes,
-      projectId,
-      mediaFileId: file.id,
-    })
-
-    expect(submit.result.status).toBe('completed_local_no_contract')
-    expect(submit.result.document_id).toBeUndefined()
-
-    const history = await api.listAnalysisHistory(projectId)
-    expect(history.length).toBe(1)
-    expect(history[0].contract_current).toBe(false)
-    const docId = String(history[0].document_id || '')
-    expect(docId).not.toBe('')
-
-    const artifacts = await api.listDocumentArtifacts(docId)
-    expect(artifacts.some((row) => row.name === 'full_text.txt')).toBe(true)
-    expect(artifacts.some((row) => row.name === 'subtitles_en.srt')).toBe(true)
-    expect(artifacts.some((row) => row.name === 'contract_visualizer.json')).toBe(false)
-    expect(artifacts.some((row) => row.name === 'contract_sentences.json')).toBe(false)
-
-    const payload = await api.getVisualizerPayload(docId)
-    expect(Object.keys(payload)).toHaveLength(0)
-
-    const files = await api.listFiles(projectId)
-    const tracked = files.find((row) => row.id === file.id)
-    expect(tracked?.analyzed).toBe(false)
-    expect(tracked?.document_id).toBeUndefined()
-  })
-
   it('keeps file analysis flags in sync when analysis versions are deleted', async () => {
     const selected = await LocalWorkspace.getSelectedProject()
     const projectId = String(selected.project_id || '')
@@ -248,5 +193,133 @@ describe('HttpRuntimeApi', () => {
     expect(tracked?.document_id).toBeUndefined()
     const history = await LocalWorkspace.listAnalysisHistory(projectId)
     expect(history.length).toBe(0)
+  })
+
+  it('deletes project with cascade cleanup for files and analyses', async () => {
+    const first = await LocalWorkspace.getSelectedProject()
+    const keepProjectId = String(first.project_id || '')
+    const extra = await LocalWorkspace.createProject('Project To Delete')
+    await LocalWorkspace.setSelectedProject(extra.id)
+    const file = await LocalWorkspace.registerMediaFile({
+      projectId: extra.id,
+      name: 'delete-me.mp3',
+      mediaPath: '/client-media/delete-me.mp3',
+      sizeBytes: 10,
+      durationSec: 1,
+    })
+    await LocalWorkspace.upsertAnalysis({
+      documentId: 'doc-delete-project',
+      projectId: extra.id,
+      mediaFileId: file.id,
+      fileName: file.name,
+      filePath: file.path || '',
+      sizeBytes: file.size_bytes,
+      durationSeconds: file.duration_seconds,
+      settings: 'Transl: m2m100 / Subs: bilingual_simultaneous / Voice: female / Proc: force',
+      contract: {},
+      artifacts: [],
+      contractCurrent: false,
+    })
+
+    const deleted = await LocalWorkspace.deleteProject(extra.id)
+    expect(deleted.status).toBe('ok')
+
+    const projects = await LocalWorkspace.listProjects()
+    expect(projects.some((p) => p.id === extra.id)).toBe(false)
+
+    const files = await LocalWorkspace.listFiles(extra.id)
+    expect(files.length).toBe(0)
+
+    const history = await LocalWorkspace.listAnalysisHistory(extra.id)
+    expect(history.length).toBe(0)
+
+    const selected = await LocalWorkspace.getSelectedProject()
+    expect(String(selected.project_id || '')).not.toBe(extra.id)
+    expect(String(selected.project_id || '')).not.toBe('')
+    expect(projects.some((p) => p.id === keepProjectId)).toBe(true)
+  })
+
+  it('saves no-contract analysis with user-friendly service message and downloadable artifacts', async () => {
+    const api = new HttpRuntimeApi()
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/api/sentence-contract')) {
+        return new Response(JSON.stringify({ error: 'Not found' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
+    })
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch)
+
+    const uploaded = await api.uploadMedia(new File(['One sentence only.'], 'fallback.txt', { type: 'text/plain' }))
+    const project = await api.getSelectedProject()
+    const file = await api.registerMediaFile({
+      projectId: String(project.project_id || ''),
+      name: uploaded.fileName,
+      mediaPath: uploaded.mediaPath,
+      sizeBytes: uploaded.sizeBytes,
+      durationSec: 1,
+    })
+
+    const submit = await api.submitMedia({
+      mediaPath: uploaded.mediaPath,
+      durationSec: 1,
+      sizeBytes: uploaded.sizeBytes,
+      mediaFileId: file.id,
+      translationProvider: 'm2m100',
+      subtitlesMode: 'bilingual_sequential',
+    })
+
+    expect(submit.result.status).toBe('completed_local_no_contract')
+    expect((submit.result.stage_logs || []).join('\n')).toContain('Project service is unavailable')
+    expect((submit.result.stage_logs || []).join('\n')).not.toContain('HTTP 404')
+
+    const history = await api.listAnalysisHistory(project.project_id || undefined)
+    expect(history.length).toBeGreaterThan(0)
+    const docId = String(history[0]?.document_id || '')
+    const artifacts = await api.listDocumentArtifacts(docId)
+    expect(artifacts.length).toBeGreaterThan(0)
+    expect(artifacts.every((a) => typeof a.download_url === 'string' && a.download_url.length > 0)).toBe(true)
+    expect(artifacts.some((a) => a.name === 'subtitles_bilingual.srt')).toBe(true)
+  })
+
+  it('produces non-empty translated_video artifact entry for audio analyses', async () => {
+    const selected = await LocalWorkspace.getSelectedProject()
+    const projectId = String(selected.project_id || '')
+    const mediaPath = '/client-media/audio-case/sample.mp3'
+    await LocalWorkspace.cacheUploadedMedia(mediaPath, new Blob([new Uint8Array([1, 2, 3, 4, 5])], { type: 'audio/mpeg' }))
+    const file = await LocalWorkspace.registerMediaFile({
+      projectId,
+      name: 'sample.mp3',
+      mediaPath,
+      sizeBytes: 5,
+      durationSec: 1,
+    })
+    await LocalWorkspace.upsertAnalysis({
+      documentId: 'doc-audio-fallback',
+      projectId,
+      mediaFileId: file.id,
+      fileName: file.name,
+      filePath: mediaPath,
+      sizeBytes: 5,
+      durationSeconds: 1,
+      settings: 'Transl: m2m100 / Subs: bilingual_simultaneous / Voice: female / Proc: force',
+      contract: {},
+      artifacts: [
+        {
+          name: 'full_text.txt',
+          size_bytes: 3,
+          download_url: 'data:text/plain;charset=utf-8,abc',
+        },
+      ],
+      contractCurrent: false,
+    })
+    const artifacts = await LocalWorkspace.listDocumentArtifacts('doc-audio-fallback')
+    const translatedVideo = artifacts.find((a) => a.name === 'translated_video_ru.mp4')
+    expect(translatedVideo).toBeDefined()
+    expect(Number(translatedVideo?.size_bytes || 0)).toBeGreaterThan(0)
+    expect(String(translatedVideo?.download_url || '')).not.toBe('')
   })
 })

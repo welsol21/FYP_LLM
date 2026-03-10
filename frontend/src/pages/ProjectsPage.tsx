@@ -11,6 +11,7 @@ export function ProjectsPage() {
   const [rows, setRows] = useState<ProjectRow[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [stats, setStats] = useState<Record<string, ProjectStat>>({})
+  const [deletingByProjectId, setDeletingByProjectId] = useState<Record<string, boolean>>({})
   const tapRef = useRef<{ rowId: string; ts: number } | null>(null)
 
   async function refresh() {
@@ -42,6 +43,25 @@ export function ProjectsPage() {
     navigate('/files')
   }
 
+  async function onDeleteProject(row: ProjectRow) {
+    const id = String(row.id || '').trim()
+    if (!id) return
+    if (typeof api.deleteProject !== 'function') return
+    const shouldDelete = window.confirm(`Delete project "${row.name}" and all related files/analyses/artifacts?`)
+    if (!shouldDelete) return
+    setDeletingByProjectId((prev) => ({ ...prev, [id]: true }))
+    try {
+      await api.deleteProject(id)
+      await refresh()
+    } finally {
+      setDeletingByProjectId((prev) => {
+        const next = { ...prev }
+        delete next[id]
+        return next
+      })
+    }
+  }
+
   function onRowTap(row: ProjectRow) {
     const now = Date.now()
     const last = tapRef.current
@@ -68,6 +88,7 @@ export function ProjectsPage() {
             <th>Created</th>
             <th>Updated</th>
             <th>Analyzed</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -84,6 +105,22 @@ export function ProjectsPage() {
                 <td>{new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                 <td>{new Date(row.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                 <td>{`${stat.analyzed}/${stat.total}`}</td>
+                <td>
+                  {typeof api.deleteProject === 'function' ? (
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void onDeleteProject(row)
+                      }}
+                      disabled={Boolean(deletingByProjectId[row.id])}
+                      aria-label={`delete-project-${row.id}`}
+                    >
+                      {deletingByProjectId[row.id] ? 'Deleting...' : 'Delete'}
+                    </button>
+                  ) : null}
+                </td>
               </tr>
             )
           })}
@@ -92,4 +129,3 @@ export function ProjectsPage() {
     </section>
   )
 }
-

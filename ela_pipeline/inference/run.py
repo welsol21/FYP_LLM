@@ -1298,11 +1298,17 @@ def main() -> None:
         choices=["auto", "local", "backend", "distributed"],
         help="Deployment context for license-gated features. `auto` resolves from ELA_DEPLOYMENT_MODE.",
     )
-    parser.add_argument("--persist-db", action="store_true", help="Persist inference result to PostgreSQL.")
+    parser.add_argument("--persist-db", action="store_true", help="Persist inference result to DB backend.")
+    parser.add_argument(
+        "--db-backend",
+        default=None,
+        choices=["sqlite", "postgres"],
+        help="DB backend for persistence (default from ELA_DB_BACKEND, fallback sqlite).",
+    )
     parser.add_argument(
         "--db-url",
         default=None,
-        help="PostgreSQL DSN. If omitted, ELA_DATABASE_URL or DATABASE_URL env var is used.",
+        help="DB URL/path. Postgres: DSN; SQLite: file path or sqlite:///path.",
     )
     parser.add_argument("--db-run-id", default=None, help="Optional external run id for DB persistence.")
     parser.add_argument("--db-source-lang", default="en", help="Source language for sentence keying in DB.")
@@ -1397,6 +1403,7 @@ def main() -> None:
         mapping = persist_inference_result(
             result=result,
             db_url=args.db_url or "",
+            db_backend=args.db_backend,
             source_lang=args.db_source_lang,
             target_lang=db_target_lang,
             pipeline_context=pipeline_context,

@@ -3,6 +3,7 @@ import type {
   AnalyzeTextPayload,
   DocumentArtifact,
   MediaFileRow,
+  MediaProgressPayload,
   MediaSubmissionPayload,
   ProjectRow,
   RuntimeApi,
@@ -33,6 +34,10 @@ type ArtifactSentenceRow = {
   units: unknown[]
   units_ru: unknown[]
 }
+
+type TranslationPipeline = (input: string, options?: Record<string, unknown>) => Promise<unknown>
+let translationPipelinePromise: Promise<TranslationPipeline> | null = null
+let translationWarmupStarted = false
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init)
@@ -81,6 +86,126 @@ function splitIntoSentences(rawText: string): string[] {
     .filter(Boolean)
 }
 
+function parseTranslationText(result: unknown): string {
+  if (typeof result === 'string') return result.trim()
+  if (Array.isArray(result)) {
+    const first = result[0]
+    if (first && typeof first === 'object') {
+      const row = first as Record<string, unknown>
+      if (typeof row.translation_text === 'string') return row.translation_text.trim()
+      if (typeof row.generated_text === 'string') return row.generated_text.trim()
+      if (typeof row.text === 'string') return row.text.trim()
+    }
+  }
+  if (result && typeof result === 'object') {
+    const row = result as Record<string, unknown>
+    if (typeof row.translation_text === 'string') return row.translation_text.trim()
+    if (typeof row.generated_text === 'string') return row.generated_text.trim()
+    if (typeof row.text === 'string') return row.text.trim()
+  }
+  return ''
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    let settled = false
+    const timer = window.setTimeout(() => {
+      if (settled) return
+      settled = true
+      resolve(null)
+    }, Math.max(1, timeoutMs))
+    promise
+      .then((value) => {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timer)
+        resolve(value)
+      })
+      .catch(() => {
+        if (settled) return
+        settled = true
+        window.clearTimeout(timer)
+        resolve(null)
+      })
+  })
+}
+
+function normalizeContractError(errorMessage: string): string {
+  const text = String(errorMessage || '').trim().toLowerCase()
+  if (!text) return 'Project service is unavailable. Check internet access and service URL.'
+  if (text.includes('failed to fetch') || text.includes('networkerror') || text.includes('http 404') || text.includes('http 502') || text.includes('http 503') || text.includes('http 504')) {
+    return 'Project service is unavailable. Check internet access and service URL.'
+  }
+  return 'Project service is unavailable. Check internet access and service URL.'
+}
+
+async function getTranslationPipeline(): Promise<TranslationPipeline> {
+  if (!translationPipelinePromise) {
+    translationPipelinePromise = (async () => {
+      const transformers = await import('@huggingface/transformers')
+      const env = (transformers as unknown as { env?: Record<string, unknown> }).env
+      if (env && typeof env === 'object') {
+        ;(env as Record<string, unknown>).allowLocalModels = false
+        ;(env as Record<string, unknown>).allowRemoteModels = true
+        ;(env as Record<string, unknown>).useBrowserCache = true
+      }
+      const modelId = String(import.meta.env?.VITE_CLIENT_TRANSLATION_MODEL || 'Xenova/m2m100_418M').trim()
+      const pipelineFactory = (transformers as unknown as {
+        pipeline: (task: string, model: string, opts?: Record<string, unknown>) => Promise<TranslationPipeline>
+      }).pipeline
+      return await pipelineFactory('translation', modelId, { quantized: true })
+    })()
+  }
+  return translationPipelinePromise
+}
+
+function warmupTranslationPipeline(): void {
+  if (translationWarmupStarted) return
+  translationWarmupStarted = true
+  void getTranslationPipeline().catch(() => undefined)
+}
+
+async function translateSentencesForArtifacts(
+  sentences: string[],
+  provider: string | undefined,
+  log?: (message: string, progress: number) => void,
+): Promise<string[]> {
+  const providerId = String(provider || '').trim().toLowerCase()
+  if (!sentences.length) return []
+  if (!providerId || providerId === 'original' || providerId === 'none') return sentences.map(() => '')
+  if (!['m2m100', 'backend_m2m100', 'hf', 'huggingface'].includes(providerId)) return sentences.map(() => '')
+  if (import.meta.env.MODE === 'test') return sentences.map((s) => s)
+  const loadTimeoutMs = Number(import.meta.env?.VITE_CLIENT_TRANSLATION_LOAD_TIMEOUT_MS || 45000)
+  const sentenceTimeoutMs = Number(import.meta.env?.VITE_CLIENT_TRANSLATION_SENTENCE_TIMEOUT_MS || 15000)
+  log?.('Loading local translation model', 20)
+  const pipe = await withTimeout(getTranslationPipeline(), loadTimeoutMs)
+  if (!pipe) {
+    throw new Error('Local translation model is unavailable or timed out while loading.')
+  }
+  const out: string[] = []
+  for (let i = 0; i < sentences.length; i += 1) {
+    const sentence = sentences[i]
+    const result = await withTimeout(
+      pipe(sentence, {
+        src_lang: 'en',
+        tgt_lang: 'ru',
+        max_length: 256,
+      }),
+      sentenceTimeoutMs,
+    )
+    if (result == null) {
+      throw new Error(`Local translation model timed out on sentence ${i + 1}.`)
+    }
+    const translated = parseTranslationText(result)
+    if (!translated) {
+      throw new Error(`Local translation model returned empty translation on sentence ${i + 1}.`)
+    }
+    out.push(translated)
+    log?.(`Translating ${i + 1}/${sentences.length}`, 20 + Math.round(((i + 1) / sentences.length) * 80))
+  }
+  return out
+}
+
 function bytesOfText(text: string): number {
   return new TextEncoder().encode(text).length
 }
@@ -126,7 +251,12 @@ function buildSrt(rows: ArtifactSentenceRow[], bilingual: boolean): string {
   return blocks.join('\n')
 }
 
-function buildNonContractArtifacts(documentId: string, rawText: string, sentences: string[]): DocumentArtifact[] {
+function buildNonContractArtifacts(
+  documentId: string,
+  rawText: string,
+  sentences: string[],
+  translatedSentences: string[],
+): DocumentArtifact[] {
   const mediaSentences: ArtifactSentenceRow[] = sentences.map((sentence, idx) => {
     const startMs = idx * 3000
     const endMs = startMs + 2600
@@ -135,7 +265,7 @@ function buildNonContractArtifacts(documentId: string, rawText: string, sentence
       sentence_text: sentence,
       sentence_hash: simpleHash(`${idx}:${sentence}`),
       text_eng: sentence,
-      text_ru: '',
+      text_ru: String(translatedSentences[idx] || '').trim(),
       start: startMs / 1000,
       end: endMs / 1000,
       start_ms: startMs,
@@ -221,6 +351,10 @@ export class HttpRuntimeApi implements RuntimeApi {
     return await LocalWorkspace.createProject(name)
   }
 
+  async deleteProject(projectId: string): Promise<{ status: 'ok' | 'error'; message: string; project_id?: string }> {
+    return await LocalWorkspace.deleteProject(projectId)
+  }
+
   async getSelectedProject(): Promise<SelectedProject> {
     return await LocalWorkspace.getSelectedProject()
   }
@@ -268,19 +402,42 @@ export class HttpRuntimeApi implements RuntimeApi {
     subtitlesMode?: string
     voiceChoice?: string
     forceFullReprocess?: boolean
+    onProgress?: (payload: MediaProgressPayload) => void
   }): Promise<MediaSubmissionPayload> {
     const selected = await LocalWorkspace.getSelectedProject()
     const projects = await LocalWorkspace.listProjects()
     const effectiveProjectId = input.projectId || selected.project_id || projects[0]?.id || ''
+    if (!effectiveProjectId) {
+      return {
+        result: {
+          route: 'reject',
+          status: 'rejected',
+          message: 'Select project first.',
+          stage_name: 'loading_file',
+        },
+        ui_feedback: {
+          severity: 'error',
+          title: 'Project is required',
+          message: 'Select a project before starting pipeline.',
+        },
+      }
+    }
     const localFile = input.mediaFileId ? await LocalWorkspace.getFileById(input.mediaFileId) : null
     const fileName = localFile?.name || input.mediaPath.split('/').pop() || input.mediaPath
     const settings = `Transl: ${input.translationProvider || 'm2m100'} / Subs: ${input.subtitlesMode || 'bilingual'} / Voice: ${input.voiceChoice || 'male'} / Proc: ${input.forceFullReprocess ? 'force' : 'incremental'}`
     const startedAt = Date.now()
     const stageLogs: string[] = []
     const progress: number[] = [0, 0, 0, 0, 0]
+    const stageNames = ['loading_file', 'transcribing_audio', 'linguistic_parsing', 'generating_media', 'exporting_files']
     const log = (stage: number, text: string, pct: number): void => {
       progress[stage] = Math.max(progress[stage], Math.max(0, Math.min(100, Math.round(pct))))
       stageLogs.push(text)
+      input.onProgress?.({
+        stage_name: stageNames[stage] || '',
+        message: text,
+        stage_logs: stageLogs.slice(-30),
+        stage_progress: [...progress],
+      })
     }
 
     const finish = (payload: MediaSubmissionPayload): MediaSubmissionPayload => ({
@@ -296,16 +453,17 @@ export class HttpRuntimeApi implements RuntimeApi {
 
     const mediaBlob = await LocalWorkspace.getCachedUploadedMedia(input.mediaPath)
     if (!(mediaBlob instanceof Blob)) {
+      const detail = `Client media blob not found in local DB for: ${input.mediaPath}`
       return finish({
         result: {
           route: 'reject',
           status: 'rejected',
-          message: 'Client media blob not found in local cache.',
+          message: detail,
         },
         ui_feedback: {
           severity: 'error',
           title: 'Processing failed',
-          message: 'Client media blob not found in local cache.',
+          message: `${detail}. Re-upload this file in Files and retry.`,
         },
       })
     }
@@ -413,14 +571,13 @@ export class HttpRuntimeApi implements RuntimeApi {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sentenceText, sentenceIdx: idx }),
         })
-        if (!payload?.sentence_node || typeof payload.sentence_node !== 'object') {
-          throw new Error('Contract node is missing in /api/sentence-contract response.')
-        }
         const baseKey = String(payload?.sentence_text || sentenceText).trim() || `sentence_${idx + 1}`
         const seen = duplicateCounter.get(baseKey) || 0
         duplicateCounter.set(baseKey, seen + 1)
         const key = seen === 0 ? baseKey : `${baseKey} #${seen + 1}`
-        contract[key] = payload.sentence_node
+        if (payload?.sentence_node && typeof payload.sentence_node === 'object') {
+          contract[key] = payload.sentence_node
+        }
         log(2, `Built sentence contract ${idx + 1}/${sentences.length}`, 15 + Math.round(((idx + 1) / sentences.length) * 85))
       } catch (err) {
         contractBuildError = err instanceof Error ? err.message : String(err)
@@ -432,7 +589,32 @@ export class HttpRuntimeApi implements RuntimeApi {
       const documentId = `doc-${typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
         ? crypto.randomUUID().replace(/-/g, '').slice(0, 12)
         : `${Date.now()}${Math.random().toString(16).slice(2, 8)}`}`
-      const artifacts = buildNonContractArtifacts(documentId, rawText, sentences)
+      let translatedSentences: string[] = []
+      try {
+        translatedSentences = await translateSentencesForArtifacts(
+          sentences,
+          input.translationProvider,
+          (message, progress) => log(3, message, progress),
+        )
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        log(3, `Translation failed: ${message}`, 100)
+        return finish({
+          result: {
+            route: 'reject',
+            status: 'rejected',
+            message: `Translation failed: ${message}`,
+            stage_name: 'generating_media',
+          },
+          ui_feedback: {
+            severity: 'error',
+            title: 'Processing failed',
+            message: `Translation failed: ${message}`,
+          },
+        })
+      }
+      const artifacts = buildNonContractArtifacts(documentId, rawText, sentences, translatedSentences)
+      const normalizedError = normalizeContractError(contractBuildError)
       await LocalWorkspace.upsertAnalysis({
         documentId,
         projectId: effectiveProjectId,
@@ -446,7 +628,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         artifacts,
         contractCurrent: false,
       })
-      log(2, 'Backend contract is unavailable. Saved local non-contract artifacts only.', 100)
+      log(2, `Contract unavailable: ${normalizedError}`, 100)
       log(3, 'Generating client artifacts', 100)
       log(4, 'Exporting client artifacts', 100)
       return finish({
@@ -512,6 +694,10 @@ export class HttpRuntimeApi implements RuntimeApi {
     return await LocalWorkspace.listFiles(projectId)
   }
 
+  async deleteFile(fileId: string): Promise<{ status: 'ok' | 'error'; message: string; file_id?: string }> {
+    return await LocalWorkspace.deleteFile(fileId)
+  }
+
   async listAnalysisHistory(projectId?: string): Promise<AnalysisHistoryRow[]> {
     return await LocalWorkspace.listAnalysisHistory(projectId)
   }
@@ -557,4 +743,8 @@ export class HttpRuntimeApi implements RuntimeApi {
   async deleteAnalysis(documentId: string): Promise<{ status: 'ok' | 'error'; message: string; document_id?: string }> {
     return await LocalWorkspace.deleteAnalysis(documentId)
   }
+}
+
+if (import.meta.env.MODE !== 'test') {
+  warmupTranslationPipeline()
 }

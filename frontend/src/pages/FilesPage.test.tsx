@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { FilesPage } from './FilesPage'
 import { renderWithProviders } from '../test/testUtils'
@@ -94,5 +94,20 @@ describe('FilesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'toggle-versions-file-1' }))
     expect(await screen.findByText('Subs: Bi-sim')).toBeInTheDocument()
     expect(screen.getByText('Proc: Force')).toBeInTheDocument()
+  })
+
+  it('deletes file and its analysis versions', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderWithProviders(<FilesPage />)
+    expect(await screen.findByLabelText('file-row-file-1')).toBeInTheDocument()
+    expect(screen.getByText('sample.mp4')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'delete-file-file-1' }))
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText('file-row-file-1')).not.toBeInTheDocument()
+      expect(screen.queryByText('sample.mp4')).not.toBeInTheDocument()
+    })
+    confirmSpy.mockRestore()
   })
 })

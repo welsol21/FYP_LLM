@@ -43,12 +43,13 @@ class _FakeConnection:
 
 
 class DBPersistenceTests(unittest.TestCase):
-    def test_persist_requires_db_url(self):
+    def test_persist_requires_db_url_for_postgres_backend(self):
         with patch.dict("os.environ", {"ELA_DATABASE_URL": "", "DATABASE_URL": ""}, clear=False):
             with self.assertRaises(ValueError):
                 persist_inference_result(
                     result={},
                     db_url="",
+                    db_backend="postgres",
                     source_lang="en",
                     target_lang="none",
                     pipeline_context={},
