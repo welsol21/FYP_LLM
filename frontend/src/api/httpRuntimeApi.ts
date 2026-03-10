@@ -20,6 +20,20 @@ type SentenceContractPayload = {
   sentence_node?: VisualizerPayload[string]
 }
 
+type ArtifactSentenceRow = {
+  sentence_idx: number
+  sentence_text: string
+  sentence_hash: string
+  text_eng: string
+  text_ru: string
+  start: number
+  end: number
+  start_ms: number
+  end_ms: number
+  units: unknown[]
+  units_ru: unknown[]
+}
+
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init)
   if (!res.ok) {
@@ -65,6 +79,121 @@ function splitIntoSentences(rawText: string): string[] {
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
     .filter(Boolean)
+}
+
+function bytesOfText(text: string): number {
+  return new TextEncoder().encode(text).length
+}
+
+function encodeTextArtifact(mime: string, text: string): string {
+  return `data:${mime};charset=utf-8,${encodeURIComponent(text)}`
+}
+
+function simpleHash(input: string): string {
+  let h = 2166136261
+  for (let i = 0; i < input.length; i += 1) {
+    h ^= input.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return `h${(h >>> 0).toString(16)}`
+}
+
+function formatSrtTime(ms: number): string {
+  const safe = Math.max(0, Math.floor(ms))
+  const hours = Math.floor(safe / 3600000)
+  const minutes = Math.floor((safe % 3600000) / 60000)
+  const seconds = Math.floor((safe % 60000) / 1000)
+  const millis = safe % 1000
+  const pad = (value: number, len: number): string => String(value).padStart(len, '0')
+  return `${pad(hours, 2)}:${pad(minutes, 2)}:${pad(seconds, 2)},${pad(millis, 3)}`
+}
+
+function buildSrt(rows: ArtifactSentenceRow[], bilingual: boolean): string {
+  const blocks = rows
+    .map((row, idx) => {
+      const lines = bilingual
+        ? [String(row.text_eng || '').trim(), String(row.text_ru || '').trim()].filter(Boolean)
+        : [String(row.text_eng || '').trim()].filter(Boolean)
+      if (lines.length === 0) return ''
+      return [
+        String(idx + 1),
+        `${formatSrtTime(row.start_ms)} --> ${formatSrtTime(Math.max(row.end_ms, row.start_ms + 800))}`,
+        ...lines,
+        '',
+      ].join('\n')
+    })
+    .filter(Boolean)
+  return blocks.join('\n')
+}
+
+function buildNonContractArtifacts(documentId: string, rawText: string, sentences: string[]): DocumentArtifact[] {
+  const mediaSentences: ArtifactSentenceRow[] = sentences.map((sentence, idx) => {
+    const startMs = idx * 3000
+    const endMs = startMs + 2600
+    return {
+      sentence_idx: idx,
+      sentence_text: sentence,
+      sentence_hash: simpleHash(`${idx}:${sentence}`),
+      text_eng: sentence,
+      text_ru: '',
+      start: startMs / 1000,
+      end: endMs / 1000,
+      start_ms: startMs,
+      end_ms: endMs,
+      units: [],
+      units_ru: [],
+    }
+  })
+  const links = mediaSentences.map((row) => ({
+    sentence_idx: row.sentence_idx,
+    sentence_hash: row.sentence_hash,
+  }))
+  const mediaContract = {
+    document_id: documentId,
+    source_type: 'audio',
+    source_path: '',
+    text_hash: simpleHash(rawText),
+    media_sentences: mediaSentences,
+  }
+  const legacySegments = mediaSentences.map((row) => ({
+    id: row.sentence_idx + 1,
+    text_eng: row.text_eng,
+    units: row.units,
+    start: row.start,
+    end: row.end,
+    text_ru: row.text_ru,
+    units_ru: row.units_ru,
+  }))
+  const stageManifest = {
+    schema_version: 1,
+    last_document_id: documentId,
+    immutable: {
+      source_type: mediaContract.source_type,
+      text_hash: mediaContract.text_hash,
+      media_sentences_count: mediaSentences.length,
+      contract_sentences_count: 0,
+    },
+  }
+  const addText = (name: string, mime: string, text: string): DocumentArtifact => ({
+    name,
+    size_bytes: bytesOfText(text),
+    download_url: encodeTextArtifact(mime, text),
+  })
+  return [
+    addText('full_text.txt', 'text/plain', rawText),
+    addText('media_contract.json', 'application/json', JSON.stringify(mediaContract, null, 2)),
+    addText('sentence_link.json', 'application/json', JSON.stringify(links, null, 2)),
+    addText('semantic_units_runtime.json', 'application/json', JSON.stringify(legacySegments, null, 2)),
+    addText('bilingual_objects_runtime.json', 'application/json', JSON.stringify(legacySegments, null, 2)),
+    addText('subtitles_en.srt', 'application/x-subrip', buildSrt(mediaSentences, false)),
+    addText('subtitles_bilingual.srt', 'application/x-subrip', buildSrt(mediaSentences, true)),
+    addText(
+      'subtitles_target.srt',
+      'application/x-subrip',
+      buildSrt(mediaSentences.map((row) => ({ ...row, text_eng: '' })), true),
+    ),
+    addText('stage_manifest.json', 'application/json', JSON.stringify(stageManifest, null, 2)),
+  ]
 }
 
 async function extractRawTextFromBlob(blob: Blob, mediaPath: string): Promise<string> {
@@ -275,21 +404,64 @@ export class HttpRuntimeApi implements RuntimeApi {
     log(2, `Prepared ${sentences.length} sentences`, 15)
     const contract: VisualizerPayload = {}
     const duplicateCounter = new Map<string, number>()
+    let contractBuildError = ''
     for (let idx = 0; idx < sentences.length; idx += 1) {
       const sentenceText = sentences[idx]
-      const payload = await requestJson<SentenceContractPayload>('/api/sentence-contract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sentenceText, sentenceIdx: idx }),
-      })
-      const baseKey = String(payload?.sentence_text || sentenceText).trim() || `sentence_${idx + 1}`
-      const seen = duplicateCounter.get(baseKey) || 0
-      duplicateCounter.set(baseKey, seen + 1)
-      const key = seen === 0 ? baseKey : `${baseKey} #${seen + 1}`
-      if (payload?.sentence_node && typeof payload.sentence_node === 'object') {
+      try {
+        const payload = await requestJson<SentenceContractPayload>('/api/sentence-contract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sentenceText, sentenceIdx: idx }),
+        })
+        if (!payload?.sentence_node || typeof payload.sentence_node !== 'object') {
+          throw new Error('Contract node is missing in /api/sentence-contract response.')
+        }
+        const baseKey = String(payload?.sentence_text || sentenceText).trim() || `sentence_${idx + 1}`
+        const seen = duplicateCounter.get(baseKey) || 0
+        duplicateCounter.set(baseKey, seen + 1)
+        const key = seen === 0 ? baseKey : `${baseKey} #${seen + 1}`
         contract[key] = payload.sentence_node
+        log(2, `Built sentence contract ${idx + 1}/${sentences.length}`, 15 + Math.round(((idx + 1) / sentences.length) * 85))
+      } catch (err) {
+        contractBuildError = err instanceof Error ? err.message : String(err)
+        break
       }
-      log(2, `Built sentence contract ${idx + 1}/${sentences.length}`, 15 + Math.round(((idx + 1) / sentences.length) * 85))
+    }
+
+    if (contractBuildError) {
+      const documentId = `doc-${typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID().replace(/-/g, '').slice(0, 12)
+        : `${Date.now()}${Math.random().toString(16).slice(2, 8)}`}`
+      const artifacts = buildNonContractArtifacts(documentId, rawText, sentences)
+      await LocalWorkspace.upsertAnalysis({
+        documentId,
+        projectId: effectiveProjectId,
+        mediaFileId: input.mediaFileId,
+        fileName,
+        filePath: input.mediaPath,
+        sizeBytes: input.sizeBytes,
+        durationSeconds: input.durationSec,
+        settings,
+        contract: {},
+        artifacts,
+        contractCurrent: false,
+      })
+      log(2, 'Backend contract is unavailable. Saved local non-contract artifacts only.', 100)
+      log(3, 'Generating client artifacts', 100)
+      log(4, 'Exporting client artifacts', 100)
+      return finish({
+        result: {
+          route: 'local',
+          status: 'completed_local_no_contract',
+          message: 'Backend contract is unavailable. Analysis saved without contract.',
+          stage_name: 'completed',
+        },
+        ui_feedback: {
+          severity: 'warning',
+          title: 'Local processing completed',
+          message: 'Backend contract is unavailable. Analysis saved without contract.',
+        },
+      })
     }
 
     log(3, 'Generating client artifacts', 100)

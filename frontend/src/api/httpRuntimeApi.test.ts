@@ -125,6 +125,62 @@ describe('HttpRuntimeApi', () => {
     expect(history.some((row) => row.document_id === documentId)).toBe(true)
   })
 
+  it('stores non-contract artifacts and keeps file unanalyzed when contract endpoint is unavailable', async () => {
+    const api = new HttpRuntimeApi()
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/api/sentence-contract')) {
+        return new Response('backend down', { status: 503 })
+      }
+      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
+    })
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch)
+
+    const selected = await LocalWorkspace.getSelectedProject()
+    const projectId = String(selected.project_id || '')
+    expect(projectId).not.toBe('')
+
+    const uploaded = await api.uploadMedia(new File(['She trusted him.'], 'fallback.txt', { type: 'text/plain' }))
+    const file = await api.registerMediaFile({
+      projectId,
+      name: 'fallback.txt',
+      mediaPath: uploaded.mediaPath,
+      sizeBytes: uploaded.sizeBytes,
+      durationSec: 10,
+    })
+
+    const submit = await api.submitMedia({
+      mediaPath: uploaded.mediaPath,
+      durationSec: 10,
+      sizeBytes: uploaded.sizeBytes,
+      projectId,
+      mediaFileId: file.id,
+    })
+
+    expect(submit.result.status).toBe('completed_local_no_contract')
+    expect(submit.result.document_id).toBeUndefined()
+
+    const history = await api.listAnalysisHistory(projectId)
+    expect(history.length).toBe(1)
+    expect(history[0].contract_current).toBe(false)
+    const docId = String(history[0].document_id || '')
+    expect(docId).not.toBe('')
+
+    const artifacts = await api.listDocumentArtifacts(docId)
+    expect(artifacts.some((row) => row.name === 'full_text.txt')).toBe(true)
+    expect(artifacts.some((row) => row.name === 'subtitles_en.srt')).toBe(true)
+    expect(artifacts.some((row) => row.name === 'contract_visualizer.json')).toBe(false)
+    expect(artifacts.some((row) => row.name === 'contract_sentences.json')).toBe(false)
+
+    const payload = await api.getVisualizerPayload(docId)
+    expect(Object.keys(payload)).toHaveLength(0)
+
+    const files = await api.listFiles(projectId)
+    const tracked = files.find((row) => row.id === file.id)
+    expect(tracked?.analyzed).toBe(false)
+    expect(tracked?.document_id).toBeUndefined()
+  })
+
   it('keeps file analysis flags in sync when analysis versions are deleted', async () => {
     const selected = await LocalWorkspace.getSelectedProject()
     const projectId = String(selected.project_id || '')

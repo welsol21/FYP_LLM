@@ -396,9 +396,16 @@ function syncFileAnalysisFlags(state: WorkspaceState): void {
       continue
     }
     const latest = matches[0]
+    if (latest.contract_current === false) {
+      file.analyzed = false
+      file.document_id = undefined
+      file.settings = normalizeSettings(latest.settings)
+      continue
+    }
+    const latestContract = matches.find((analysis) => analysis.contract_current !== false) || latest
     file.analyzed = true
-    file.document_id = String(latest.document_id || '').trim() || undefined
-    file.settings = normalizeSettings(latest.settings)
+    file.document_id = String(latestContract.document_id || '').trim() || undefined
+    file.settings = normalizeSettings(latestContract.settings)
   }
 }
 
@@ -776,6 +783,7 @@ export const LocalWorkspace = {
     settings: string
     contract: VisualizerPayload
     artifacts?: DocumentArtifact[]
+    contractCurrent?: boolean
   }): Promise<AnalysisHistoryRow> {
     const state = await ensureState()
     const ts = nowIso()
@@ -793,10 +801,10 @@ export const LocalWorkspace = {
       size_bytes: input.sizeBytes,
       duration_seconds: input.durationSeconds,
       settings: normalizeSettings(input.settings),
-      items_count: countContractNodes(input.contract),
+      items_count: input.contractCurrent === false ? 0 : countContractNodes(input.contract),
       updated_at: ts,
       created_at: existing ? existing.created_at : ts,
-      contract_current: true,
+      contract_current: input.contractCurrent !== false,
       contract: clone(input.contract),
       artifacts: clone(input.artifacts || existing?.artifacts || []),
     }
@@ -839,6 +847,7 @@ export const LocalWorkspace = {
     if (!docId) return {}
     const state = await ensureState()
     const row = state.analyses.find((a) => a.document_id === docId || a.analysis_id === docId)
+    if (row?.contract_current === false) return {}
     return clone(row?.contract || {})
   },
 

@@ -130,4 +130,58 @@ describe('AnalyzePage', () => {
     confirmSpy.mockRestore()
   })
 
+  it('does not show visualizer action for history versions without contract', async () => {
+    const api = new MockRuntimeApi()
+    vi.spyOn(api, 'listAnalysisHistory').mockResolvedValue([
+      {
+        analysis_id: 'doc-no-contract',
+        document_id: 'doc-no-contract',
+        project_id: 'proj-1',
+        project_name: 'Demo Project',
+        media_file_id: 'file-1',
+        file_name: 'sample.mp4',
+        file_path: '/uploads/sample.mp4',
+        size_bytes: 104857600,
+        duration_seconds: 600,
+        settings: 'Transl: m2m100 / Subs: bilingual / Voice: male',
+        updated_at: '2026-03-08T12:25:33Z',
+        created_at: '2026-03-08T12:24:32Z',
+        contract_current: false,
+      },
+    ])
+    vi.spyOn(api, 'listDocumentArtifacts').mockResolvedValue([
+      { name: 'subtitles_en.srt', size_bytes: 123, download_url: 'data:text/plain,ok' },
+    ])
+
+    render(
+      <ApiContext.Provider value={api}>
+        <MemoryRouter
+          initialEntries={[
+            {
+              pathname: '/analyze',
+              state: {
+                analyzeEntry: 'files',
+                selectedMedia: {
+                  mediaFileId: 'file-1',
+                  fileName: 'sample.mp4',
+                  mediaPath: '/uploads/sample.mp4',
+                  sizeBytes: 104857600,
+                  durationSec: 600,
+                },
+              },
+            },
+          ]}
+        >
+          <AnalyzePage />
+        </MemoryRouter>
+      </ApiContext.Provider>,
+    )
+
+    const historyCard = await screen.findByLabelText('analyze-history')
+    await waitFor(() => {
+      expect(within(historyCard).queryByRole('button', { name: /history-open-sample.mp4/i })).not.toBeInTheDocument()
+      expect(within(historyCard).getByText(/Visualizer unavailable: backend contract was not received./i)).toBeInTheDocument()
+    })
+  })
+
 })

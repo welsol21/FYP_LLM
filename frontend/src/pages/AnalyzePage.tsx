@@ -29,6 +29,7 @@ type AnalysisHistoryItem = {
   file_id: string
   file_name: string
   document_id: string
+  contract_current: boolean
   analyzed_at: string
   settings: string
   artifacts: DocumentArtifact[]
@@ -149,6 +150,7 @@ export function AnalyzePage() {
               analyzed_at: String(row.updated_at || row.created_at || ''),
               settings: String(row.settings || ''),
               documentId,
+              contractCurrent: row.contract_current !== false,
               artifacts: docArtifacts,
             }
           }),
@@ -163,10 +165,11 @@ export function AnalyzePage() {
             file_id: item.file_id,
             file_name: item.file_name,
             document_id: item.documentId,
-            analyzed_at: item.analyzed_at,
-            settings: item.settings,
-            artifacts: item.artifacts,
-          })
+              analyzed_at: item.analyzed_at,
+              settings: item.settings,
+              artifacts: item.artifacts,
+              contract_current: item.contractCurrent,
+            })
           grouped.set(timeKey, bucket)
         }
         if (!stopped) {
@@ -348,8 +351,10 @@ export function AnalyzePage() {
           setIsSubmittingPipeline(false)
           if (payload.result.document_id) {
             setActiveMedia((prev) => (prev ? { ...prev, documentId: payload.result.document_id } : prev))
-            setHistoryReloadKey((prev) => prev + 1)
+          } else {
+            setActiveMedia((prev) => (prev ? { ...prev, documentId: undefined } : prev))
           }
+          setHistoryReloadKey((prev) => prev + 1)
         }}
         onSubmittingChange={(value) => setIsSubmittingPipeline(value)}
         projectId={selectedProject.project_id ?? null}
@@ -414,7 +419,7 @@ export function AnalyzePage() {
                     <div className="analysis-history-head">
                       <strong>{item.file_name}</strong>
                       <div className="actions-row">
-                        {item.document_id ? (
+                        {item.document_id && item.contract_current ? (
                           <button
                             type="button"
                             onClick={() => navigate('/visualizer', { state: { documentId: item.document_id } })}
@@ -448,6 +453,9 @@ export function AnalyzePage() {
                       </div>
                     ) : null}
                     <div className="artifact-actions">
+                      {!item.contract_current ? (
+                        <span className="muted">Visualizer unavailable: backend contract was not received.</span>
+                      ) : null}
                       {item.artifacts.length > 0 ? (
                         item.artifacts.map((artifact) => (
                           <a key={`${item.file_id}-${artifact.name}`} className="top-link" href={artifact.download_url} target="_blank" rel="noreferrer">
