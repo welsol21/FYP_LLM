@@ -353,7 +353,7 @@ function pickProject(state: WorkspaceState, projectId?: string): ProjectRow {
 }
 
 function normalizeSettings(settings: string | undefined): string {
-  return String(settings || '').trim() || 'Transl: m2m100 / Subs: bilingual / Voice: male'
+  return String(settings || '').trim() || 'Transl: m2m100 / Subs: bilingual / Voice: male / Proc: incremental'
 }
 
 function parsePath(path: string): Array<string | number> {

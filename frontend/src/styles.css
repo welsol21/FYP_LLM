@@ -403,11 +403,49 @@ button {
   border-top: 1px dashed #3c4a61;
 }
 
+.analysis-feature-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.analysis-feature-badge {
+  font-size: 11px;
+  padding: 3px 7px;
+  color: #d8e4fb;
+  border-color: #465a7a;
+  background: #0f1726;
+}
+
 .analysis-history-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.file-versions-row td {
+  background: #0f1624;
+}
+
+.file-versions-list {
+  display: grid;
+  gap: 8px;
+}
+
+.file-version-item {
+  border: 1px solid #2f3d54;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #101725;
+}
+
+.file-version-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .visualizer-root {

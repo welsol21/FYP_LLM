@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
 import type { AnalysisHistoryRow, VisualizerNode, VisualizerPayload } from '../api/runtimeApi'
+import { buildAnalysisFeatureBadges, getTranslationProviderFromSettings } from '../lib/analysisSettings'
 import { normalizeLinguisticNotes } from '../lib/linguisticNotes'
 import { resolveNodeTranslation } from '../lib/translationContract'
 
@@ -11,6 +12,7 @@ export type VocabRow = {
   file: string
   items: number
   created: string
+  settings: string
   documentId: string | null
   payload: VisualizerPayload | null
   translationProvider: string
@@ -64,11 +66,6 @@ function countPayloadElements(payload: VisualizerPayload | null): number {
     total += collectLinguisticElements(root).length
   }
   return total
-}
-
-function parseTranslationProvider(settings: string): string {
-  const match = String(settings || '').match(/Transl:\s*([^/]+)/i)
-  return match?.[1]?.trim().toLowerCase() || 'backend_m2m100'
 }
 
 function formatAnalysisTime(value: string): string {
@@ -246,9 +243,10 @@ export function VocabularyPage() {
           file: String(row.file_name || row.media_file_id || row.document_id || 'Unknown'),
           items: 0,
           created: formatAnalysisTime(row.updated_at),
+          settings: String(row.settings || ''),
           documentId: row.document_id ?? null,
           payload: null,
-          translationProvider: parseTranslationProvider(row.settings),
+          translationProvider: getTranslationProviderFromSettings(row.settings),
         }
       }
 
@@ -271,9 +269,10 @@ export function VocabularyPage() {
                   file: f.name,
                   items: 0,
                   created: formatAnalysisTime(f.updated),
+                  settings: String(f.settings || ''),
                   documentId: f.document_id ?? null,
                   payload: null,
-                  translationProvider: parseTranslationProvider(f.settings),
+                  translationProvider: getTranslationProviderFromSettings(f.settings),
                 }
               }),
             )
@@ -437,6 +436,7 @@ export function VocabularyPage() {
             <th style={{ width: 36 }} />
             <th>Project</th>
             <th>File</th>
+            <th>Settings</th>
             <th>Items</th>
             <th>Created</th>
           </tr>
@@ -453,6 +453,15 @@ export function VocabularyPage() {
               </td>
               <td>{row.project}</td>
               <td>{row.file}</td>
+              <td>
+                <div className="analysis-feature-badges">
+                  {buildAnalysisFeatureBadges(row.settings).map((badge) => (
+                    <span key={`${row.id}-${badge.key}`} className="badge analysis-feature-badge">
+                      {badge.label}: {badge.value}
+                    </span>
+                  ))}
+                </div>
+              </td>
               <td>{row.items}</td>
               <td>{row.created}</td>
             </tr>

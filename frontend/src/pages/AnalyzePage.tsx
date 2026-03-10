@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
+import { buildAnalysisFeatureBadges } from '../lib/analysisSettings'
 import type {
   BackendJobStatus,
   DocumentArtifact,
@@ -30,6 +31,7 @@ type AnalysisHistoryItem = {
   file_name: string
   document_id: string
   analyzed_at: string
+  settings: string
   artifacts: DocumentArtifact[]
 }
 
@@ -151,6 +153,7 @@ export function AnalyzePage() {
               file_id: String(row.media_file_id || row.analysis_id || row.document_id),
               file_name: String(row.file_name || row.media_file_id || row.document_id || 'Unknown'),
               analyzed_at: String(row.updated_at || row.created_at || ''),
+              settings: String(row.settings || ''),
               documentId,
               artifacts: docArtifacts,
             }
@@ -167,6 +170,7 @@ export function AnalyzePage() {
             file_name: item.file_name,
             document_id: item.documentId,
             analyzed_at: item.analyzed_at,
+            settings: item.settings,
             artifacts: item.artifacts,
           })
           grouped.set(timeKey, bucket)
@@ -475,6 +479,7 @@ export function AnalyzePage() {
                 <p className="analysis-history-time">{group.time_key}</p>
                 {group.items.map((item) => {
                   const isDeleting = Boolean(deletingByDocumentId[item.document_id])
+                  const featureBadges = buildAnalysisFeatureBadges(item.settings)
                   return (
                   <article key={`${item.analysis_id}-${item.document_id}`} className="analysis-history-item">
                     <div className="analysis-history-head">
@@ -504,6 +509,15 @@ export function AnalyzePage() {
                         ) : null}
                       </div>
                     </div>
+                    {featureBadges.length > 0 ? (
+                      <div className="analysis-feature-badges">
+                        {featureBadges.map((badge) => (
+                          <span key={`${item.analysis_id}-${badge.key}`} className="badge analysis-feature-badge">
+                            {badge.label}: {badge.value}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                     <div className="artifact-actions">
                       {item.artifacts.length > 0 ? (
                         item.artifacts.map((artifact) => (

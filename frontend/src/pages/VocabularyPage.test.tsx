@@ -103,6 +103,7 @@ describe('VocabularyPage', () => {
       file: 'sample.mp4',
       items: 1,
       created: 'Feb 18, 2026',
+      settings: 'Transl: gpt / Subs: bilingual_sequential / Voice: male / Proc: incremental',
       documentId: 'doc-1',
       payload,
       translationProvider: 'gpt',

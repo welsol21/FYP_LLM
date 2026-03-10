@@ -107,7 +107,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     const effectiveProjectId = input.projectId || selected.project_id || projects[0]?.id || ''
     const localFile = input.mediaFileId ? await LocalWorkspace.getFileById(input.mediaFileId) : null
     const fileName = localFile?.name || input.mediaPath.split('/').pop() || input.mediaPath
-    const settings = `Transl: ${input.translationProvider || 'm2m100'} / Subs: ${input.subtitlesMode || 'bilingual'} / Voice: ${input.voiceChoice || 'male'}`
+    const settings = `Transl: ${input.translationProvider || 'm2m100'} / Subs: ${input.subtitlesMode || 'bilingual'} / Voice: ${input.voiceChoice || 'male'} / Proc: ${input.forceFullReprocess ? 'force' : 'incremental'}`
 
     const payload = await requestJson<MediaSubmissionPayload>('/api/submit-media', {
       method: 'POST',
