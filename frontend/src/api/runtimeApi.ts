@@ -75,6 +75,7 @@ export type AnalysisHistoryRow = {
   size_bytes?: number
   duration_seconds?: number
   settings: string
+  items_count?: number
   updated_at: string
   created_at: string
   contract_current?: boolean

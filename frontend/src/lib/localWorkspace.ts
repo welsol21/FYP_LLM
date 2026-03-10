@@ -356,6 +356,20 @@ function normalizeSettings(settings: string | undefined): string {
   return String(settings || '').trim() || 'Transl: m2m100 / Subs: bilingual / Voice: male / Proc: incremental'
 }
 
+function countContractNodes(contract: VisualizerPayload): number {
+  let total = 0
+  const roots = Object.values(contract || {})
+  const stack: VisualizerNode[] = roots.filter(Boolean) as VisualizerNode[]
+  while (stack.length > 0) {
+    const node = stack.pop() as VisualizerNode
+    for (const child of node.linguistic_elements || []) {
+      total += 1
+      stack.push(child)
+    }
+  }
+  return total
+}
+
 function parsePath(path: string): Array<string | number> {
   const out: Array<string | number> = []
   const normalized = path.replace(/\[(\d+)\]/g, '.$1')
@@ -729,6 +743,7 @@ export const LocalWorkspace = {
       size_bytes: input.sizeBytes,
       duration_seconds: input.durationSeconds,
       settings: normalizeSettings(input.settings),
+      items_count: countContractNodes(input.contract),
       updated_at: ts,
       created_at: existing ? existing.created_at : ts,
       contract_current: true,
@@ -754,6 +769,15 @@ export const LocalWorkspace = {
 
   async listAnalysisHistory(projectId?: string): Promise<AnalysisHistoryRow[]> {
     const state = await ensureState()
+    let needsPersist = false
+    for (const row of state.analyses) {
+      if (typeof row.items_count === 'number') continue
+      row.items_count = countContractNodes(row.contract)
+      needsPersist = true
+    }
+    if (needsPersist) {
+      await saveRawState(state)
+    }
     const rows = state.analyses
       .filter((a) => !projectId || a.project_id === projectId)
       .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))

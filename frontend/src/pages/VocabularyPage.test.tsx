@@ -22,10 +22,30 @@ describe('VocabularyPage', () => {
     expect(visualizerBtn).toBeEnabled()
   })
 
-  it('shows row with default items count before lazy payload hydration', async () => {
-    renderWithProviders(<VocabularyPage />)
+  it('shows items count from analysis history', async () => {
+    const api = new MockRuntimeApi()
+    vi.spyOn(api, 'listAnalysisHistory').mockResolvedValue([
+      {
+        analysis_id: 'doc-new',
+        document_id: 'doc-1',
+        project_id: 'proj-1',
+        project_name: 'Demo Project',
+        media_file_id: 'file-1',
+        file_name: 'sample.mp4',
+        file_path: '/uploads/sample.mp4',
+        size_bytes: 104857600,
+        duration_seconds: 600,
+        settings: 'Transl: m2m100 / Subs: bilingual / Voice: male / Proc: incremental',
+        items_count: 7,
+        updated_at: '2026-03-08T12:25:33Z',
+        created_at: '2026-03-08T12:24:32Z',
+        contract_current: true,
+      },
+    ])
+
+    renderWithProviders(<VocabularyPage />, api)
     expect(await screen.findByText('sample.mp4')).toBeInTheDocument()
-    expect(await screen.findByText('0')).toBeInTheDocument()
+    expect(await screen.findByText('7')).toBeInTheDocument()
   })
 
   it('shows all analysis history versions for the same file', async () => {
@@ -111,8 +131,8 @@ describe('VocabularyPage', () => {
     const rows = toExportRows(row)
     expect(rows[0].translation_provider).toBe('gpt')
     expect(rows[0].translation).toBe('Она (GPT)')
-    expect(rows[0].translation_backend_m2m100).toBe('Она')
-    expect(rows[0].translation_gpt).toBe('Она (GPT)')
+    expect(rows[0].translations_json).toContain('backend_m2m100')
+    expect(rows[0].translations_json).toContain('gpt')
   })
 
   it('deletes selected analyses from vocabulary table', async () => {

@@ -35,16 +35,42 @@ export type ExportRow = {
   translations_json: string
   phonetic_uk: string
   phonetic_us: string
-} & Record<string, string>
-
-function toProviderColumn(provider: string): string {
-  const normalized = String(provider || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-  return normalized ? `translation_${normalized}` : 'translation_unknown'
 }
+
+type ExportFormat = 'json' | 'csv'
+
+const DEFAULT_EXPORT_FIELDS: Array<keyof ExportRow> = [
+  'project',
+  'file',
+  'created',
+  'document_id',
+  'content',
+  'cefr_level',
+  'tense',
+  'translation_provider',
+  'translation',
+  'phonetic_uk',
+  'phonetic_us',
+]
+
+const EXPORT_FIELD_OPTIONS: Array<{ key: keyof ExportRow; label: string }> = [
+  { key: 'project', label: 'project' },
+  { key: 'file', label: 'file' },
+  { key: 'created', label: 'created' },
+  { key: 'document_id', label: 'document_id' },
+  { key: 'sentence', label: 'sentence' },
+  { key: 'node_id', label: 'node_id' },
+  { key: 'node_type', label: 'node_type' },
+  { key: 'content', label: 'content' },
+  { key: 'cefr_level', label: 'cefr_level' },
+  { key: 'tense', label: 'tense' },
+  { key: 'linguistic_notes', label: 'linguistic_notes' },
+  { key: 'translation_provider', label: 'translation_provider' },
+  { key: 'translation', label: 'translation' },
+  { key: 'translations_json', label: 'translations_json' },
+  { key: 'phonetic_uk', label: 'phonetic_uk' },
+  { key: 'phonetic_us', label: 'phonetic_us' },
+]
 
 function collectLinguisticElements(node: VisualizerNode): VisualizerNode[] {
   const out: VisualizerNode[] = []
@@ -89,6 +115,16 @@ function notesToExportText(node: VisualizerNode): string {
   return out.join(' | ')
 }
 
+function normalizePhoneticValue(value: string, sourceContent: string): string {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  const source = String(sourceContent || '').trim()
+  if (!source) return raw
+  // Drop backend fallback where phonetic repeats source text verbatim.
+  if (raw.toLowerCase() === source.toLowerCase()) return ''
+  return raw
+}
+
 async function sleepMs(ms: number): Promise<void> {
   await new Promise((resolve) => window.setTimeout(resolve, ms))
 }
@@ -129,14 +165,8 @@ export function toExportRows(row: VocabRow): ExportRow[] {
         translation_provider: row.translationProvider,
         translation: resolveNodeTranslation(node, row.translationProvider),
         translations_json: JSON.stringify(node.translations || {}),
-        phonetic_uk: String(node.phonetic?.uk || ''),
-        phonetic_us: String(node.phonetic?.us || ''),
-      }
-      if (node.translations && typeof node.translations === 'object') {
-        for (const [provider, payload] of Object.entries(node.translations)) {
-          const col = toProviderColumn(provider)
-          exportRow[col] = String(payload?.text || '')
-        }
+        phonetic_uk: normalizePhoneticValue(String(node.phonetic?.uk || ''), String(node.content || '')),
+        phonetic_us: normalizePhoneticValue(String(node.phonetic?.us || ''), String(node.content || '')),
       }
       out.push(exportRow)
     }
@@ -156,35 +186,21 @@ function downloadTextFile(filename: string, text: string, mimeType: string): voi
   URL.revokeObjectURL(url)
 }
 
-function toCsv(rows: ExportRow[]): string {
-  const fallbackHeaders = Object.keys({
-    project: '',
-    file: '',
-    created: '',
-    document_id: '',
-    sentence: '',
-    node_id: '',
-    node_type: '',
-    content: '',
-    cefr_level: '',
-    tense: '',
-    linguistic_notes: '',
-    translation: '',
-    translation_provider: '',
-    translations_json: '',
-    phonetic_uk: '',
-    phonetic_us: '',
+function pickExportFields(rows: ExportRow[], selectedFields: Array<keyof ExportRow>): Array<Partial<ExportRow>> {
+  return rows.map((row) => {
+    const out: Partial<ExportRow> = {}
+    for (const field of selectedFields) {
+      out[field] = row[field]
+    }
+    return out
   })
-  const headers = rows.length
-    ? Array.from(rows.reduce((set, row) => {
-      Object.keys(row).forEach((k) => set.add(k))
-      return set
-    }, new Set<string>()))
-    : fallbackHeaders
-  const csvHeaders = headers.filter((h) => h !== 'translations_json')
+}
+
+function toCsvWithFields(rows: ExportRow[], selectedFields: Array<keyof ExportRow>): string {
+  const headers = selectedFields.length > 0 ? selectedFields : DEFAULT_EXPORT_FIELDS
   const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
-  const body = rows.map((row) => csvHeaders.map((h) => esc((row as Record<string, unknown>)[h])).join(','))
-  return [csvHeaders.join(','), ...body].join('\n')
+  const body = rows.map((row) => headers.map((h) => esc((row as Record<string, unknown>)[h])).join(','))
+  return [headers.join(','), ...body].join('\n')
 }
 
 export function VocabularyPage() {
@@ -195,6 +211,8 @@ export function VocabularyPage() {
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [pendingExportFormat, setPendingExportFormat] = useState<ExportFormat | null>(null)
+  const [selectedExportFields, setSelectedExportFields] = useState<Array<keyof ExportRow>>(DEFAULT_EXPORT_FIELDS)
 
   const fetchPayloadByDocumentId = useCallback(async (documentId: string): Promise<VisualizerPayload | null> => {
     try {
@@ -203,25 +221,6 @@ export function VocabularyPage() {
       return null
     }
   }, [api])
-
-  const enrichRowsWithPayload = useCallback(async (documentIds: string[]) => {
-    const unique = Array.from(new Set(documentIds.filter(Boolean)))
-    for (const documentId of unique) {
-      let shouldFetch = false
-      setRows((prev) => {
-        const hasPayload = prev.some((row) => row.documentId === documentId && row.payload)
-        if (!hasPayload) shouldFetch = true
-        return prev
-      })
-      if (!shouldFetch) continue
-      const payload = await fetchPayloadByDocumentId(documentId)
-      setRows((prev) => prev.map((row) => (
-        row.documentId === documentId
-          ? { ...row, payload, items: countPayloadElements(payload) }
-          : row
-      )))
-    }
-  }, [fetchPayloadByDocumentId])
 
   const resolveRowsForExport = useCallback(async (selected: VocabRow[]): Promise<VocabRow[]> => {
     return Promise.all(selected.map(async (row) => {
@@ -241,7 +240,7 @@ export function VocabularyPage() {
           id: String(row.analysis_id || row.document_id),
           project: String(row.project_name || row.project_id || '-'),
           file: String(row.file_name || row.media_file_id || row.document_id || 'Unknown'),
-          items: 0,
+          items: Math.max(0, Number(row.items_count || 0)),
           created: formatAnalysisTime(row.updated_at),
           settings: String(row.settings || ''),
           documentId: row.document_id ?? null,
@@ -302,15 +301,6 @@ export function VocabularyPage() {
     }
   }, [api])
 
-  useEffect(() => {
-    const docIds = Object.entries(checked)
-      .filter(([, isChecked]) => isChecked)
-      .map(([rowId]) => rows.find((row) => row.id === rowId)?.documentId || '')
-      .filter((v): v is string => Boolean(v))
-    if (!docIds.length) return
-    void enrichRowsWithPayload(docIds)
-  }, [checked, rows, enrichRowsWithPayload])
-
   const selectedCount = useMemo(() => Object.values(checked).filter(Boolean).length, [checked])
   const selectedRows = useMemo(() => rows.filter((row) => checked[row.id]), [rows, checked])
   const selectedDocumentId = selectedRows.find((row) => row.documentId)?.documentId ?? null
@@ -357,6 +347,28 @@ export function VocabularyPage() {
     }
   }, [api, rows, selectedDocumentIds])
 
+  const confirmExport = useCallback(async () => {
+    if (!pendingExportFormat || selectedCount === 0) return
+    const freshRows = await resolveRowsForExport(selectedRows)
+    const freshExportRows = freshRows.flatMap((row) => toExportRows(row))
+    const exportFields = selectedExportFields.length > 0 ? selectedExportFields : DEFAULT_EXPORT_FIELDS
+    if (pendingExportFormat === 'json') {
+      const narrowed = pickExportFields(freshExportRows, exportFields)
+      downloadTextFile(
+        `vocabulary_export_${Date.now()}.json`,
+        JSON.stringify(narrowed, null, 2),
+        'application/json;charset=utf-8',
+      )
+    } else {
+      downloadTextFile(
+        `vocabulary_export_${Date.now()}.csv`,
+        toCsvWithFields(freshExportRows, exportFields),
+        'text/csv;charset=utf-8',
+      )
+    }
+    setPendingExportFormat(null)
+  }, [pendingExportFormat, resolveRowsForExport, selectedCount, selectedExportFields, selectedRows])
+
   return (
     <section className="screen-block">
       <div className="page-head">
@@ -390,14 +402,9 @@ export function VocabularyPage() {
             type="button"
             className="secondary-btn"
             disabled={selectedCount === 0}
-            onClick={async () => {
-              const freshRows = await resolveRowsForExport(selectedRows)
-              const freshExportRows = freshRows.flatMap((row) => toExportRows(row))
-              downloadTextFile(
-                `vocabulary_export_${Date.now()}.json`,
-                JSON.stringify(freshExportRows, null, 2),
-                'application/json;charset=utf-8',
-              )
+            onClick={() => {
+              setSelectedExportFields(DEFAULT_EXPORT_FIELDS)
+              setPendingExportFormat('json')
             }}
           >
             Export JSON
@@ -406,10 +413,9 @@ export function VocabularyPage() {
             type="button"
             className="secondary-btn"
             disabled={selectedCount === 0}
-            onClick={async () => {
-              const freshRows = await resolveRowsForExport(selectedRows)
-              const freshExportRows = freshRows.flatMap((row) => toExportRows(row))
-              downloadTextFile(`vocabulary_export_${Date.now()}.csv`, toCsv(freshExportRows), 'text/csv;charset=utf-8')
+            onClick={() => {
+              setSelectedExportFields(DEFAULT_EXPORT_FIELDS)
+              setPendingExportFormat('csv')
             }}
           >
             Export CSV
@@ -426,6 +432,42 @@ export function VocabularyPage() {
           </button>
         </div>
       </div>
+      {pendingExportFormat ? (
+        <section className="card compact-card">
+          <p className="stage-log-title">Choose export fields</p>
+          <div className="analysis-feature-badges">
+            {EXPORT_FIELD_OPTIONS.map((option) => {
+              const active = selectedExportFields.includes(option.key)
+              return (
+                <button
+                  key={`export-field-${option.key}`}
+                  type="button"
+                  className={`touch-option-btn ${active ? 'active' : ''}`}
+                  onClick={() => {
+                    setSelectedExportFields((prev) => {
+                      if (prev.includes(option.key)) return prev.filter((field) => field !== option.key)
+                      return [...prev, option.key]
+                    })
+                  }}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
+          </div>
+          <div className="actions-row">
+            <button type="button" onClick={() => setSelectedExportFields(DEFAULT_EXPORT_FIELDS)}>
+              Reset Defaults
+            </button>
+            <button type="button" onClick={() => setPendingExportFormat(null)} className="secondary-btn">
+              Cancel
+            </button>
+            <button type="button" onClick={() => { void confirmExport() }}>
+              Export {pendingExportFormat.toUpperCase()}
+            </button>
+          </div>
+        </section>
+      ) : null}
       {loading ? <p className="muted">Loading analysis history...</p> : null}
       {!loading && loadError ? <p style={{ color: '#ff8a8a' }}>{loadError}</p> : null}
       {!loading && !loadError && rows.length === 0 ? <p className="muted">No analyzed history yet.</p> : null}

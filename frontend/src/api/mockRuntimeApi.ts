@@ -109,6 +109,20 @@ function coerceInputValue(raw: string, existing: unknown): unknown {
   return raw
 }
 
+function countPayloadElements(payload: VisualizerPayload | null | undefined): number {
+  if (!payload) return 0
+  let total = 0
+  const stack: VisualizerNode[] = Object.values(payload).filter(Boolean) as VisualizerNode[]
+  while (stack.length > 0) {
+    const node = stack.pop() as VisualizerNode
+    for (const child of node.linguistic_elements || []) {
+      total += 1
+      stack.push(child)
+    }
+  }
+  return total
+}
+
 export class MockRuntimeApi implements RuntimeApi {
   private localJobs: Record<string, { ticks: number; document_id: string }> = {}
   private translationConfig: TranslationConfig = {
@@ -341,6 +355,7 @@ export class MockRuntimeApi implements RuntimeApi {
           size_bytes: row.size_bytes,
           duration_seconds: row.duration_seconds,
           settings: row.settings,
+          items_count: countPayloadElements(this.payloadByDocument[String(row.document_id || '')]),
           updated_at: row.updated,
           created_at: row.updated,
           contract_current: true,
