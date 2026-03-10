@@ -19,6 +19,15 @@ export type VocabRow = {
 }
 
 export type ExportRow = {
+  content: string
+  translation: string
+  translation_provider: string
+  phonetic_uk: string
+  phonetic_us: string
+  cefr_level: string
+  tense: string
+  project_file: string
+  created_document_id: string
   project: string
   file: string
   created: string
@@ -26,34 +35,35 @@ export type ExportRow = {
   sentence: string
   node_id: string
   node_type: string
-  content: string
-  cefr_level: string
-  tense: string
   linguistic_notes: string
-  translation_provider: string
-  translation: string
   translations_json: string
-  phonetic_uk: string
-  phonetic_us: string
 }
 
 type ExportFormat = 'json' | 'csv'
 
 const DEFAULT_EXPORT_FIELDS: Array<keyof ExportRow> = [
-  'project',
-  'file',
-  'created',
-  'document_id',
   'content',
-  'cefr_level',
-  'tense',
-  'translation_provider',
   'translation',
+  'translation_provider',
   'phonetic_uk',
   'phonetic_us',
+  'cefr_level',
+  'tense',
+  'project_file',
+  'created',
+  'created_document_id',
 ]
 
 const EXPORT_FIELD_OPTIONS: Array<{ key: keyof ExportRow; label: string }> = [
+  { key: 'content', label: 'content' },
+  { key: 'translation', label: 'translation' },
+  { key: 'translation_provider', label: 'translation_provider' },
+  { key: 'phonetic_uk', label: 'phonetic_uk' },
+  { key: 'phonetic_us', label: 'phonetic_us' },
+  { key: 'cefr_level', label: 'cefr_level' },
+  { key: 'tense', label: 'tense' },
+  { key: 'project_file', label: 'project_file' },
+  { key: 'created_document_id', label: 'created_document_id' },
   { key: 'project', label: 'project' },
   { key: 'file', label: 'file' },
   { key: 'created', label: 'created' },
@@ -61,15 +71,8 @@ const EXPORT_FIELD_OPTIONS: Array<{ key: keyof ExportRow; label: string }> = [
   { key: 'sentence', label: 'sentence' },
   { key: 'node_id', label: 'node_id' },
   { key: 'node_type', label: 'node_type' },
-  { key: 'content', label: 'content' },
-  { key: 'cefr_level', label: 'cefr_level' },
-  { key: 'tense', label: 'tense' },
   { key: 'linguistic_notes', label: 'linguistic_notes' },
-  { key: 'translation_provider', label: 'translation_provider' },
-  { key: 'translation', label: 'translation' },
   { key: 'translations_json', label: 'translations_json' },
-  { key: 'phonetic_uk', label: 'phonetic_uk' },
-  { key: 'phonetic_us', label: 'phonetic_us' },
 ]
 
 function collectLinguisticElements(node: VisualizerNode): VisualizerNode[] {
@@ -150,7 +153,17 @@ export function toExportRows(row: VocabRow): ExportRow[] {
   for (const [sentence, root] of Object.entries(row.payload)) {
     const elements = collectLinguisticElements(root)
     for (const node of elements) {
+      const nodeContent = String(node.content || '')
       const exportRow: ExportRow = {
+        content: nodeContent,
+        translation: resolveNodeTranslation(node, row.translationProvider),
+        translation_provider: row.translationProvider,
+        phonetic_uk: normalizePhoneticValue(String(node.phonetic?.uk || ''), nodeContent),
+        phonetic_us: normalizePhoneticValue(String(node.phonetic?.us || ''), nodeContent),
+        cefr_level: String(node.cefr_level || ''),
+        tense: String(node.tense || ''),
+        project_file: joinExportPair(row.project, row.file),
+        created_document_id: String(row.documentId || ''),
         project: row.project,
         file: row.file,
         created: row.created,
@@ -158,15 +171,8 @@ export function toExportRows(row: VocabRow): ExportRow[] {
         sentence,
         node_id: String(node.node_id || ''),
         node_type: String(node.type || ''),
-        content: String(node.content || ''),
-        cefr_level: String(node.cefr_level || ''),
-        tense: String(node.tense || ''),
         linguistic_notes: notesToExportText(node),
-        translation_provider: row.translationProvider,
-        translation: resolveNodeTranslation(node, row.translationProvider),
         translations_json: JSON.stringify(node.translations || {}),
-        phonetic_uk: normalizePhoneticValue(String(node.phonetic?.uk || ''), String(node.content || '')),
-        phonetic_us: normalizePhoneticValue(String(node.phonetic?.us || ''), String(node.content || '')),
       }
       out.push(exportRow)
     }
@@ -186,10 +192,32 @@ function downloadTextFile(filename: string, text: string, mimeType: string): voi
   URL.revokeObjectURL(url)
 }
 
+function joinExportPair(left: string, right: string): string {
+  const l = String(left || '').trim()
+  const r = String(right || '').trim()
+  if (l && r) return `${l} | ${r}`
+  return l || r
+}
+
+function orderExportFields(selectedFields: Array<keyof ExportRow>): Array<keyof ExportRow> {
+  const selectedSet = new Set(selectedFields)
+  const defaultsInOrder = DEFAULT_EXPORT_FIELDS.filter((field) => selectedSet.has(field))
+  const extrasInUserOrder = selectedFields.filter((field) => !DEFAULT_EXPORT_FIELDS.includes(field))
+  const out: Array<keyof ExportRow> = []
+  const seen = new Set<keyof ExportRow>()
+  for (const field of [...defaultsInOrder, ...extrasInUserOrder]) {
+    if (seen.has(field)) continue
+    seen.add(field)
+    out.push(field)
+  }
+  return out
+}
+
 function pickExportFields(rows: ExportRow[], selectedFields: Array<keyof ExportRow>): Array<Partial<ExportRow>> {
+  const orderedFields = orderExportFields(selectedFields)
   return rows.map((row) => {
     const out: Partial<ExportRow> = {}
-    for (const field of selectedFields) {
+    for (const field of orderedFields) {
       out[field] = row[field]
     }
     return out
@@ -197,7 +225,7 @@ function pickExportFields(rows: ExportRow[], selectedFields: Array<keyof ExportR
 }
 
 function toCsvWithFields(rows: ExportRow[], selectedFields: Array<keyof ExportRow>): string {
-  const headers = selectedFields.length > 0 ? selectedFields : DEFAULT_EXPORT_FIELDS
+  const headers = selectedFields.length > 0 ? orderExportFields(selectedFields) : DEFAULT_EXPORT_FIELDS
   const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
   const body = rows.map((row) => headers.map((h) => esc((row as Record<string, unknown>)[h])).join(','))
   return [headers.join(','), ...body].join('\n')
@@ -315,13 +343,14 @@ export function VocabularyPage() {
     if (!shouldDelete) return
     setDeleting(true)
     try {
-      const results = await Promise.all(selectedDocumentIds.map(async (docId) => {
+      const results: Array<{ status: 'ok' | 'error'; message: string; document_id?: string }> = []
+      for (const docId of selectedDocumentIds) {
         try {
-          return await api.deleteAnalysis(docId)
+          results.push(await api.deleteAnalysis(docId))
         } catch {
-          return { status: 'error' as const, message: 'delete failed', document_id: docId }
+          results.push({ status: 'error', message: 'delete failed', document_id: docId })
         }
-      }))
+      }
       const deletedIds = new Set(
         results
           .filter((row) => row.status === 'ok')

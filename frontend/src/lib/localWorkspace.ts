@@ -370,6 +370,36 @@ function countContractNodes(contract: VisualizerPayload): number {
   return total
 }
 
+function matchAnalysisToFile(file: WorkspaceFile, analysis: WorkspaceAnalysis): boolean {
+  const fileId = String(file.id || '').trim()
+  const filePath = String(file.path || '').trim()
+  const fileName = String(file.name || '').trim().toLowerCase()
+  const analysisFileId = String(analysis.media_file_id || '').trim()
+  const analysisFilePath = String(analysis.file_path || '').trim()
+  const analysisFileName = String(analysis.file_name || '').trim().toLowerCase()
+  if (analysisFileId && fileId && analysisFileId === fileId) return true
+  if (analysisFilePath && filePath && analysisFilePath === filePath) return true
+  return Boolean(analysisFileName && fileName && analysisFileName === fileName)
+}
+
+function syncFileAnalysisFlags(state: WorkspaceState): void {
+  for (const file of state.files) {
+    const matches = state.analyses
+      .filter((analysis) => analysis.project_id === file.project_id)
+      .filter((analysis) => matchAnalysisToFile(file, analysis))
+      .sort((a, b) => Date.parse(String(b.updated_at || '')) - Date.parse(String(a.updated_at || '')))
+    if (matches.length === 0) {
+      file.analyzed = false
+      file.document_id = undefined
+      continue
+    }
+    const latest = matches[0]
+    file.analyzed = true
+    file.document_id = String(latest.document_id || '').trim() || undefined
+    file.settings = normalizeSettings(latest.settings)
+  }
+}
+
 function parsePath(path: string): Array<string | number> {
   const out: Array<string | number> = []
   const normalized = path.replace(/\[(\d+)\]/g, '.$1')
@@ -754,13 +784,9 @@ export const LocalWorkspace = {
     else state.analyses.unshift(row)
     if (input.mediaFileId) {
       const file = state.files.find((f) => f.id === input.mediaFileId)
-      if (file) {
-        file.analyzed = true
-        file.document_id = input.documentId
-        file.updated = ts
-        file.settings = normalizeSettings(input.settings)
-      }
+      if (file) file.updated = ts
     }
+    syncFileAnalysisFlags(state)
     const projectRow = state.projects.find((p) => p.id === project.id)
     if (projectRow) projectRow.updated_at = ts
     await saveRawState(state)
@@ -824,13 +850,7 @@ export const LocalWorkspace = {
     state.analyses = state.analyses.filter((a) => a.document_id !== docId && a.analysis_id !== docId)
     const deleted = before !== state.analyses.length
     if (!deleted) return { status: 'error', message: 'analysis not found', document_id: docId }
-    for (const file of state.files) {
-      if (String(file.document_id || '') === docId) {
-        file.analyzed = false
-        file.document_id = undefined
-        file.updated = nowIso()
-      }
-    }
+    syncFileAnalysisFlags(state)
     await saveRawState(state)
     return { status: 'ok', message: 'Analysis artifacts deleted.', document_id: docId }
   },

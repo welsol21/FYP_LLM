@@ -159,4 +159,73 @@ describe('HttpRuntimeApi', () => {
     const history = await apiReloaded.listAnalysisHistory(project.project_id || undefined)
     expect(history.some((row) => row.document_id === 'doc-2')).toBe(true)
   })
+
+  it('keeps file analysis flags in sync when analysis versions are deleted', async () => {
+    const selected = await LocalWorkspace.getSelectedProject()
+    const projectId = String(selected.project_id || '')
+    expect(projectId).not.toBe('')
+
+    const file = await LocalWorkspace.registerMediaFile({
+      projectId,
+      name: 'sync-test.mp3',
+      mediaPath: '/uploads/sync-test.mp3',
+      sizeBytes: 1024,
+      durationSec: 10,
+    })
+
+    const contract = {
+      'She came home.': {
+        node_id: 's-1',
+        type: 'Sentence',
+        content: 'She came home.',
+        tense: 'past',
+        linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
+        part_of_speech: 'sentence',
+        linguistic_elements: [],
+        translations: { backend_m2m100: { text: 'Она пришла домой.' } },
+      },
+    }
+
+    await LocalWorkspace.upsertAnalysis({
+      documentId: 'doc-old',
+      projectId,
+      mediaFileId: file.id,
+      fileName: file.name,
+      filePath: file.path || '',
+      sizeBytes: file.size_bytes,
+      durationSeconds: file.duration_seconds,
+      settings: 'Transl: m2m100 / Subs: bilingual_sequential / Voice: male / Proc: incremental',
+      contract,
+    })
+    await LocalWorkspace.upsertAnalysis({
+      documentId: 'doc-new',
+      projectId,
+      mediaFileId: file.id,
+      fileName: file.name,
+      filePath: file.path || '',
+      sizeBytes: file.size_bytes,
+      durationSeconds: file.duration_seconds,
+      settings: 'Transl: m2m100 / Subs: bilingual_simultaneous / Voice: female / Proc: force',
+      contract,
+    })
+
+    let files = await LocalWorkspace.listFiles(projectId)
+    let tracked = files.find((row) => row.id === file.id)
+    expect(tracked?.analyzed).toBe(true)
+    expect(tracked?.document_id).toBe('doc-new')
+
+    await LocalWorkspace.deleteAnalysis('doc-new')
+    files = await LocalWorkspace.listFiles(projectId)
+    tracked = files.find((row) => row.id === file.id)
+    expect(tracked?.analyzed).toBe(true)
+    expect(tracked?.document_id).toBe('doc-old')
+
+    await LocalWorkspace.deleteAnalysis('doc-old')
+    files = await LocalWorkspace.listFiles(projectId)
+    tracked = files.find((row) => row.id === file.id)
+    expect(tracked?.analyzed).toBe(false)
+    expect(tracked?.document_id).toBeUndefined()
+    const history = await LocalWorkspace.listAnalysisHistory(projectId)
+    expect(history.length).toBe(0)
+  })
 })
