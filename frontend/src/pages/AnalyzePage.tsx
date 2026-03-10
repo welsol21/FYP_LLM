@@ -363,35 +363,48 @@ export function AnalyzePage() {
         <section className="card compact-card" aria-label="analyze-direct-select">
           <p className="stage-log-title">Select project and file</p>
           <div className="analyze-grid">
-            <label className="analyze-label" htmlFor="analyze-project-select">Project</label>
-            <select
-              id="analyze-project-select"
-              value={directProjectId}
-              onChange={async (e) => {
-                const projectId = e.target.value
-                setDirectProjectId(projectId)
-                setDirectFileId('')
-                const selected = await api.setSelectedProject(projectId)
-                setSelectedProject(selected)
-              }}
-            >
-              <option value="">Select project...</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>{project.name}</option>
-              ))}
-            </select>
-            <label className="analyze-label" htmlFor="analyze-file-select">File</label>
-            <select
-              id="analyze-file-select"
-              value={directFileId}
-              onChange={(e) => setDirectFileId(e.target.value)}
-              disabled={!directProjectId}
-            >
-              <option value="">Select file...</option>
-              {directFiles.map((file) => (
-                <option key={file.id} value={file.id}>{file.name}</option>
-              ))}
-            </select>
+            <label className="analyze-label">Project</label>
+            <div className="touch-options-grid">
+              {projects.length > 0 ? (
+                projects.map((project) => (
+                  <button
+                    key={project.id}
+                    type="button"
+                    className={`touch-option-btn${directProjectId === project.id ? ' active' : ''}`}
+                    onClick={async () => {
+                      const projectId = project.id
+                      setDirectProjectId(projectId)
+                      setDirectFileId('')
+                      const selected = await api.setSelectedProject(projectId)
+                      setSelectedProject(selected)
+                    }}
+                  >
+                    {project.name}
+                  </button>
+                ))
+              ) : (
+                <span className="muted">No projects available.</span>
+              )}
+            </div>
+            <label className="analyze-label">File</label>
+            <div className="touch-options-grid">
+              {!directProjectId ? (
+                <span className="muted">Select project first.</span>
+              ) : directFiles.length > 0 ? (
+                directFiles.map((file) => (
+                  <button
+                    key={file.id}
+                    type="button"
+                    className={`touch-option-btn${directFileId === file.id ? ' active' : ''}`}
+                    onClick={() => setDirectFileId(file.id)}
+                  >
+                    {file.name}
+                  </button>
+                ))
+              ) : (
+                <span className="muted">No files in this project.</span>
+              )}
+            </div>
           </div>
           <button
             type="button"

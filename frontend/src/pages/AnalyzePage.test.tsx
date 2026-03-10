@@ -54,21 +54,19 @@ describe('AnalyzePage', () => {
       </ApiContext.Provider>,
     )
 
-    expect(await screen.findByLabelText('analyze-direct-select')).toBeInTheDocument()
-    const projectSelect = screen.getByRole('combobox', { name: 'Project' }) as HTMLSelectElement
-    const fileSelect = screen.getByRole('combobox', { name: 'File' }) as HTMLSelectElement
-    expect(projectSelect).toBeInTheDocument()
-    expect(fileSelect).toBeInTheDocument()
-    expect(projectSelect.value).toBe('')
-    expect(fileSelect.value).toBe('')
+    const directSelect = await screen.findByLabelText('analyze-direct-select')
+    expect(directSelect).toBeInTheDocument()
+    const useBtn = within(directSelect).getByRole('button', { name: 'Use selected file' }) as HTMLButtonElement
+    expect(useBtn.disabled).toBe(true)
 
-    fireEvent.change(projectSelect, { target: { value: 'proj-1' } })
+    fireEvent.click(within(directSelect).getByRole('button', { name: 'Demo Project' }))
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'sample.mp4' })).toBeInTheDocument()
+      expect(within(directSelect).getByRole('button', { name: 'sample.mp4' })).toBeInTheDocument()
     })
-    fireEvent.change(fileSelect, { target: { value: 'file-1' } })
+    fireEvent.click(within(directSelect).getByRole('button', { name: 'sample.mp4' }))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Use selected file' }))
+    await waitFor(() => expect(useBtn.disabled).toBe(false))
+    fireEvent.click(useBtn)
 
     await waitFor(() => {
       expect(screen.getAllByText('sample.mp4').length).toBeGreaterThan(0)
@@ -86,17 +84,15 @@ describe('AnalyzePage', () => {
     )
 
     const historyCard = await screen.findByLabelText('analyze-history')
+    const directSelect = await screen.findByLabelText('analyze-direct-select')
     await waitFor(() => {
       expect(within(historyCard).getByText('No analyzed files yet.')).toBeInTheDocument()
     })
 
-    await screen.findByRole('option', { name: 'Demo Project' })
-    const projectSelect = screen.getByRole('combobox', { name: 'Project' })
-    fireEvent.change(projectSelect, { target: { value: 'proj-1' } })
-    const fileSelect = screen.getByRole('combobox', { name: 'File' }) as HTMLSelectElement
-    await waitFor(() => expect(fileSelect.disabled).toBe(false))
-    fireEvent.change(fileSelect, { target: { value: 'file-1' } })
-    const useBtn = screen.getByRole('button', { name: 'Use selected file' }) as HTMLButtonElement
+    fireEvent.click(within(directSelect).getByRole('button', { name: 'Demo Project' }))
+    await waitFor(() => expect(within(directSelect).getByRole('button', { name: 'sample.mp4' })).toBeInTheDocument())
+    fireEvent.click(within(directSelect).getByRole('button', { name: 'sample.mp4' }))
+    const useBtn = within(directSelect).getByRole('button', { name: 'Use selected file' }) as HTMLButtonElement
     await waitFor(() => expect(useBtn.disabled).toBe(false))
     fireEvent.click(useBtn)
 
@@ -117,12 +113,11 @@ describe('AnalyzePage', () => {
       </ApiContext.Provider>,
     )
 
-    await screen.findByRole('option', { name: 'Demo Project' })
-    fireEvent.change(screen.getByRole('combobox', { name: 'Project' }), { target: { value: 'proj-1' } })
-    const fileSelect = screen.getByRole('combobox', { name: 'File' }) as HTMLSelectElement
-    await waitFor(() => expect(fileSelect.disabled).toBe(false))
-    fireEvent.change(fileSelect, { target: { value: 'file-1' } })
-    const useBtn = screen.getByRole('button', { name: 'Use selected file' }) as HTMLButtonElement
+    const directSelect = await screen.findByLabelText('analyze-direct-select')
+    fireEvent.click(within(directSelect).getByRole('button', { name: 'Demo Project' }))
+    await waitFor(() => expect(within(directSelect).getByRole('button', { name: 'sample.mp4' })).toBeInTheDocument())
+    fireEvent.click(within(directSelect).getByRole('button', { name: 'sample.mp4' }))
+    const useBtn = within(directSelect).getByRole('button', { name: 'Use selected file' }) as HTMLButtonElement
     await waitFor(() => expect(useBtn.disabled).toBe(false))
     fireEvent.click(useBtn)
 
