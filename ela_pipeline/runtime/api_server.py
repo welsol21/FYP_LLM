@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+import cgi
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
+from .media_pipeline import warmup_media_models
 from .service import RuntimeMediaService
 
 
@@ -147,6 +150,19 @@ def _run_sentence_contract_warmup() -> None:
         print(f"[runtime-api] sentence-contract warmup failed: {exc}", flush=True)
 
 
+def _run_media_pipeline_warmup() -> None:
+    if not _env_bool("ELA_MEDIA_PIPELINE_WARMUP", True):
+        print("[runtime-api] media warmup disabled", flush=True)
+        return
+    warmup_asr = _env_bool("ELA_MEDIA_WARMUP_ASR", True)
+    print(f"[runtime-api] media warmup started (asr={str(warmup_asr).lower()})", flush=True)
+    try:
+        warmup_media_models(spacy_model="en_core_web_sm", warmup_asr=warmup_asr)
+        print("[runtime-api] media warmup completed", flush=True)
+    except Exception as exc:
+        print(f"[runtime-api] media warmup failed: {exc}", flush=True)
+
+
 class RuntimeApiHandler(BaseHTTPRequestHandler):
     server_version = "ELARuntimeHTTP/1.0"
 
@@ -172,6 +188,7 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         path = parsed.path
+        query = parse_qs(parsed.query)
 
         if path == "/health":
             self._send_json({"status": "ok"})
@@ -179,13 +196,119 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
         if path == "/api/ui-state":
             self._send_json(SERVICE.get_ui_state())
             return
+        if path == "/api/visualizer-payload":
+            document_id = (query.get("document_id") or [""])[0]
+            if not document_id:
+                self._send_json({}, status=200)
+                return
+            self._send_json(SERVICE.get_visualizer_payload(document_id=document_id))
+            return
+        if path == "/api/backend-job-status":
+            job_id = (query.get("job_id") or [""])[0]
+            if not job_id:
+                self._send_json({"error": "job_id is required"}, status=400)
+                return
+            self._send_json(SERVICE.get_backend_job_status(job_id=job_id))
+            return
+        if path == "/api/document-artifacts":
+            document_id = (query.get("document_id") or [""])[0]
+            if not document_id:
+                self._send_json([], status=200)
+                return
+            self._send_json(SERVICE.list_document_artifacts(document_id=document_id))
+            return
+        if path == "/api/document-artifact-download":
+            document_id = (query.get("document_id") or [""])[0]
+            name = (query.get("name") or [""])[0]
+            if not document_id or not name:
+                self._send_json({"error": "document_id and name are required"}, status=400)
+                return
+            base = Path(os.getenv("MEDIA_CONTRACT_ARTIFACTS_DIR", "artifacts/media_contracts")).resolve()
+            candidate = (base / document_id / name).resolve()
+            if not str(candidate).startswith(str(base)) or not candidate.exists() or not candidate.is_file():
+                self._send_json({"error": "Not found"}, status=404)
+                return
+            data = candidate.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Disposition", f'attachment; filename="{candidate.name}"')
+            self.end_headers()
+            self.wfile.write(data)
+            return
         self._send_json({"error": "Not found"}, status=404)
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         path = parsed.path
+        content_type = self.headers.get("Content-Type", "")
+
+        if path == "/api/upload":
+            if "multipart/form-data" not in content_type:
+                self._send_json({"error": "multipart/form-data is required"}, status=400)
+                return
+            storage = cgi.FieldStorage(
+                fp=self.rfile,
+                headers=self.headers,
+                environ={"REQUEST_METHOD": "POST", "CONTENT_TYPE": content_type},
+            )
+            upload_item = storage["file"] if "file" in storage else None
+            if upload_item is None or not getattr(upload_item, "filename", None):
+                self._send_json({"error": "file field is required"}, status=400)
+                return
+            base_dir = Path(os.getenv("MEDIA_TEMP_DIR", "artifacts/media_tmp")) / "uploads"
+            base_dir.mkdir(parents=True, exist_ok=True)
+            safe_name = Path(str(upload_item.filename)).name
+            save_path = base_dir / safe_name
+            data = upload_item.file.read()
+            save_path.write_bytes(data)
+            self._send_json({"fileName": safe_name, "mediaPath": str(save_path), "sizeBytes": len(data)})
+            return
 
         body = self._read_json_body()
+        if path == "/api/submit-media":
+            media_path = str(body.get("mediaPath") or body.get("media_path") or "").strip()
+            duration = _env_int("ELA_DEFAULT_DURATION_SEC", 1) if body.get("durationSec") is None else int(body.get("durationSec") or 0)
+            size = _env_int("ELA_DEFAULT_SIZE_BYTES", 0) if body.get("sizeBytes") is None else int(body.get("sizeBytes") or 0)
+            if not media_path:
+                self._send_json({"error": "mediaPath is required"}, status=400)
+                return
+            if duration <= 0:
+                duration = 1
+            try:
+                payload = SERVICE.submit_media(
+                    media_path=media_path,
+                    duration_seconds=duration,
+                    size_bytes=size,
+                    project_id=body.get("projectId"),
+                    media_file_id=body.get("mediaFileId"),
+                    translation_provider=body.get("translationProvider"),
+                    subtitles_mode=body.get("subtitlesMode"),
+                    voice_choice=body.get("voiceChoice"),
+                    force_full_reprocess=bool(body.get("forceFullReprocess")),
+                    async_local_processing=True,
+                )
+            except ValueError as exc:
+                self._send_json({"error": str(exc)}, status=400)
+                return
+            self._send_json(payload)
+            return
+        if path == "/api/cancel-job":
+            job_id = str(body.get("job_id") or body.get("jobId") or "").strip()
+            if not job_id:
+                self._send_json({"error": "job_id is required"}, status=400)
+                return
+            payload = SERVICE.cancel_backend_job(job_id=job_id)
+            self._send_json(payload, status=200 if payload.get("status") == "ok" else 404)
+            return
+        if path == "/api/delete-analysis":
+            document_id = str(body.get("document_id") or body.get("documentId") or "").strip()
+            if not document_id:
+                self._send_json({"error": "document_id is required"}, status=400)
+                return
+            payload = SERVICE.delete_analysis(document_id=document_id)
+            self._send_json(payload, status=200 if payload.get("status") == "ok" else 404)
+            return
         if path == "/api/sentence-contract":
             sentence_text = str(body.get("sentenceText") or body.get("sentence_text") or "").strip()
             if not sentence_text:
@@ -212,6 +335,7 @@ def main() -> None:
     host = os.getenv("ELA_RUNTIME_HTTP_HOST", "0.0.0.0")
     port = _env_int("ELA_RUNTIME_HTTP_PORT", 8000)
     _run_sentence_contract_warmup()
+    _run_media_pipeline_warmup()
     server = ThreadingHTTPServer((host, port), RuntimeApiHandler)
     print(f"[runtime-api] serving on http://{host}:{port}", flush=True)
     server.serve_forever()

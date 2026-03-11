@@ -50,7 +50,7 @@ export function MediaSubmitForm({
   const [selectedFileName, setSelectedFileName] = useState('')
   const [translator, setTranslator] = useState(defaultTranslator || 'm2m100')
   const [subtitles, setSubtitles] = useState('Bilingual (sequential)')
-  const [voice, setVoice] = useState('Dmitry (Male)')
+  const [voice, setVoice] = useState('Male')
   const [processingMode, setProcessingMode] = useState<'incremental' | 'force'>('incremental')
   const [submitting, setSubmitting] = useState(false)
   const currentControllerRef = useRef<AbortController | null>(null)
@@ -61,10 +61,14 @@ export function MediaSubmitForm({
     { label: 'Target only', value: 'target only' },
     { label: 'Source only', value: 'source only' },
   ]
-  const voiceOptions: Array<{ label: string; value: string }> = [
-    { label: 'Dmitry (Male)', value: 'male' },
-    { label: 'Svetlana (Female)', value: 'female' },
-  ]
+  const online = typeof navigator !== 'undefined' ? navigator.onLine : true
+  const voiceOptions: Array<{ label: string; value: string }> = online
+    ? [
+        { label: 'Male', value: 'client_male' },
+        { label: 'Dmitry (Male)', value: 'backend_dmitry' },
+        { label: 'Svetlana (Female)', value: 'backend_svetlana' },
+      ]
+    : [{ label: 'Male', value: 'client_male' }]
   const normalizedProjectLabel = String(projectLabel || '').trim()
   const showProjectLine = normalizedProjectLabel.length > 0 && normalizedProjectLabel !== '-'
   const normalizedFileLabel = String(selectedFileName || '').trim()
@@ -89,6 +93,12 @@ export function MediaSubmitForm({
   useEffect(() => {
     if (defaultTranslator) setTranslator(defaultTranslator)
   }, [defaultTranslator])
+
+  useEffect(() => {
+    if (!voiceOptions.some((option) => option.label === voice)) {
+      setVoice(voiceOptions[0]?.label || 'Male')
+    }
+  }, [voice, voiceOptions])
 
   useEffect(() => {
     if (!enabledProviders.length) return

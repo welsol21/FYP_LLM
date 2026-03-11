@@ -626,6 +626,12 @@ class LocalSQLiteRepository:
             "updated_at": row[7],
         }
 
+    def delete_media_file(self, media_file_id: str) -> bool:
+        with self._connect() as conn:
+            cur = conn.execute("DELETE FROM media_files WHERE id = ?", (media_file_id,))
+            conn.commit()
+        return int(cur.rowcount or 0) > 0
+
     def list_media_files_with_analysis(self, project_id: str | None = None) -> list[dict[str, Any]]:
         params: list[Any] = []
         where_sql = ""
