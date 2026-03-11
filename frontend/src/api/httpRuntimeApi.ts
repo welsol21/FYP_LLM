@@ -533,6 +533,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     voiceChoice?: string
     forceFullReprocess?: boolean
     onProgress?: (payload: MediaProgressPayload) => void
+    signal?: AbortSignal
   }): Promise<MediaSubmissionPayload> {
     const selected = await LocalWorkspace.getSelectedProject()
     const projects = await LocalWorkspace.listProjects()
@@ -559,9 +560,19 @@ export class HttpRuntimeApi implements RuntimeApi {
     const stageLogs: string[] = []
     const progress: number[] = [0, 0, 0, 0, 0]
     const stageNames = ['loading_file', 'transcribing_audio', 'linguistic_parsing', 'generating_media', 'exporting_files']
+    let lastLoggedText = ''
+    const ensureNotAborted = (): void => {
+      if (input.signal?.aborted) {
+        throw new DOMException('Analysis cancelled.', 'AbortError')
+      }
+    }
     const log = (stage: number, text: string, pct: number): void => {
+      if (input.signal?.aborted) return
       progress[stage] = Math.max(progress[stage], Math.max(0, Math.min(100, Math.round(pct))))
-      stageLogs.push(text)
+      if (text !== lastLoggedText) {
+        stageLogs.push(text)
+        lastLoggedText = text
+      }
       input.onProgress?.({
         stage_name: stageNames[stage] || '',
         message: text,
@@ -599,6 +610,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     }
 
     log(0, 'Loading source file', 100)
+    ensureNotAborted()
 
     const sourceKind = inferSourceKind(input.mediaPath, mediaBlob.type)
     if ((sourceKind === 'audio' || sourceKind === 'video') && !input.forceFullReprocess) {
@@ -633,6 +645,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         const asr = await transcribeMediaBlobDetailed(mediaBlob, {
             onProgress: ({ message, progress }) => log(1, message, progress),
           })
+        ensureNotAborted()
         rawText = normalizeText(asr.text)
         timedSentences = (asr.sentences || [])
           .map((row) => ({
@@ -699,6 +712,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     }
 
     log(2, `Prepared ${sentences.length} sentences`, 15)
+    ensureNotAborted()
     const contract: VisualizerPayload = {}
     const duplicateCounter = new Map<string, number>()
     let contractBuildError = ''
@@ -735,6 +749,7 @@ export class HttpRuntimeApi implements RuntimeApi {
           input.translationProvider,
           (message, progress) => log(3, message, progress),
         )
+        ensureNotAborted()
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         log(3, `Translation failed: ${message}`, 100)
@@ -764,8 +779,13 @@ export class HttpRuntimeApi implements RuntimeApi {
           subtitlesMode: input.subtitlesMode,
           voiceChoice: input.voiceChoice,
           mediaSentences: bundle.mediaSentences,
-          log: (message, progress) => log(3, message, progress),
+          log: (message, progressValue) => {
+            const normalized = String(message || '').trim()
+            const exportStage = normalized === 'Finalizing media artifacts' || normalized === 'Media artifacts exported'
+            log(exportStage ? 4 : 3, normalized, progressValue)
+          },
         })
+        ensureNotAborted()
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         log(3, `Media rendering failed: ${message}`, 100)
@@ -788,6 +808,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         replaceTextArtifact(bundle.artifacts, 'subtitles_bilingual.srt', 'application/x-subrip', subtitleBundle.subtitlesBilingual)
         replaceTextArtifact(bundle.artifacts, 'subtitles_target.srt', 'application/x-subrip', subtitleBundle.subtitlesTarget)
       }
+      ensureNotAborted()
       await LocalWorkspace.upsertAnalysis({
         documentId,
         projectId: effectiveProjectId,
@@ -843,8 +864,13 @@ export class HttpRuntimeApi implements RuntimeApi {
         subtitlesMode: input.subtitlesMode,
         voiceChoice: input.voiceChoice,
         mediaSentences,
-        log: (message, progress) => log(3, message, progress),
+        log: (message, progressValue) => {
+          const normalized = String(message || '').trim()
+          const exportStage = normalized === 'Finalizing media artifacts' || normalized === 'Media artifacts exported'
+          log(exportStage ? 4 : 3, normalized, progressValue)
+        },
       })
+      ensureNotAborted()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       log(3, `Media rendering failed: ${message}`, 100)
@@ -869,6 +895,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     }
     log(3, 'Generating client artifacts', 100)
     log(4, 'Exporting client artifacts', 100)
+    ensureNotAborted()
     await LocalWorkspace.upsertAnalysis({
       documentId,
       projectId: effectiveProjectId,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useApi } from '../api/apiContext'
 import type { MediaProgressPayload, MediaSubmissionPayload, TranslationProviderConfig } from '../api/runtimeApi'
 
@@ -53,6 +53,7 @@ export function MediaSubmitForm({
   const [voice, setVoice] = useState('Dmitry (Male)')
   const [processingMode, setProcessingMode] = useState<'incremental' | 'force'>('incremental')
   const [submitting, setSubmitting] = useState(false)
+  const currentControllerRef = useRef<AbortController | null>(null)
   const enabledProviders = translatorOptions.filter((p) => p.enabled && hasRequiredCredentials(p))
   const subtitleOptions: Array<{ label: string; value: string }> = [
     { label: 'Bilingual (sequential)', value: 'bilingual_sequential' },
@@ -97,6 +98,8 @@ export function MediaSubmitForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const controller = new AbortController()
+    currentControllerRef.current = controller
     setSubmitting(true)
     onSubmittingChange?.(true)
     try {
@@ -111,12 +114,39 @@ export function MediaSubmitForm({
         voiceChoice: voiceOptions.find((option) => option.label === voice)?.value || 'male',
         forceFullReprocess: processingMode === 'force',
         onProgress,
+        signal: controller.signal,
       })
+      if (controller.signal.aborted || currentControllerRef.current !== controller) return
       onSubmitted(payload)
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === 'AbortError')) throw err
     } finally {
-      setSubmitting(false)
-      onSubmittingChange?.(false)
+      if (currentControllerRef.current === controller) {
+        currentControllerRef.current = null
+        setSubmitting(false)
+        onSubmittingChange?.(false)
+      }
     }
+  }
+
+  function handleCancel(): void {
+    currentControllerRef.current?.abort()
+    currentControllerRef.current = null
+    setSubmitting(false)
+    onSubmittingChange?.(false)
+    onSubmitted({
+      result: {
+        route: 'reject',
+        message: 'Analysis cancelled.',
+        status: 'cancelled',
+        stage_name: 'completed',
+      },
+      ui_feedback: {
+        severity: 'warning',
+        title: 'Processing cancelled',
+        message: 'Analysis cancelled.',
+      },
+    })
   }
 
   return (
@@ -200,9 +230,15 @@ export function MediaSubmitForm({
         ))}
       </div>
 
-      <button type="submit" className="start-btn" disabled={submitting || isAnalyzing || !mediaPath || !projectId}>
-        {submitting || isAnalyzing ? 'Starting...' : 'Start pipeline'}
-      </button>
+      {submitting || isAnalyzing ? (
+        <button type="button" className="start-btn cancel-btn" onClick={handleCancel}>
+          Cancel
+        </button>
+      ) : (
+        <button type="submit" className="start-btn" disabled={!mediaPath || !projectId}>
+          Start pipeline
+        </button>
+      )}
     </form>
   )
 }

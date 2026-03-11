@@ -175,6 +175,7 @@ export interface RuntimeApi {
     voiceChoice?: string
     forceFullReprocess?: boolean
     onProgress?: (payload: MediaProgressPayload) => void
+    signal?: AbortSignal
   }): Promise<MediaSubmissionPayload>
   getTranslationConfig(): Promise<TranslationConfig>
   saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig>

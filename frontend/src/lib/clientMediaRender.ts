@@ -60,6 +60,10 @@ function progress(cb: ProgressCb | undefined, message: string, pct: number): voi
   cb?.(message, Math.max(0, Math.min(100, Math.round(pct))))
 }
 
+async function yieldToBrowser(): Promise<void> {
+  await new Promise<void>((resolve) => window.setTimeout(resolve, 0))
+}
+
 function toSubtitleMode(mode: string | undefined): 'source' | 'target' | 'bilingual_simultaneous' | 'bilingual_sequential' {
   const raw = String(mode || '').trim().toLowerCase()
   if (raw === 'source' || raw === 'source_only' || raw === 'source only') return 'source'
@@ -214,8 +218,10 @@ async function ensureTtsPipeline(onProgress?: ProgressCb): Promise<TtsPipeline> 
             pipeline: (task: string, model: string, options?: Record<string, unknown>) => Promise<TtsPipeline>
           }).pipeline
           const modelId = String(import.meta.env?.VITE_CLIENT_TTS_MODEL || 'Xenova/mms-tts-rus').trim()
+          await yieldToBrowser()
           const tts = await pipelineFactory('text-to-speech', modelId, { quantized: true })
           progress(onProgress, 'Local TTS model loaded', 30)
+          await yieldToBrowser()
           return tts
         } finally {
           window.clearInterval(heartbeat)
@@ -251,8 +257,10 @@ async function ensureFfmpeg(onProgress?: ProgressCb): Promise<{ ffmpeg: FfmpegIn
         const wasmURL = await util.toBlobURL(`${baseUrl}/ffmpeg-core.wasm`, 'application/wasm')
         const workerURL = await util.toBlobURL(`${baseUrl}/ffmpeg-core.worker.js`, 'text/javascript')
 
+        await yieldToBrowser()
         await ffmpeg.load({ coreURL, wasmURL, workerURL })
         progress(onProgress, 'Local media renderer loaded', 12)
+        await yieldToBrowser()
         return { ffmpeg, util }
       } catch (err) {
         ffmpegReadyPromise = null
@@ -301,6 +309,24 @@ async function runQueued<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+async function createSilentWavSegment(ffmpeg: FfmpegInstance, durationMs: number, outPath: string): Promise<void> {
+  const safeMs = Math.max(1, Math.round(durationMs))
+  await runCommand(
+    ffmpeg,
+    [
+      '-y',
+      '-f', 'lavfi',
+      '-i', 'anullsrc=r=24000:cl=mono',
+      '-t', secondsFromMs(safeMs),
+      '-ac', '1',
+      '-ar', '24000',
+      '-c:a', 'pcm_s16le',
+      outPath,
+    ],
+    `Silent wav rendering ${outPath}`,
+  )
+}
+
 async function runCommand(ffmpeg: FfmpegInstance, args: string[], errorLabel: string): Promise<void> {
   const code = await ffmpeg.exec(args)
   if (code !== 0) {
@@ -312,14 +338,74 @@ function isMediaKind(kind: SourceKind): kind is 'audio' | 'video' {
   return kind === 'audio' || kind === 'video'
 }
 
+const LATIN_DIGRAPH_MAP: Array<[RegExp, string]> = [
+  [/shch/gi, 'щ'],
+  [/sch/gi, 'щ'],
+  [/yo/gi, 'ё'],
+  [/yu/gi, 'ю'],
+  [/ya/gi, 'я'],
+  [/zh/gi, 'ж'],
+  [/kh/gi, 'х'],
+  [/ts/gi, 'ц'],
+  [/ch/gi, 'ч'],
+  [/sh/gi, 'ш'],
+  [/ph/gi, 'ф'],
+  [/th/gi, 'т'],
+  [/qu/gi, 'кв'],
+]
+
+const LATIN_CHAR_MAP: Record<string, string> = {
+  a: 'а',
+  b: 'б',
+  c: 'к',
+  d: 'д',
+  e: 'е',
+  f: 'ф',
+  g: 'г',
+  h: 'х',
+  i: 'и',
+  j: 'дж',
+  k: 'к',
+  l: 'л',
+  m: 'м',
+  n: 'н',
+  o: 'о',
+  p: 'п',
+  q: 'к',
+  r: 'р',
+  s: 'с',
+  t: 'т',
+  u: 'у',
+  v: 'в',
+  w: 'в',
+  x: 'кс',
+  y: 'й',
+  z: 'з',
+}
+
+function transliterateLatinTokenToCyrillic(token: string): string {
+  let out = String(token || '')
+  for (const [pattern, replacement] of LATIN_DIGRAPH_MAP) {
+    out = out.replace(pattern, replacement)
+  }
+  out = out.replace(/[A-Za-z]/g, (char) => LATIN_CHAR_MAP[char.toLowerCase()] || char)
+  return out
+}
+
+function prepareRussianTtsText(text: string): string {
+  return String(text || '').replace(/[A-Za-z][A-Za-z'.-]*/g, (token) => transliterateLatinTokenToCyrillic(token))
+}
+
 async function synthesizeTargetSegment(textForTts: string, sentenceIdx: number, sentenceTotal: number, onProgress?: ProgressCb): Promise<{ wav: Blob; durationMs: number; text: string }> {
   const tts = await ensureTtsPipeline(onProgress)
   const text = String(textForTts || '').trim()
   if (!text) {
     throw new Error(`Translated sentence ${sentenceIdx + 1} is empty, TTS cannot continue.`)
   }
+  const preparedText = prepareRussianTtsText(text)
   progress(onProgress, `Synthesizing speech ${sentenceIdx + 1}/${sentenceTotal}`, 30 + Math.round(((sentenceIdx + 1) / Math.max(1, sentenceTotal)) * 24))
-  const raw = await tts(text)
+  await yieldToBrowser()
+  const raw = await tts(preparedText)
   const sampleRate = Number(raw?.sampling_rate || 16000)
   const samples = raw?.audio instanceof Float32Array ? raw.audio : new Float32Array(0)
   if (!samples.length) {
@@ -446,9 +532,6 @@ function drawSubtitleOverlay(
     const boxY = centerY - boxHeight / 2
     ctx.fillStyle = 'rgba(0, 0, 0, 0.68)'
     ctx.fillRect(boxX, boxY, boxWidth, boxHeight)
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.55)'
-    ctx.lineWidth = 2
-    ctx.strokeRect(boxX, boxY, boxWidth, boxHeight)
     ctx.fillStyle = '#ffffff'
     let lineY = centerY - ((wrapped.length - 1) * lineHeight) / 2
     for (const line of wrapped) {
@@ -547,7 +630,6 @@ async function renderVideoWithCanvas(input: {
   const destination = audioCtx.createMediaStreamDestination()
   const audioSource = audioCtx.createMediaElementSource(audioEl)
   audioSource.connect(destination)
-  audioSource.connect(audioCtx.destination)
 
   const canvasStream = canvas.captureStream(25)
   const mixedStream = new MediaStream([
@@ -576,6 +658,7 @@ async function renderVideoWithCanvas(input: {
   }
 
   let rafId = 0
+  let lastRenderPct = -1
   const drawFrame = (): void => {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     if (videoEl && videoEl.readyState >= 2) {
@@ -587,12 +670,20 @@ async function renderVideoWithCanvas(input: {
     const activeRow = findActiveSubtitleRow(input.subtitleRows, Math.round(audioEl.currentTime * 1000))
     const lines = subtitleLinesForMode(activeRow, input.mode)
     drawSubtitleOverlay(ctx, canvas.width, canvas.height, lines, input.mode)
+    const duration = Math.max(0.001, audioEl.duration || 0)
+    const renderPct = 76 + Math.min(14, Math.max(0, (audioEl.currentTime / duration) * 14))
+    const roundedPct = Math.round(renderPct)
+    if (roundedPct !== lastRenderPct) {
+      lastRenderPct = roundedPct
+      progress(input.onProgress, 'Rendering translated video track', roundedPct)
+    }
     rafId = window.requestAnimationFrame(drawFrame)
   }
 
   recorder.start(250)
   drawFrame()
   progress(input.onProgress, 'Rendering translated video track', 76)
+  await yieldToBrowser()
   await audioCtx.resume()
   if (videoEl) {
     void videoEl.play().catch(() => undefined)
@@ -618,12 +709,16 @@ async function renderVideoWithCanvas(input: {
 function buildSimultaneousBilingualTimeline(windows: SentenceWindow[]): TimelineSegment[] {
   const out: TimelineSegment[] = []
   for (const row of windows) {
-    const starts = [row.source_start_ms, row.target_start_ms].filter((value): value is number => typeof value === 'number')
-    const ends = [row.source_end_ms, row.target_end_ms].filter((value): value is number => typeof value === 'number')
-    if (!starts.length || !ends.length) continue
+    const start = typeof row.source_start_ms === 'number'
+      ? row.source_start_ms
+      : row.target_start_ms
+    const end = typeof row.target_end_ms === 'number'
+      ? row.target_end_ms
+      : row.source_end_ms
+    if (typeof start !== 'number' || typeof end !== 'number') continue
     out.push({
-      start_ms: Math.min(...starts),
-      end_ms: Math.max(...ends),
+      start_ms: start,
+      end_ms: end,
       text_eng: String(row.text_eng || ''),
       text_ru: String(row.text_ru || ''),
     })
@@ -660,9 +755,9 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
     const videoFile = 'translated_video_ru.mp4'
 
     progress(input.onProgress, 'Preparing media timeline', 20)
+    await yieldToBrowser()
     await ffmpeg.writeFile(sourceFile, await util.fetchFile(input.sourceBlob))
 
-    const gapMs = 120
     let currentMs = 0
     const segmentFiles: string[] = []
     const sourceSubtitleSegments: TimelineSegment[] = []
@@ -687,12 +782,13 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
         if (flags.includeSource) {
           const sourceStartMs = Math.max(0, Number(row.start_ms || 0))
           const sourceEndMs = Math.max(sourceStartMs + 300, Number(row.end_ms || 0))
-          const sourceSegName = `src_${String(i + 1).padStart(4, '0')}.mp3`
+          const sourceSegName = `src_${String(i + 1).padStart(4, '0')}.wav`
           progress(
             input.onProgress,
             `Rendering source segment ${i + 1}/${input.sentences.length}`,
             34 + Math.round(((i + 1) / Math.max(1, input.sentences.length)) * 12),
           )
+          await yieldToBrowser()
           await runCommand(
             ffmpeg,
             [
@@ -701,57 +797,89 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
               '-to', secondsFromMs(sourceEndMs),
               '-i', sourceFile,
               '-vn',
-              '-acodec', 'libmp3lame',
-              '-q:a', '3',
+              '-ac', '1',
+              '-ar', '24000',
+              '-c:a', 'pcm_s16le',
               sourceSegName,
             ],
             `Source segment rendering ${i + 1}`,
           )
           segmentFiles.push(sourceSegName)
-          const sourceBlob = await readFsBlob(ffmpeg, sourceSegName, 'audio/mpeg')
+          const sourceBlob = await readFsBlob(ffmpeg, sourceSegName, 'audio/wav')
           const durationMs = Math.max(300, await probeBlobDurationMs(sourceBlob) || (sourceEndMs - sourceStartMs))
           const startMs = currentMs
           const endMs = startMs + durationMs
           sourceSubtitleSegments.push({ start_ms: startMs, end_ms: endMs, text_eng: textEn, text_ru: '' })
-          bilingualSequentialSegments.push({ start_ms: startMs, end_ms: endMs, text_eng: textEn, text_ru: '' })
           window.source_start_ms = startMs
           window.source_end_ms = endMs
-          currentMs = endMs + gapMs
+          if (!flags.bilingualSimultaneous) {
+            bilingualSequentialSegments.push({ start_ms: startMs, end_ms: endMs, text_eng: textEn, text_ru: '' })
+          }
+          currentMs = endMs
         }
 
         if (flags.includeTarget) {
           const textForTts = textRu || textEn
           if (textForTts) {
+            const leadSilenceMs = flags.includeSource ? 10 : 0
+            if (leadSilenceMs > 0) {
+              const leadSilenceName = `silence_lead_${String(i + 1).padStart(4, '0')}.wav`
+              await createSilentWavSegment(ffmpeg, leadSilenceMs, leadSilenceName)
+              segmentFiles.push(leadSilenceName)
+              currentMs += leadSilenceMs
+            }
+            if (flags.bilingualSimultaneous && flags.includeSource) {
+              const simSilenceName = `silence_sim_${String(i + 1).padStart(4, '0')}.wav`
+              await createSilentWavSegment(ffmpeg, 10, simSilenceName)
+              segmentFiles.push(simSilenceName)
+              currentMs += 10
+            }
+            await yieldToBrowser()
             const target = await synthesizeTargetSegment(textForTts, i, input.sentences.length, input.onProgress)
+            const targetInputWavName = `tgt_in_${String(i + 1).padStart(4, '0')}.wav`
             const targetWavName = `tgt_${String(i + 1).padStart(4, '0')}.wav`
-            const targetSegName = `tgt_${String(i + 1).padStart(4, '0')}.mp3`
-            await ffmpeg.writeFile(targetWavName, await util.fetchFile(target.wav))
+            await ffmpeg.writeFile(targetInputWavName, await util.fetchFile(target.wav))
             await runCommand(
               ffmpeg,
               [
                 '-y',
-                '-i', targetWavName,
-                '-acodec', 'libmp3lame',
-                '-q:a', '3',
-                targetSegName,
+                '-i', targetInputWavName,
+                '-ac', '1',
+                '-ar', '24000',
+                '-c:a', 'pcm_s16le',
+                targetWavName,
               ],
-              `Target segment rendering ${i + 1}`,
+              `Target segment normalization ${i + 1}`,
             )
-            await safeDelete(ffmpeg, targetWavName)
-            segmentFiles.push(targetSegName)
-            const targetBlob = await readFsBlob(ffmpeg, targetSegName, 'audio/mpeg')
+            await safeDelete(ffmpeg, targetInputWavName)
+            segmentFiles.push(targetWavName)
+            const targetBlob = await readFsBlob(ffmpeg, targetWavName, 'audio/wav')
             const targetDurationMs = Math.max(300, await probeBlobDurationMs(targetBlob) || target.durationMs)
             const startMs = currentMs
             const endMs = startMs + targetDurationMs
             targetSubtitleSegments.push({ start_ms: startMs, end_ms: endMs, text_eng: '', text_ru: target.text })
-            bilingualSequentialSegments.push({ start_ms: startMs, end_ms: endMs, text_eng: '', text_ru: target.text })
             window.target_start_ms = startMs
             window.target_end_ms = endMs
-            currentMs = endMs + gapMs
+            if (!flags.bilingualSimultaneous) {
+              bilingualSequentialSegments.push({ start_ms: startMs, end_ms: endMs, text_eng: '', text_ru: target.text })
+            }
+            currentMs = endMs
           }
         }
 
         sentenceWindows.push(window)
+
+        if (i < input.sentences.length - 1) {
+          const nextRow = input.sentences[i + 1]
+          const sourceGapMs = Math.max(
+            10,
+            Math.floor((Math.max(0, Number(nextRow.start_ms || 0)) - Math.max(0, Number(row.end_ms || 0))) / 3),
+          )
+          const gapSegName = `silence_gap_${String(i + 1).padStart(4, '0')}.wav`
+          await createSilentWavSegment(ffmpeg, sourceGapMs, gapSegName)
+          segmentFiles.push(gapSegName)
+          currentMs += sourceGapMs
+        }
       }
 
       if (!segmentFiles.length) {
@@ -761,7 +889,22 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
       const concatFile = 'tts_concat.txt'
       await ffmpeg.writeFile(concatFile, new TextEncoder().encode(segmentFiles.map((name) => `file '${name}'`).join('\n')))
       progress(input.onProgress, 'Concatenating final audio track', 58)
-      await runCommand(ffmpeg, ['-y', '-f', 'concat', '-safe', '0', '-i', concatFile, '-c:a', 'libmp3lame', '-q:a', '2', audioFile], 'Final audio concatenation')
+      await yieldToBrowser()
+      await runCommand(
+        ffmpeg,
+        [
+          '-y',
+          '-f', 'concat',
+          '-safe', '0',
+          '-i', concatFile,
+          '-ac', '1',
+          '-ar', '24000',
+          '-c:a', 'libmp3lame',
+          '-q:a', '2',
+          audioFile,
+        ],
+        'Final audio concatenation',
+      )
       await safeDelete(ffmpeg, concatFile)
       for (const name of segmentFiles) await safeDelete(ffmpeg, name)
 
@@ -790,6 +933,7 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
       await ffmpeg.writeFile(subtitleFile, new TextEncoder().encode(selectedSubtitle))
 
       progress(input.onProgress, 'Rendering translated video track', 76)
+      await yieldToBrowser()
       const audioBlob = await readFsBlob(ffmpeg, audioFile, 'audio/mpeg')
       const subtitleRows = selectedSubtitle === subtitlesEn
         ? subtitlesEnRows
@@ -806,25 +950,32 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
       })
       const renderedVideoInput = 'translated_video_input.webm'
       await ffmpeg.writeFile(renderedVideoInput, await util.fetchFile(renderedVideo))
+      progress(input.onProgress, 'Remuxing final video container', 92)
+      await yieldToBrowser()
       await runCommand(
         ffmpeg,
         [
           '-y',
           '-i', renderedVideoInput,
           '-c:v', 'libx264',
-          '-preset', 'veryfast',
-          '-crf', '23',
+          '-pix_fmt', 'yuv420p',
+          '-preset', 'ultrafast',
+          '-crf', '24',
           '-c:a', 'aac',
+          '-b:a', '192k',
+          '-movflags', '+faststart',
           videoFile,
         ],
         'Video remuxing',
       )
       await safeDelete(ffmpeg, renderedVideoInput)
+      progress(input.onProgress, 'Finalizing media artifacts', 96)
+      await yieldToBrowser()
 
-      progress(input.onProgress, 'Finalizing media artifacts', 92)
       const audioBytes = await ffmpeg.readFile(audioFile)
       const videoBytes = await ffmpeg.readFile(videoFile)
       progress(input.onProgress, 'Media artifacts exported', 100)
+      await yieldToBrowser()
 
       const audioCopy = new Uint8Array(audioBytes.byteLength)
       audioCopy.set(audioBytes)
