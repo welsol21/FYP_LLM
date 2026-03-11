@@ -561,6 +561,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     const progress: number[] = [0, 0, 0, 0, 0]
     const stageNames = ['loading_file', 'transcribing_audio', 'linguistic_parsing', 'generating_media', 'exporting_files']
     let lastLoggedText = ''
+    let mediaStageClosed = false
     const ensureNotAborted = (): void => {
       if (input.signal?.aborted) {
         throw new DOMException('Analysis cancelled.', 'AbortError')
@@ -568,6 +569,10 @@ export class HttpRuntimeApi implements RuntimeApi {
     }
     const log = (stage: number, text: string, pct: number): void => {
       if (input.signal?.aborted) return
+      if (stage >= 4 && !mediaStageClosed) {
+        progress[3] = 100
+        mediaStageClosed = true
+      }
       progress[stage] = Math.max(progress[stage], Math.max(0, Math.min(100, Math.round(pct))))
       if (text !== lastLoggedText) {
         stageLogs.push(text)
@@ -747,7 +752,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         translatedSentences = await translateSentencesForArtifacts(
           sentences,
           input.translationProvider,
-          (message, progress) => log(3, message, progress),
+          (message, progress) => log(2, message, progress),
         )
         ensureNotAborted()
       } catch (err) {

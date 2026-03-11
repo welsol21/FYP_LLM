@@ -260,9 +260,6 @@ export function AnalyzePage() {
     if (Array.isArray(submission?.result.stage_progress) && submission.result.stage_progress.length === 5) {
       return submission.result.stage_progress
     }
-    if (!submission) return [0, 0, 0, 0, 0]
-    if (submission.result.route === 'reject') return [100, 0, 0, 0, 0]
-    if (submission.result.route === 'local') return [100, 100, 100, 100, 100]
     return [0, 0, 0, 0, 0]
   }, [submission])
 
@@ -370,15 +367,35 @@ export function AnalyzePage() {
                 document_id: prevResult?.document_id,
                 job_id: prevResult?.job_id,
               },
-              ui_feedback: prev?.ui_feedback || {
-                severity: 'info',
-                title: 'Local processing',
-                message: payload.message || 'Processing...',
+              ui_feedback: {
+                severity: prev?.ui_feedback?.severity || 'info',
+                title: prev?.ui_feedback?.title || 'Local processing',
+                message: payload.message || prev?.ui_feedback?.message || 'Processing...',
               },
             }
           })
         }}
-        onSubmittingChange={(value) => setIsSubmittingPipeline(value)}
+        onSubmittingChange={(value) => {
+          setIsSubmittingPipeline(value)
+          if (value) {
+            setSubmission({
+              result: {
+                route: 'local',
+                status: 'running_local',
+                message: 'Starting pipeline...',
+                stage_name: 'loading_file',
+                stage_log: '',
+                stage_logs: [],
+                stage_progress: [0, 0, 0, 0, 0],
+              },
+              ui_feedback: {
+                severity: 'info',
+                title: 'Local processing',
+                message: 'Starting pipeline...',
+              },
+            })
+          }
+        }}
         projectId={selectedProject.project_id ?? null}
         projectLabel={activeMedia ? (selectedProject.project_name ?? selectedProject.project_id ?? 'Project') : ''}
         stageProgress={stageProgress}

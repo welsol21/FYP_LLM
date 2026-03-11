@@ -12,6 +12,7 @@ import initSqlJs from 'sql.js'
 import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
 
 const STORAGE_KEY = 'ela_frontend_workspace_sqlite_b64_v1'
+const OPFS_DB_FILE = 'ela_frontend_workspace.sqlite'
 const SQLITE_STATE_KEY = 'workspace_state_v1'
 const LEGACY_STORAGE_KEY = 'ela_frontend_workspace_v1'
 const SQLITE_MEDIA_TABLE = 'media_blob_store'
@@ -113,12 +114,11 @@ type SqlModule = {
 
 let sqlModule: SqlModule | null = null
 let sqliteInitPromise: Promise<void> | null = null
-let sqliteBlobSnapshot = ''
 let sqliteDb: SqlDatabase | null = null
 
-function openDbFromSnapshot(snapshot: string): SqlDatabase {
+function openDbFromSnapshot(snapshot?: Uint8Array | null): SqlDatabase {
   if (!sqlModule) throw new Error('SQLite module not initialized')
-  const db = snapshot ? new sqlModule.Database(base64ToBytes(snapshot)) : new sqlModule.Database()
+  const db = snapshot && snapshot.byteLength > 0 ? new sqlModule.Database(snapshot) : new sqlModule.Database()
   db.run('CREATE TABLE IF NOT EXISTS kv_store (k TEXT PRIMARY KEY, v TEXT NOT NULL)')
   db.run(`
     CREATE TABLE IF NOT EXISTS ${SQLITE_MEDIA_TABLE} (
@@ -132,15 +132,66 @@ function openDbFromSnapshot(snapshot: string): SqlDatabase {
   return db
 }
 
+async function getWorkspaceDirectory(): Promise<FileSystemDirectoryHandle | null> {
+  const storage = (navigator as Navigator & {
+    storage?: StorageManager & { getDirectory?: () => Promise<FileSystemDirectoryHandle> }
+  }).storage
+  if (!storage || typeof storage.getDirectory !== 'function') return null
+  try {
+    return await storage.getDirectory()
+  } catch {
+    return null
+  }
+}
+
+async function readPersistedSnapshot(): Promise<Uint8Array | null> {
+  const dir = await getWorkspaceDirectory()
+  if (dir) {
+    try {
+      const handle = await dir.getFileHandle(OPFS_DB_FILE, { create: false })
+      const file = await handle.getFile()
+      const buffer = await file.arrayBuffer()
+      return new Uint8Array(buffer)
+    } catch {
+      // fallback below
+    }
+  }
+  const encoded = String(window.localStorage.getItem(STORAGE_KEY) || '')
+  return encoded ? base64ToBytes(encoded) : null
+}
+
+async function writePersistedSnapshot(bytes: Uint8Array): Promise<void> {
+  const dir = await getWorkspaceDirectory()
+  if (dir) {
+    const handle = await dir.getFileHandle(OPFS_DB_FILE, { create: true })
+    const writable = await handle.createWritable()
+    await writable.write(toArrayBuffer(bytes))
+    await writable.close()
+    window.localStorage.removeItem(STORAGE_KEY)
+    return
+  }
+  window.localStorage.setItem(STORAGE_KEY, bytesToBase64(bytes))
+}
+
+async function clearPersistedSnapshot(): Promise<void> {
+  const dir = await getWorkspaceDirectory()
+  if (dir) {
+    try {
+      await dir.removeEntry(OPFS_DB_FILE)
+    } catch {
+      // ignore
+    }
+  }
+  window.localStorage.removeItem(STORAGE_KEY)
+}
+
 function readCell(rows: Array<{ values: unknown[][] }>, rowIndex = 0, colIndex = 0): unknown {
   return rows?.[0]?.values?.[rowIndex]?.[colIndex]
 }
 
 async function persistDbSnapshot(): Promise<void> {
   const exported = sqliteDb?.export() || new Uint8Array()
-  const encoded = bytesToBase64(exported)
-  window.localStorage.setItem(STORAGE_KEY, encoded)
-  sqliteBlobSnapshot = encoded
+  await writePersistedSnapshot(exported)
 }
 
 async function sqlitePutBlob(key: string, blob: Blob): Promise<void> {
@@ -221,11 +272,11 @@ async function ensureDbReady(): Promise<void> {
           return candidate
         },
       })) as unknown as SqlModule
-      sqliteBlobSnapshot = String(window.localStorage.getItem(STORAGE_KEY) || '')
-      sqliteDb = openDbFromSnapshot(sqliteBlobSnapshot)
+      const snapshot = await readPersistedSnapshot()
+      sqliteDb = openDbFromSnapshot(snapshot)
 
       // One-time migration from legacy JSON workspace to SQLite snapshot.
-      if (!sqliteBlobSnapshot) {
+      if (!snapshot || snapshot.byteLength === 0) {
         const legacyRaw = String(window.localStorage.getItem(LEGACY_STORAGE_KEY) || '')
         if (legacyRaw) {
           try {
@@ -244,24 +295,8 @@ async function ensureDbReady(): Promise<void> {
   await sqliteInitPromise
 }
 
-function reopenDbFromSnapshot(snapshot: string): void {
-  if (sqliteDb) {
-    try {
-      sqliteDb.close()
-    } catch {
-      // ignore
-    }
-  }
-  sqliteBlobSnapshot = String(snapshot || '')
-  sqliteDb = openDbFromSnapshot(sqliteBlobSnapshot)
-}
-
 async function ensureDbFresh(): Promise<void> {
-  if (!sqliteDb) return
-  const current = String(window.localStorage.getItem(STORAGE_KEY) || '')
-  if (current !== sqliteBlobSnapshot) {
-    reopenDbFromSnapshot(current)
-  }
+  return
 }
 
 async function loadRawState(): Promise<WorkspaceState> {
@@ -587,8 +622,7 @@ export const LocalWorkspace = {
     sqliteDb = null
     sqliteInitPromise = null
     sqlModule = null
-    sqliteBlobSnapshot = ''
-    window.localStorage.removeItem(STORAGE_KEY)
+    await clearPersistedSnapshot()
     window.localStorage.removeItem(LEGACY_STORAGE_KEY)
   },
 

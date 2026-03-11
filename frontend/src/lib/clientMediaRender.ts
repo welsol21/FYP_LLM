@@ -309,6 +309,27 @@ async function runQueued<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+async function runWithProgressPulse<T>(
+  work: Promise<T>,
+  onProgress: ProgressCb | undefined,
+  message: string,
+  startPct: number,
+  endPct: number,
+  tickMs = 1500,
+): Promise<T> {
+  let pct = startPct
+  progress(onProgress, message, pct)
+  const timer = window.setInterval(() => {
+    pct = Math.min(endPct, pct + 1)
+    progress(onProgress, message, pct)
+  }, Math.max(250, tickMs))
+  try {
+    return await work
+  } finally {
+    window.clearInterval(timer)
+  }
+}
+
 async function createSilentWavSegment(ffmpeg: FfmpegInstance, durationMs: number, outPath: string): Promise<void> {
   const safeMs = Math.max(1, Math.round(durationMs))
   await runCommand(
@@ -789,20 +810,27 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
             34 + Math.round(((i + 1) / Math.max(1, input.sentences.length)) * 12),
           )
           await yieldToBrowser()
-          await runCommand(
-            ffmpeg,
-            [
-              '-y',
-              '-ss', secondsFromMs(sourceStartMs),
-              '-to', secondsFromMs(sourceEndMs),
-              '-i', sourceFile,
-              '-vn',
-              '-ac', '1',
-              '-ar', '24000',
-              '-c:a', 'pcm_s16le',
-              sourceSegName,
-            ],
-            `Source segment rendering ${i + 1}`,
+          await runWithProgressPulse(
+            runCommand(
+              ffmpeg,
+              [
+                '-y',
+                '-ss', secondsFromMs(sourceStartMs),
+                '-to', secondsFromMs(sourceEndMs),
+                '-i', sourceFile,
+                '-vn',
+                '-ac', '1',
+                '-ar', '24000',
+                '-c:a', 'pcm_s16le',
+                sourceSegName,
+              ],
+              `Source segment rendering ${i + 1}`,
+            ),
+            input.onProgress,
+            `Rendering source segment ${i + 1}/${input.sentences.length}`,
+            34 + Math.round((i / Math.max(1, input.sentences.length)) * 12),
+            34 + Math.round(((i + 1) / Math.max(1, input.sentences.length)) * 12),
+            900,
           )
           segmentFiles.push(sourceSegName)
           const sourceBlob = await readFsBlob(ffmpeg, sourceSegName, 'audio/wav')
@@ -839,17 +867,24 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
             const targetInputWavName = `tgt_in_${String(i + 1).padStart(4, '0')}.wav`
             const targetWavName = `tgt_${String(i + 1).padStart(4, '0')}.wav`
             await ffmpeg.writeFile(targetInputWavName, await util.fetchFile(target.wav))
-            await runCommand(
-              ffmpeg,
-              [
-                '-y',
-                '-i', targetInputWavName,
-                '-ac', '1',
-                '-ar', '24000',
-                '-c:a', 'pcm_s16le',
-                targetWavName,
-              ],
-              `Target segment normalization ${i + 1}`,
+            await runWithProgressPulse(
+              runCommand(
+                ffmpeg,
+                [
+                  '-y',
+                  '-i', targetInputWavName,
+                  '-ac', '1',
+                  '-ar', '24000',
+                  '-c:a', 'pcm_s16le',
+                  targetWavName,
+                ],
+                `Target segment normalization ${i + 1}`,
+              ),
+              input.onProgress,
+              `Normalizing translated segment ${i + 1}/${input.sentences.length}`,
+              46 + Math.round((i / Math.max(1, input.sentences.length)) * 10),
+              46 + Math.round(((i + 1) / Math.max(1, input.sentences.length)) * 10),
+              900,
             )
             await safeDelete(ffmpeg, targetInputWavName)
             segmentFiles.push(targetWavName)
@@ -890,20 +925,27 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
       await ffmpeg.writeFile(concatFile, new TextEncoder().encode(segmentFiles.map((name) => `file '${name}'`).join('\n')))
       progress(input.onProgress, 'Concatenating final audio track', 58)
       await yieldToBrowser()
-      await runCommand(
-        ffmpeg,
-        [
-          '-y',
-          '-f', 'concat',
-          '-safe', '0',
-          '-i', concatFile,
-          '-ac', '1',
-          '-ar', '24000',
-          '-c:a', 'libmp3lame',
-          '-q:a', '2',
-          audioFile,
-        ],
-        'Final audio concatenation',
+      await runWithProgressPulse(
+        runCommand(
+          ffmpeg,
+          [
+            '-y',
+            '-f', 'concat',
+            '-safe', '0',
+            '-i', concatFile,
+            '-ac', '1',
+            '-ar', '24000',
+            '-c:a', 'libmp3lame',
+            '-q:a', '2',
+            audioFile,
+          ],
+          'Final audio concatenation',
+        ),
+        input.onProgress,
+        'Concatenating final audio track',
+        58,
+        68,
+        900,
       )
       await safeDelete(ffmpeg, concatFile)
       for (const name of segmentFiles) await safeDelete(ffmpeg, name)
@@ -932,7 +974,7 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
       }
       await ffmpeg.writeFile(subtitleFile, new TextEncoder().encode(selectedSubtitle))
 
-      progress(input.onProgress, 'Rendering translated video track', 76)
+      progress(input.onProgress, 'Preparing translated video track', 74)
       await yieldToBrowser()
       const audioBlob = await readFsBlob(ffmpeg, audioFile, 'audio/mpeg')
       const subtitleRows = selectedSubtitle === subtitlesEn
@@ -950,23 +992,30 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
       })
       const renderedVideoInput = 'translated_video_input.webm'
       await ffmpeg.writeFile(renderedVideoInput, await util.fetchFile(renderedVideo))
-      progress(input.onProgress, 'Remuxing final video container', 92)
+      progress(input.onProgress, 'Encoding mp4 container', 92)
       await yieldToBrowser()
-      await runCommand(
-        ffmpeg,
-        [
-          '-y',
-          '-i', renderedVideoInput,
-          '-c:v', 'libx264',
-          '-pix_fmt', 'yuv420p',
-          '-preset', 'ultrafast',
-          '-crf', '24',
-          '-c:a', 'aac',
-          '-b:a', '192k',
-          '-movflags', '+faststart',
-          videoFile,
-        ],
-        'Video remuxing',
+      await runWithProgressPulse(
+        runCommand(
+          ffmpeg,
+          [
+            '-y',
+            '-i', renderedVideoInput,
+            '-c:v', 'libx264',
+            '-pix_fmt', 'yuv420p',
+            '-preset', 'ultrafast',
+            '-crf', '24',
+            '-c:a', 'aac',
+            '-b:a', '192k',
+            '-movflags', '+faststart',
+            videoFile,
+          ],
+          'Video remuxing',
+        ),
+        input.onProgress,
+        'Encoding mp4 container',
+        92,
+        95,
+        1200,
       )
       await safeDelete(ffmpeg, renderedVideoInput)
       progress(input.onProgress, 'Finalizing media artifacts', 96)
