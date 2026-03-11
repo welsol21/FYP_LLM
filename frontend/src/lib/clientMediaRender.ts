@@ -963,6 +963,11 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
         flags.bilingualSimultaneous ? 'bilingual_simultaneous' : 'bilingual_sequential',
       )
       const subtitlesTarget = buildSubtitleSrt(subtitlesTargetRows, 'target')
+      const selectedSubtitleRows = mode === 'source'
+        ? subtitlesEnRows
+        : mode === 'target'
+          ? subtitlesTargetRows
+          : subtitlesBilingualRows
       const selectedSubtitle = mode === 'source'
         ? subtitlesEn
         : mode === 'target'
@@ -977,16 +982,11 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
       progress(input.onProgress, 'Preparing translated video track', 74)
       await yieldToBrowser()
       const audioBlob = await readFsBlob(ffmpeg, audioFile, 'audio/mpeg')
-      const subtitleRows = selectedSubtitle === subtitlesEn
-        ? subtitlesEnRows
-        : selectedSubtitle === subtitlesTarget
-          ? subtitlesTargetRows
-          : subtitlesBilingualRows
       const renderedVideo = await renderVideoWithCanvas({
         sourceBlob: input.sourceBlob,
         sourceKind: input.sourceKind,
         translatedAudio: audioBlob,
-        subtitleRows,
+        subtitleRows: selectedSubtitleRows,
         mode,
         onProgress: input.onProgress,
       })

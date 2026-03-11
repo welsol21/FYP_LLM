@@ -455,6 +455,16 @@ function mergeTimedRowsWithTranslations(
   }))
 }
 
+function applyTranslationsToMediaSentences(
+  mediaSentences: ArtifactSentenceRow[],
+  translatedSentences: string[],
+): ArtifactSentenceRow[] {
+  return mediaSentences.map((row, idx) => ({
+    ...row,
+    text_ru: String(translatedSentences[idx] || row.text_ru || '').trim(),
+  }))
+}
+
 function replaceTextArtifact(artifacts: DocumentArtifact[], name: string, mime: string, text: string): void {
   const content = String(text || '').trim()
   if (!content) return
@@ -850,14 +860,35 @@ export class HttpRuntimeApi implements RuntimeApi {
       : `${Date.now()}${Math.random().toString(16).slice(2, 8)}`}`
     const artifacts = LocalWorkspace.buildDocumentArtifacts(documentId, contract)
     let mediaSentences = extractMediaSentencesFromArtifacts(artifacts)
-    if ((sourceKind === 'audio' || sourceKind === 'video') && timedSentences.length === sentences.length && timedSentences.length > 0) {
-      const translatedSentences = Object.values(contract).map((node) => {
-        const preferred = String(node.active_translation_provider || '').trim()
-        if (preferred && node.translations?.[preferred]?.text) return String(node.translations[preferred].text || '').trim()
-        const first = Object.values(node.translations || {}).find((row) => String(row?.text || '').trim())
-        return String(first?.text || '').trim()
+    let translatedSentencesForMedia: string[] = []
+    try {
+      translatedSentencesForMedia = await translateSentencesForArtifacts(
+        sentences,
+        input.translationProvider,
+        (message, progress) => log(2, message, progress),
+      )
+      ensureNotAborted()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      log(2, `Translation failed: ${message}`, 100)
+      return finish({
+        result: {
+          route: 'reject',
+          status: 'rejected',
+          message: `Translation failed: ${message}`,
+          stage_name: 'linguistic_parsing',
+        },
+        ui_feedback: {
+          severity: 'error',
+          title: 'Processing failed',
+          message: `Translation failed: ${message}`,
+        },
       })
-      mediaSentences = mergeTimedRowsWithTranslations(timedSentences, translatedSentences)
+    }
+    if ((sourceKind === 'audio' || sourceKind === 'video') && timedSentences.length === sentences.length && timedSentences.length > 0) {
+      mediaSentences = mergeTimedRowsWithTranslations(timedSentences, translatedSentencesForMedia)
+    } else if (translatedSentencesForMedia.length > 0) {
+      mediaSentences = applyTranslationsToMediaSentences(mediaSentences, translatedSentencesForMedia)
     }
     let subtitleBundle: { subtitlesEn: string; subtitlesBilingual: string; subtitlesTarget: string } | null = null
     try {
