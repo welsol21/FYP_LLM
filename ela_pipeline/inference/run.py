@@ -759,6 +759,8 @@ def _attach_note_blueprints(doc: dict) -> None:
             content=content,
             grammatical_role=role,
             tam_construction=tam,
+            part_of_speech=str(node.get("part_of_speech") or "").strip().lower(),
+            tense=str(node.get("tense") or "").strip().lower(),
         )
 
     def walk(node: dict) -> None:

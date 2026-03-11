@@ -220,6 +220,8 @@ class TabularProfileClassifier:
                 content=str(node.get("content") or ""),
                 grammatical_role=str(node.get("grammatical_role") or ""),
                 tam_construction=str(node.get("tam_construction") or ""),
+                part_of_speech=str(node.get("part_of_speech") or ""),
+                tense=str(node.get("tense") or ""),
             )
             if class_id
             else {}

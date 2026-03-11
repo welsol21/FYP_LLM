@@ -218,6 +218,77 @@ def _instruction_to_explanation(text: str, *, subject: str) -> str:
     return src
 
 
+_INVALID_ROLE_HINTS = {"", "other", "unknown", "null", "none", "grammar slot"}
+
+
+def _normalize_role_hint(role: str | None) -> str:
+    value = str(role or "").strip().lower().replace("_", " ")
+    if value in _INVALID_ROLE_HINTS:
+        return ""
+    return value
+
+
+def _word_form_override(
+    *,
+    primary_class: str,
+    node_type: str | None,
+    part_of_speech: str | None,
+    tense: str | None,
+) -> dict[str, str] | None:
+    if str(node_type or "").strip().lower() != "word":
+        return None
+    pos = str(part_of_speech or "").strip().lower()
+    tense_value = str(tense or "").strip().lower()
+    finite_clause_classes = {
+        "present_simple_affirmative",
+        "present_simple_negative",
+        "present_simple_question",
+        "past_simple_affirmative",
+        "past_simple_negative",
+        "present_continuous",
+        "present_perfect_affirmative",
+        "present_perfect_negative",
+        "future_will",
+        "future_going_to",
+        "modal_can_ability",
+        "modal_should_advice",
+        "past_perfect",
+        "passive_voice",
+        "modal_perfect",
+        "future_perfect",
+        "copular_clause",
+        "relative_clause",
+    }
+    if primary_class not in finite_clause_classes or pos not in {"verb", "auxiliary verb"}:
+        return None
+
+    if tense_value == "past participle":
+        return {
+            "elementary_text": "This word is a past participle form.",
+            "intermediate_text": (
+                "This word is a past participle, so it does not mark a finite tense by itself. "
+                "It usually contributes to a perfect, passive, or reduced-clause pattern."
+            ),
+            "advanced_text": (
+                "This word realizes non-finite past-participle morphology and contributes to perfect, passive, "
+                "or reduced-clause structure rather than serving as an independent finite tense marker."
+            ),
+        }
+    if tense_value == "present participle":
+        return {
+            "elementary_text": "This word is an -ing participle form.",
+            "intermediate_text": (
+                "This word is a present participle, so it usually contributes to a progressive or non-finite pattern "
+                "instead of functioning as an independent finite tense form."
+            ),
+            "advanced_text": (
+                "This word realizes non-finite -ing morphology and contributes to progressive aspect or clause "
+                "compression rather than standing alone as a finite tense marker."
+            ),
+        }
+    return None
+
+
 def build_note_blueprints(
     *,
     grammar_classes: list[str] | None,
@@ -226,6 +297,8 @@ def build_note_blueprints(
     content: str | None = None,
     grammatical_role: str | None = None,
     tam_construction: str | None = None,
+    part_of_speech: str | None = None,
+    tense: str | None = None,
 ) -> dict[str, str]:
     class_ids = [
         normalize_grammar_class_id(str(class_id).strip())
@@ -236,16 +309,23 @@ def build_note_blueprints(
     if primary_class:
         spec = PEDAGOGICAL_CLASS_SPECS[primary_class]
         subject = _node_subject_label(node_type)
-        role = str(grammatical_role or "").strip().lower()
-        role_hint = role.replace("_", " ") if role else "grammar slot"
+        role_hint = _normalize_role_hint(grammatical_role)
         snippet = str(content or "").strip()
         snippet = " ".join(snippet.split())
         if len(snippet) > 72:
             snippet = f"{snippet[:69].rstrip()}..."
+        override = _word_form_override(
+            primary_class=primary_class,
+            node_type=node_type,
+            part_of_speech=part_of_speech,
+            tense=tense,
+        )
+        if override:
+            return override
         elementary = _instruction_to_explanation(str(spec["elementary_text"]).strip(), subject=subject)
         intermediate = _instruction_to_explanation(str(spec["intermediate_text"]).strip(), subject=subject)
         advanced = _instruction_to_explanation(str(spec["advanced_text"]).strip(), subject=subject)
-        if snippet:
+        if snippet and role_hint:
             intermediate = f"{intermediate} Here, '{snippet}' functions as {role_hint}."
             advanced = f"{advanced} In this sentence, '{snippet}' fills the {role_hint} role."
         return {
