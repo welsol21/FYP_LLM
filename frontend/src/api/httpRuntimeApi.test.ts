@@ -110,14 +110,14 @@ describe('HttpRuntimeApi', () => {
     expect(artifacts.some((row) => row.name === 'contract_sentences.json')).toBe(true)
     expect(artifacts.some((row) => row.name === 'subtitles_en.srt')).toBe(true)
     expect(artifacts.some((row) => row.name === 'subtitles_bilingual.srt')).toBe(true)
-    expect(artifacts.some((row) => row.name === 'translated_audio_ru.mp3')).toBe(true)
-    expect(artifacts.some((row) => row.name === 'translated_video_ru.mp4')).toBe(true)
+    expect(artifacts.some((row) => row.name === 'translated_audio_ru.mp3')).toBe(false)
+    expect(artifacts.some((row) => row.name === 'translated_video_ru.mp4')).toBe(false)
     expect(artifacts.some((row) => row.name === 'media_contract.json')).toBe(true)
-    expect(artifacts.some((row) => row.name === 'sentence_link.json')).toBe(true)
+    expect(artifacts.some((row) => row.name === 'sentence_link.json')).toBe(false)
     expect(artifacts.some((row) => row.name === 'semantic_units_runtime.json')).toBe(true)
     expect(artifacts.some((row) => row.name === 'bilingual_objects_runtime.json')).toBe(true)
     expect(artifacts.some((row) => row.name === 'subtitles_target.srt')).toBe(true)
-    expect(artifacts.some((row) => row.name === 'stage_manifest.json')).toBe(true)
+    expect(artifacts.some((row) => row.name === 'stage_manifest.json')).toBe(false)
 
     // Persistence check across API instance recreation (SQLite snapshot restore).
     const apiReloaded = new HttpRuntimeApi()
@@ -285,7 +285,7 @@ describe('HttpRuntimeApi', () => {
     expect(artifacts.some((a) => a.name === 'subtitles_bilingual.srt')).toBe(true)
   })
 
-  it('produces non-empty translated_video artifact entry for audio analyses', async () => {
+  it('exposes cached translated media artifacts for audio analyses', async () => {
     const selected = await LocalWorkspace.getSelectedProject()
     const projectId = String(selected.project_id || '')
     const mediaPath = '/client-media/audio-case/sample.mp3'
@@ -316,7 +316,64 @@ describe('HttpRuntimeApi', () => {
       ],
       contractCurrent: false,
     })
+    await LocalWorkspace.cacheAnalysisArtifactBlob(
+      'doc-audio-fallback',
+      'translated_audio_ru.mp3',
+      new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'audio/mpeg' }),
+    )
+    await LocalWorkspace.cacheAnalysisArtifactBlob(
+      'doc-audio-fallback',
+      'translated_video_ru.mp4',
+      new Blob([new Uint8Array([9, 8, 7, 6])], { type: 'video/mp4' }),
+    )
     const artifacts = await LocalWorkspace.listDocumentArtifacts('doc-audio-fallback')
+    const translatedVideo = artifacts.find((a) => a.name === 'translated_video_ru.mp4')
+    const translatedAudio = artifacts.find((a) => a.name === 'translated_audio_ru.mp3')
+    expect(translatedAudio).toBeDefined()
+    expect(Number(translatedAudio?.size_bytes || 0)).toBeGreaterThan(0)
+    expect(String(translatedAudio?.download_url || '')).not.toBe('')
+    expect(translatedVideo).toBeDefined()
+    expect(Number(translatedVideo?.size_bytes || 0)).toBeGreaterThan(0)
+    expect(String(translatedVideo?.download_url || '')).not.toBe('')
+  })
+
+  it('exposes non-empty translated_video artifact for video analyses', async () => {
+    const selected = await LocalWorkspace.getSelectedProject()
+    const projectId = String(selected.project_id || '')
+    const mediaPath = '/client-media/video-case/sample.mp4'
+    await LocalWorkspace.cacheUploadedMedia(mediaPath, new Blob([new Uint8Array([1, 2, 3, 4, 5, 6])], { type: 'video/mp4' }))
+    const file = await LocalWorkspace.registerMediaFile({
+      projectId,
+      name: 'sample.mp4',
+      mediaPath,
+      sizeBytes: 6,
+      durationSec: 1,
+    })
+    await LocalWorkspace.upsertAnalysis({
+      documentId: 'doc-video',
+      projectId,
+      mediaFileId: file.id,
+      fileName: file.name,
+      filePath: mediaPath,
+      sizeBytes: 6,
+      durationSeconds: 1,
+      settings: 'Transl: m2m100 / Subs: bilingual_simultaneous / Voice: female / Proc: force',
+      contract: {},
+      artifacts: [
+        {
+          name: 'full_text.txt',
+          size_bytes: 3,
+          download_url: 'data:text/plain;charset=utf-8,abc',
+        },
+      ],
+      contractCurrent: false,
+    })
+    await LocalWorkspace.cacheAnalysisArtifactBlob(
+      'doc-video',
+      'translated_video_ru.mp4',
+      new Blob([new Uint8Array([1, 2, 3, 4, 5, 6, 7])], { type: 'video/mp4' }),
+    )
+    const artifacts = await LocalWorkspace.listDocumentArtifacts('doc-video')
     const translatedVideo = artifacts.find((a) => a.name === 'translated_video_ru.mp4')
     expect(translatedVideo).toBeDefined()
     expect(Number(translatedVideo?.size_bytes || 0)).toBeGreaterThan(0)

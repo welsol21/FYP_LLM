@@ -12,6 +12,8 @@ export function ProjectsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [stats, setStats] = useState<Record<string, ProjectStat>>({})
   const [deletingByProjectId, setDeletingByProjectId] = useState<Record<string, boolean>>({})
+  const [creatingProject, setCreatingProject] = useState(false)
+  const creatingProjectRef = useRef(false)
   const tapRef = useRef<{ rowId: string; ts: number } | null>(null)
 
   async function refresh() {
@@ -32,9 +34,25 @@ export function ProjectsPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function onNewProject() {
-    const created = await api.createProject(`New Project ${rows.length + 1}`)
-    await api.setSelectedProject(created.id)
-    await refresh()
+    if (creatingProjectRef.current) return
+    creatingProjectRef.current = true
+    setCreatingProject(true)
+    try {
+      const entered = window.prompt('Enter project name:')
+      const name = String(entered || '').trim()
+      if (!name) return
+      try {
+        const created = await api.createProject(name)
+        await api.setSelectedProject(created.id)
+        await refresh()
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        window.alert(message || 'Unable to create project.')
+      }
+    } finally {
+      creatingProjectRef.current = false
+      setCreatingProject(false)
+    }
   }
 
   async function openFiles(row: ProjectRow) {
@@ -77,8 +95,8 @@ export function ProjectsPage() {
     <section className="screen-block">
       <div className="page-head">
         <h2 className="page-title">Projects</h2>
-        <button type="button" className="secondary-btn" onClick={onNewProject}>
-          New Project
+        <button type="button" className="secondary-btn" onClick={onNewProject} disabled={creatingProject}>
+          {creatingProject ? 'Creating...' : 'New Project'}
         </button>
       </div>
       <table>

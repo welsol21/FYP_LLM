@@ -13,7 +13,8 @@ import type {
   VisualizerPayload,
 } from './runtimeApi'
 import { LocalWorkspace } from '../lib/localWorkspace'
-import { transcribeMediaBlob } from '../lib/clientAsr'
+import { transcribeMediaBlobDetailed } from '../lib/clientAsr'
+import { renderTranslatedMediaArtifacts } from '../lib/clientMediaRender'
 
 type SentenceContractPayload = {
   sentence_text?: string
@@ -35,9 +36,16 @@ type ArtifactSentenceRow = {
   units_ru: unknown[]
 }
 
+type TimedSentenceRow = {
+  text: string
+  start_ms: number
+  end_ms: number
+}
+
 type TranslationPipeline = (input: string, options?: Record<string, unknown>) => Promise<unknown>
 let translationPipelinePromise: Promise<TranslationPipeline> | null = null
 let translationWarmupStarted = false
+let translationPipelineReady = false
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init)
@@ -142,18 +150,26 @@ function normalizeContractError(errorMessage: string): string {
 async function getTranslationPipeline(): Promise<TranslationPipeline> {
   if (!translationPipelinePromise) {
     translationPipelinePromise = (async () => {
-      const transformers = await import('@huggingface/transformers')
-      const env = (transformers as unknown as { env?: Record<string, unknown> }).env
-      if (env && typeof env === 'object') {
-        ;(env as Record<string, unknown>).allowLocalModels = false
-        ;(env as Record<string, unknown>).allowRemoteModels = true
-        ;(env as Record<string, unknown>).useBrowserCache = true
+      try {
+        const transformers = await import('@huggingface/transformers')
+        const env = (transformers as unknown as { env?: Record<string, unknown> }).env
+        if (env && typeof env === 'object') {
+          ;(env as Record<string, unknown>).allowLocalModels = false
+          ;(env as Record<string, unknown>).allowRemoteModels = true
+          ;(env as Record<string, unknown>).useBrowserCache = true
+        }
+        const modelId = String(import.meta.env?.VITE_CLIENT_TRANSLATION_MODEL || 'Xenova/m2m100_418M').trim()
+        const pipelineFactory = (transformers as unknown as {
+          pipeline: (task: string, model: string, opts?: Record<string, unknown>) => Promise<TranslationPipeline>
+        }).pipeline
+        const pipe = await pipelineFactory('translation', modelId, { quantized: true })
+        translationPipelineReady = true
+        return pipe
+      } catch (err) {
+        translationPipelinePromise = null
+        translationPipelineReady = false
+        throw err
       }
-      const modelId = String(import.meta.env?.VITE_CLIENT_TRANSLATION_MODEL || 'Xenova/m2m100_418M').trim()
-      const pipelineFactory = (transformers as unknown as {
-        pipeline: (task: string, model: string, opts?: Record<string, unknown>) => Promise<TranslationPipeline>
-      }).pipeline
-      return await pipelineFactory('translation', modelId, { quantized: true })
     })()
   }
   return translationPipelinePromise
@@ -177,11 +193,23 @@ async function translateSentencesForArtifacts(
   if (import.meta.env.MODE === 'test') return sentences.map((s) => s)
   const loadTimeoutMs = Number(import.meta.env?.VITE_CLIENT_TRANSLATION_LOAD_TIMEOUT_MS || 45000)
   const sentenceTimeoutMs = Number(import.meta.env?.VITE_CLIENT_TRANSLATION_SENTENCE_TIMEOUT_MS || 15000)
-  log?.('Loading local translation model', 20)
+  if (translationPipelineReady) {
+    log?.('Using cached local translation model', 40)
+  } else {
+    log?.('Loading local translation model', 20)
+  }
+  const loadStartedAt = Date.now()
+  const heartbeat = window.setInterval(() => {
+    const elapsedSec = Math.max(1, Math.floor((Date.now() - loadStartedAt) / 1000))
+    const loadingProgress = 20 + Math.min(20, Math.floor(((Date.now() - loadStartedAt) / Math.max(1, loadTimeoutMs)) * 20))
+    log?.(`Loading local translation model (${elapsedSec}s)`, loadingProgress)
+  }, 3000)
   const pipe = await withTimeout(getTranslationPipeline(), loadTimeoutMs)
+  window.clearInterval(heartbeat)
   if (!pipe) {
     throw new Error('Local translation model is unavailable or timed out while loading.')
   }
+  log?.('Local translation model loaded', 40)
   const out: string[] = []
   for (let i = 0; i < sentences.length; i += 1) {
     const sentence = sentences[i]
@@ -201,7 +229,7 @@ async function translateSentencesForArtifacts(
       throw new Error(`Local translation model returned empty translation on sentence ${i + 1}.`)
     }
     out.push(translated)
-    log?.(`Translating ${i + 1}/${sentences.length}`, 20 + Math.round(((i + 1) / sentences.length) * 80))
+    log?.(`Translating ${i + 1}/${sentences.length}`, 40 + Math.round(((i + 1) / sentences.length) * 60))
   }
   return out
 }
@@ -251,15 +279,15 @@ function buildSrt(rows: ArtifactSentenceRow[], bilingual: boolean): string {
   return blocks.join('\n')
 }
 
-function buildNonContractArtifacts(
-  documentId: string,
-  rawText: string,
+function buildMediaSentenceRows(
   sentences: string[],
   translatedSentences: string[],
-): DocumentArtifact[] {
-  const mediaSentences: ArtifactSentenceRow[] = sentences.map((sentence, idx) => {
-    const startMs = idx * 3000
-    const endMs = startMs + 2600
+  timedSentences?: TimedSentenceRow[],
+): ArtifactSentenceRow[] {
+  return sentences.map((sentence, idx) => {
+    const timed = timedSentences?.[idx]
+    const startMs = typeof timed?.start_ms === 'number' ? Math.max(0, timed.start_ms) : idx * 3000
+    const endMs = typeof timed?.end_ms === 'number' ? Math.max(startMs + 300, timed.end_ms) : startMs + 2600
     return {
       sentence_idx: idx,
       sentence_text: sentence,
@@ -274,10 +302,16 @@ function buildNonContractArtifacts(
       units_ru: [],
     }
   })
-  const links = mediaSentences.map((row) => ({
-    sentence_idx: row.sentence_idx,
-    sentence_hash: row.sentence_hash,
-  }))
+}
+
+function buildNonContractArtifacts(
+  documentId: string,
+  rawText: string,
+  sentences: string[],
+  translatedSentences: string[],
+  timedSentences?: TimedSentenceRow[],
+): { artifacts: DocumentArtifact[]; mediaSentences: ArtifactSentenceRow[] } {
+  const mediaSentences: ArtifactSentenceRow[] = buildMediaSentenceRows(sentences, translatedSentences, timedSentences)
   const mediaContract = {
     document_id: documentId,
     source_type: 'audio',
@@ -294,25 +328,15 @@ function buildNonContractArtifacts(
     text_ru: row.text_ru,
     units_ru: row.units_ru,
   }))
-  const stageManifest = {
-    schema_version: 1,
-    last_document_id: documentId,
-    immutable: {
-      source_type: mediaContract.source_type,
-      text_hash: mediaContract.text_hash,
-      media_sentences_count: mediaSentences.length,
-      contract_sentences_count: 0,
-    },
-  }
   const addText = (name: string, mime: string, text: string): DocumentArtifact => ({
     name,
     size_bytes: bytesOfText(text),
     download_url: encodeTextArtifact(mime, text),
   })
-  return [
+  return {
+    artifacts: [
     addText('full_text.txt', 'text/plain', rawText),
     addText('media_contract.json', 'application/json', JSON.stringify(mediaContract, null, 2)),
-    addText('sentence_link.json', 'application/json', JSON.stringify(links, null, 2)),
     addText('semantic_units_runtime.json', 'application/json', JSON.stringify(legacySegments, null, 2)),
     addText('bilingual_objects_runtime.json', 'application/json', JSON.stringify(legacySegments, null, 2)),
     addText('subtitles_en.srt', 'application/x-subrip', buildSrt(mediaSentences, false)),
@@ -322,8 +346,37 @@ function buildNonContractArtifacts(
       'application/x-subrip',
       buildSrt(mediaSentences.map((row) => ({ ...row, text_eng: '' })), true),
     ),
-    addText('stage_manifest.json', 'application/json', JSON.stringify(stageManifest, null, 2)),
-  ]
+    ],
+    mediaSentences,
+  }
+}
+
+function extractMediaSentencesFromArtifacts(artifacts: DocumentArtifact[]): ArtifactSentenceRow[] {
+  const mediaContract = artifacts.find((row) => row.name === 'media_contract.json')
+  if (!mediaContract?.download_url?.startsWith('data:')) return []
+  try {
+    const payload = decodeURIComponent(String(mediaContract.download_url).split(',', 2)[1] || '')
+    const parsed = JSON.parse(payload) as { media_sentences?: unknown[] }
+    if (!Array.isArray(parsed.media_sentences)) return []
+    return parsed.media_sentences.map((row, idx) => {
+      const item = (row || {}) as Record<string, unknown>
+      return {
+        sentence_idx: Number(item.sentence_idx ?? idx),
+        sentence_text: String(item.sentence_text || item.text_eng || ''),
+        sentence_hash: String(item.sentence_hash || simpleHash(`${idx}:${String(item.sentence_text || item.text_eng || '')}`)),
+        text_eng: String(item.text_eng || item.sentence_text || ''),
+        text_ru: String(item.text_ru || ''),
+        start: Number(item.start || 0),
+        end: Number(item.end || 0),
+        start_ms: Number(item.start_ms || 0),
+        end_ms: Number(item.end_ms || 0),
+        units: Array.isArray(item.units) ? item.units : [],
+        units_ru: Array.isArray(item.units_ru) ? item.units_ru : [],
+      }
+    })
+  } catch {
+    return []
+  }
 }
 
 async function extractRawTextFromBlob(blob: Blob, mediaPath: string): Promise<string> {
@@ -336,6 +389,83 @@ async function extractRawTextFromBlob(blob: Blob, mediaPath: string): Promise<st
     return normalizeText(stripSubtitleMarkup(text))
   }
   return normalizeText(text)
+}
+
+async function persistRenderedMediaArtifacts(input: {
+  documentId: string
+  sourceBlob: Blob
+  sourceKind: 'text' | 'audio' | 'video' | 'other'
+  subtitlesMode?: string
+  voiceChoice?: string
+  mediaSentences: ArtifactSentenceRow[]
+  log?: (message: string, progress: number) => void
+}): Promise<{ subtitlesEn: string; subtitlesBilingual: string; subtitlesTarget: string } | null> {
+  if (input.sourceKind !== 'audio' && input.sourceKind !== 'video') return null
+  input.log?.(
+    `Rendering media: mode=${String(input.subtitlesMode || 'bilingual_sequential')}, voice=${String(input.voiceChoice || 'male')}, sentences=${input.mediaSentences.length}`,
+    10,
+  )
+  const rendered = await renderTranslatedMediaArtifacts({
+    sourceBlob: input.sourceBlob,
+    sourceKind: input.sourceKind,
+    subtitlesMode: input.subtitlesMode,
+    voiceChoice: input.voiceChoice,
+    sentences: input.mediaSentences.map((row) => ({
+      start_ms: row.start_ms,
+      end_ms: row.end_ms,
+      text_eng: row.text_eng,
+      text_ru: row.text_ru,
+    })),
+    onProgress: (message, progress) => input.log?.(message, progress),
+  })
+  if (!rendered) return null
+  const audioBuf = await rendered.translatedAudio.arrayBuffer()
+  const videoBuf = await rendered.translatedVideo.arrayBuffer()
+  const audioBytes = new Uint8Array(audioBuf)
+  const videoBytes = new Uint8Array(videoBuf)
+  input.log?.(
+    `Rendered media artifacts: audio=${audioBytes.byteLength}B (${rendered.translatedAudio.type || 'audio/mpeg'}), video=${videoBytes.byteLength}B (${rendered.translatedVideo.type || 'video/mp4'})`,
+    96,
+  )
+  await LocalWorkspace.cacheAnalysisArtifactBlob(input.documentId, 'translated_audio_ru.mp3', rendered.translatedAudio)
+  await LocalWorkspace.cacheAnalysisArtifactBlob(input.documentId, 'translated_video_ru.mp4', rendered.translatedVideo)
+  return {
+    subtitlesEn: String(rendered.subtitlesEn || ''),
+    subtitlesBilingual: String(rendered.subtitlesBilingual || ''),
+    subtitlesTarget: String(rendered.subtitlesTarget || ''),
+  }
+}
+
+function mergeTimedRowsWithTranslations(
+  timedSentences: TimedSentenceRow[],
+  translatedSentences: string[],
+): ArtifactSentenceRow[] {
+  return timedSentences.map((row, idx) => ({
+    sentence_idx: idx,
+    sentence_text: row.text,
+    sentence_hash: simpleHash(`${idx}:${row.text}`),
+    text_eng: row.text,
+    text_ru: String(translatedSentences[idx] || '').trim(),
+    start: row.start_ms / 1000,
+    end: row.end_ms / 1000,
+    start_ms: row.start_ms,
+    end_ms: row.end_ms,
+    units: [],
+    units_ru: [],
+  }))
+}
+
+function replaceTextArtifact(artifacts: DocumentArtifact[], name: string, mime: string, text: string): void {
+  const content = String(text || '').trim()
+  if (!content) return
+  const next: DocumentArtifact = {
+    name,
+    size_bytes: bytesOfText(content),
+    download_url: encodeTextArtifact(mime, content),
+  }
+  const idx = artifacts.findIndex((row) => String(row?.name || '') === name)
+  if (idx >= 0) artifacts[idx] = next
+  else artifacts.push(next)
 }
 
 export class HttpRuntimeApi implements RuntimeApi {
@@ -494,16 +624,23 @@ export class HttpRuntimeApi implements RuntimeApi {
     }
 
     let rawText = ''
+    let timedSentences: TimedSentenceRow[] = []
     if (sourceKind === 'text') {
       rawText = await extractRawTextFromBlob(mediaBlob, input.mediaPath)
       log(1, 'Text extracted on client', 100)
     } else if (sourceKind === 'audio' || sourceKind === 'video') {
       try {
-        rawText = normalizeText(
-          await transcribeMediaBlob(mediaBlob, {
+        const asr = await transcribeMediaBlobDetailed(mediaBlob, {
             onProgress: ({ message, progress }) => log(1, message, progress),
-          }),
-        )
+          })
+        rawText = normalizeText(asr.text)
+        timedSentences = (asr.sentences || [])
+          .map((row) => ({
+            text: normalizeText(row.text),
+            start_ms: Math.max(0, Number(row.start_ms || 0)),
+            end_ms: Math.max(0, Number(row.end_ms || 0)),
+          }))
+          .filter((row) => row.text && row.end_ms > row.start_ms)
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         return finish({
@@ -542,7 +679,9 @@ export class HttpRuntimeApi implements RuntimeApi {
         },
       })
     }
-    const sentences = splitIntoSentences(rawText)
+    const sentences = timedSentences.length > 0
+      ? timedSentences.map((row) => row.text)
+      : splitIntoSentences(rawText)
     if (sentences.length === 0) {
       return finish({
         result: {
@@ -613,8 +752,42 @@ export class HttpRuntimeApi implements RuntimeApi {
           },
         })
       }
-      const artifacts = buildNonContractArtifacts(documentId, rawText, sentences, translatedSentences)
+      const bundle = buildNonContractArtifacts(documentId, rawText, sentences, translatedSentences, timedSentences)
       const normalizedError = normalizeContractError(contractBuildError)
+      let subtitleBundle: { subtitlesEn: string; subtitlesBilingual: string; subtitlesTarget: string } | null = null
+      try {
+        log(3, 'Generating translated media artifacts', 8)
+        subtitleBundle = await persistRenderedMediaArtifacts({
+          documentId,
+          sourceBlob: mediaBlob,
+          sourceKind,
+          subtitlesMode: input.subtitlesMode,
+          voiceChoice: input.voiceChoice,
+          mediaSentences: bundle.mediaSentences,
+          log: (message, progress) => log(3, message, progress),
+        })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        log(3, `Media rendering failed: ${message}`, 100)
+        return finish({
+          result: {
+            route: 'reject',
+            status: 'rejected',
+            message: `Media rendering failed: ${message}`,
+            stage_name: 'generating_media',
+          },
+          ui_feedback: {
+            severity: 'error',
+            title: 'Processing failed',
+            message: `Media rendering failed: ${message}`,
+          },
+        })
+      }
+      if (subtitleBundle) {
+        replaceTextArtifact(bundle.artifacts, 'subtitles_en.srt', 'application/x-subrip', subtitleBundle.subtitlesEn)
+        replaceTextArtifact(bundle.artifacts, 'subtitles_bilingual.srt', 'application/x-subrip', subtitleBundle.subtitlesBilingual)
+        replaceTextArtifact(bundle.artifacts, 'subtitles_target.srt', 'application/x-subrip', subtitleBundle.subtitlesTarget)
+      }
       await LocalWorkspace.upsertAnalysis({
         documentId,
         projectId: effectiveProjectId,
@@ -625,7 +798,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         durationSeconds: input.durationSec,
         settings,
         contract: {},
-        artifacts,
+        artifacts: bundle.artifacts,
         contractCurrent: false,
       })
       log(2, `Contract unavailable: ${normalizedError}`, 100)
@@ -646,13 +819,56 @@ export class HttpRuntimeApi implements RuntimeApi {
       })
     }
 
-    log(3, 'Generating client artifacts', 100)
-    log(4, 'Exporting client artifacts', 100)
-
     const documentId = `doc-${typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       ? crypto.randomUUID().replace(/-/g, '').slice(0, 12)
       : `${Date.now()}${Math.random().toString(16).slice(2, 8)}`}`
     const artifacts = LocalWorkspace.buildDocumentArtifacts(documentId, contract)
+    let mediaSentences = extractMediaSentencesFromArtifacts(artifacts)
+    if ((sourceKind === 'audio' || sourceKind === 'video') && timedSentences.length === sentences.length && timedSentences.length > 0) {
+      const translatedSentences = Object.values(contract).map((node) => {
+        const preferred = String(node.active_translation_provider || '').trim()
+        if (preferred && node.translations?.[preferred]?.text) return String(node.translations[preferred].text || '').trim()
+        const first = Object.values(node.translations || {}).find((row) => String(row?.text || '').trim())
+        return String(first?.text || '').trim()
+      })
+      mediaSentences = mergeTimedRowsWithTranslations(timedSentences, translatedSentences)
+    }
+    let subtitleBundle: { subtitlesEn: string; subtitlesBilingual: string; subtitlesTarget: string } | null = null
+    try {
+      log(3, 'Generating translated media artifacts', 8)
+      subtitleBundle = await persistRenderedMediaArtifacts({
+        documentId,
+        sourceBlob: mediaBlob,
+        sourceKind,
+        subtitlesMode: input.subtitlesMode,
+        voiceChoice: input.voiceChoice,
+        mediaSentences,
+        log: (message, progress) => log(3, message, progress),
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      log(3, `Media rendering failed: ${message}`, 100)
+      return finish({
+        result: {
+          route: 'reject',
+          status: 'rejected',
+          message: `Media rendering failed: ${message}`,
+          stage_name: 'generating_media',
+        },
+        ui_feedback: {
+          severity: 'error',
+          title: 'Processing failed',
+          message: `Media rendering failed: ${message}`,
+        },
+      })
+    }
+    if (subtitleBundle) {
+      replaceTextArtifact(artifacts, 'subtitles_en.srt', 'application/x-subrip', subtitleBundle.subtitlesEn)
+      replaceTextArtifact(artifacts, 'subtitles_bilingual.srt', 'application/x-subrip', subtitleBundle.subtitlesBilingual)
+      replaceTextArtifact(artifacts, 'subtitles_target.srt', 'application/x-subrip', subtitleBundle.subtitlesTarget)
+    }
+    log(3, 'Generating client artifacts', 100)
+    log(4, 'Exporting client artifacts', 100)
     await LocalWorkspace.upsertAnalysis({
       documentId,
       projectId: effectiveProjectId,

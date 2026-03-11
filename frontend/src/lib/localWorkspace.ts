@@ -175,6 +175,15 @@ async function sqliteDeleteBlob(key: string): Promise<void> {
   await persistDbSnapshot()
 }
 
+async function sqliteDeleteBlobPrefix(prefix: string): Promise<void> {
+  const safe = String(prefix || '').trim()
+  if (!safe) return
+  await ensureDbReady()
+  await ensureDbFresh()
+  sqliteDb?.run(`DELETE FROM ${SQLITE_MEDIA_TABLE} WHERE k LIKE ?`, [`${safe}%`])
+  await persistDbSnapshot()
+}
+
 async function sqliteFindBlobByKeySuffix(suffix: string): Promise<{ key: string; blob: Blob } | null> {
   if (!suffix) return null
   await ensureDbReady()
@@ -194,6 +203,10 @@ async function sqliteFindBlobByKeySuffix(suffix: string): Promise<{ key: string;
     }
   }
   return null
+}
+
+function analysisArtifactKey(documentId: string, artifactName: string): string {
+  return `analysis_artifact:${String(documentId || '').trim()}:${String(artifactName || '').trim()}`
 }
 
 async function ensureDbReady(): Promise<void> {
@@ -293,6 +306,13 @@ function pickProject(state: WorkspaceState, projectId?: string): ProjectRow | nu
 
 function normalizeSettings(settings: string | undefined): string {
   return String(settings || '').trim() || 'Transl: m2m100 / Subs: bilingual / Voice: male / Proc: incremental'
+}
+
+function normalizeProjectName(name: string): string {
+  return String(name || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
 }
 
 function countContractNodes(contract: VisualizerPayload): number {
@@ -434,22 +454,6 @@ async function encodeBlobArtifact(blob: Blob): Promise<string> {
   return encodeBinaryArtifact(blob.type || 'application/octet-stream', new Uint8Array(arrayBuffer))
 }
 
-function mediaFallbackArtifacts(documentId: string): DocumentArtifact[] {
-  const mediaPlaceholder = new TextEncoder().encode(`generated_on_client:${documentId}`)
-  return [
-    {
-      name: 'translated_audio_ru.mp3',
-      size_bytes: mediaPlaceholder.length,
-      download_url: encodeBinaryArtifact('audio/mpeg', mediaPlaceholder),
-    },
-    {
-      name: 'translated_video_ru.mp4',
-      size_bytes: mediaPlaceholder.length,
-      download_url: encodeBinaryArtifact('video/mp4', mediaPlaceholder),
-    },
-  ]
-}
-
 function formatSrtTime(ms: number): string {
   const safe = Math.max(0, Math.floor(ms))
   const hours = Math.floor(safe / 3600000)
@@ -530,10 +534,6 @@ function buildContractArtifacts(documentId: string, contract: VisualizerPayload)
     sentence_text: row.sentence_text,
     sentence_node: contract[row.sentence_text],
   }))
-  const links = mediaSentences.map((row) => ({
-    sentence_idx: row.sentence_idx,
-    sentence_hash: row.sentence_hash,
-  }))
   const mediaContract = {
     document_id: documentId,
     source_type: 'audio',
@@ -550,17 +550,6 @@ function buildContractArtifacts(documentId: string, contract: VisualizerPayload)
     text_ru: row.text_ru,
     units_ru: row.units_ru,
   }))
-  const stageManifest = {
-    schema_version: 1,
-    last_document_id: documentId,
-    immutable: {
-      source_type: mediaContract.source_type,
-      text_hash: mediaContract.text_hash,
-      media_sentences_count: mediaSentences.length,
-      contract_sentences_count: contractSentences.length,
-    },
-  }
-
   const addText = (name: string, mime: string, text: string): DocumentArtifact => ({
     name,
     size_bytes: bytesOfText(text),
@@ -572,7 +561,6 @@ function buildContractArtifacts(documentId: string, contract: VisualizerPayload)
     addText('contract_visualizer.json', 'application/json', contractJson),
     addText('contract_sentences.json', 'application/json', JSON.stringify(contractSentences, null, 2)),
     addText('media_contract.json', 'application/json', JSON.stringify(mediaContract, null, 2)),
-    addText('sentence_link.json', 'application/json', JSON.stringify(links, null, 2)),
     addText('semantic_units_runtime.json', 'application/json', JSON.stringify(legacySegments, null, 2)),
     addText('bilingual_objects_runtime.json', 'application/json', JSON.stringify(legacySegments, null, 2)),
     addText('subtitles_en.srt', 'application/x-subrip', buildSrt(mediaSentences, false)),
@@ -582,7 +570,6 @@ function buildContractArtifacts(documentId: string, contract: VisualizerPayload)
       'application/x-subrip',
       buildSrt(mediaSentences.map((row) => ({ ...row, text_eng: '' })), true),
     ),
-    addText('stage_manifest.json', 'application/json', JSON.stringify(stageManifest, null, 2)),
   ]
 
   return artifacts
@@ -626,6 +613,26 @@ export const LocalWorkspace = {
     return fallback.blob
   },
 
+  async cacheAnalysisArtifactBlob(documentId: string, artifactName: string, blob: Blob): Promise<void> {
+    const docId = String(documentId || '').trim()
+    const name = String(artifactName || '').trim()
+    if (!docId || !name || !(blob instanceof Blob)) return
+    await sqlitePutBlob(analysisArtifactKey(docId, name), blob)
+  },
+
+  async getAnalysisArtifactBlob(documentId: string, artifactName: string): Promise<Blob | null> {
+    const docId = String(documentId || '').trim()
+    const name = String(artifactName || '').trim()
+    if (!docId || !name) return null
+    return await sqliteGetBlob(analysisArtifactKey(docId, name))
+  },
+
+  async clearAnalysisArtifactBlobs(documentId: string): Promise<void> {
+    const docId = String(documentId || '').trim()
+    if (!docId) return
+    await sqliteDeleteBlobPrefix(`analysis_artifact:${docId}:`)
+  },
+
   buildDocumentArtifacts(documentId: string, contract: VisualizerPayload): DocumentArtifact[] {
     return buildContractArtifacts(String(documentId || '').trim(), contract)
   },
@@ -637,10 +644,19 @@ export const LocalWorkspace = {
 
   async createProject(name: string): Promise<ProjectRow> {
     const state = await ensureState()
+    const trimmed = String(name || '').trim().replace(/\s+/g, ' ')
+    if (!trimmed) {
+      throw new Error('Project name is required.')
+    }
+    const normalized = normalizeProjectName(trimmed)
+    const duplicate = state.projects.some((row) => normalizeProjectName(row.name) === normalized)
+    if (duplicate) {
+      throw new Error('Project with this name already exists.')
+    }
     const ts = nowIso()
     const project: ProjectRow = {
       id: `proj-${Math.random().toString(36).slice(2, 10)}`,
-      name: String(name || '').trim() || `New Project ${state.projects.length + 1}`,
+      name: trimmed,
       created_at: ts,
       updated_at: ts,
     }
@@ -664,6 +680,7 @@ export const LocalWorkspace = {
         .filter(Boolean),
     )
 
+    const removedAnalyses = state.analyses.filter((row) => row.project_id === id)
     state.files = state.files.filter((row) => row.project_id !== id)
     state.analyses = state.analyses.filter((row) => row.project_id !== id)
     state.projects = state.projects.filter((row) => row.id !== id)
@@ -685,6 +702,9 @@ export const LocalWorkspace = {
     for (const mediaPath of removedPaths) {
       if (stillUsedPaths.has(mediaPath)) continue
       await sqliteDeleteBlob(`media_path:${mediaPath}`)
+    }
+    for (const row of removedAnalyses) {
+      await sqliteDeleteBlobPrefix(`analysis_artifact:${String(row.document_id || '').trim()}:`)
     }
 
     return { status: 'ok', message: 'Project and all related data deleted.', project_id: id }
@@ -756,12 +776,16 @@ export const LocalWorkspace = {
     if (!id) return { status: 'error', message: 'file id is required' }
     const file = state.files.find((row) => row.id === id)
     if (!file) return { status: 'error', message: 'file not found', file_id: id }
+    const removedAnalyses = state.analyses.filter((row) => row.media_file_id === id)
     state.files = state.files.filter((row) => row.id !== id)
     state.analyses = state.analyses.filter((row) => row.media_file_id !== id)
     syncFileAnalysisFlags(state)
     await saveRawState(state)
     const mediaPath = String(file.media_path || file.path || '').trim()
     if (mediaPath) await sqliteDeleteBlob(`media_path:${mediaPath}`)
+    for (const row of removedAnalyses) {
+      await sqliteDeleteBlobPrefix(`analysis_artifact:${String(row.document_id || '').trim()}:`)
+    }
     return { status: 'ok', message: 'File deleted.', file_id: id }
   },
 
@@ -875,6 +899,7 @@ export const LocalWorkspace = {
     if (!deleted) return { status: 'error', message: 'analysis not found', document_id: docId }
     syncFileAnalysisFlags(state)
     await saveRawState(state)
+    await sqliteDeleteBlobPrefix(`analysis_artifact:${docId}:`)
     return { status: 'ok', message: 'Analysis artifacts deleted.', document_id: docId }
   },
 
@@ -886,45 +911,30 @@ export const LocalWorkspace = {
     if (!row) return []
     const baseArtifacts = Array.isArray(row.artifacts) && row.artifacts.length > 0
       ? row.artifacts.filter((item) => (
-          item?.name !== 'translated_audio_ru.mp3' && item?.name !== 'translated_video_ru.mp4'
+          item?.name !== 'translated_audio_ru.mp3' &&
+          item?.name !== 'translated_video_ru.mp4' &&
+          item?.name !== 'sentence_link.json' &&
+          item?.name !== 'stage_manifest.json'
         ))
       : buildContractArtifacts(docId, row.contract)
-
-    const mediaPath = String(row.file_path || '').trim()
-    if (!mediaPath) {
-      return [...clone(baseArtifacts), ...mediaFallbackArtifacts(docId)]
-    }
-
-    const blob = await sqliteGetBlob(`media_path:${mediaPath}`)
-    if (!blob) {
-      return [...clone(baseArtifacts), ...mediaFallbackArtifacts(docId)]
-    }
-
-    const blobUrl = await encodeBlobArtifact(blob)
     const out = [...clone(baseArtifacts)]
-    if ((blob.type || '').startsWith('audio/')) {
+    const translatedAudio = await sqliteGetBlob(analysisArtifactKey(docId, 'translated_audio_ru.mp3'))
+    if (translatedAudio) {
       out.push({
         name: 'translated_audio_ru.mp3',
-        size_bytes: blob.size,
-        download_url: blobUrl,
+        size_bytes: translatedAudio.size,
+        download_url: await encodeBlobArtifact(translatedAudio),
       })
+    }
+    const translatedVideo = await sqliteGetBlob(analysisArtifactKey(docId, 'translated_video_ru.mp4'))
+    if (translatedVideo) {
       out.push({
         name: 'translated_video_ru.mp4',
-        size_bytes: blob.size,
-        download_url: blobUrl,
+        size_bytes: translatedVideo.size,
+        download_url: await encodeBlobArtifact(translatedVideo),
       })
-      return out
     }
-    if ((blob.type || '').startsWith('video/')) {
-      out.push(mediaFallbackArtifacts(docId)[0])
-      out.push({
-        name: 'translated_video_ru.mp4',
-        size_bytes: blob.size,
-        download_url: blobUrl,
-      })
-      return out
-    }
-    return [...out, ...mediaFallbackArtifacts(docId)]
+    return out
   },
 
   async getTranslationConfig(): Promise<TranslationConfig | null> {

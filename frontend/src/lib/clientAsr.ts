@@ -9,6 +9,17 @@ type AsrOptions = {
 
 type AsrPipeline = (audio: Float32Array, options?: Record<string, unknown>) => Promise<unknown>
 
+export type TimedSentence = {
+  text: string
+  start_ms: number
+  end_ms: number
+}
+
+export type DetailedAsrResult = {
+  text: string
+  sentences: TimedSentence[]
+}
+
 let pipelinePromise: Promise<AsrPipeline> | null = null
 
 function notify(options: AsrOptions | undefined, message: string, progress: number): void {
@@ -72,40 +83,111 @@ async function getAsrPipeline(options?: AsrOptions): Promise<AsrPipeline> {
   if (!pipelinePromise) {
     pipelinePromise = (async () => {
       notify(options, 'Loading local ASR model', 24)
-      const transformers = await import('@huggingface/transformers')
-      const env = (transformers as unknown as { env?: Record<string, unknown> }).env
-      if (env && typeof env === 'object') {
-        ;(env as Record<string, unknown>).allowLocalModels = false
-        ;(env as Record<string, unknown>).allowRemoteModels = true
-        ;(env as Record<string, unknown>).useBrowserCache = true
+      const startedAt = Date.now()
+      const heartbeat = window.setInterval(() => {
+        const elapsedSec = Math.max(1, Math.floor((Date.now() - startedAt) / 1000))
+        notify(options, `Loading local ASR model (${elapsedSec}s)`, 24)
+      }, 3000)
+      try {
+        const transformers = await import('@huggingface/transformers')
+        const env = (transformers as unknown as { env?: Record<string, unknown> }).env
+        if (env && typeof env === 'object') {
+          ;(env as Record<string, unknown>).allowLocalModels = false
+          ;(env as Record<string, unknown>).allowRemoteModels = true
+          ;(env as Record<string, unknown>).useBrowserCache = true
+        }
+        const modelId = String(import.meta.env?.VITE_CLIENT_ASR_MODEL || 'Xenova/whisper-base.en').trim()
+        const pipelineFactory = (transformers as unknown as {
+          pipeline: (task: string, model: string, opts?: Record<string, unknown>) => Promise<AsrPipeline>
+        }).pipeline
+        const pipe = await pipelineFactory('automatic-speech-recognition', modelId, {
+          quantized: true,
+        })
+        notify(options, 'ASR model loaded', 46)
+        return pipe
+      } finally {
+        window.clearInterval(heartbeat)
       }
-      const modelId = String(import.meta.env?.VITE_CLIENT_ASR_MODEL || 'Xenova/whisper-base.en').trim()
-      const pipelineFactory = (transformers as unknown as {
-        pipeline: (task: string, model: string, opts?: Record<string, unknown>) => Promise<AsrPipeline>
-      }).pipeline
-      const pipe = await pipelineFactory('automatic-speech-recognition', modelId, {
-        quantized: true,
-      })
-      notify(options, 'ASR model loaded', 46)
-      return pipe
     })()
   }
   return pipelinePromise
 }
 
-export async function transcribeMediaBlob(blob: Blob, options?: AsrOptions): Promise<string> {
+function chunkText(value: unknown): string {
+  return String(value || '').replace(/\s+/g, ' ').trim()
+}
+
+function isSentenceEnd(text: string): boolean {
+  return /[.!?]["')\]]*$/.test(String(text || '').trim())
+}
+
+function buildTimedSentencesFromResult(result: unknown): TimedSentence[] {
+  const chunks = Array.isArray((result as { chunks?: unknown[] } | null | undefined)?.chunks)
+    ? ((result as { chunks?: unknown[] }).chunks as unknown[])
+    : []
+  if (!chunks.length) return []
+
+  const out: TimedSentence[] = []
+  let parts: string[] = []
+  let startMs: number | null = null
+  let endMs: number | null = null
+
+  const flush = (): void => {
+    const text = parts.join(' ').replace(/\s+/g, ' ').trim()
+    if (!text || startMs == null || endMs == null || endMs <= startMs) {
+      parts = []
+      startMs = null
+      endMs = null
+      return
+    }
+    out.push({ text, start_ms: startMs, end_ms: endMs })
+    parts = []
+    startMs = null
+    endMs = null
+  }
+
+  for (const raw of chunks) {
+    const row = (raw || {}) as { text?: unknown; timestamp?: unknown }
+    const text = chunkText(row.text)
+    const timestamp = Array.isArray(row.timestamp) ? row.timestamp : []
+    const startSec = typeof timestamp[0] === 'number' ? Number(timestamp[0]) : null
+    const endSec = typeof timestamp[1] === 'number' ? Number(timestamp[1]) : null
+    if (!text || startSec == null || endSec == null) continue
+
+    if (startMs == null) startMs = Math.max(0, Math.round(startSec * 1000))
+    endMs = Math.max(startMs, Math.round(endSec * 1000))
+    parts.push(text)
+
+    if (isSentenceEnd(text)) flush()
+  }
+
+  flush()
+  return out
+}
+
+export async function transcribeMediaBlobDetailed(blob: Blob, options?: AsrOptions): Promise<DetailedAsrResult> {
   const mono16k = await decodeTo16kMono(blob, options)
   const asr = await getAsrPipeline(options)
   notify(options, 'Running local ASR', 62)
   const result = await asr(mono16k, {
     chunk_length_s: 30,
     stride_length_s: 5,
+    return_timestamps: 'word',
   })
   notify(options, 'ASR completed', 100)
-  if (typeof result === 'string') return result.trim()
-  if (result && typeof result === 'object' && 'text' in result) {
-    return String((result as { text?: string }).text || '').trim()
+  if (typeof result === 'string') {
+    return { text: result.trim(), sentences: [] }
   }
-  return ''
+  if (result && typeof result === 'object' && 'text' in result) {
+    return {
+      text: String((result as { text?: string }).text || '').trim(),
+      sentences: buildTimedSentencesFromResult(result),
+    }
+  }
+  return { text: '', sentences: [] }
 }
 
+export async function transcribeMediaBlob(blob: Blob, options?: AsrOptions): Promise<string> {
+  const result = await transcribeMediaBlobDetailed(blob, options)
+  return result.text
+}

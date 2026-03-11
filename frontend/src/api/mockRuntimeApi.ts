@@ -196,10 +196,19 @@ export class MockRuntimeApi implements RuntimeApi {
   }
 
   async createProject(name: string): Promise<ProjectRow> {
+    const trimmed = String(name || '').trim().replace(/\s+/g, ' ')
+    if (!trimmed) {
+      throw new Error('Project name is required.')
+    }
+    const normalized = trimmed.toLowerCase()
+    const duplicate = this.projects.some((row) => String(row.name || '').trim().replace(/\s+/g, ' ').toLowerCase() === normalized)
+    if (duplicate) {
+      throw new Error('Project with this name already exists.')
+    }
     const now = new Date().toISOString()
     const row: ProjectRow = {
       id: `proj-${this.projects.length + 1}`,
-      name: name.trim() || `Project ${this.projects.length + 1}`,
+      name: trimmed,
       created_at: now,
       updated_at: now,
     }

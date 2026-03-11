@@ -15,11 +15,13 @@ vi.mock('react-router-dom', async () => {
 
 describe('ProjectsPage', () => {
   it('creates project from New Project button and shows it in table', async () => {
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Custom Project')
     renderWithProviders(<ProjectsPage />)
     fireEvent.click(await screen.findByRole('button', { name: 'New Project' }))
     await waitFor(() => {
-      expect(screen.getByText('New Project 2')).toBeInTheDocument()
+      expect(screen.getByText('Custom Project')).toBeInTheDocument()
     })
+    promptSpy.mockRestore()
   })
 
   it('opens files on project double tap/click', async () => {
@@ -42,5 +44,26 @@ describe('ProjectsPage', () => {
       expect(screen.queryByLabelText('project-row-proj-1')).not.toBeInTheDocument()
     })
     confirmSpy.mockRestore()
+  })
+
+  it('rejects duplicate project name', async () => {
+    const promptSpy = vi.spyOn(window, 'prompt')
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined)
+    renderWithProviders(<ProjectsPage />)
+
+    promptSpy.mockReturnValueOnce('Unique Project')
+    fireEvent.click(await screen.findByRole('button', { name: 'New Project' }))
+    await waitFor(() => {
+      expect(screen.getByText('Unique Project')).toBeInTheDocument()
+    })
+
+    promptSpy.mockReturnValueOnce('Unique Project')
+    fireEvent.click(await screen.findByRole('button', { name: 'New Project' }))
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalled()
+    })
+    expect(screen.getAllByText('Unique Project').length).toBe(1)
+    promptSpy.mockRestore()
+    alertSpy.mockRestore()
   })
 })

@@ -50,7 +50,7 @@ export function MediaSubmitForm({
   const [selectedFileName, setSelectedFileName] = useState('')
   const [translator, setTranslator] = useState(defaultTranslator || 'm2m100')
   const [subtitles, setSubtitles] = useState('Bilingual (sequential)')
-  const [voice, setVoice] = useState('Male')
+  const [voice, setVoice] = useState('Dmitry (Male)')
   const [processingMode, setProcessingMode] = useState<'incremental' | 'force'>('incremental')
   const [submitting, setSubmitting] = useState(false)
   const enabledProviders = translatorOptions.filter((p) => p.enabled && hasRequiredCredentials(p))
@@ -60,7 +60,10 @@ export function MediaSubmitForm({
     { label: 'Target only', value: 'target only' },
     { label: 'Source only', value: 'source only' },
   ]
-  const voiceOptions = ['Male', 'Female']
+  const voiceOptions: Array<{ label: string; value: string }> = [
+    { label: 'Dmitry (Male)', value: 'male' },
+    { label: 'Svetlana (Female)', value: 'female' },
+  ]
   const normalizedProjectLabel = String(projectLabel || '').trim()
   const showProjectLine = normalizedProjectLabel.length > 0 && normalizedProjectLabel !== '-'
   const normalizedFileLabel = String(selectedFileName || '').trim()
@@ -105,7 +108,7 @@ export function MediaSubmitForm({
         mediaFileId,
         translationProvider: translator,
         subtitlesMode: subtitleOptions.find((option) => option.label === subtitles)?.value || 'bilingual_sequential',
-        voiceChoice: voice.toLowerCase(),
+        voiceChoice: voiceOptions.find((option) => option.label === voice)?.value || 'male',
         forceFullReprocess: processingMode === 'force',
         onProgress,
       })
@@ -154,12 +157,12 @@ export function MediaSubmitForm({
         <div className="touch-options-grid">
           {voiceOptions.map((option) => (
             <button
-              key={option}
+              key={option.value}
               type="button"
-              className={`touch-option-btn${voice === option ? ' active' : ''}`}
-              onClick={() => setVoice(option)}
+              className={`touch-option-btn${voice === option.label ? ' active' : ''}`}
+              onClick={() => setVoice(option.label)}
             >
-              {option}
+              {option.label}
             </button>
           ))}
         </div>

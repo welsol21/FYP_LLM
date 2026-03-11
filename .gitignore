@@ -112,3 +112,4 @@ frontend/dist/
 frontend/.vite/
 frontend/coverage/
 frontend/*.tsbuildinfo
+tmp_media_check/
