@@ -303,8 +303,8 @@ def _attach_translation(
         }
         if include_model:
             entry["model"] = getattr(translator, "model_name", "unknown")
-        node["translations"] = {"backend_m2m100": entry}
-        node["active_translation_provider"] = "backend_m2m100"
+        node["translations"] = {"m2m100": entry}
+        node["active_translation_provider"] = "m2m100"
 
     for sentence_node in doc.values():
         if not isinstance(sentence_node, dict):

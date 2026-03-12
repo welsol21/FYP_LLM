@@ -11,7 +11,7 @@ const BASIC_EDIT_FIELDS: Array<{ key: string; label: string }> = [
   { key: 'linguistic_notes.elementary', label: 'Linguistic Notes (Elementary)' },
   { key: 'linguistic_notes.intermediate', label: 'Linguistic Notes (Intermediate)' },
   { key: 'linguistic_notes.advanced', label: 'Linguistic Notes (Advanced)' },
-  { key: 'translations.backend_m2m100.text', label: 'Translation' },
+  { key: 'translations.m2m100.text', label: 'Translation' },
   { key: 'phonetic.uk', label: 'Phonetic (UK)' },
   { key: 'phonetic.us', label: 'Phonetic (US)' },
 ]
@@ -25,8 +25,8 @@ const ADVANCED_EDIT_FIELDS: Array<{ key: string; label: string }> = [
   { key: 'finiteness', label: 'Finiteness' },
   { key: 'tam_construction', label: 'TAM Construction' },
   { key: 'dep_label', label: 'Dependency Label' },
-  { key: 'translations.backend_m2m100.source_lang', label: 'Translation Source Language' },
-  { key: 'translations.backend_m2m100.target_lang', label: 'Translation Target Language' },
+  { key: 'translations.m2m100.source_lang', label: 'Translation Source Language' },
+  { key: 'translations.m2m100.target_lang', label: 'Translation Target Language' },
 ]
 
 const NULL_SENTINEL = '__NULL__'
@@ -126,7 +126,7 @@ const ADVANCED_SELECT_OPTIONS: Record<string, Array<{ value: string; label: stri
     { value: 'cc', label: 'cc' },
     { value: 'conj', label: 'conj' },
   ],
-  'translations.backend_m2m100.source_lang': [
+  'translations.m2m100.source_lang': [
     { value: 'en', label: 'en' },
     { value: 'ru', label: 'ru' },
     { value: 'uk', label: 'uk' },
@@ -142,7 +142,7 @@ const ADVANCED_SELECT_OPTIONS: Record<string, Array<{ value: string; label: stri
     { value: 'ko', label: 'ko' },
     { value: 'ar', label: 'ar' },
   ],
-  'translations.backend_m2m100.target_lang': [
+  'translations.m2m100.target_lang': [
     { value: 'en', label: 'en' },
     { value: 'ru', label: 'ru' },
     { value: 'uk', label: 'uk' },
@@ -207,17 +207,34 @@ function decodeEditorValue(raw: string): string {
 }
 
 function collectTranslationProviders(node: VisualizerNode, out: Set<string>): void {
-  const active = String(node.active_translation_provider || '').trim().toLowerCase()
+  const active = normalizeTranslationProviderForUi(node.active_translation_provider)
   if (active) out.add(active)
   if (node.translations && typeof node.translations === 'object') {
     for (const key of Object.keys(node.translations)) {
-      const normalized = String(key || '').trim().toLowerCase()
+      const normalized = normalizeTranslationProviderForUi(key)
       if (normalized) out.add(normalized)
     }
   }
   for (const child of node.linguistic_elements || []) {
     collectTranslationProviders(child, out)
   }
+}
+
+function normalizeTranslationProviderForUi(provider: string | undefined): string {
+  const raw = String(provider || '').trim().toLowerCase()
+  return raw || ''
+}
+
+function formatTranslationProviderLabel(provider: string): string {
+  const raw = normalizeTranslationProviderForUi(provider)
+  if (!raw) return 'Translation'
+  if (raw === 'm2m100') return 'M2M100'
+  if (raw === 'hf' || raw === 'huggingface') return 'HuggingFace'
+  if (raw === 'gpt') return 'ChatGPT'
+  if (raw === 'original' || raw === 'none') return 'Original'
+  return raw
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (ch) => ch.toUpperCase())
 }
 
 export function VisualizerPage() {
@@ -237,7 +254,7 @@ export function VisualizerPage() {
   const [isNarrowScreen, setIsNarrowScreen] = useState(
     typeof window !== 'undefined' ? window.innerWidth <= 860 : false,
   )
-  const [editorMode, setEditorMode] = useState<'quick' | 'translate' | 'none'>('quick')
+  const [editorMode, setEditorMode] = useState<'quick' | 'translate' | 'none'>('none')
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [nodeId, setNodeId] = useState('')
   const [selectedNodeLabel, setSelectedNodeLabel] = useState('')
@@ -247,7 +264,7 @@ export function VisualizerPage() {
   const [advancedValueExpanded, setAdvancedValueExpanded] = useState(false)
   const [newValue, setNewValue] = useState('')
   const [editStatus, setEditStatus] = useState('')
-  const [selectedTranslationProvider, setSelectedTranslationProvider] = useState('backend_m2m100')
+  const [selectedTranslationProvider, setSelectedTranslationProvider] = useState('m2m100')
   const [showAllTranslations, setShowAllTranslations] = useState(false)
 
   async function refresh() {
@@ -305,21 +322,21 @@ export function VisualizerPage() {
   const activeRow = rows[activeSentenceIndex]
   const activeMeta = activeRow ? documentMeta[activeRow.document_id] : undefined
   const translationProviderOptions = (() => {
-    if (!activeRow?.tree) return ['backend_m2m100']
+    if (!activeRow?.tree) return ['m2m100']
     const out = new Set<string>()
     collectTranslationProviders(activeRow.tree, out)
-    out.add('backend_m2m100')
+    out.add('m2m100')
     return Array.from(out).sort()
   })()
 
   useEffect(() => {
-    const preferred = String(activeRow?.tree?.active_translation_provider || '').trim().toLowerCase()
+    const preferred = normalizeTranslationProviderForUi(activeRow?.tree?.active_translation_provider)
     if (preferred && translationProviderOptions.includes(preferred)) {
       setSelectedTranslationProvider(preferred)
       return
     }
     if (!translationProviderOptions.includes(selectedTranslationProvider)) {
-      setSelectedTranslationProvider('backend_m2m100')
+      setSelectedTranslationProvider('m2m100')
     }
   }, [activeRow?.tree?.active_translation_provider, translationProviderOptions.join('|')])
 
@@ -445,7 +462,7 @@ export function VisualizerPage() {
                     className={`touch-option-btn ${selectedTranslationProvider === provider ? 'active' : ''}`}
                     onClick={() => setSelectedTranslationProvider(provider)}
                   >
-                    {provider}
+                    {formatTranslationProviderLabel(provider)}
                   </button>
                 ))}
               </div>

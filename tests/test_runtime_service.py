@@ -238,9 +238,9 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             svc.repo.set_workspace_state(
                 TRANSLATION_CONFIG_STATE_KEY,
                 {
-                    "default_provider": "backend_m2m100",
+                    "default_provider": "m2m100",
                     "providers": [
-                        {"id": "backend_m2m100", "enabled": True, "credentials": {}},
+                        {"id": "m2m100", "enabled": True, "credentials": {}},
                         {"id": "gpt", "enabled": True, "credentials": {"api_key": "x"}},
                     ],
                 },
@@ -308,7 +308,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                             "content": "She trusted him.",
                             "node_id": "n1",
                             "translations": {
-                                "backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
+                                "m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
                             },
                             "linguistic_elements": [],
                         },
@@ -404,9 +404,9 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             svc.repo.set_workspace_state(
                 TRANSLATION_CONFIG_STATE_KEY,
                 {
-                    "default_provider": "backend_m2m100",
+                    "default_provider": "m2m100",
                     "providers": [
-                        {"id": "backend_m2m100", "enabled": True, "credentials": {}},
+                        {"id": "m2m100", "enabled": True, "credentials": {}},
                         {"id": "gpt", "enabled": True, "credentials": {"api_key": "x"}},
                     ],
                 },
@@ -422,7 +422,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                         "content": "She trusted him.",
                         "node_id": "n1",
                         "translations": {
-                            "backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
+                            "m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
                         },
                         "linguistic_elements": [],
                     },
@@ -439,19 +439,19 @@ class RuntimeMediaServiceTests(unittest.TestCase):
             self.assertEqual(result["status"], "completed")
             rows = svc.repo.list_document_visualizer_rows(document_id=result["document_id"])
             self.assertEqual(
-                rows[0]["sentence_node"]["translations"]["backend_m2m100"]["text"],
+                rows[0]["sentence_node"]["translations"]["m2m100"]["text"],
                 "Она доверяла ему.",
             )
             payload = svc.get_visualizer_payload(document_id=result["document_id"])
             sentence_node = payload["She trusted him."]
             self.assertEqual(
-                sentence_node["translations"]["backend_m2m100"]["text"],
+                sentence_node["translations"]["m2m100"]["text"],
                 "Она доверяла ему.",
             )
             overlay_values = [
                 str(entry.get("text") or "")
                 for key, entry in sentence_node["translations"].items()
-                if key != "backend_m2m100" and isinstance(entry, dict)
+                if key != "m2m100" and isinstance(entry, dict)
             ]
             self.assertIn("Клиентский перевод", overlay_values)
 
@@ -503,7 +503,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                     "content": "She trusted him.",
                     "node_id": "n1",
                     "translations": {
-                        "backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
+                        "m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
                     },
                     "linguistic_elements": [],
                 },
@@ -515,7 +515,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
 
             payload = svc.get_visualizer_payload(document_id="doc-1")
             sentence_node = payload["She trusted him."]
-            self.assertEqual(sentence_node["translations"]["backend_m2m100"]["text"], "Она доверяла ему.")
+            self.assertEqual(sentence_node["translations"]["m2m100"]["text"], "Она доверяла ему.")
 
     def test_export_final_media_artifacts_creates_audio_for_audio_source(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -794,7 +794,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                     "source_span": {"start": 0, "end": 16},
                     "schema_version": "v2",
                     "translations": {
-                        "backend_m2m100": {
+                        "m2m100": {
                             "text": "Она доверяла ему.",
                             "source_lang": "en",
                             "target_lang": "ru",
@@ -814,7 +814,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                             "source_span": {"start": 4, "end": 15},
                             "schema_version": "v2",
                             "translations": {
-                                "backend_m2m100": {
+                                "m2m100": {
                                     "text": "доверяла ему",
                                     "source_lang": "en",
                                     "target_lang": "ru",
@@ -839,7 +839,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                                     "source_span": {"start": 4, "end": 11},
                                     "schema_version": "v2",
                                     "translations": {
-                                        "backend_m2m100": {
+                                        "m2m100": {
                                             "text": "доверяла",
                                             "source_lang": "en",
                                             "target_lang": "ru",
@@ -1207,7 +1207,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                             "content": "She trusted him.",
                             "node_id": "n1",
                             "translations": {
-                                "backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
+                                "m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
                             },
                             "linguistic_elements": [],
                         },
@@ -1269,7 +1269,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                             "content": "She trusted him.",
                             "node_id": "n1",
                             "translations": {
-                                "backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
+                                "m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
                             },
                             "linguistic_elements": [],
                         },
@@ -1311,7 +1311,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                                 "content": "She trusted him.",
                                 "node_id": "n2",
                                 "translations": {
-                                    "backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
+                                    "m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
                                 },
                                 "linguistic_elements": [],
                             },
@@ -1365,7 +1365,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                             "content": "She trusted him.",
                             "node_id": "n1",
                             "translations": {
-                                "backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
+                                "m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
                             },
                             "linguistic_elements": [],
                         },
@@ -1408,7 +1408,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                                 "content": "She trusted him. Again.",
                                 "node_id": "n-new",
                                 "translations": {
-                                    "backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она снова доверяла ему."}
+                                    "m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она снова доверяла ему."}
                                 },
                                 "linguistic_elements": [],
                             },
@@ -1490,7 +1490,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                             "content": "She trusted him.",
                             "node_id": "n1",
                             "translations": {
-                                "backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
+                                "m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
                             },
                             "linguistic_elements": [],
                         },
@@ -1532,7 +1532,7 @@ class RuntimeMediaServiceTests(unittest.TestCase):
                                 "content": "She trusted him.",
                                 "node_id": "n-asr",
                                 "translations": {
-                                    "backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
+                                    "m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}
                                 },
                                 "linguistic_elements": [],
                             },

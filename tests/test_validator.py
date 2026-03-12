@@ -84,7 +84,7 @@ class ValidatorTests(unittest.TestCase):
             "linguistic_notes": [],
             "part_of_speech": "noun phrase",
             "translations": {
-                "backend_m2m100": {
+                "m2m100": {
                     "source_lang": "en",
                     "target_lang": "ru",
                     "text": "nested phrase",
@@ -98,7 +98,7 @@ class ValidatorTests(unittest.TestCase):
                     "linguistic_notes": [],
                     "part_of_speech": "adjective",
                     "translations": {
-                        "backend_m2m100": {
+                        "m2m100": {
                             "source_lang": "en",
                             "target_lang": "ru",
                             "text": "nested",
@@ -113,7 +113,7 @@ class ValidatorTests(unittest.TestCase):
                     "linguistic_notes": [],
                     "part_of_speech": "noun",
                     "translations": {
-                        "backend_m2m100": {
+                        "m2m100": {
                             "source_lang": "en",
                             "target_lang": "ru",
                             "text": "phrase",
@@ -422,7 +422,7 @@ class ValidatorTests(unittest.TestCase):
         sentence_key = next(iter(data))
         sentence = data[sentence_key]
         sentence["translations"] = {
-            "backend_m2m100": {
+            "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "model": "facebook/m2m100_418M",
@@ -431,7 +431,7 @@ class ValidatorTests(unittest.TestCase):
         }
         first_word = sentence["linguistic_elements"][0]["linguistic_elements"][0]
         first_word["translations"] = {
-            "backend_m2m100": {
+            "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "следовало",
@@ -446,7 +446,7 @@ class ValidatorTests(unittest.TestCase):
             data = json.load(f)
         sentence_key = next(iter(data))
         sentence = data[sentence_key]
-        sentence["translations"] = {"backend_m2m100": {"source_lang": "en", "target_lang": None, "text": 5}}
+        sentence["translations"] = {"m2m100": {"source_lang": "en", "target_lang": None, "text": 5}}
 
         result = validate_contract(data, validation_mode="v1")
         self.assertFalse(result.ok)

@@ -7,6 +7,7 @@ import type { AnalysisHistoryRow, MediaFileRow, SelectedProject } from '../api/r
 type FileAnalysisVersion = {
   analysis_id: string
   document_id: string
+  file_name: string
   updated_at: string
   settings: string
 }
@@ -75,6 +76,7 @@ export function FilesPage() {
         .map((row) => ({
           analysis_id: String(row.analysis_id || ''),
           document_id: String(row.document_id || ''),
+          file_name: String(row.file_name || fileRow.name || ''),
           updated_at: String(row.updated_at || row.created_at || ''),
           settings: String(row.settings || ''),
         }))
@@ -245,7 +247,19 @@ export function FilesPage() {
                                 {version.document_id ? (
                                   <button
                                     type="button"
-                                    onClick={() => navigate('/visualizer', { state: { documentId: version.document_id } })}
+                                    onClick={() =>
+                                      navigate('/visualizer', {
+                                        state: {
+                                          documentId: version.document_id,
+                                          documentMeta: {
+                                            [version.document_id]: {
+                                              project: selectedProject.project_name ?? selectedProject.project_id ?? '-',
+                                              file: version.file_name || row.name,
+                                            },
+                                          },
+                                        },
+                                      })
+                                    }
                                   >
                                     Open Visualizer
                                   </button>

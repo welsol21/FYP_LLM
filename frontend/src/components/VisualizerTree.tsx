@@ -91,14 +91,14 @@ export function VisualizerTree({ node, depth = 0 }: Props) {
               <span
                 key={child.node_id}
                 className="child-content"
-                style={{ borderBottomColor: toneForLabel(childLabel) }}
+                style={{ textDecorationColor: toneForLabel(childLabel) }}
               >
                 {child.content}
               </span>
             )
           })
         ) : (
-          <span className="child-content own" style={{ borderBottomColor: borderColor }}>
+          <span className="child-content own" style={{ textDecorationColor: borderColor }}>
             {node.content}
           </span>
         )}

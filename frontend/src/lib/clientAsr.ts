@@ -91,11 +91,7 @@ async function getAsrPipeline(options?: AsrOptions): Promise<AsrPipeline> {
       try {
         const transformers = await import('@huggingface/transformers')
         const env = (transformers as unknown as { env?: Record<string, unknown> }).env
-        if (env && typeof env === 'object') {
-          ;(env as Record<string, unknown>).allowLocalModels = false
-          ;(env as Record<string, unknown>).allowRemoteModels = true
-          ;(env as Record<string, unknown>).useBrowserCache = true
-        }
+        configureTransformersEnv(env)
         const modelId = String(import.meta.env?.VITE_CLIENT_ASR_MODEL || 'Xenova/whisper-base.en').trim()
         const pipelineFactory = (transformers as unknown as {
           pipeline: (task: string, model: string, opts?: Record<string, unknown>) => Promise<AsrPipeline>
@@ -191,3 +187,4 @@ export async function transcribeMediaBlob(blob: Blob, options?: AsrOptions): Pro
   const result = await transcribeMediaBlobDetailed(blob, options)
   return result.text
 }
+import { configureTransformersEnv } from './transformersEnv'

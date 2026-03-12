@@ -1,6 +1,6 @@
 import type { VisualizerNode } from '../api/runtimeApi'
 
-const DEFAULT_CANONICAL_PROVIDER = 'backend_m2m100'
+const DEFAULT_CANONICAL_PROVIDER = 'm2m100'
 
 function normalizeProviderKey(value: string | undefined): string {
   return String(value || '').trim().toLowerCase().replace(/-/g, '_').replace(/ /g, '_')
@@ -8,9 +8,7 @@ function normalizeProviderKey(value: string | undefined): string {
 
 function canonicalizeProviderKey(value: string | undefined): string {
   const normalized = normalizeProviderKey(value)
-  if (!normalized) return ''
-  if (normalized.startsWith('backend_')) return normalized.slice('backend_'.length)
-  return normalized
+  return normalized || ''
 }
 
 function buildTranslationIndex(
@@ -33,13 +31,8 @@ function resolveByCanonicalProvider(
 ): TranslationVariant | null {
   const canonical = canonicalizeProviderKey(provider)
   if (!canonical) return null
-  const candidates = new Set<string>([canonical, `backend_${canonical}`])
-  for (const candidate of candidates) {
-    const text = index.get(candidate)
-    if (!text) continue
-    return { provider: canonical, text }
-  }
-  return null
+  const text = index.get(canonical)
+  return text ? { provider: canonical, text } : null
 }
 
 export function resolveNodeTranslation(

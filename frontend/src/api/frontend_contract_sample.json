@@ -203,7 +203,7 @@
             "cefr_level": "A1",
             "linguistic_elements": [],
             "translations": {
-              "backend_m2m100": {
+              "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "Она"
@@ -212,7 +212,7 @@
           }
         ],
         "translations": {
-          "backend_m2m100": {
+          "m2m100": {
             "source_lang": "en",
             "target_lang": "ru",
             "text": "Она"
@@ -347,7 +347,7 @@
             "cefr_level": "A1",
             "linguistic_elements": [],
             "translations": {
-              "backend_m2m100": {
+              "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "должно быть"
@@ -424,7 +424,7 @@
             "cefr_level": "A1",
             "linguistic_elements": [],
             "translations": {
-              "backend_m2m100": {
+              "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "Иметь"
@@ -506,7 +506,7 @@
             "cefr_level": "A1",
             "linguistic_elements": [],
             "translations": {
-              "backend_m2m100": {
+              "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "Доверяем"
@@ -583,7 +583,7 @@
             "cefr_level": "A1",
             "linguistic_elements": [],
             "translations": {
-              "backend_m2m100": {
+              "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "Ее"
@@ -664,7 +664,7 @@
             "cefr_level": "A2",
             "linguistic_elements": [],
             "translations": {
-              "backend_m2m100": {
+              "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "Инстинкт"
@@ -673,7 +673,7 @@
           }
         ],
         "translations": {
-          "backend_m2m100": {
+          "m2m100": {
             "source_lang": "en",
             "target_lang": "ru",
             "text": "Она должна доверять своим инстинктам."
@@ -809,7 +809,7 @@
             "cefr_level": "A1",
             "linguistic_elements": [],
             "translations": {
-              "backend_m2m100": {
+              "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "Ее"
@@ -891,7 +891,7 @@
             "cefr_level": "A2",
             "linguistic_elements": [],
             "translations": {
-              "backend_m2m100": {
+              "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "Инстинкт"
@@ -900,7 +900,7 @@
           }
         ],
         "translations": {
-          "backend_m2m100": {
+          "m2m100": {
             "source_lang": "en",
             "target_lang": "ru",
             "text": "Ее инстинкты"
@@ -1035,7 +1035,7 @@
             "cefr_level": "A1",
             "linguistic_elements": [],
             "translations": {
-              "backend_m2m100": {
+              "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "Прежде"
@@ -1118,7 +1118,7 @@
             "cefr_level": "A1",
             "linguistic_elements": [],
             "translations": {
-              "backend_m2m100": {
+              "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "Сделать"
@@ -1196,7 +1196,7 @@
             "cefr_level": "A1",
             "linguistic_elements": [],
             "translations": {
-              "backend_m2m100": {
+              "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "В"
@@ -1278,7 +1278,7 @@
             "cefr_level": "B1",
             "linguistic_elements": [],
             "translations": {
-              "backend_m2m100": {
+              "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "Решение"
@@ -1287,7 +1287,7 @@
           }
         ],
         "translations": {
-          "backend_m2m100": {
+          "m2m100": {
             "source_lang": "en",
             "target_lang": "ru",
             "text": "Перед принятием решения"
@@ -1296,7 +1296,7 @@
       }
     ],
     "translations": {
-      "backend_m2m100": {
+      "m2m100": {
         "source_lang": "en",
         "target_lang": "ru",
         "model": "facebook/m2m100_418M",

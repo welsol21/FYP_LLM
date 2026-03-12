@@ -16,6 +16,7 @@ import type {
 import { LocalWorkspace } from '../lib/localWorkspace'
 import { transcribeMediaBlobDetailed } from '../lib/clientAsr'
 import { renderTranslatedMediaArtifacts } from '../lib/clientMediaRender'
+import { configureTransformersEnv } from '../lib/transformersEnv'
 
 type SentenceContractPayload = {
   sentence_text?: string
@@ -179,11 +180,7 @@ async function getTranslationPipeline(): Promise<TranslationPipeline> {
       try {
         const transformers = await import('@huggingface/transformers')
         const env = (transformers as unknown as { env?: Record<string, unknown> }).env
-        if (env && typeof env === 'object') {
-          ;(env as Record<string, unknown>).allowLocalModels = false
-          ;(env as Record<string, unknown>).allowRemoteModels = true
-          ;(env as Record<string, unknown>).useBrowserCache = true
-        }
+        configureTransformersEnv(env)
         const modelId = String(import.meta.env?.VITE_CLIENT_TRANSLATION_MODEL || 'Xenova/m2m100_418M').trim()
         const pipelineFactory = (transformers as unknown as {
           pipeline: (task: string, model: string, opts?: Record<string, unknown>) => Promise<TranslationPipeline>
@@ -215,7 +212,7 @@ async function translateSentencesForArtifacts(
   const providerId = String(provider || '').trim().toLowerCase()
   if (!sentences.length) return []
   if (!providerId || providerId === 'original' || providerId === 'none') return sentences.map(() => '')
-  if (!['m2m100', 'backend_m2m100', 'hf', 'huggingface'].includes(providerId)) return sentences.map(() => '')
+  if (!['m2m100', 'hf', 'huggingface'].includes(providerId)) return sentences.map(() => '')
   if (import.meta.env.MODE === 'test') return sentences.map((s) => s)
   const loadTimeoutMs = Number(import.meta.env?.VITE_CLIENT_TRANSLATION_LOAD_TIMEOUT_MS || 45000)
   const sentenceTimeoutMs = Number(import.meta.env?.VITE_CLIENT_TRANSLATION_SENTENCE_TIMEOUT_MS || 15000)
