@@ -48,7 +48,7 @@ describe('FilesPage', () => {
     const fileInput = (await screen.findByLabelText('Media File')) as HTMLInputElement
     const file = new File(['hello'], 'lesson.mp3', { type: 'audio/mpeg' })
     fireEvent.change(fileInput, { target: { files: [file] } })
-    expect(await screen.findByText('lesson.mp3')).toBeInTheDocument()
+    expect(await screen.findByLabelText('file-row-file-3')).toBeInTheDocument()
   })
 
   it('shows analysis versions only after expanding a file row', async () => {
@@ -92,15 +92,15 @@ describe('FilesPage', () => {
     expect(screen.queryByText('Subs: Bi-sim')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'toggle-versions-file-1' }))
-    expect(await screen.findByText('Subs: Bi-sim')).toBeInTheDocument()
-    expect(screen.getByText('Proc: Force')).toBeInTheDocument()
+    expect(await screen.findAllByText('Subs: Bi-sim')).not.toHaveLength(0)
+    expect(screen.getAllByText('Proc: Force').length).toBeGreaterThan(0)
   })
 
   it('deletes file and its analysis versions', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderWithProviders(<FilesPage />)
     expect(await screen.findByLabelText('file-row-file-1')).toBeInTheDocument()
-    expect(screen.getByText('sample.mp4')).toBeInTheDocument()
+    expect(screen.getAllByText('sample.mp4').length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByRole('button', { name: 'delete-file-file-1' }))
 

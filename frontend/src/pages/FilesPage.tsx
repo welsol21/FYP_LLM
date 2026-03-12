@@ -9,6 +9,7 @@ type FileAnalysisVersion = {
   document_id: string
   updated_at: string
   settings: string
+  file_name: string
 }
 
 export function FilesPage() {
@@ -77,6 +78,7 @@ export function FilesPage() {
           document_id: String(row.document_id || ''),
           updated_at: String(row.updated_at || row.created_at || ''),
           settings: String(row.settings || ''),
+          file_name: String(row.file_name || fileRow.name || ''),
         }))
         .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at))
       out[fileId] = versions
@@ -178,100 +180,223 @@ export function FilesPage() {
       {uploading ? <p>Uploading...</p> : null}
       {uploadError ? <p style={{ color: '#ff6b6b' }}>{uploadError}</p> : null}
 
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Updated</th>
-            <th>Analyzed</th>
-            <th>Versions</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const versions = versionsByFileId[row.id] || []
-            const expanded = Boolean(expandedVersionsByFileId[row.id])
-            return (
-              <Fragment key={row.id}>
-                <tr onClick={() => onRowTap(row)} aria-label={`file-row-${row.id}`} style={{ cursor: 'pointer' }}>
-                  <td>{row.name}</td>
-                  <td>{new Date(row.updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                  <td>{row.analyzed ? 'Yes' : 'No'}</td>
-                  <td>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setExpandedVersionsByFileId((prev) => ({ ...prev, [row.id]: !expanded }))
-                      }}
-                      aria-label={`toggle-versions-${row.id}`}
-                    >
-                      {expanded ? `Hide versions (${versions.length})` : `Show versions (${versions.length})`}
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="secondary-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        void deleteFile(row.id)
-                      }}
-                      disabled={Boolean(deletingByFileId[row.id])}
-                      aria-label={`delete-file-${row.id}`}
-                    >
-                      {deletingByFileId[row.id] ? 'Deleting...' : 'Delete'}
-                    </button>
-                  </td>
-                </tr>
-                {expanded ? (
-                  <tr className="file-versions-row">
-                    <td colSpan={5}>
-                      {versions.length > 0 ? (
-                        <div className="file-versions-list">
-                          {versions.map((version) => (
-                            <section key={`${row.id}-${version.analysis_id}`} className="file-version-item">
-                              <div className="file-version-head">
-                                <strong>
-                                  {new Date(version.updated_at).toLocaleString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })}
-                                </strong>
-                                {version.document_id ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => navigate('/visualizer', { state: { documentId: version.document_id } })}
-                                  >
-                                    Open Visualizer
-                                  </button>
-                                ) : null}
-                              </div>
-                              <div className="analysis-feature-badges">
-                                {buildAnalysisFeatureBadges(version.settings).map((badge) => (
-                                  <span key={`${version.analysis_id}-${badge.key}`} className="badge analysis-feature-badge">
-                                    {badge.label}: {badge.value}
-                                  </span>
-                                ))}
-                              </div>
-                            </section>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="muted">No analysis versions yet.</span>
-                      )}
+      <div className="desktop-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Updated</th>
+              <th>Analyzed</th>
+              <th>Versions</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const versions = versionsByFileId[row.id] || []
+              const expanded = Boolean(expandedVersionsByFileId[row.id])
+              return (
+                <Fragment key={row.id}>
+                  <tr onClick={() => onRowTap(row)} aria-label={`file-row-${row.id}`} style={{ cursor: 'pointer' }}>
+                    <td>{row.name}</td>
+                    <td>{new Date(row.updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                    <td>{row.analyzed ? 'Yes' : 'No'}</td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setExpandedVersionsByFileId((prev) => ({ ...prev, [row.id]: !expanded }))
+                        }}
+                        aria-label={`toggle-versions-${row.id}`}
+                      >
+                        {expanded ? `Hide versions (${versions.length})` : `Show versions (${versions.length})`}
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void deleteFile(row.id)
+                        }}
+                        disabled={Boolean(deletingByFileId[row.id])}
+                        aria-label={`delete-file-${row.id}`}
+                      >
+                        {deletingByFileId[row.id] ? 'Deleting...' : 'Delete'}
+                      </button>
                     </td>
                   </tr>
-                ) : null}
-              </Fragment>
-            )
-          })}
-        </tbody>
-      </table>
+                  {expanded ? (
+                    <tr className="file-versions-row">
+                      <td colSpan={5}>
+                        {versions.length > 0 ? (
+                          <div className="file-versions-list">
+                            {versions.map((version) => (
+                              <section key={`${row.id}-${version.analysis_id}`} className="file-version-item">
+                                <div className="file-version-head">
+                                  <strong>
+                                    {new Date(version.updated_at).toLocaleString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </strong>
+                                  {version.document_id ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        navigate('/visualizer', {
+                                          state: {
+                                            documentId: version.document_id,
+                                            documentMeta: {
+                                              [version.document_id]: {
+                                                project: selectedProject.project_name ?? selectedProject.project_id ?? '-',
+                                                file: version.file_name || row.name,
+                                              },
+                                            },
+                                          },
+                                        })
+                                      }
+                                    >
+                                      Open Visualizer
+                                    </button>
+                                  ) : null}
+                                </div>
+                                <div className="analysis-feature-badges">
+                                  {buildAnalysisFeatureBadges(version.settings).map((badge) => (
+                                    <span key={`${version.analysis_id}-${badge.key}`} className="badge analysis-feature-badge">
+                                      {badge.label}: {badge.value}
+                                    </span>
+                                  ))}
+                                </div>
+                              </section>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="muted">No analysis versions yet.</span>
+                        )}
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mobile-records">
+        {rows.map((row) => {
+          const versions = versionsByFileId[row.id] || []
+          const expanded = Boolean(expandedVersionsByFileId[row.id])
+          return (
+            <article
+              key={`mobile-${row.id}`}
+              className="mobile-record-card"
+              onClick={() => onRowTap(row)}
+              aria-label={`mobile-file-row-${row.id}`}
+            >
+              <div className="mobile-record-head">
+                <h3 className="mobile-record-title">{row.name}</h3>
+              </div>
+              <div className="mobile-record-meta">
+                <div className="mobile-record-field">
+                  <span className="mobile-record-label">Updated</span>
+                  <span>{new Date(row.updated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                </div>
+                <div className="mobile-record-field">
+                  <span className="mobile-record-label">Analyzed</span>
+                  <span>{row.analyzed ? 'Yes' : 'No'}</span>
+                </div>
+                <div className="mobile-record-field">
+                  <span className="mobile-record-label">Versions</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setExpandedVersionsByFileId((prev) => ({ ...prev, [row.id]: !expanded }))
+                    }}
+                    aria-label={`mobile-toggle-versions-${row.id}`}
+                  >
+                    {expanded ? `Hide versions (${versions.length})` : `Show versions (${versions.length})`}
+                  </button>
+                </div>
+              </div>
+              <div className="mobile-record-actions">
+                <button
+                  type="button"
+                  className="secondary-btn mobile-record-action-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void deleteFile(row.id)
+                  }}
+                  disabled={Boolean(deletingByFileId[row.id])}
+                  aria-label={`mobile-delete-file-${row.id}`}
+                >
+                  {deletingByFileId[row.id] ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+              {expanded ? (
+                <div className="mobile-record-extra">
+                  {versions.length > 0 ? (
+                    <div className="file-versions-list">
+                      {versions.map((version) => (
+                        <section key={`mobile-${row.id}-${version.analysis_id}`} className="file-version-item">
+                          <div className="file-version-head">
+                            <strong>
+                              {new Date(version.updated_at).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </strong>
+                            {version.document_id ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  navigate('/visualizer', {
+                                    state: {
+                                      documentId: version.document_id,
+                                      documentMeta: {
+                                        [version.document_id]: {
+                                          project: selectedProject.project_name ?? selectedProject.project_id ?? '-',
+                                          file: version.file_name || row.name,
+                                        },
+                                      },
+                                    },
+                                  })
+                                }}
+                              >
+                                Open Visualizer
+                              </button>
+                            ) : null}
+                          </div>
+                          <div className="analysis-feature-badges">
+                            {buildAnalysisFeatureBadges(version.settings).map((badge) => (
+                              <span key={`mobile-${version.analysis_id}-${badge.key}`} className="badge analysis-feature-badge">
+                                {badge.label}: {badge.value}
+                              </span>
+                            ))}
+                          </div>
+                        </section>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="muted">No analysis versions yet.</span>
+                  )}
+                </div>
+              ) : null}
+            </article>
+          )
+        })}
+      </div>
     </section>
   )
 }

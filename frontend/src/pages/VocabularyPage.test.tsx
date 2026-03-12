@@ -8,7 +8,7 @@ import type { VisualizerNode, VisualizerPayload } from '../api/runtimeApi'
 describe('VocabularyPage', () => {
   it('shows only analyzed files', async () => {
     renderWithProviders(<VocabularyPage />)
-    expect(await screen.findByText('sample.mp4')).toBeInTheDocument()
+    expect(await screen.findByTestId('vocab-row-doc-1')).toBeInTheDocument()
     expect(screen.queryByText('draft.mp3')).not.toBeInTheDocument()
   })
 
@@ -17,8 +17,8 @@ describe('VocabularyPage', () => {
     const visualizerBtn = await screen.findByRole('button', { name: 'Visualizer' })
     expect(visualizerBtn).toBeDisabled()
 
-    const checkboxes = await screen.findAllByRole('checkbox')
-    fireEvent.click(checkboxes[0])
+    const row = await screen.findByTestId('vocab-row-doc-1')
+    fireEvent.click(row)
     expect(visualizerBtn).toBeEnabled()
   })
 
@@ -44,8 +44,8 @@ describe('VocabularyPage', () => {
     ])
 
     renderWithProviders(<VocabularyPage />, api)
-    expect(await screen.findByText('sample.mp4')).toBeInTheDocument()
-    expect(await screen.findByText('7')).toBeInTheDocument()
+    expect(await screen.findByTestId('vocab-row-doc-new')).toBeInTheDocument()
+    expect(await screen.findAllByText('7')).not.toHaveLength(0)
   })
 
   it('shows all analysis history versions for the same file', async () => {
@@ -84,8 +84,7 @@ describe('VocabularyPage', () => {
     ])
 
     renderWithProviders(<VocabularyPage />, api)
-    const rows = await screen.findAllByText('sample.mp4')
-    expect(rows.length).toBe(2)
+    expect((await screen.findAllByText('sample.mp4')).length).toBe(4)
   })
 
   it('exports selected provider translation rows', async () => {
@@ -138,10 +137,10 @@ describe('VocabularyPage', () => {
   it('deletes selected analyses from vocabulary table', async () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderWithProviders(<VocabularyPage />)
-    expect(await screen.findByText('sample.mp4')).toBeInTheDocument()
+    expect(await screen.findByTestId('vocab-row-doc-1')).toBeInTheDocument()
 
-    const checkboxes = await screen.findAllByRole('checkbox')
-    fireEvent.click(checkboxes[0])
+    const row = await screen.findByTestId('vocab-row-doc-1')
+    fireEvent.click(row)
     fireEvent.click(screen.getByRole('button', { name: 'Delete Analyses' }))
 
     await waitFor(() => {

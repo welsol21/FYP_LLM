@@ -423,7 +423,22 @@ export function AnalyzePage() {
       ) : null}
       {activeDocumentId ? (
         <section className="card compact-card" aria-label="analyze-open-visualizer">
-          <button type="button" onClick={() => navigate('/visualizer', { state: { documentId: activeDocumentId } })}>
+          <button
+            type="button"
+            onClick={() =>
+              navigate('/visualizer', {
+                state: {
+                  documentId: activeDocumentId,
+                  documentMeta: {
+                    [activeDocumentId]: {
+                      project: selectedProject.project_name ?? selectedProject.project_id ?? '-',
+                      file: activeMedia?.fileName || '-',
+                    },
+                  },
+                },
+              })
+            }
+          >
             Open Visualizer
           </button>
           <button
@@ -461,7 +476,19 @@ export function AnalyzePage() {
                         {item.document_id ? (
                           <button
                             type="button"
-                            onClick={() => navigate('/visualizer', { state: { documentId: item.document_id } })}
+                            onClick={() =>
+                              navigate('/visualizer', {
+                                state: {
+                                  documentId: item.document_id,
+                                  documentMeta: {
+                                    [item.document_id]: {
+                                      project: selectedProject.project_name ?? selectedProject.project_id ?? '-',
+                                      file: item.file_name,
+                                    },
+                                  },
+                                },
+                              })
+                            }
                             aria-label={`history-open-${item.file_name}`}
                           >
                             Open Visualizer

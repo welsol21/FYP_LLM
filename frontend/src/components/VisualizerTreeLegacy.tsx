@@ -221,7 +221,11 @@ export function VisualizerTreeLegacy({
 
       <div className="lv-content-line">
         {tokens.map((token, idx) => (
-          <span key={`${node.node_id}-${idx}-${token.text}`} className="lv-content-token" style={{ borderBottomColor: token.tone }}>
+          <span
+            key={`${node.node_id}-${idx}-${token.text}`}
+            className="lv-content-token"
+            style={{ textDecorationColor: token.tone }}
+          >
             {token.text}
           </span>
         ))}

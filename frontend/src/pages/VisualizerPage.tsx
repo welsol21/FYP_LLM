@@ -237,7 +237,7 @@ export function VisualizerPage() {
   const [isNarrowScreen, setIsNarrowScreen] = useState(
     typeof window !== 'undefined' ? window.innerWidth <= 860 : false,
   )
-  const [editorMode, setEditorMode] = useState<'quick' | 'translate' | 'none'>('quick')
+  const [editorMode, setEditorMode] = useState<'quick' | 'translate' | 'none'>('none')
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [nodeId, setNodeId] = useState('')
   const [selectedNodeLabel, setSelectedNodeLabel] = useState('')

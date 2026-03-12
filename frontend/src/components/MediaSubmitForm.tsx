@@ -50,7 +50,7 @@ export function MediaSubmitForm({
   const [selectedFileName, setSelectedFileName] = useState('')
   const [translator, setTranslator] = useState(defaultTranslator || 'm2m100')
   const [subtitles, setSubtitles] = useState('Bilingual (sequential)')
-  const [voice, setVoice] = useState('Male')
+  const [voice, setVoice] = useState('Dmitry (Male)')
   const [processingMode, setProcessingMode] = useState<'incremental' | 'force'>('incremental')
   const [submitting, setSubmitting] = useState(false)
   const currentControllerRef = useRef<AbortController | null>(null)
@@ -61,14 +61,10 @@ export function MediaSubmitForm({
     { label: 'Target only', value: 'target only' },
     { label: 'Source only', value: 'source only' },
   ]
-  const online = typeof navigator !== 'undefined' ? navigator.onLine : true
-  const voiceOptions: Array<{ label: string; value: string }> = online
-    ? [
-        { label: 'Male', value: 'client_male' },
-        { label: 'Dmitry (Male)', value: 'backend_dmitry' },
-        { label: 'Svetlana (Female)', value: 'backend_svetlana' },
-      ]
-    : [{ label: 'Male', value: 'client_male' }]
+  const voiceOptions: Array<{ label: string; value: string }> = [
+    { label: 'Dmitry (Male)', value: 'backend_dmitry' },
+    { label: 'Svetlana (Female)', value: 'backend_svetlana' },
+  ]
   const normalizedProjectLabel = String(projectLabel || '').trim()
   const showProjectLine = normalizedProjectLabel.length > 0 && normalizedProjectLabel !== '-'
   const normalizedFileLabel = String(selectedFileName || '').trim()
@@ -121,7 +117,7 @@ export function MediaSubmitForm({
         mediaFileId,
         translationProvider: translator,
         subtitlesMode: subtitleOptions.find((option) => option.label === subtitles)?.value || 'bilingual_sequential',
-        voiceChoice: voiceOptions.find((option) => option.label === voice)?.value || 'male',
+        voiceChoice: voiceOptions.find((option) => option.label === voice)?.value || 'backend_dmitry',
         forceFullReprocess: processingMode === 'force',
         onProgress,
         signal: controller.signal,

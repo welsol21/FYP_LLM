@@ -27,6 +27,8 @@ describe('VisualizerPage', () => {
       expect(screen.getByRole('button', { name: 'select-node-n1' })).toBeInTheDocument()
     })
 
+    fireEvent.click(screen.getByRole('button', { name: 'toggle-quick-edit' }))
+
     await waitFor(() => {
       expect(screen.getByText(/Selected Node:\s*sentence/i)).toBeInTheDocument()
       const editorInput = screen.getByLabelText('New Content') as HTMLInputElement | HTMLTextAreaElement
@@ -41,6 +43,7 @@ describe('VisualizerPage', () => {
       expect(screen.getByRole('button', { name: 'toggle-children-n1' })).toBeInTheDocument()
     })
 
+    fireEvent.click(screen.getByRole('button', { name: 'toggle-quick-edit' }))
     fireEvent.click(screen.getByRole('button', { name: 'toggle-children-n1' }))
     fireEvent.click(screen.getByRole('button', { name: 'select-node-n4' }))
     fireEvent.change(screen.getByLabelText(/New Content/), { target: { value: 'trusted them' } })
@@ -58,6 +61,7 @@ describe('VisualizerPage', () => {
       expect(screen.getByRole('button', { name: 'toggle-children-n1' })).toBeInTheDocument()
     })
 
+    fireEvent.click(screen.getByRole('button', { name: 'toggle-quick-edit' }))
     expect(screen.getByRole('button', { name: 'Linguistic Notes (Elementary)' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Linguistic Notes (Intermediate)' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Linguistic Notes (Advanced)' })).toBeInTheDocument()
@@ -160,6 +164,7 @@ describe('VisualizerPage', () => {
     expect(getVisualizerPayload).toHaveBeenCalledWith('doc-42')
     expect(screen.getByText('1 / 2')).toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole('button', { name: 'toggle-quick-edit' }))
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.getByRole('button', { name: 'toggle-quick-edit' })).toBeInTheDocument()
     expect(screen.queryByText(/Selected Node:/i)).not.toBeInTheDocument()
@@ -266,6 +271,7 @@ describe('VisualizerPage', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Sentence one.').length).toBeGreaterThan(0)
     })
+    fireEvent.click(screen.getByRole('button', { name: 'toggle-quick-edit' }))
     expect(screen.getByText(/Selected Node:/i)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))

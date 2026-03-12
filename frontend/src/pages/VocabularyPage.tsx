@@ -235,7 +235,7 @@ export function VocabularyPage() {
   const api = useApi()
   const navigate = useNavigate()
   const [rows, setRows] = useState<VocabRow[]>([])
-  const [checked, setChecked] = useState<Record<string, boolean>>({})
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [deleting, setDeleting] = useState(false)
@@ -279,7 +279,9 @@ export function VocabularyPage() {
 
       const loadFromHistory = async (): Promise<VocabRow[]> => {
         const history = await withRetry(() => api.listAnalysisHistory(), 5, 600)
-        return history.map((row) => mapHistoryRow(row))
+        return history
+          .filter((row) => row.contract_current !== false)
+          .map((row) => mapHistoryRow(row))
       }
 
       const loadLegacy = async (): Promise<VocabRow[]> => {
@@ -321,6 +323,7 @@ export function VocabularyPage() {
       }
       if (alive) {
         setRows(loaded)
+        setSelectedIds((prev) => prev.filter((id) => loaded.some((row) => row.id === id)))
         setLoading(false)
       }
     })()
@@ -329,8 +332,8 @@ export function VocabularyPage() {
     }
   }, [api])
 
-  const selectedCount = useMemo(() => Object.values(checked).filter(Boolean).length, [checked])
-  const selectedRows = useMemo(() => rows.filter((row) => checked[row.id]), [rows, checked])
+  const selectedCount = selectedIds.length
+  const selectedRows = useMemo(() => rows.filter((row) => selectedIds.includes(row.id)), [rows, selectedIds])
   const selectedDocumentId = selectedRows.find((row) => row.documentId)?.documentId ?? null
   const selectedDocumentIds = useMemo(
     () => Array.from(new Set(selectedRows.map((row) => row.documentId).filter((v): v is string => Boolean(v)))),
@@ -359,14 +362,11 @@ export function VocabularyPage() {
       )
       if (deletedIds.size > 0) {
         setRows((prev) => prev.filter((row) => !row.documentId || !deletedIds.has(row.documentId)))
-        setChecked((prev) => {
-          const next: Record<string, boolean> = {}
-          for (const row of rows) {
-            if (deletedIds.has(String(row.documentId || ''))) continue
-            if (prev[row.id]) next[row.id] = true
-          }
-          return next
-        })
+        setSelectedIds((prev) => prev.filter((id) => {
+          const row = rows.find((item) => item.id === id)
+          if (!row) return false
+          return !row.documentId || !deletedIds.has(String(row.documentId || ''))
+        }))
       }
       if (deletedIds.size !== selectedDocumentIds.length) {
         setLoadError('Some selected analyses were not deleted. Reload page and retry.')
@@ -500,45 +500,106 @@ export function VocabularyPage() {
       {loading ? <p className="muted">Loading analysis history...</p> : null}
       {!loading && loadError ? <p style={{ color: '#ff8a8a' }}>{loadError}</p> : null}
       {!loading && !loadError && rows.length === 0 ? <p className="muted">No analyzed history yet.</p> : null}
+      {rows.length > 0 ? <p className="muted">Tap row to select ({selectedCount} selected).</p> : null}
 
-      <table>
-        <thead>
-          <tr>
-            <th style={{ width: 36 }} />
-            <th>Project</th>
-            <th>File</th>
-            <th>Settings</th>
-            <th>Items</th>
-            <th>Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id}>
-              <td>
-                <input
-                  type="checkbox"
-                  checked={!!checked[row.id]}
-                  onChange={(e) => setChecked((prev) => ({ ...prev, [row.id]: e.target.checked }))}
-                />
-              </td>
-              <td>{row.project}</td>
-              <td>{row.file}</td>
-              <td>
-                <div className="analysis-feature-badges">
-                  {buildAnalysisFeatureBadges(row.settings).map((badge) => (
-                    <span key={`${row.id}-${badge.key}`} className="badge analysis-feature-badge">
-                      {badge.label}: {badge.value}
-                    </span>
-                  ))}
-                </div>
-              </td>
-              <td>{row.items}</td>
-              <td>{row.created}</td>
+      <div className="desktop-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>File</th>
+              <th>Settings</th>
+              <th>Items</th>
+              <th>Created</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const selected = selectedIds.includes(row.id)
+              return (
+                <tr
+                  key={row.id}
+                  data-testid={`vocab-row-${row.id}`}
+                  className={`vocab-row${selected ? ' is-selected' : ''}`}
+                  onClick={() => setSelectedIds((prev) => (prev.includes(row.id) ? prev.filter((id) => id !== row.id) : [...prev, row.id]))}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return
+                    event.preventDefault()
+                    setSelectedIds((prev) => (prev.includes(row.id) ? prev.filter((id) => id !== row.id) : [...prev, row.id]))
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={selected}
+                >
+                  <td>{row.project}</td>
+                  <td>{row.file}</td>
+                  <td>
+                    <div className="analysis-feature-badges">
+                      {buildAnalysisFeatureBadges(row.settings).map((badge) => (
+                        <span key={`${row.id}-${badge.key}`} className="badge analysis-feature-badge">
+                          {badge.label}: {badge.value}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td>{row.items}</td>
+                  <td>{row.created}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mobile-records">
+        {rows.map((row) => {
+          const selected = selectedIds.includes(row.id)
+          return (
+            <article
+              key={`mobile-${row.id}`}
+              data-testid={`mobile-vocab-row-${row.id}`}
+              className={`mobile-record-card${selected ? ' is-selected' : ''}`}
+              onClick={() => setSelectedIds((prev) => (prev.includes(row.id) ? prev.filter((id) => id !== row.id) : [...prev, row.id]))}
+              onKeyDown={(event) => {
+                if (event.key !== 'Enter' && event.key !== ' ') return
+                event.preventDefault()
+                setSelectedIds((prev) => (prev.includes(row.id) ? prev.filter((id) => id !== row.id) : [...prev, row.id]))
+              }}
+              role="button"
+              tabIndex={0}
+              aria-pressed={selected}
+            >
+              <div className="mobile-record-head">
+                <h3 className="mobile-record-title">{row.file}</h3>
+              </div>
+              <div className="mobile-record-meta">
+                <div className="mobile-record-field">
+                  <span className="mobile-record-label">Project</span>
+                  <span>{row.project}</span>
+                </div>
+                <div className="mobile-record-field">
+                  <span className="mobile-record-label">Items</span>
+                  <span>{row.items}</span>
+                </div>
+                <div className="mobile-record-field">
+                  <span className="mobile-record-label">Created</span>
+                  <span>{row.created}</span>
+                </div>
+                <div className="mobile-record-field">
+                  <span className="mobile-record-label">Settings</span>
+                  <div className="analysis-feature-badges">
+                    {buildAnalysisFeatureBadges(row.settings).map((badge) => (
+                      <span key={`mobile-${row.id}-${badge.key}`} className="badge analysis-feature-badge">
+                        {badge.label}: {badge.value}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </article>
+          )
+        })}
+      </div>
     </section>
   )
 }

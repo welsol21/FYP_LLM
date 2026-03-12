@@ -209,11 +209,7 @@ async function ensureTtsPipeline(onProgress?: ProgressCb): Promise<TtsPipeline> 
         try {
           const transformers = await import('@huggingface/transformers')
           const env = (transformers as unknown as { env?: Record<string, unknown> }).env
-          if (env && typeof env === 'object') {
-            ;(env as Record<string, unknown>).allowLocalModels = false
-            ;(env as Record<string, unknown>).allowRemoteModels = true
-            ;(env as Record<string, unknown>).useBrowserCache = true
-          }
+          configureTransformersEnv(env)
           const pipelineFactory = (transformers as unknown as {
             pipeline: (task: string, model: string, options?: Record<string, unknown>) => Promise<TtsPipeline>
           }).pipeline
@@ -1050,3 +1046,4 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
 if (import.meta.env.MODE !== 'test') {
   warmupTtsPipeline()
 }
+import { configureTransformersEnv } from './transformersEnv'
