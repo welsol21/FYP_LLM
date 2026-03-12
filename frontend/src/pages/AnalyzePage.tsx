@@ -421,39 +421,6 @@ export function AnalyzePage() {
           ) : null}
         </section>
       ) : null}
-      {activeDocumentId ? (
-        <section className="card compact-card" aria-label="analyze-open-visualizer">
-          <button
-            type="button"
-            onClick={() =>
-              navigate('/visualizer', {
-                state: {
-                  documentId: activeDocumentId,
-                  documentMeta: {
-                    [activeDocumentId]: {
-                      project: selectedProject.project_name ?? selectedProject.project_id ?? '-',
-                      file: activeMedia?.fileName || '-',
-                    },
-                  },
-                },
-              })
-            }
-          >
-            Open Visualizer
-          </button>
-          <button
-            type="button"
-            className="secondary-btn"
-            onClick={() => {
-              void deleteAnalysis(activeDocumentId)
-            }}
-            disabled={Boolean(deletingByDocumentId[activeDocumentId])}
-            aria-label="delete-active-analysis"
-          >
-            {deletingByDocumentId[activeDocumentId] ? 'Deleting...' : 'Delete analysis artifacts'}
-          </button>
-        </section>
-      ) : null}
       <section className="card compact-card" aria-label="analyze-history">
         <p className="stage-log-title">Analysis history</p>
         {historyLoading ? (
