@@ -84,7 +84,7 @@ describe('VisualizerPage', () => {
         linguistic_notes: [],
         part_of_speech: 'sentence',
         translations: {
-          backend_m2m100: { text: 'Sentence one.' },
+          m2m100: { text: 'Sentence one.' },
         },
         linguistic_elements: [],
       },
@@ -96,7 +96,7 @@ describe('VisualizerPage', () => {
         linguistic_notes: [],
         part_of_speech: 'sentence',
         translations: {
-          backend_m2m100: { text: 'Sentence two.' },
+          m2m100: { text: 'Sentence two.' },
         },
         linguistic_elements: [],
       },
@@ -194,7 +194,7 @@ describe('VisualizerPage', () => {
         linguistic_notes: [],
         part_of_speech: 'sentence',
         translations: {
-          backend_m2m100: { text: 'Sentence one.' },
+          m2m100: { text: 'Sentence one.' },
         },
         linguistic_elements: [],
       },
@@ -206,7 +206,7 @@ describe('VisualizerPage', () => {
         linguistic_notes: [],
         part_of_speech: 'sentence',
         translations: {
-          backend_m2m100: { text: 'Sentence two.' },
+          m2m100: { text: 'Sentence two.' },
         },
         linguistic_elements: [],
       },
@@ -301,7 +301,7 @@ describe('VisualizerPage', () => {
         part_of_speech: 'sentence',
         active_translation_provider: 'gpt',
         translations: {
-          backend_m2m100: { text: 'Backend translation', source_lang: 'en', target_lang: 'ru' },
+          m2m100: { text: 'Backend translation', source_lang: 'en', target_lang: 'ru' },
           gpt: { text: 'GPT translation', source_lang: 'en', target_lang: 'ru' },
         },
         linguistic_elements: [],
@@ -364,13 +364,13 @@ describe('VisualizerPage', () => {
       expect(screen.getByText('GPT translation')).toBeInTheDocument()
     })
     fireEvent.click(screen.getByRole('button', { name: 'toggle-translate-controls' }))
-    fireEvent.click(screen.getByRole('button', { name: 'backend_m2m100' }))
+    fireEvent.click(screen.getByRole('button', { name: 'M2M100' }))
     await waitFor(() => {
       expect(screen.getByText('Backend translation')).toBeInTheDocument()
     })
     expect(screen.getByRole('button', { name: 'More translations (1)' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'More translations (1)' }))
-    expect(screen.getByText('client_gpt:')).toBeInTheDocument()
+    expect(screen.getByText('ChatGPT:')).toBeInTheDocument()
     expect(screen.getByText('GPT translation')).toBeInTheDocument()
   })
 
@@ -383,7 +383,7 @@ describe('VisualizerPage', () => {
         tense: 'null',
         linguistic_notes: [],
         part_of_speech: 'sentence',
-        translations: { backend_m2m100: { text: 'A' } },
+        translations: { m2m100: { text: 'A' } },
         linguistic_elements: [],
       },
     }
@@ -395,7 +395,7 @@ describe('VisualizerPage', () => {
         tense: 'null',
         linguistic_notes: [],
         part_of_speech: 'sentence',
-        translations: { backend_m2m100: { text: 'B' } },
+        translations: { m2m100: { text: 'B' } },
         linguistic_elements: [],
       },
     }

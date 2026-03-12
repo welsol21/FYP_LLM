@@ -28,7 +28,7 @@ describe('HttpRuntimeApi', () => {
             linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
             part_of_speech: 'sentence',
             linguistic_elements: [],
-            translations: { backend_m2m100: { text: 'Она доверяла ему.' } },
+            translations: { m2m100: { text: 'Она доверяла ему.' } },
           },
         }
         return new Response(JSON.stringify(payload), {
@@ -80,7 +80,7 @@ describe('HttpRuntimeApi', () => {
             linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
             part_of_speech: 'sentence',
             linguistic_elements: [],
-            translations: { backend_m2m100: { text: 'Она доверяла ему.' } },
+            translations: { m2m100: { text: 'Она доверяла ему.' } },
           },
         }
         return new Response(JSON.stringify(payload), {
@@ -148,7 +148,7 @@ describe('HttpRuntimeApi', () => {
         linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
         part_of_speech: 'sentence',
         linguistic_elements: [],
-        translations: { backend_m2m100: { text: 'Она пришла домой.' } },
+        translations: { m2m100: { text: 'Она пришла домой.' } },
       },
     }
 
@@ -193,6 +193,102 @@ describe('HttpRuntimeApi', () => {
     expect(tracked?.document_id).toBeUndefined()
     const history = await LocalWorkspace.listAnalysisHistory(projectId)
     expect(history.length).toBe(0)
+  })
+
+  it('enriches visualizer payload with translations from other analysis versions of the same file', async () => {
+    const selected = await LocalWorkspace.getSelectedProject()
+    const projectId = String(selected.project_id || '')
+    const file = await LocalWorkspace.registerMediaFile({
+      projectId,
+      name: 'providers-test.mp3',
+      mediaPath: '/uploads/providers-test.mp3',
+      sizeBytes: 128,
+      durationSec: 3,
+    })
+
+    const baseContract = {
+      'She came home.': {
+        node_id: 's-1',
+        type: 'Sentence',
+        content: 'She came home.',
+        tense: 'past',
+        linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
+        part_of_speech: 'sentence',
+        active_translation_provider: 'm2m100',
+        linguistic_elements: [
+          {
+            node_id: 'w-1',
+            type: 'Word',
+            content: 'came',
+            tense: 'past',
+            linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
+            part_of_speech: 'verb',
+            active_translation_provider: 'm2m100',
+            linguistic_elements: [],
+            translations: { m2m100: { text: 'пришла' } },
+          },
+        ],
+        translations: { m2m100: { text: 'Она пришла домой.' } },
+      },
+    }
+
+    const gptContract = {
+      'She came home.': {
+        node_id: 's-1',
+        type: 'Sentence',
+        content: 'She came home.',
+        tense: 'past',
+        linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
+        part_of_speech: 'sentence',
+        active_translation_provider: 'gpt',
+        linguistic_elements: [
+          {
+            node_id: 'w-1',
+            type: 'Word',
+            content: 'came',
+            tense: 'past',
+            linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
+            part_of_speech: 'verb',
+            active_translation_provider: 'gpt',
+            linguistic_elements: [],
+            translations: { gpt: { text: 'вернулась' } },
+          },
+        ],
+        translations: { gpt: { text: 'Она вернулась домой.' } },
+      },
+    }
+
+    await LocalWorkspace.upsertAnalysis({
+      documentId: 'doc-m2m100',
+      projectId,
+      mediaFileId: file.id,
+      fileName: file.name,
+      filePath: file.path || '',
+      sizeBytes: file.size_bytes,
+      durationSeconds: file.duration_seconds,
+      settings: 'Transl: m2m100 / Subs: bilingual_sequential / Voice: male / Proc: incremental',
+      contract: baseContract,
+    })
+
+    await LocalWorkspace.upsertAnalysis({
+      documentId: 'doc-gpt',
+      projectId,
+      mediaFileId: file.id,
+      fileName: file.name,
+      filePath: file.path || '',
+      sizeBytes: file.size_bytes,
+      durationSeconds: file.duration_seconds,
+      settings: 'Transl: gpt / Subs: bilingual_sequential / Voice: male / Proc: incremental',
+      contract: gptContract,
+    })
+
+    const payload = await LocalWorkspace.getVisualizerPayload('doc-m2m100')
+    const sentenceNode = payload['She came home.']
+    expect(sentenceNode.translations.m2m100.text).toBe('Она пришла домой.')
+    expect(sentenceNode.translations.gpt.text).toBe('Она вернулась домой.')
+    expect(sentenceNode.active_translation_provider).toBe('m2m100')
+    expect(sentenceNode.linguistic_elements[0].translations.m2m100.text).toBe('пришла')
+    expect(sentenceNode.linguistic_elements[0].translations.gpt.text).toBe('вернулась')
   })
 
   it('deletes project with cascade cleanup for files and analyses', async () => {

@@ -9,7 +9,7 @@ class EnrichmentQualityControlTests(unittest.TestCase):
             "She trusted him.": {
                 "type": "Sentence",
                 "content": "She trusted him.",
-                "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}},
+                "translations": {"m2m100": {"source_lang": "en", "target_lang": "ru", "text": "Она доверяла ему."}},
                 "phonetic": {"uk": "ʃi", "us": "ʃi"},
                 "synonyms": ["depend", "rely on"],
                 "cefr_level": "A2",
@@ -17,7 +17,7 @@ class EnrichmentQualityControlTests(unittest.TestCase):
                     {
                         "type": "Phrase",
                         "content": "trusted him",
-                        "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "доверяла ему"}},
+                        "translations": {"m2m100": {"source_lang": "en", "target_lang": "ru", "text": "доверяла ему"}},
                         "phonetic": {"uk": "t", "us": "t"},
                         "synonyms": ["trust"],
                         "cefr_level": "A2",
@@ -25,7 +25,7 @@ class EnrichmentQualityControlTests(unittest.TestCase):
                             {
                                 "type": "Word",
                                 "content": "trusted",
-                                "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "доверяла"}},
+                                "translations": {"m2m100": {"source_lang": "en", "target_lang": "ru", "text": "доверяла"}},
                                 "phonetic": {"uk": "t", "us": "t"},
                                 "synonyms": ["rely on", "bank on"],
                                 "cefr_level": "B1",
@@ -34,7 +34,7 @@ class EnrichmentQualityControlTests(unittest.TestCase):
                             {
                                 "type": "Word",
                                 "content": "him",
-                                "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": ""}},
+                                "translations": {"m2m100": {"source_lang": "en", "target_lang": "ru", "text": ""}},
                                 "phonetic": {"uk": "h", "us": ""},
                                 "synonyms": ["", "same", "same"],
                                 "cefr_level": "B3",
@@ -68,7 +68,7 @@ class EnrichmentQualityControlTests(unittest.TestCase):
             "S.": {
                 "type": "Sentence",
                 "content": "S.",
-                "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "S"}},
+                "translations": {"m2m100": {"source_lang": "en", "target_lang": "ru", "text": "S"}},
                 "phonetic": {"uk": "s", "us": "s"},
                 "synonyms": [],
                 "cefr_level": "A1",
@@ -77,7 +77,7 @@ class EnrichmentQualityControlTests(unittest.TestCase):
                         "type": "Word",
                         "content": "the",
                         "part_of_speech": "article",
-                        "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "the"}},
+                        "translations": {"m2m100": {"source_lang": "en", "target_lang": "ru", "text": "the"}},
                         "phonetic": {"uk": "ðə", "us": "ðə"},
                         "synonyms": [],
                         "cefr_level": "A1",
@@ -87,7 +87,7 @@ class EnrichmentQualityControlTests(unittest.TestCase):
                         "type": "Word",
                         "content": "decision",
                         "part_of_speech": "noun",
-                        "translations": {"backend_m2m100": {"source_lang": "en", "target_lang": "ru", "text": "decision"}},
+                        "translations": {"m2m100": {"source_lang": "en", "target_lang": "ru", "text": "decision"}},
                         "phonetic": {"uk": "d", "us": "d"},
                         "synonyms": [],
                         "cefr_level": "B1",

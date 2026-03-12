@@ -26,13 +26,13 @@ def blank_node(node_type: str, content: str, part_of_speech: str, tense: str = "
         "schema_version": "v2",
         "part_of_speech": part_of_speech,
         "translations": {
-            "backend_m2m100": {
+            "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": text,
             }
         },
-        "active_translation_provider": "backend_m2m100",
+        "active_translation_provider": "m2m100",
         "linguistic_elements": [],
     }
 

@@ -97,7 +97,7 @@ describe('VocabularyPage', () => {
         linguistic_notes: [],
         part_of_speech: 'sentence',
         translations: {
-          backend_m2m100: { text: 'Sentence one.' },
+          m2m100: { text: 'Sentence one.' },
         },
         linguistic_elements: [
           {
@@ -109,7 +109,7 @@ describe('VocabularyPage', () => {
             part_of_speech: 'pronoun',
             linguistic_elements: [],
             translations: {
-              backend_m2m100: { text: 'Она' },
+              m2m100: { text: 'Она' },
               gpt: { text: 'Она (GPT)' },
             },
           },
@@ -130,7 +130,7 @@ describe('VocabularyPage', () => {
     const rows = toExportRows(row)
     expect(rows[0].translation_provider).toBe('gpt')
     expect(rows[0].translation).toBe('Она (GPT)')
-    expect(rows[0].translations_json).toContain('backend_m2m100')
+    expect(rows[0].translations_json).toContain('m2m100')
     expect(rows[0].translations_json).toContain('gpt')
   })
 

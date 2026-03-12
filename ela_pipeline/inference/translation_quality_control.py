@@ -48,7 +48,7 @@ def _extract_translation_probe_stats(
         if not isinstance(translations, dict):
             missing_translation_nodes += 1
             continue
-        tr = translations.get("backend_m2m100")
+        tr = translations.get("m2m100")
         if not isinstance(tr, dict):
             rows = [row for row in translations.values() if isinstance(row, dict)]
             tr = rows[0] if rows else None
@@ -66,7 +66,7 @@ def _extract_translation_probe_stats(
     sentence_tr = None
     root_translations = root.get("translations")
     if isinstance(root_translations, dict):
-        sentence_tr = root_translations.get("backend_m2m100")
+        sentence_tr = root_translations.get("m2m100")
         if not isinstance(sentence_tr, dict):
             rows = [row for row in root_translations.values() if isinstance(row, dict)]
             sentence_tr = rows[0] if rows else None

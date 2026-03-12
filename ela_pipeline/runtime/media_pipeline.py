@@ -113,7 +113,7 @@ def _tokenize_semantic_units(text: str, *, start_sec: float, end_sec: float) -> 
 def _extract_translation_text(sentence_node: dict[str, Any]) -> str:
     translations = sentence_node.get("translations")
     if isinstance(translations, dict):
-        preferred = translations.get("backend_m2m100")
+        preferred = translations.get("m2m100")
         if isinstance(preferred, dict):
             text = str(preferred.get("text") or "").strip()
             if text:
@@ -540,13 +540,13 @@ def _attach_translation_runtime(
             source_text = str(node.get("content") or "").strip()
             translated = translator.translate_text(source_text, source_lang=source_lang, target_lang=target_lang)
             node["translations"] = {
-                "backend_m2m100": {
+                "m2m100": {
                     "source_lang": source_lang,
                     "target_lang": target_lang,
                     "text": translated,
                 }
             }
-            node["active_translation_provider"] = "backend_m2m100"
+            node["active_translation_provider"] = "m2m100"
 
 
 def apply_translation_to_sentence_node(
@@ -569,7 +569,7 @@ def apply_translation_to_sentence_node(
         translations = node.get("translations")
         if not isinstance(translations, dict):
             continue
-        row = translations.get("backend_m2m100")
+        row = translations.get("m2m100")
         if isinstance(row, dict):
             existing_text_by_node_id[id(node)] = str(row.get("text") or "").strip()
 
@@ -592,7 +592,7 @@ def apply_translation_to_sentence_node(
         translations = node.get("translations")
         if not isinstance(translations, dict):
             continue
-        tr = translations.get("backend_m2m100")
+        tr = translations.get("m2m100")
         if not isinstance(tr, dict):
             continue
 

@@ -230,7 +230,7 @@ class RuntimeClientAPITests(unittest.TestCase):
                     "source_span": {"start": 0, "end": 16},
                     "schema_version": "v2",
                     "translations": {
-                        "backend_m2m100": {
+                        "m2m100": {
                             "text": "Она доверяла ему.",
                             "source_lang": "en",
                             "target_lang": "ru",

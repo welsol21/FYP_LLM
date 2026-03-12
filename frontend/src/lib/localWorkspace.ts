@@ -10,6 +10,7 @@ import type {
 } from '../api/runtimeApi'
 import initSqlJs from 'sql.js'
 import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
+import { getTranslationProviderFromSettings } from './analysisSettings'
 
 const STORAGE_KEY = 'ela_frontend_workspace_sqlite_b64_v1'
 const OPFS_DB_FILE = 'ela_frontend_workspace.sqlite'
@@ -374,6 +375,117 @@ function matchAnalysisToFile(file: WorkspaceFile, analysis: WorkspaceAnalysis): 
   if (analysisFileId && fileId && analysisFileId === fileId) return true
   if (analysisFilePath && filePath && analysisFilePath === filePath) return true
   return Boolean(analysisFileName && fileName && analysisFileName === fileName)
+}
+
+function matchAnalysisToAnalysis(target: WorkspaceAnalysis, candidate: WorkspaceAnalysis): boolean {
+  if (target.project_id !== candidate.project_id) return false
+  const targetFileId = String(target.media_file_id || '').trim()
+  const candidateFileId = String(candidate.media_file_id || '').trim()
+  if (targetFileId && candidateFileId && targetFileId === candidateFileId) return true
+  const targetPath = String(target.file_path || '').trim()
+  const candidatePath = String(candidate.file_path || '').trim()
+  if (targetPath && candidatePath && targetPath === candidatePath) return true
+  const targetName = String(target.file_name || '').trim().toLowerCase()
+  const candidateName = String(candidate.file_name || '').trim().toLowerCase()
+  return Boolean(targetName && candidateName && targetName === candidateName)
+}
+
+function normalizeProviderKey(value: string | undefined): string {
+  const raw = String(value || '').trim().toLowerCase().replace(/-/g, '_').replace(/ /g, '_')
+  return raw || ''
+}
+
+function analysisProviderOf(row: WorkspaceAnalysis): string {
+  const fromSettings = normalizeProviderKey(getTranslationProviderFromSettings(row.settings || '', 'm2m100'))
+  if (fromSettings) return fromSettings
+  const firstNode = Object.values(row.contract || {})[0]
+  const active = normalizeProviderKey(firstNode?.active_translation_provider)
+  if (active) return active
+  const firstKey = firstNode?.translations && typeof firstNode.translations === 'object'
+    ? normalizeProviderKey(Object.keys(firstNode.translations)[0])
+    : ''
+  return firstKey || 'm2m100'
+}
+
+function buildNodeIndex(root: VisualizerNode): Map<string, VisualizerNode> {
+  const out = new Map<string, VisualizerNode>()
+  const stack: VisualizerNode[] = [root]
+  while (stack.length > 0) {
+    const node = stack.pop() as VisualizerNode
+    out.set(String(node.node_id || ''), node)
+    for (const child of node.linguistic_elements || []) stack.push(child)
+  }
+  return out
+}
+
+function pickTranslationRowForProvider(
+  node: VisualizerNode,
+  provider: string,
+): { text: string; source_lang?: string; target_lang?: string; created_at?: string; origin?: string } | null {
+  const translations = node.translations || {}
+  for (const [key, row] of Object.entries(translations)) {
+    if (normalizeProviderKey(key) !== provider) continue
+    if (row && String(row.text || '').trim()) return row
+  }
+  const active = normalizeProviderKey(node.active_translation_provider)
+  if (active === provider) {
+    const first = Object.values(translations).find((row) => String(row?.text || '').trim())
+    if (first) return first
+  }
+  return null
+}
+
+function enrichContractTranslationsFromAnalyses(
+  baseContract: VisualizerPayload,
+  baseRow: WorkspaceAnalysis,
+  analyses: WorkspaceAnalysis[],
+): VisualizerPayload {
+  const enriched = clone(baseContract)
+  const providerSeen = new Set<string>()
+  for (const sentenceNode of Object.values(enriched)) {
+    const active = normalizeProviderKey(sentenceNode.active_translation_provider)
+    if (active) providerSeen.add(active)
+  }
+
+  const related = analyses
+    .filter((row) => row.document_id !== baseRow.document_id)
+    .filter((row) => row.contract_current !== false)
+    .filter((row) => matchAnalysisToAnalysis(baseRow, row))
+    .sort((a, b) => Date.parse(String(b.updated_at || '')) - Date.parse(String(a.updated_at || '')))
+
+  for (const relatedRow of related) {
+    const provider = analysisProviderOf(relatedRow)
+    if (!provider || providerSeen.has(provider)) continue
+    let addedAny = false
+    for (const [sentenceText, baseSentenceNode] of Object.entries(enriched)) {
+      const relatedSentenceNode = relatedRow.contract[sentenceText]
+      if (!relatedSentenceNode) continue
+      const baseIndex = buildNodeIndex(baseSentenceNode)
+      const relatedIndex = buildNodeIndex(relatedSentenceNode)
+      for (const [nodeId, targetNode] of baseIndex.entries()) {
+        const sourceNode = relatedIndex.get(nodeId)
+        if (!sourceNode) continue
+        const picked = pickTranslationRowForProvider(sourceNode, provider)
+        if (!picked || !String(picked.text || '').trim()) continue
+        if (!targetNode.translations || typeof targetNode.translations !== 'object') {
+          targetNode.translations = {}
+        }
+        if (!targetNode.translations[provider] || !String(targetNode.translations[provider].text || '').trim()) {
+          targetNode.translations[provider] = {
+            text: String(picked.text || '').trim(),
+            source_lang: picked.source_lang || 'en',
+            target_lang: picked.target_lang || 'ru',
+            created_at: picked.created_at,
+            origin: picked.origin || 'provider',
+          }
+          addedAny = true
+        }
+      }
+    }
+    if (addedAny) providerSeen.add(provider)
+  }
+
+  return enriched
 }
 
 function syncFileAnalysisFlags(state: WorkspaceState): void {
@@ -900,7 +1012,8 @@ export const LocalWorkspace = {
     const state = await ensureState()
     const row = state.analyses.find((a) => a.document_id === docId || a.analysis_id === docId)
     if (row?.contract_current === false) return {}
-    return clone(row?.contract || {})
+    if (!row) return {}
+    return enrichContractTranslationsFromAnalyses(row.contract || {}, row, state.analyses)
   },
 
   async applyEdit(input: {

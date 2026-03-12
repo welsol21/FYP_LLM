@@ -66,7 +66,7 @@ export function parseAnalysisSettings(settings: string): ParsedAnalysisSettings 
   return parsed
 }
 
-export function getTranslationProviderFromSettings(settings: string, fallback = 'backend_m2m100'): string {
+export function getTranslationProviderFromSettings(settings: string, fallback = 'm2m100'): string {
   const parsed = parseAnalysisSettings(settings)
   return parsed.translator || fallback
 }

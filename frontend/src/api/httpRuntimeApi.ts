@@ -212,7 +212,7 @@ async function translateSentencesForArtifacts(
   const providerId = String(provider || '').trim().toLowerCase()
   if (!sentences.length) return []
   if (!providerId || providerId === 'original' || providerId === 'none') return sentences.map(() => '')
-  if (!['m2m100', 'backend_m2m100', 'hf', 'huggingface'].includes(providerId)) return sentences.map(() => '')
+  if (!['m2m100', 'hf', 'huggingface'].includes(providerId)) return sentences.map(() => '')
   if (import.meta.env.MODE === 'test') return sentences.map((s) => s)
   const loadTimeoutMs = Number(import.meta.env?.VITE_CLIENT_TRANSLATION_LOAD_TIMEOUT_MS || 45000)
   const sentenceTimeoutMs = Number(import.meta.env?.VITE_CLIENT_TRANSLATION_SENTENCE_TIMEOUT_MS || 15000)

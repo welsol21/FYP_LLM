@@ -18,8 +18,8 @@ class NoteContextPromptTests(unittest.TestCase):
             "finiteness": "finite",
             "tam_construction": "modal_perfect",
             "grammar_classes": [{"class_id": "modal_perfect", "confidence": 0.9}],
-            "translations": {"backend_m2m100": {"text": "..."}} ,
-            "active_translation_provider": "backend_m2m100",
+            "translations": {"m2m100": {"text": "..."}} ,
+            "active_translation_provider": "m2m100",
             "linguistic_elements": [],
         }
         node = {
@@ -35,8 +35,8 @@ class NoteContextPromptTests(unittest.TestCase):
             "finiteness": "finite",
             "tam_construction": "modal_perfect",
             "grammar_classes": [{"class_id": "modal_perfect", "confidence": 0.9}],
-            "translations": {"backend_m2m100": {"text": "..."}} ,
-            "active_translation_provider": "backend_m2m100",
+            "translations": {"m2m100": {"text": "..."}} ,
+            "active_translation_provider": "m2m100",
             "linguistic_notes": ["legacy"],
             "linguistic_elements": [],
         }
@@ -52,7 +52,7 @@ class NoteContextPromptTests(unittest.TestCase):
         self.assertIn("self.type=Phrase", prompt)
         self.assertIn("self.grammar_classes=modal_perfect", prompt)
         self.assertNotIn("should have trusted", prompt)
-        self.assertNotIn("backend_m2m100", prompt)
+        self.assertNotIn("m2m100", prompt)
         self.assertNotIn("legacy", prompt)
 
 

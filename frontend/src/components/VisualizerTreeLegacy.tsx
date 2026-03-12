@@ -79,10 +79,13 @@ function textColorForBg(hexColor: string): string {
 }
 
 function providerLabel(provider: string | undefined): string {
-  const normalized = String(provider || '').trim()
+  const normalized = String(provider || '').trim().toLowerCase()
   if (!normalized) return '-'
-  if (normalized.startsWith('client_')) return normalized
-  return `client_${normalized}`
+  if (normalized === 'm2m100') return 'M2M100'
+  if (normalized === 'gpt') return 'ChatGPT'
+  if (normalized === 'hf' || normalized === 'huggingface') return 'HuggingFace'
+  if (normalized === 'original' || normalized === 'none') return 'Original'
+  return normalized
 }
 
 function nodeTokens(node: VisualizerNode, level: number): Token[] {

@@ -9,13 +9,13 @@ from ela_pipeline.hil.review_schema import (
 class HILReviewSchemaTests(unittest.TestCase):
     def test_review_field_root(self):
         self.assertEqual(review_field_root("notes[0].text"), "notes")
-        self.assertEqual(review_field_root("translations.backend_m2m100.text"), "translations")
+        self.assertEqual(review_field_root("translations.m2m100.text"), "translations")
         self.assertEqual(review_field_root("cefr_level"), "cefr_level")
         self.assertIsNone(review_field_root(""))
 
     def test_allowed_review_field_paths(self):
         self.assertTrue(is_allowed_review_field_path("notes[0].text"))
-        self.assertTrue(is_allowed_review_field_path("translations.backend_m2m100.text"))
+        self.assertTrue(is_allowed_review_field_path("translations.m2m100.text"))
         self.assertTrue(is_allowed_review_field_path("phonetic.uk"))
         self.assertTrue(is_allowed_review_field_path("features.number"))
         self.assertTrue(is_allowed_review_field_path("cefr_level"))

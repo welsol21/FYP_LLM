@@ -32,7 +32,7 @@ from .ui_state import build_runtime_ui_state, build_submission_ui_feedback
 
 TRANSLATION_CONFIG_STATE_KEY = "translation_config"
 MEDIA_FILE_SETTINGS_PREFIX = "media_file_settings:"
-BACKEND_TRANSLATION_PROVIDER_KEY = "backend_m2m100"
+BACKEND_TRANSLATION_PROVIDER_KEY = "m2m100"
 MEDIA_STAGE_MANIFEST_PREFIX = "media_stage_manifest:"
 CONTRACT_BUILD_VERSION = "2026-03-04-rulesfirst-v1"
 FRONTEND_INTERNAL_PROJECT_ID = "_frontend_internal_project"
