@@ -399,7 +399,7 @@ export function VocabularyPage() {
   }, [pendingExportFormat, resolveRowsForExport, selectedCount, selectedExportFields, selectedRows])
 
   return (
-    <section className="screen-block">
+    <section className="screen-block vocabulary-page">
       <div className="page-head">
         <h2 className="page-title">Vocabulary</h2>
         <div className="actions-row">

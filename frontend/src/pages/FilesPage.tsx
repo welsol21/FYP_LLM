@@ -138,7 +138,7 @@ export function FilesPage() {
   }
 
   return (
-    <section className="screen-block">
+    <section className="screen-block files-page">
       <div className="page-head">
         <h2 className="page-title">{selectedProject.project_name ?? selectedProject.project_id ?? 'Project'}</h2>
         <button type="button" className="secondary-btn" onClick={() => inputRef.current?.click()}>

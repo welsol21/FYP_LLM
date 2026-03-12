@@ -92,7 +92,7 @@ export function ProjectsPage() {
   }
 
   return (
-    <section className="screen-block">
+    <section className="screen-block projects-page">
       <div className="page-head">
         <h2 className="page-title">Projects</h2>
         <button type="button" className="secondary-btn" onClick={onNewProject} disabled={creatingProject}>
@@ -173,23 +173,25 @@ export function ProjectsPage() {
                   <span className="mobile-record-label">Analyzed</span>
                   <span>{`${stat.analyzed}/${stat.total}`}</span>
                 </div>
+                {typeof api.deleteProject === 'function' ? (
+                  <div className="mobile-record-field mobile-record-field-delete">
+                    <button
+                      type="button"
+                      className="secondary-btn mobile-project-delete-btn"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void onDeleteProject(row)
+                      }}
+                      disabled={Boolean(deletingByProjectId[row.id])}
+                      aria-label={`mobile-delete-project-${row.id}`}
+                    >
+                      <span className="mobile-project-delete-btn-text">
+                        {deletingByProjectId[row.id] ? 'Deleting...' : 'Delete'}
+                      </span>
+                    </button>
+                  </div>
+                ) : null}
               </div>
-              {typeof api.deleteProject === 'function' ? (
-                <div className="mobile-record-actions">
-                  <button
-                    type="button"
-                    className="secondary-btn mobile-record-action-btn"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      void onDeleteProject(row)
-                    }}
-                    disabled={Boolean(deletingByProjectId[row.id])}
-                    aria-label={`mobile-delete-project-${row.id}`}
-                  >
-                    {deletingByProjectId[row.id] ? 'Deleting...' : 'Delete'}
-                  </button>
-                </div>
-              ) : null}
             </article>
           )
         })}

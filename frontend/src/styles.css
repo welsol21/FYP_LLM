@@ -1109,6 +1109,111 @@ button {
     gap: 10px;
   }
 
+  .projects-page .mobile-record-card,
+  .files-page .mobile-record-card {
+    margin: 0 14px 10px;
+    padding: 10px 12px;
+    gap: 8px;
+    border-radius: 10px;
+  }
+
+  .projects-page .mobile-record-head,
+  .files-page .mobile-record-head {
+    align-items: center;
+    gap: 10px;
+  }
+
+  .projects-page .mobile-record-title,
+  .files-page .mobile-record-title {
+    font-size: 20px;
+    line-height: 1.15;
+    flex: 1;
+  }
+
+  .projects-page .mobile-record-meta,
+  .files-page .mobile-record-meta {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px 12px;
+    align-items: start;
+  }
+
+  .projects-page .mobile-record-field,
+  .files-page .mobile-record-field {
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .projects-page .mobile-record-field span:last-child,
+  .files-page .mobile-record-field span:last-child {
+    font-size: 14px;
+    line-height: 1.25;
+    word-break: break-word;
+  }
+
+  .projects-page .mobile-record-label,
+  .files-page .mobile-record-label {
+    font-size: 12px;
+  }
+
+  .projects-page .mobile-record-actions,
+  .files-page .mobile-record-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .projects-page .mobile-record-meta {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .projects-page .mobile-record-field-delete {
+    align-self: stretch;
+  }
+
+  .projects-page .mobile-project-delete-btn {
+    min-width: 0;
+    width: 100%;
+    min-height: 44px;
+    height: 100%;
+    padding: 6px 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .projects-page .mobile-project-delete-btn-text {
+    display: inline-block;
+    white-space: nowrap;
+    font-size: 12px;
+    line-height: 1;
+  }
+
+  .projects-page .mobile-record-action-btn,
+  .files-page .mobile-record-action-btn {
+    min-height: 44px;
+  }
+
+  .vocabulary-page .desktop-table {
+    display: block;
+    overflow-x: auto;
+    margin: 0 14px 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .vocabulary-page .desktop-table table {
+    min-width: 720px;
+  }
+
+  .vocabulary-page .desktop-table th,
+  .vocabulary-page .desktop-table td {
+    padding: 8px 10px;
+    font-size: 14px;
+    vertical-align: top;
+  }
+
+  .vocabulary-page .mobile-records {
+    display: none;
+  }
+
   .visualizer-root {
     gap: 10px;
   }
