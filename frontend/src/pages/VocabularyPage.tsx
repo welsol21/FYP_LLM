@@ -401,65 +401,63 @@ export function VocabularyPage() {
   return (
     <section className="screen-block vocabulary-page">
       <div className="page-head">
-        <h2 className="page-title">Vocabulary</h2>
-        <div className="actions-row">
-          <button
-            type="button"
-            className="secondary-btn"
-            disabled={!selectedDocumentId}
-            onClick={() => {
-              if (!selectedDocumentId) return
-              navigate('/visualizer', {
-                state: {
-                  documentId: selectedDocumentId,
-                  documentIds: selectedDocumentIds,
-                  documentMeta: Object.fromEntries(
-                    selectedRows
-                      .filter((row) => row.documentId)
-                      .map((row) => [
-                        row.documentId as string,
-                        { project: row.project, file: row.file },
-                      ]),
-                  ),
-                },
-              })
-            }}
-          >
-            Visualizer
-          </button>
-          <button
-            type="button"
-            className="secondary-btn"
-            disabled={selectedCount === 0}
-            onClick={() => {
-              setSelectedExportFields(DEFAULT_EXPORT_FIELDS)
-              setPendingExportFormat('json')
-            }}
-          >
-            Export JSON
-          </button>
-          <button
-            type="button"
-            className="secondary-btn"
-            disabled={selectedCount === 0}
-            onClick={() => {
-              setSelectedExportFields(DEFAULT_EXPORT_FIELDS)
-              setPendingExportFormat('csv')
-            }}
-          >
-            Export CSV
-          </button>
-          <button
-            type="button"
-            className="secondary-btn"
-            disabled={selectedDocumentIds.length === 0 || deleting}
-            onClick={() => {
-              void deleteSelectedAnalyses()
-            }}
-          >
-            {deleting ? 'Deleting...' : 'Delete Analyses'}
-          </button>
-        </div>
+        {selectedCount > 0 ? (
+          <div className="actions-row">
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() => {
+                if (!selectedDocumentId) return
+                navigate('/visualizer', {
+                  state: {
+                    documentId: selectedDocumentId,
+                    documentIds: selectedDocumentIds,
+                    documentMeta: Object.fromEntries(
+                      selectedRows
+                        .filter((row) => row.documentId)
+                        .map((row) => [
+                          row.documentId as string,
+                          { project: row.project, file: row.file },
+                        ]),
+                    ),
+                  },
+                })
+              }}
+            >
+              Visualizer
+            </button>
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() => {
+                setSelectedExportFields(DEFAULT_EXPORT_FIELDS)
+                setPendingExportFormat('json')
+              }}
+            >
+              Export JSON
+            </button>
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() => {
+                setSelectedExportFields(DEFAULT_EXPORT_FIELDS)
+                setPendingExportFormat('csv')
+              }}
+            >
+              Export CSV
+            </button>
+            <button
+              type="button"
+              className="secondary-btn"
+              disabled={selectedDocumentIds.length === 0 || deleting}
+              onClick={() => {
+                void deleteSelectedAnalyses()
+              }}
+            >
+              {deleting ? 'Deleting...' : 'Delete Analyses'}
+            </button>
+          </div>
+        ) : null}
       </div>
       {pendingExportFormat ? (
         <section className="card compact-card">
@@ -554,11 +552,12 @@ export function VocabularyPage() {
       <div className="mobile-records">
         {rows.map((row) => {
           const selected = selectedIds.includes(row.id)
+          const badges = buildAnalysisFeatureBadges(row.settings)
           return (
             <article
               key={`mobile-${row.id}`}
               data-testid={`mobile-vocab-row-${row.id}`}
-              className={`mobile-record-card${selected ? ' is-selected' : ''}`}
+              className={`mobile-record-card mobile-vocab-row${selected ? ' is-selected' : ''}`}
               onClick={() => setSelectedIds((prev) => (prev.includes(row.id) ? prev.filter((id) => id !== row.id) : [...prev, row.id]))}
               onKeyDown={(event) => {
                 if (event.key !== 'Enter' && event.key !== ' ') return
@@ -569,26 +568,27 @@ export function VocabularyPage() {
               tabIndex={0}
               aria-pressed={selected}
             >
-              <div className="mobile-record-head">
-                <h3 className="mobile-record-title">{row.file}</h3>
-              </div>
-              <div className="mobile-record-meta">
-                <div className="mobile-record-field">
-                  <span className="mobile-record-label">Project</span>
-                  <span>{row.project}</span>
+              <div className="mobile-vocab-main">
+                <div className="mobile-vocab-topline">
+                  <strong className="mobile-vocab-heading">{row.project}</strong>
                 </div>
-                <div className="mobile-record-field">
-                  <span className="mobile-record-label">Items</span>
-                  <span>{row.items}</span>
+                <div className="mobile-vocab-subline">
+                  <strong className="mobile-vocab-heading">{row.file}</strong>
                 </div>
-                <div className="mobile-record-field">
-                  <span className="mobile-record-label">Created</span>
-                  <span>{row.created}</span>
+                <div className="mobile-vocab-metrics">
+                  <div className="mobile-vocab-cell">
+                    <span className="mobile-record-label">Items</span>
+                    <span className="mobile-vocab-value">{row.items}</span>
+                  </div>
+                  <div className="mobile-vocab-cell mobile-vocab-created-cell">
+                    <span className="mobile-record-label">Created</span>
+                    <span className="mobile-vocab-value">{row.created}</span>
+                  </div>
                 </div>
-                <div className="mobile-record-field">
+                <div className="mobile-vocab-settings">
                   <span className="mobile-record-label">Settings</span>
                   <div className="analysis-feature-badges">
-                    {buildAnalysisFeatureBadges(row.settings).map((badge) => (
+                    {badges.map((badge) => (
                       <span key={`mobile-${row.id}-${badge.key}`} className="badge analysis-feature-badge">
                         {badge.label}: {badge.value}
                       </span>

@@ -1,8 +1,6 @@
-const APP_SHELL_CACHE = 'ela-app-shell-v1'
-const RUNTIME_CACHE = 'ela-runtime-v1'
+const APP_SHELL_CACHE = 'ela-app-shell-v2'
+const RUNTIME_CACHE = 'ela-runtime-v2'
 const APP_SHELL_FILES = [
-  '/',
-  '/index.html',
   '/manifest.webmanifest',
   '/offline.html',
   '/icon-192.png',
@@ -14,7 +12,7 @@ const APP_SHELL_FILES = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(APP_SHELL_CACHE).then((cache) => cache.addAll(APP_SHELL_FILES)).then(() => self.skipWaiting()),
+    caches.open(APP_SHELL_CACHE).then((cache) => cache.addAll(APP_SHELL_FILES)),
   )
 })
 
@@ -26,7 +24,7 @@ self.addEventListener('activate', (event) => {
           .filter((key) => key !== APP_SHELL_CACHE && key !== RUNTIME_CACHE)
           .map((key) => caches.delete(key)),
       ),
-    ).then(() => self.clients.claim()),
+    ),
   )
 })
 
@@ -40,14 +38,9 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          const copy = response.clone()
-          caches.open(RUNTIME_CACHE).then((cache) => cache.put('/index.html', copy)).catch(() => undefined)
-          return response
-        })
+        .then((response) => response)
         .catch(async () => {
-          const cached = await caches.match('/index.html')
-          return cached || caches.match('/offline.html')
+          return (await caches.match('/offline.html')) || Response.error()
         }),
     )
     return
@@ -59,22 +52,25 @@ self.addEventListener('fetch', (event) => {
   if (!cacheableAsset) return
 
   event.respondWith(
-    caches.match(request).then(async (cached) => {
-      if (cached) {
-        fetch(request)
-          .then((response) => {
-            if (!response || response.status !== 200) return
-            caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, response)).catch(() => undefined)
-          })
-          .catch(() => undefined)
-        return cached
+    fetch(request)
+      .then((response) => {
+        if (response && response.status === 200) {
+          const copy = response.clone()
+          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy)).catch(() => undefined)
+        }
+        return response
+      })
+      .catch(async () => {
+        const cached = await caches.match(request)
+        if (cached) {
+          return cached
+        }
+        if (/\.(png|svg|ico)$/i.test(url.pathname)) {
+          const fallbackIcon = await caches.match('/icon-192.png')
+          if (fallbackIcon) return fallbackIcon
+        }
+        return Response.error()
       }
-      const response = await fetch(request)
-      if (response && response.status === 200) {
-        const copy = response.clone()
-        caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy)).catch(() => undefined)
-      }
-      return response
-    }),
+    ),
   )
 })

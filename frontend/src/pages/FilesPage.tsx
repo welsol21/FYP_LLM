@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
 import { buildAnalysisFeatureBadges } from '../lib/analysisSettings'
+import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics'
 import type { AnalysisHistoryRow, MediaFileRow, SelectedProject } from '../api/runtimeApi'
 
 type FileAnalysisVersion = {
@@ -26,9 +27,11 @@ export function FilesPage() {
   const tapRef = useRef<{ rowId: string; ts: number } | null>(null)
 
   async function refreshProjectData(projectId: string | null | undefined) {
+    recordRuntimeDiagnostic('ui.files', 'refresh.start', { projectId })
     if (!projectId) {
       setRows([])
       setAnalysisHistory([])
+      recordRuntimeDiagnostic('ui.files', 'refresh.empty')
       return
     }
     const [items, history] = await Promise.all([
@@ -37,6 +40,11 @@ export function FilesPage() {
     ])
     setRows(items)
     setAnalysisHistory(history)
+    recordRuntimeDiagnostic('ui.files', 'refresh.success', {
+      projectId,
+      files: items.length,
+      analyses: history.length,
+    })
   }
 
   useEffect(() => {
@@ -87,6 +95,7 @@ export function FilesPage() {
   }, [rows, analysisHistory])
 
   function openAnalyze(row: MediaFileRow) {
+    recordRuntimeDiagnostic('ui.files', 'open_analyze', { fileId: row.id, name: row.name, documentId: row.document_id || '' })
     navigate('/analyze', {
       state: {
         analyzeEntry: 'files',
@@ -103,6 +112,7 @@ export function FilesPage() {
   }
 
   function onRowTap(row: MediaFileRow) {
+    recordRuntimeDiagnostic('ui.files', 'row.tap', { fileId: row.id, name: row.name })
     const now = Date.now()
     const lastTap = tapRef.current
     if (lastTap && lastTap.rowId === row.id && now - lastTap.ts < 350) {
@@ -117,6 +127,7 @@ export function FilesPage() {
     const id = String(fileId || '').trim()
     if (!id) return
     const shouldDelete = window.confirm('Delete this file and all related analyses/artifacts?')
+    recordRuntimeDiagnostic('ui.files', 'delete.confirm', { fileId: id, confirmed: shouldDelete })
     if (!shouldDelete) return
     setDeletingByFileId((prev) => ({ ...prev, [id]: true }))
     try {
@@ -141,7 +152,14 @@ export function FilesPage() {
     <section className="screen-block files-page">
       <div className="page-head">
         <h2 className="page-title">{selectedProject.project_name ?? selectedProject.project_id ?? 'Project'}</h2>
-        <button type="button" className="secondary-btn" onClick={() => inputRef.current?.click()}>
+        <button
+          type="button"
+          className="secondary-btn"
+          onClick={() => {
+            recordRuntimeDiagnostic('ui.files', 'new_file.click', { projectId: selectedProject.project_id || '' })
+            inputRef.current?.click()
+          }}
+        >
           New File
         </button>
       </div>
@@ -153,13 +171,30 @@ export function FilesPage() {
         accept=".mp3,.wav,.m4a,.flac,.ogg,.mp4,.mkv,.mov,.avi,.webm,.pdf,.txt"
         style={{ display: 'none' }}
         onChange={async (e) => {
+          recordRuntimeDiagnostic('ui.files', 'file_input.change', {
+            count: e.target.files?.length || 0,
+            projectId: selectedProject.project_id || '',
+          })
           const inputEl = e.currentTarget
           const file = e.target.files?.[0]
           if (!file || !selectedProject.project_id) return
+          recordRuntimeDiagnostic('ui.files', 'file_input.selected', {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            projectId: selectedProject.project_id,
+          })
           setUploading(true)
           setUploadError('')
           try {
+            recordRuntimeDiagnostic('ui.files', 'upload.start', { name: file.name, size: file.size })
             const uploaded = await api.uploadMedia(file)
+            recordRuntimeDiagnostic('ui.files', 'upload.success', uploaded)
+            recordRuntimeDiagnostic('ui.files', 'register.start', {
+              projectId: selectedProject.project_id,
+              fileName: uploaded.fileName,
+              mediaPath: uploaded.mediaPath,
+            })
             await api.registerMediaFile({
               projectId: selectedProject.project_id,
               name: uploaded.fileName,
@@ -167,13 +202,16 @@ export function FilesPage() {
               sizeBytes: uploaded.sizeBytes,
               durationSec: 1,
             })
+            recordRuntimeDiagnostic('ui.files', 'register.success', { fileName: uploaded.fileName })
             await refreshProjectData(selectedProject.project_id)
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err)
+            recordRuntimeDiagnostic('ui.files', 'upload_or_register.error', msg, 'error')
             setUploadError(msg)
           } finally {
             setUploading(false)
             inputEl.value = ''
+            recordRuntimeDiagnostic('ui.files', 'file_input.reset')
           }
         }}
       />

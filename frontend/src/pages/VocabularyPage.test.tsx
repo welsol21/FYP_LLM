@@ -14,11 +14,11 @@ describe('VocabularyPage', () => {
 
   it('enables Visualizer button after selecting analyzed row', async () => {
     renderWithProviders(<VocabularyPage />)
-    const visualizerBtn = await screen.findByRole('button', { name: 'Visualizer' })
-    expect(visualizerBtn).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Visualizer' })).not.toBeInTheDocument()
 
     const row = await screen.findByTestId('vocab-row-doc-1')
     fireEvent.click(row)
+    const visualizerBtn = await screen.findByRole('button', { name: 'Visualizer' })
     expect(visualizerBtn).toBeEnabled()
   })
 

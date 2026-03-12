@@ -160,6 +160,13 @@ button {
   margin-bottom: 12px;
 }
 
+.pwa-diagnostics-box {
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .compact-card {
   padding-top: 10px;
   padding-bottom: 10px;
@@ -1193,21 +1200,163 @@ button {
   }
 
   .vocabulary-page .desktop-table {
-    display: block;
-    overflow-x: auto;
+    display: none;
+  }
+
+  .vocabulary-page .mobile-records {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     margin: 0 14px 12px;
-    -webkit-overflow-scrolling: touch;
+  }
+
+  .vocabulary-page .mobile-vocab-row {
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(228, 186, 43, 0.24);
+    background: rgba(7, 16, 38, 0.72);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  }
+
+  .vocabulary-page .mobile-vocab-main {
+    display: grid;
+    gap: 6px;
+  }
+
+  .vocabulary-page .mobile-vocab-topline,
+  .vocabulary-page .mobile-vocab-subline {
+    display: grid;
+    gap: 2px;
+    align-items: start;
+  }
+
+  .vocabulary-page .mobile-vocab-metrics {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 10px;
+    align-items: end;
+  }
+
+  .vocabulary-page .mobile-vocab-items,
+  .vocabulary-page .mobile-vocab-cell {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .vocabulary-page .mobile-vocab-heading {
+    display: inline-block;
+    font-size: 16px;
+    line-height: 1.2;
+    font-weight: 700;
+    word-break: break-word;
+  }
+
+  .vocabulary-page .mobile-vocab-topline .mobile-vocab-heading,
+  .vocabulary-page .mobile-vocab-subline .mobile-vocab-heading {
+    color: #f5ea2f;
+  }
+
+  .vocabulary-page .mobile-vocab-topline .mobile-vocab-heading {
+    font-size: 28px;
+    line-height: 1.05;
+    font-weight: 400;
+  }
+
+  .vocabulary-page .mobile-vocab-subline {
+    padding-left: 18px;
+  }
+
+  .vocabulary-page .mobile-vocab-subline .mobile-vocab-heading {
+    font-size: 24px;
+    line-height: 1.08;
+    font-weight: 400;
+  }
+
+  .vocabulary-page .mobile-vocab-settings {
+    display: grid;
+    gap: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(228, 186, 43, 0.16);
+  }
+
+  .vocabulary-page .mobile-vocab-value {
+    display: inline-block;
+    font-size: 14px;
+    line-height: 1.25;
+    font-weight: 600;
+    word-break: break-word;
+  }
+
+  .vocabulary-page .mobile-vocab-created-cell .mobile-vocab-value {
+    white-space: nowrap;
+  }
+
+  .vocabulary-page .mobile-vocab-row .analysis-feature-badges {
+    gap: 6px;
+  }
+
+  .vocabulary-page .mobile-vocab-row .analysis-feature-badge {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+  .vocabulary-page .desktop-table {
+    display: block;
+    margin: 0 14px 12px;
+    overflow-x: hidden;
   }
 
   .vocabulary-page .desktop-table table {
-    min-width: 720px;
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
   }
 
   .vocabulary-page .desktop-table th,
   .vocabulary-page .desktop-table td {
-    padding: 8px 10px;
-    font-size: 14px;
+    padding: 8px 8px;
+    font-size: 13px;
     vertical-align: top;
+    overflow-wrap: anywhere;
+  }
+
+  .vocabulary-page .desktop-table th:nth-child(1),
+  .vocabulary-page .desktop-table td:nth-child(1) {
+    width: 22%;
+  }
+
+  .vocabulary-page .desktop-table th:nth-child(2),
+  .vocabulary-page .desktop-table td:nth-child(2) {
+    width: 24%;
+  }
+
+  .vocabulary-page .desktop-table th:nth-child(3),
+  .vocabulary-page .desktop-table td:nth-child(3) {
+    width: 34%;
+  }
+
+  .vocabulary-page .desktop-table th:nth-child(4),
+  .vocabulary-page .desktop-table td:nth-child(4) {
+    width: 8%;
+    text-align: center;
+  }
+
+  .vocabulary-page .desktop-table th:nth-child(5),
+  .vocabulary-page .desktop-table td:nth-child(5) {
+    width: 12%;
+    white-space: normal;
+  }
+
+  .vocabulary-page .desktop-table .analysis-feature-badges {
+    gap: 4px;
+  }
+
+  .vocabulary-page .desktop-table .analysis-feature-badge {
+    font-size: 11px;
+    padding: 3px 6px;
   }
 
   .vocabulary-page .mobile-records {

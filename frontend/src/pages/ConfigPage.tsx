@@ -2,6 +2,20 @@ import { useEffect, useMemo, useState } from 'react'
 import { useApi } from '../api/apiContext'
 import type { RuntimeUiState, TranslationConfig, TranslationProviderConfig } from '../api/runtimeApi'
 import { RuntimeStatusCard } from '../components/RuntimeStatusCard'
+import { clearPwaDiagnostics, getPwaDiagnostics, subscribePwaDiagnostics } from '../lib/pwa'
+import { clearRuntimeDiagnostics, getRuntimeDiagnostics, subscribeRuntimeDiagnostics } from '../lib/runtimeDiagnostics'
+
+function downloadTextFile(fileName: string, text: string): void {
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
 
 export function ConfigPage() {
   const api = useApi()
@@ -11,11 +25,25 @@ export function ConfigPage() {
   const [newProviderId, setNewProviderId] = useState('')
   const [newProviderLabel, setNewProviderLabel] = useState('')
   const [newCredentialFields, setNewCredentialFields] = useState('')
+  const [pwaDiagnostics, setPwaDiagnostics] = useState(getPwaDiagnostics())
+  const [runtimeDiagnostics, setRuntimeDiagnostics] = useState(getRuntimeDiagnostics())
 
   useEffect(() => {
     api.getUiState().then(setUiState)
     api.getTranslationConfig().then(setTranslationConfig)
   }, [api])
+
+  useEffect(() => {
+    return subscribePwaDiagnostics(() => {
+      setPwaDiagnostics(getPwaDiagnostics())
+    })
+  }, [])
+
+  useEffect(() => {
+    return subscribeRuntimeDiagnostics(() => {
+      setRuntimeDiagnostics(getRuntimeDiagnostics())
+    })
+  }, [])
 
   const providerIds = useMemo(
     () => new Set((translationConfig?.providers || []).map((p) => p.id.toLowerCase())),
@@ -166,6 +194,53 @@ export function ConfigPage() {
         ) : (
           <p>Loading translation config...</p>
         )}
+      </section>
+      <section className="card">
+        <div className="top-tabs" style={{ marginBottom: 8 }}>
+          <h2 style={{ margin: 0 }}>Diagnostics</h2>
+        </div>
+        <div className="touch-options-grid">
+          <button
+            type="button"
+            className="touch-option-btn"
+            onClick={() => {
+              const text = runtimeDiagnostics
+                .slice()
+                .reverse()
+                .map((entry) => `${entry.at} [${entry.session}] ${entry.level.toUpperCase()} ${entry.scope}.${entry.event}${entry.details ? ` :: ${entry.details}` : ''}`)
+                .join('\n')
+              downloadTextFile('runtime_diagnostics.log', text || 'No runtime diagnostics.')
+            }}
+          >
+            Export Runtime Logs
+          </button>
+          <button
+            type="button"
+            className="touch-option-btn"
+            onClick={() => {
+              const text = pwaDiagnostics
+                .slice()
+                .reverse()
+                .map((entry) => `${entry.at} [${entry.session}] ${entry.event}${entry.details ? ` :: ${entry.details}` : ''}`)
+                .join('\n')
+              downloadTextFile('pwa_diagnostics.log', text || 'No PWA diagnostics.')
+            }}
+          >
+            Export PWA Logs
+          </button>
+          <button
+            type="button"
+            className="touch-option-btn"
+            onClick={() => {
+              clearRuntimeDiagnostics()
+              clearPwaDiagnostics()
+              setRuntimeDiagnostics(getRuntimeDiagnostics())
+              setPwaDiagnostics(getPwaDiagnostics())
+            }}
+          >
+            Clear Logs
+          </button>
+        </div>
       </section>
     </section>
   )

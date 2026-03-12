@@ -17,6 +17,7 @@ import { LocalWorkspace } from '../lib/localWorkspace'
 import { transcribeMediaBlobDetailed } from '../lib/clientAsr'
 import { renderTranslatedMediaArtifacts } from '../lib/clientMediaRender'
 import { configureTransformersEnv } from '../lib/transformersEnv'
+import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics'
 
 type SentenceContractPayload = {
   sentence_text?: string
@@ -511,11 +512,27 @@ export class HttpRuntimeApi implements RuntimeApi {
   }
 
   async createProject(name: string): Promise<ProjectRow> {
-    return await LocalWorkspace.createProject(name)
+    try {
+      recordRuntimeDiagnostic('api.project', 'create.start', { name })
+      const row = await LocalWorkspace.createProject(name)
+      recordRuntimeDiagnostic('api.project', 'create.success', row)
+      return row
+    } catch (error) {
+      recordRuntimeDiagnostic('api.project', 'create.error', error, 'error')
+      throw error
+    }
   }
 
   async deleteProject(projectId: string): Promise<{ status: 'ok' | 'error'; message: string; project_id?: string }> {
-    return await LocalWorkspace.deleteProject(projectId)
+    try {
+      recordRuntimeDiagnostic('api.project', 'delete.start', { projectId })
+      const result = await LocalWorkspace.deleteProject(projectId)
+      recordRuntimeDiagnostic('api.project', 'delete.success', result)
+      return result
+    } catch (error) {
+      recordRuntimeDiagnostic('api.project', 'delete.error', error, 'error')
+      throw error
+    }
   }
 
   async getSelectedProject(): Promise<SelectedProject> {
@@ -527,14 +544,21 @@ export class HttpRuntimeApi implements RuntimeApi {
   }
 
   async uploadMedia(file: File): Promise<{ fileName: string; mediaPath: string; sizeBytes: number }> {
-    const fileName = String(file.name || 'uploaded.bin')
-    const localId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-    const mediaPath = `/client-media/${localId}/${fileName}`
-    const uploaded = { fileName, mediaPath, sizeBytes: file.size }
-    await LocalWorkspace.cacheUploadedMedia(uploaded.mediaPath, file)
-    return uploaded
+    try {
+      recordRuntimeDiagnostic('api.file', 'upload.start', { name: file.name, size: file.size, type: file.type })
+      const fileName = String(file.name || 'uploaded.bin')
+      const localId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+      const mediaPath = `/client-media/${localId}/${fileName}`
+      const uploaded = { fileName, mediaPath, sizeBytes: file.size }
+      await LocalWorkspace.cacheUploadedMedia(uploaded.mediaPath, file)
+      recordRuntimeDiagnostic('api.file', 'upload.success', uploaded)
+      return uploaded
+    } catch (error) {
+      recordRuntimeDiagnostic('api.file', 'upload.error', error, 'error')
+      throw error
+    }
   }
 
   async registerMediaFile(input: {
@@ -544,14 +568,22 @@ export class HttpRuntimeApi implements RuntimeApi {
     sizeBytes: number
     durationSec?: number
   }): Promise<{ id: string; project_id: string; name: string; path: string; size_bytes?: number; duration_seconds?: number }> {
-    const row = await LocalWorkspace.registerMediaFile(input)
-    return {
-      id: row.id,
-      project_id: row.project_id,
-      name: row.name,
-      path: row.path || row.media_path,
-      size_bytes: row.size_bytes,
-      duration_seconds: row.duration_seconds,
+    try {
+      recordRuntimeDiagnostic('api.file', 'register.start', input)
+      const row = await LocalWorkspace.registerMediaFile(input)
+      const result = {
+        id: row.id,
+        project_id: row.project_id,
+        name: row.name,
+        path: row.path || row.media_path,
+        size_bytes: row.size_bytes,
+        duration_seconds: row.duration_seconds,
+      }
+      recordRuntimeDiagnostic('api.file', 'register.success', result)
+      return result
+    } catch (error) {
+      recordRuntimeDiagnostic('api.file', 'register.error', error, 'error')
+      throw error
     }
   }
 
@@ -568,10 +600,18 @@ export class HttpRuntimeApi implements RuntimeApi {
     onProgress?: (payload: MediaProgressPayload) => void
     signal?: AbortSignal
   }): Promise<MediaSubmissionPayload> {
+    recordRuntimeDiagnostic('api.media', 'submit.start', {
+      mediaPath: input.mediaPath,
+      translationProvider: input.translationProvider,
+      subtitlesMode: input.subtitlesMode,
+      voiceChoice: input.voiceChoice,
+      forceFullReprocess: input.forceFullReprocess,
+    })
     const selected = await LocalWorkspace.getSelectedProject()
     const projects = await LocalWorkspace.listProjects()
     const effectiveProjectId = input.projectId || selected.project_id || projects[0]?.id || ''
     if (!effectiveProjectId) {
+      recordRuntimeDiagnostic('api.media', 'submit.reject', 'Select project first.', 'error')
       return {
         result: {
           route: 'reject',
@@ -633,6 +673,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     const mediaBlob = await LocalWorkspace.getCachedUploadedMedia(input.mediaPath)
     if (!(mediaBlob instanceof Blob)) {
       const detail = `Client media blob not found in local DB for: ${input.mediaPath}`
+      recordRuntimeDiagnostic('api.media', 'submit.reject', detail, 'error')
       return finish({
         result: {
           route: 'reject',
@@ -649,6 +690,7 @@ export class HttpRuntimeApi implements RuntimeApi {
 
     const normalizedVoiceChoice = String(input.voiceChoice || 'client_male').trim().toLowerCase()
     if (normalizedVoiceChoice === 'backend_dmitry' || normalizedVoiceChoice === 'backend_svetlana') {
+      recordRuntimeDiagnostic('api.media', 'submit.backend_path', { voiceChoice: normalizedVoiceChoice })
       return await this.submitMediaViaBackend({
         ...input,
         projectId: effectiveProjectId,
@@ -706,6 +748,7 @@ export class HttpRuntimeApi implements RuntimeApi {
           .filter((row) => row.text && row.end_ms > row.start_ms)
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
+        recordRuntimeDiagnostic('api.media', 'asr.error', message, 'error')
         return finish({
           result: {
             route: 'reject',
@@ -728,6 +771,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       const reason = sourceKind === 'audio' || sourceKind === 'video'
         ? 'Client ASR returned empty transcript.'
         : 'Client could not extract text from source.'
+      recordRuntimeDiagnostic('api.media', 'submit.reject', reason, 'error')
       return finish({
         result: {
           route: 'reject',
@@ -746,6 +790,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       ? timedSentences.map((row) => row.text)
       : splitIntoSentences(rawText)
     if (sentences.length === 0) {
+      recordRuntimeDiagnostic('api.media', 'submit.reject', 'No sentences detected after client text extraction.', 'error')
       return finish({
         result: {
           route: 'reject',
@@ -784,6 +829,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         log(2, `Built sentence contract ${idx + 1}/${sentences.length}`, 15 + Math.round(((idx + 1) / sentences.length) * 85))
       } catch (err) {
         contractBuildError = err instanceof Error ? err.message : String(err)
+        recordRuntimeDiagnostic('api.media', 'contract.error', contractBuildError, 'error')
         break
       }
     }
@@ -802,6 +848,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         ensureNotAborted()
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
+        recordRuntimeDiagnostic('api.media', 'translate.error', message, 'error')
         log(3, `Translation failed: ${message}`, 100)
         return finish({
           result: {
@@ -838,6 +885,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         ensureNotAborted()
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
+        recordRuntimeDiagnostic('api.media', 'render.error', message, 'error')
         log(3, `Media rendering failed: ${message}`, 100)
         return finish({
           result: {
@@ -875,6 +923,11 @@ export class HttpRuntimeApi implements RuntimeApi {
       log(2, `Contract unavailable: ${normalizedError}`, 100)
       log(3, 'Generating client artifacts', 100)
       log(4, 'Exporting client artifacts', 100)
+      recordRuntimeDiagnostic('api.media', 'submit.success', {
+        route: 'local_no_contract',
+        documentId,
+        contractUnavailable: normalizedError,
+      })
       return finish({
         result: {
           route: 'local',
@@ -905,6 +958,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       ensureNotAborted()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
+      recordRuntimeDiagnostic('api.media', 'translate.error', message, 'error')
       log(2, `Translation failed: ${message}`, 100)
       return finish({
         result: {
@@ -944,6 +998,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       ensureNotAborted()
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
+      recordRuntimeDiagnostic('api.media', 'render.error', message, 'error')
       log(3, `Media rendering failed: ${message}`, 100)
       return finish({
         result: {
@@ -979,6 +1034,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       contract,
       artifacts,
     })
+    recordRuntimeDiagnostic('api.media', 'submit.success', { route: 'local', documentId })
 
     return finish({
       result: {
@@ -1045,6 +1101,12 @@ export class HttpRuntimeApi implements RuntimeApi {
       if (input.signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
     }
     try {
+      recordRuntimeDiagnostic('api.media.backend', 'submit.start', {
+        mediaPath: input.mediaPath,
+        fileName: input.fileName,
+        voiceChoice: input.voiceChoice,
+        translationProvider: input.translationProvider,
+      })
       log('loading_file', 'Uploading media to backend for remote processing', [20, 0, 0, 0, 0])
       const form = new FormData()
       form.append('file', input.mediaBlob, input.fileName)
@@ -1054,6 +1116,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         throw new Error(`Backend upload failed: HTTP ${uploadRes.status}: ${text}`)
       }
       const uploaded = (await uploadRes.json()) as { mediaPath: string; sizeBytes: number; fileName: string }
+      recordRuntimeDiagnostic('api.media.backend', 'upload.success', uploaded)
       log('loading_file', 'Media uploaded to backend', [100, 0, 0, 0, 0])
       ensureNotAborted()
 
@@ -1075,6 +1138,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         signal: input.signal,
       })
       const jobId = String(submit?.result?.job_id || '').trim()
+      recordRuntimeDiagnostic('api.media.backend', 'job.submitted', { jobId })
       if (!jobId) {
         return finish(submit)
       }
@@ -1082,6 +1146,12 @@ export class HttpRuntimeApi implements RuntimeApi {
       while (true) {
         ensureNotAborted()
         const status = await requestJson<BackendJobStatus>(`/api/backend-job-status?job_id=${encodeURIComponent(jobId)}`)
+        recordRuntimeDiagnostic('api.media.backend', 'job.poll', {
+          jobId,
+          status: status.status,
+          stage: status.stage_name,
+          message: status.message,
+        })
         log(String(status.stage_name || ''), String(status.message || ''), status.stage_progress)
         if (status.status === 'completed_local') {
           const documentId = String(status.document_id || '').trim()
@@ -1102,6 +1172,7 @@ export class HttpRuntimeApi implements RuntimeApi {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ document_id: documentId }),
           }).catch(() => ({ status: 'error' }))
+          recordRuntimeDiagnostic('api.media.backend', 'submit.success', { jobId, documentId })
           return finish({
             result: {
               route: 'local',
@@ -1139,6 +1210,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         throw err
       }
       const message = err instanceof Error ? err.message : String(err)
+      recordRuntimeDiagnostic('api.media.backend', 'submit.error', message, 'error')
       log('loading_file', message, [100, 0, 0, 0, 0])
       return finish({
         result: {
@@ -1168,6 +1240,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       fileName: string
     },
   ): Promise<void> {
+    recordRuntimeDiagnostic('api.media.backend', 'finalize.start', { documentId, fileName: context.fileName })
     const contract = await requestJson<VisualizerPayload>(
       `/api/visualizer-payload?document_id=${encodeURIComponent(documentId)}`,
     )
@@ -1203,6 +1276,11 @@ export class HttpRuntimeApi implements RuntimeApi {
       settings: context.settings,
       contract,
       artifacts: Array.from(artifactMap.values()),
+    })
+    recordRuntimeDiagnostic('api.media.backend', 'finalize.success', {
+      documentId,
+      artifacts: artifactMap.size,
+      sentences: Object.keys(contract || {}).length,
     })
   }
 
