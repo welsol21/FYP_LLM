@@ -8,6 +8,7 @@ import { ConfigPage } from './pages/ConfigPage'
 import { NewProjectPage } from './pages/NewProjectPage'
 import { NewFilePage } from './pages/NewFilePage'
 import { AnalyzeListPage } from './pages/AnalyzeListPage'
+import { PwaInstallButton } from './components/PwaInstallButton'
 
 function MenuLink({ to, label }: { to: string; label: string }) {
   return (
@@ -48,6 +49,7 @@ export default function App() {
         </button>
         <h1 className="top-title">{pageTitle}</h1>
         <div className="top-actions">
+          <PwaInstallButton />
           <NavLink to="/config" className={({ isActive }) => (isActive ? 'top-link active' : 'top-link')}>
             Config
           </NavLink>
