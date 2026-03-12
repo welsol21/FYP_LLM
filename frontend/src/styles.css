@@ -1035,10 +1035,17 @@ button {
 
   .analysis-history-head,
   .file-version-head,
-  .sentence-nav,
   .touch-value-picker-top {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .sentence-nav {
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: center;
+    gap: 10px;
   }
 
   .visualizer-node-head {
@@ -1067,10 +1074,21 @@ button {
 
   .artifact-actions > *,
   .job-actions > *,
-  .sentence-nav > *,
   .analysis-history-head .actions-row > * {
     width: 100%;
     min-width: 0;
+  }
+
+  .sentence-nav > button {
+    width: auto;
+    min-width: 88px;
+    flex: 0 0 auto;
+  }
+
+  .sentence-nav > .sentence-nav-status {
+    width: auto;
+    min-width: 84px;
+    flex: 0 0 auto;
   }
 
   .quick-edit-actions > button {
