@@ -69,6 +69,8 @@ export function AnalyzePage() {
   const [historyReloadKey, setHistoryReloadKey] = useState(0)
   const [deletingByDocumentId, setDeletingByDocumentId] = useState<Record<string, boolean>>({})
   const [isSubmittingPipeline, setIsSubmittingPipeline] = useState(false)
+  const [analysisStartedAt, setAnalysisStartedAt] = useState<number | null>(null)
+  const [nowTs, setNowTs] = useState<number>(Date.now())
   const routeState = (location.state as AnalyzeRouteState | null | undefined) || null
   const selectedMediaFromRoute = routeState?.selectedMedia
   const analyzeEntry = routeState?.analyzeEntry || (selectedMediaFromRoute ? 'files' : 'direct')
@@ -263,12 +265,44 @@ export function AnalyzePage() {
     return [0, 0, 0, 0, 0]
   }, [submission])
 
+  useEffect(() => {
+    const shouldTick =
+      Boolean(submission) &&
+      typeof submission?.result.processing_duration_ms !== 'number' &&
+      (isSubmittingPipeline || stageProgress.some((value) => Number(value) > 0 && Number(value) < 100))
+    if (!shouldTick) return
+    const ticker = window.setInterval(() => setNowTs(Date.now()), 1000)
+    return () => window.clearInterval(ticker)
+  }, [submission, isSubmittingPipeline, stageProgress])
+
   const stageTitle = useMemo(() => {
     const value = String(submission?.result.stage_name || '').trim().toLowerCase()
     if (!value) return ''
     if (value === 'translating_text') return 'linguistic parsing'
     return value.replace(/_/g, ' ')
   }, [submission?.result.stage_name])
+  const elapsedSec = useMemo(() => {
+    if (typeof submission?.result.processing_duration_ms === 'number') {
+      return Math.max(0, Math.round(submission.result.processing_duration_ms / 1000))
+    }
+    if (!analysisStartedAt) return 0
+    return Math.max(0, Math.floor((nowTs - analysisStartedAt) / 1000))
+  }, [submission?.result.processing_duration_ms, analysisStartedAt, nowTs])
+  const estimatedSec = useMemo(() => {
+    const progressValues = stageProgress.map((value) => {
+      const n = Number(value)
+      if (!Number.isFinite(n)) return 0
+      return Math.max(0, Math.min(100, n))
+    })
+    const progressFraction = progressValues.reduce((acc, value) => acc + value, 0) / (progressValues.length * 100)
+    const sourceDuration =
+      Number(activeMedia?.durationSec ?? selectedMediaFromRoute?.durationSec ?? 0)
+    if (elapsedSec > 0 && progressFraction >= 0.03) {
+      return Math.max(elapsedSec + 1, Math.round(elapsedSec / Math.max(progressFraction, 0.03)))
+    }
+    if (sourceDuration > 0) return Math.max(20, Math.round(sourceDuration * 1.8))
+    return 60
+  }, [elapsedSec, stageProgress, activeMedia?.durationSec, selectedMediaFromRoute?.durationSec])
 
   return (
     <section className="screen-block analyze-stack">
@@ -343,6 +377,10 @@ export function AnalyzePage() {
         onSubmitted={(payload) => {
           setSubmission(payload)
           setIsSubmittingPipeline(false)
+          if (!analysisStartedAt) {
+            setAnalysisStartedAt(Date.now())
+            setNowTs(Date.now())
+          }
           if (payload.result.document_id) {
             setActiveMedia((prev) => (prev ? { ...prev, documentId: payload.result.document_id } : prev))
           } else {
@@ -378,6 +416,8 @@ export function AnalyzePage() {
         onSubmittingChange={(value) => {
           setIsSubmittingPipeline(value)
           if (value) {
+            setAnalysisStartedAt(Date.now())
+            setNowTs(Date.now())
             setSubmission({
               result: {
                 route: 'local',
@@ -408,6 +448,7 @@ export function AnalyzePage() {
       {submission ? (
         <section className={`card feedback ${submission.ui_feedback.severity}`} aria-label="submission-feedback">
           <p>{submission.ui_feedback.message}</p>
+          <p className="stage-log-title">Elapsed: {elapsedSec}s / Estimated: {estimatedSec}s</p>
           {typeof submission.result.processing_duration_ms === 'number' ? (
             <p className="stage-log-title">
               Total duration: {Math.max(0, Math.round(submission.result.processing_duration_ms / 1000))}s
