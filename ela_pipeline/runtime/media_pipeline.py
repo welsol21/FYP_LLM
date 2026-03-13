@@ -39,23 +39,46 @@ def _get_whisper_model_cached(model_name: str, asr_cache_dir: str):
     return whisper.load_model(model_name, download_root=asr_cache_dir)
 
 
-def warmup_media_models(*, spacy_model: str = "en_core_web_sm", warmup_asr: bool = True) -> None:
+def warmup_media_models(
+    *,
+    spacy_model: str = "en_core_web_sm",
+    warmup_asr: bool = True,
+    warmup_translation: bool = True,
+) -> None:
     """Preload runtime media models so first user request avoids cold starts."""
     _get_spacy_nlp_cached(spacy_model)
     if not warmup_asr:
+        pass
+    else:
+        model_name = os.getenv("ELA_MEDIA_ASR_MODEL", "base").strip() or "base"
+        asr_cache_dir = Path(
+            os.getenv("ELA_MEDIA_ASR_CACHE_DIR", "artifacts/models/whisper")
+        ).resolve()
+        asr_cache_dir.mkdir(parents=True, exist_ok=True)
+        if _runtime_downloads_disabled():
+            expected_model_path = asr_cache_dir / f"{model_name}.pt"
+            if not expected_model_path.is_file():
+                raise RuntimeError(
+                    f"ASR model '{model_name}' is not bundled. Expected local file: {expected_model_path}."
+                )
+        _get_whisper_model_cached(model_name, str(asr_cache_dir))
+
+    if not warmup_translation:
         return
-    model_name = os.getenv("ELA_MEDIA_ASR_MODEL", "base").strip() or "base"
-    asr_cache_dir = Path(
-        os.getenv("ELA_MEDIA_ASR_CACHE_DIR", "artifacts/models/whisper")
-    ).resolve()
-    asr_cache_dir.mkdir(parents=True, exist_ok=True)
-    if _runtime_downloads_disabled():
-        expected_model_path = asr_cache_dir / f"{model_name}.pt"
-        if not expected_model_path.is_file():
-            raise RuntimeError(
-                f"ASR model '{model_name}' is not bundled. Expected local file: {expected_model_path}."
-            )
-    _get_whisper_model_cached(model_name, str(asr_cache_dir))
+
+    provider = str(os.getenv("ELA_MEDIA_TRANSLATION_PROVIDER", "m2m100")).strip().lower() or "m2m100"
+    if provider not in {"m2m100", "hf"}:
+        return
+
+    model_name = os.getenv("ELA_MEDIA_TRANSLATION_MODEL", "").strip() or "facebook/m2m100_418M"
+    if model_name == "facebook/m2m100_418M" and os.path.isdir(DEFAULT_LOCAL_TRANSLATION_MODEL_DIR):
+        model_name = DEFAULT_LOCAL_TRANSLATION_MODEL_DIR
+    device = os.getenv("ELA_MEDIA_TRANSLATION_DEVICE", "cpu").strip() or "cpu"
+    if _runtime_downloads_disabled() and model_name == "facebook/m2m100_418M":
+        raise RuntimeError(
+            f"Translation model is not bundled. Expected local directory: {DEFAULT_LOCAL_TRANSLATION_MODEL_DIR}."
+        )
+    _get_m2m100_media_translator_cached(model_name, device)
 
 
 @dataclass(frozen=True)
@@ -465,6 +488,11 @@ class _LaraTranslator:
         return str(translated or "").strip()
 
 
+@lru_cache(maxsize=8)
+def _get_m2m100_media_translator_cached(model_name: str, device: str) -> M2M100Translator:
+    return M2M100Translator(model_name=model_name, device=device)
+
+
 def _resolve_media_translator(
     *,
     provider_override: str | None = None,
@@ -512,7 +540,7 @@ def _resolve_media_translator(
         if downloads_disabled:
             os.environ.setdefault("HF_HUB_OFFLINE", "1")
             os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-        return M2M100Translator(model_name=model_name, device=device)
+        return _get_m2m100_media_translator_cached(model_name, device)
     except Exception:
         if downloads_disabled:
             raise

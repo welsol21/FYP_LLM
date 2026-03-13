@@ -104,7 +104,7 @@ button {
   padding: 0;
   overflow: auto;
   min-height: 0;
-  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
 }
 
 .screen-block {
@@ -145,6 +145,26 @@ button {
   gap: 10px;
 }
 
+.vocabulary-actions-shell {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  min-height: 0;
+  margin: 0 14px 10px;
+}
+
+.vocabulary-actions-shell.is-open {
+  top: 8px;
+}
+
+.vocabulary-actions-row {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(15, 18, 26, 0.96);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
 .bottom-nav {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -155,6 +175,11 @@ button {
   width: min(100%, var(--layout-max));
   margin: 0 auto;
   min-height: calc(64px + env(safe-area-inset-bottom, 0px));
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: 25;
 }
 
 .card {
@@ -1016,6 +1041,14 @@ button {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     justify-content: stretch;
     width: 100%;
+  }
+
+  .vocabulary-actions-shell {
+    margin: 0 14px 10px;
+  }
+
+  .vocabulary-actions-row {
+    gap: 8px;
   }
 
   .secondary-btn {

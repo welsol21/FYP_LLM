@@ -73,6 +73,36 @@ async function requestBlob(url: string, init?: RequestInit): Promise<Blob> {
   return await normalizeBlobLike(await res.blob())
 }
 
+function shouldRetryBackendRequest(status: number): boolean {
+  return status === 502 || status === 503 || status === 504
+}
+
+async function sleepMs(ms: number): Promise<void> {
+  await new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+}
+
+async function fetchWithRetry(
+  input: string,
+  init: RequestInit,
+  options?: { retries?: number; retryDelayMs?: number },
+): Promise<Response> {
+  const retries = Math.max(0, options?.retries ?? 1)
+  const retryDelayMs = Math.max(0, options?.retryDelayMs ?? 1200)
+  let lastError: unknown = null
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const res = await fetch(apiUrl(input), init)
+      if (!shouldRetryBackendRequest(res.status) || attempt >= retries) return res
+      lastError = new Error(`HTTP ${res.status}`)
+    } catch (error) {
+      lastError = error
+      if (attempt >= retries) throw error
+    }
+    await sleepMs(retryDelayMs)
+  }
+  throw lastError instanceof Error ? lastError : new Error('Backend request failed.')
+}
+
 async function normalizeBlobLike(value: unknown): Promise<Blob> {
   if (value instanceof Blob) return value
   if (value && typeof (value as { arrayBuffer?: unknown }).arrayBuffer === 'function') {
@@ -532,10 +562,13 @@ export class HttpRuntimeApi implements RuntimeApi {
       log('loading_file', 'Uploading media to backend for remote processing', [20, 0, 0, 0, 0])
       const form = new FormData()
       form.append('file', input.mediaBlob, input.fileName)
-      const uploadRes = await fetch(apiUrl('/api/upload'), { method: 'POST', body: form, signal: input.signal })
+      const uploadRes = await fetchWithRetry('/api/upload', { method: 'POST', body: form, signal: input.signal }, { retries: 2, retryDelayMs: 1500 })
       if (!uploadRes.ok) {
         const text = await uploadRes.text()
-        throw new Error(`Backend upload failed: HTTP ${uploadRes.status}: ${text}`)
+        const message = shouldRetryBackendRequest(uploadRes.status)
+          ? `Backend upload failed: service is temporarily unavailable (HTTP ${uploadRes.status}). Please retry in a few seconds.`
+          : `Backend upload failed: HTTP ${uploadRes.status}: ${text}`
+        throw new Error(message)
       }
       const uploaded = (await uploadRes.json()) as { mediaPath: string; sizeBytes: number; fileName: string }
       recordRuntimeDiagnostic('api.media.backend', 'upload.success', uploaded)

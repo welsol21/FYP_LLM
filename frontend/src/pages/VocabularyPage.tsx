@@ -400,9 +400,9 @@ export function VocabularyPage() {
 
   return (
     <section className="screen-block vocabulary-page">
-      <div className="page-head">
+      <div className={`vocabulary-actions-shell${selectedCount > 0 ? ' is-open' : ''}`}>
         {selectedCount > 0 ? (
-          <div className="actions-row">
+          <div className="actions-row vocabulary-actions-row">
             <button
               type="button"
               className="secondary-btn"
