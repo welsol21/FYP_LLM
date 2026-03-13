@@ -24,6 +24,41 @@ Canonical CEFR corpus source: `linguistic_hierarchical_3000_v5_cefr_balanced.jso
 Tool/model/data license inventory: `docs/licenses_inventory.md`.
 Field ownership matrix: `docs/contract_field_ownership_2026-03-04.md`.
 
+## Git Branch Strategy
+
+The project uses one stable branch, one integration branch, and dedicated feature branches:
+
+- `master`
+  - stable baseline
+  - only reviewed and integrated changes land here
+- `development`
+  - shared integration branch
+  - backend, PWA, and desktop work are merged here together for full-stack verification
+- `backend_work`
+  - backend-only development branch
+  - shared backend for both PWA and desktop clients
+- `pwa_app`
+  - Android PWA client branch
+  - backend-heavy media processing path
+- `cross_platf_desktop_app`
+  - cross-platform desktop client branch
+  - offline-first local media processing path
+
+Expected merge flow:
+
+1. Feature work starts in one of:
+   - `backend_work`
+   - `pwa_app`
+   - `cross_platf_desktop_app`
+2. Ready work is merged into `development`
+3. Integrated behavior is validated in `development`
+4. Stable integrated state is merged into `master`
+
+Practical rule:
+
+- changes that are shared across clients or define the common product truth should be implemented on `master` first (or merged there as soon as they are stable), then propagated into the client-specific branches
+- `pwa_app` and `cross_platf_desktop_app` should contain only client-specific behavior on top of the shared base
+
 ## What Has Been Improved
 - Contract v2 metadata added and validated (`node_id`, `parent_id`, `source_span`, `grammatical_role`, dependency links, morphology features).
 - Verbal grammar split into explicit fields (`tense`, `aspect`, `mood`, `voice`, `finiteness`).
