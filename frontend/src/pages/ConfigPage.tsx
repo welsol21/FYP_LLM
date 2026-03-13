@@ -29,8 +29,24 @@ export function ConfigPage() {
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState(getRuntimeDiagnostics())
 
   useEffect(() => {
-    api.getUiState().then(setUiState)
-    api.getTranslationConfig().then(setTranslationConfig)
+    let cancelled = false
+    api.getUiState()
+      .then((value) => {
+        if (!cancelled) setUiState(value)
+      })
+      .catch(() => {
+        if (!cancelled) setUiState(null)
+      })
+    api.getTranslationConfig()
+      .then((value) => {
+        if (!cancelled) setTranslationConfig(value)
+      })
+      .catch(() => {
+        if (!cancelled) setTranslationConfig(null)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [api])
 
   useEffect(() => {

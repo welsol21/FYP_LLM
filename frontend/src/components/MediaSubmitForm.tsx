@@ -92,7 +92,7 @@ export function MediaSubmitForm({
 
   useEffect(() => {
     if (!voiceOptions.some((option) => option.label === voice)) {
-      setVoice(voiceOptions[0]?.label || 'Male')
+      setVoice(voiceOptions[0]?.label || 'Dmitry (Male)')
     }
   }, [voice, voiceOptions])
 

@@ -663,33 +663,22 @@ def run_media_pipeline(
     sentence_stream: list[str] = []
     sentence_timeline: list[dict[str, float] | None] = []
     if extracted_sentence_chunks:
-        raw_sentence_stream, raw_sentence_timeline = _sentenceize_timed_chunks(
-            chunks=extracted_sentence_chunks,
-            nlp=nlp,
-        )
-        sentence_stream = list(raw_sentence_stream)
-        sentence_timeline = list(raw_sentence_timeline)
-        filtered_stream: list[str] = []
-        filtered_timeline: list[dict[str, float] | None] = []
-        for idx, text in enumerate(sentence_stream):
-            text_resolved = str(text or "").strip()
-            if not text_resolved:
+        # Keep ASR chunk timing intact for media pipeline.
+        # The 2026-02-24 backend path used Whisper segments directly here,
+        # and later subtitle/audio assembly relied on those original windows.
+        # Re-sentenceizing via spaCy shifts sentence boundaries and breaks
+        # subtitle timing in generated video.
+        for row in extracted_sentence_chunks:
+            text = str(row.get("sentence_text") or "").strip()
+            if not text:
                 continue
-            doc = nlp(text_resolved)
-            if _is_metadata_like_sentence(text_resolved, doc):
-                continue
-            filtered_stream.append(text_resolved)
-            filtered_timeline.append(sentence_timeline[idx] if idx < len(sentence_timeline) else None)
-        sentence_stream = filtered_stream
-        sentence_timeline = filtered_timeline
-        if not sentence_stream:
-            fallback_stream = [str(text or "").strip() for text in raw_sentence_stream if str(text or "").strip()]
-            if fallback_stream:
-                sentence_stream = fallback_stream
-                sentence_timeline = list(raw_sentence_timeline)[: len(sentence_stream)]
-            elif full_text:
-                sentence_stream = [full_text]
-                sentence_timeline = [None]
+            sentence_stream.append(text)
+            sentence_timeline.append(
+                {
+                    "start_sec": float(row.get("start_sec") or 0.0),
+                    "end_sec": float(row.get("end_sec") or 0.0),
+                }
+            )
     else:
         skeleton = build_skeleton(full_text, nlp)
         fallback_stream = [str(text or "").strip() for text in skeleton.keys() if str(text or "").strip()]

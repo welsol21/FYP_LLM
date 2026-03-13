@@ -6,35 +6,62 @@ describe('HttpRuntimeApi', () => {
   beforeEach(async () => {
     window.localStorage.clear()
     await LocalWorkspace.__resetForTests()
-    await LocalWorkspace.createProject('Demo Project')
+    const project = await LocalWorkspace.createProject('Demo Project')
+    await LocalWorkspace.setSelectedProject(project.id)
     vi.restoreAllMocks()
   })
 
-  it('builds and persists analysis from client media blob using sentence-contract endpoint', async () => {
+  it('uploads media to backend and persists finalized analysis locally', async () => {
     const api = new HttpRuntimeApi()
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url.includes('/api/sentence-contract')) {
-        const body = JSON.parse(String(init?.body || '{}'))
-        const sentenceText = String(body.sentenceText || '').trim() || 'She trusted him.'
-        const payload = {
-          sentence_text: sentenceText,
-          sentence_hash: 'h-1',
-          sentence_node: {
+      if (url.includes('/api/upload')) {
+        return new Response(JSON.stringify({ mediaPath: '/tmp/01.Intro.txt', sizeBytes: 17, fileName: '01.Intro.txt' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      if (url.includes('/api/submit-media')) {
+        return new Response(JSON.stringify({
+          result: { route: 'local', job_id: 'job-1', message: 'Queued.' },
+          ui_feedback: { severity: 'info', title: 'Queued', message: 'Queued.' },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.includes('/api/backend-job-status')) {
+        return new Response(JSON.stringify({
+          job_id: 'job-1',
+          status: 'completed_local',
+          message: 'Backend completed.',
+          stage_name: 'completed',
+          stage_progress: [100, 100, 100, 100, 100],
+          document_id: 'doc-backend-1',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.includes('/api/visualizer-payload')) {
+        return new Response(JSON.stringify({
+          'She trusted him.': {
             node_id: 's-1',
             type: 'Sentence',
-            content: sentenceText,
+            content: 'She trusted him.',
             tense: 'past',
             linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
             part_of_speech: 'sentence',
             linguistic_elements: [],
             translations: { m2m100: { text: 'Она доверяла ему.' } },
           },
-        }
-        return new Response(JSON.stringify(payload), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.includes('/api/document-artifacts')) {
+        return new Response(JSON.stringify([
+          { name: 'translated_audio_ru.mp3', size_bytes: 4, download_url: '/artifact/audio.mp3' },
+          { name: 'subtitles_en.srt', size_bytes: 5, download_url: '/artifact/subtitles-en.srt' },
+        ]), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.includes('/artifact/audio.mp3')) {
+        return new Response(new Uint8Array([1, 2, 3, 4]), { status: 200, headers: { 'Content-Type': 'audio/mpeg' } })
+      }
+      if (url.includes('/artifact/subtitles-en.srt')) {
+        return new Response('Hello', { status: 200, headers: { 'Content-Type': 'text/plain' } })
       }
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
     })
@@ -45,6 +72,7 @@ describe('HttpRuntimeApi', () => {
       mediaPath: uploaded.mediaPath,
       durationSec: 10,
       sizeBytes: uploaded.sizeBytes,
+      voiceChoice: 'backend_dmitry',
     })
 
     const project = await api.getSelectedProject()
@@ -55,40 +83,67 @@ describe('HttpRuntimeApi', () => {
     expect(history.length).toBe(1)
     expect(history[0].document_id).toBe(documentId)
     expect(artifacts.some((row) => row.name === 'contract_sentences.json')).toBe(true)
-    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/api/sentence-contract'))).toBe(true)
-    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/api/submit-media'))).toBe(false)
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/api/upload'))).toBe(true)
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/api/submit-media'))).toBe(true)
   })
 
-  it('keeps visualizer payload and artifacts fully local after submit', async () => {
+  it('keeps visualizer payload and artifacts fully local after backend finalize', async () => {
     const api = new HttpRuntimeApi()
-    let sentenceContractCalls = 0
     let visualizerCalls = 0
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
-      if (url.includes('/api/sentence-contract')) {
-        sentenceContractCalls += 1
-        const body = JSON.parse(String(init?.body || '{}'))
-        const sentenceText = String(body.sentenceText || '').trim() || 'She trusted him.'
-        const payload = {
-          sentence_text: sentenceText,
-          sentence_hash: 'h-2',
-          sentence_node: {
+      if (url.includes('/api/upload')) {
+        return new Response(JSON.stringify({ mediaPath: '/tmp/02.txt', sizeBytes: 17, fileName: '02.txt' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+      if (url.includes('/api/submit-media')) {
+        return new Response(JSON.stringify({
+          result: { route: 'local', job_id: 'job-2', message: 'Queued.' },
+          ui_feedback: { severity: 'info', title: 'Queued', message: 'Queued.' },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.includes('/api/backend-job-status')) {
+        return new Response(JSON.stringify({
+          job_id: 'job-2',
+          status: 'completed_local',
+          message: 'Backend completed.',
+          stage_name: 'completed',
+          stage_progress: [100, 100, 100, 100, 100],
+          document_id: 'doc-backend-2',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.includes('/api/visualizer-payload')) {
+        visualizerCalls += 1
+        return new Response(JSON.stringify({
+          'She trusted him.': {
             node_id: 's-2',
             type: 'Sentence',
-            content: sentenceText,
+            content: 'She trusted him.',
             tense: 'past',
             linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
             part_of_speech: 'sentence',
             linguistic_elements: [],
             translations: { m2m100: { text: 'Она доверяла ему.' } },
           },
-        }
-        return new Response(JSON.stringify(payload), {
+        }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         })
       }
-      if (url.includes('/api/visualizer-payload')) visualizerCalls += 1
+      if (url.includes('/api/document-artifacts')) {
+        return new Response(JSON.stringify([
+          { name: 'full_text.txt', size_bytes: 3, download_url: '/artifact/full-text.txt' },
+          { name: 'translated_video_ru.mp4', size_bytes: 4, download_url: '/artifact/video.mp4' },
+        ]), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (url.includes('/artifact/full-text.txt')) {
+        return new Response('abc', { status: 200, headers: { 'Content-Type': 'text/plain' } })
+      }
+      if (url.includes('/artifact/video.mp4')) {
+        return new Response(new Uint8Array([9, 8, 7, 6]), { status: 200, headers: { 'Content-Type': 'video/mp4' } })
+      }
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
     })
     vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch)
@@ -98,26 +153,17 @@ describe('HttpRuntimeApi', () => {
       mediaPath: uploaded.mediaPath,
       durationSec: 10,
       sizeBytes: uploaded.sizeBytes,
+      voiceChoice: 'backend_dmitry',
     })
     const documentId = String(submit.result.document_id || '')
     const artifacts = await api.listDocumentArtifacts(documentId)
     const payload = await api.getVisualizerPayload(documentId)
     expect(Object.keys(payload).length).toBeGreaterThan(0)
-    expect(sentenceContractCalls).toBe(1)
-    expect(visualizerCalls).toBe(0)
+    expect(visualizerCalls).toBe(1)
     expect(artifacts.some((row) => row.name === 'full_text.txt')).toBe(true)
     expect(artifacts.some((row) => row.name === 'contract_visualizer.json')).toBe(true)
     expect(artifacts.some((row) => row.name === 'contract_sentences.json')).toBe(true)
-    expect(artifacts.some((row) => row.name === 'subtitles_en.srt')).toBe(true)
-    expect(artifacts.some((row) => row.name === 'subtitles_bilingual.srt')).toBe(true)
-    expect(artifacts.some((row) => row.name === 'translated_audio_ru.mp3')).toBe(false)
-    expect(artifacts.some((row) => row.name === 'translated_video_ru.mp4')).toBe(false)
-    expect(artifacts.some((row) => row.name === 'media_contract.json')).toBe(true)
-    expect(artifacts.some((row) => row.name === 'sentence_link.json')).toBe(false)
-    expect(artifacts.some((row) => row.name === 'semantic_units_runtime.json')).toBe(true)
-    expect(artifacts.some((row) => row.name === 'bilingual_objects_runtime.json')).toBe(true)
-    expect(artifacts.some((row) => row.name === 'subtitles_target.srt')).toBe(true)
-    expect(artifacts.some((row) => row.name === 'stage_manifest.json')).toBe(false)
+    expect(artifacts.some((row) => row.name === 'translated_video_ru.mp4')).toBe(true)
 
     // Persistence check across API instance recreation (SQLite snapshot restore).
     const apiReloaded = new HttpRuntimeApi()
@@ -335,14 +381,14 @@ describe('HttpRuntimeApi', () => {
     expect(projects.some((p) => p.id === keepProjectId)).toBe(true)
   })
 
-  it('saves no-contract analysis with user-friendly service message and downloadable artifacts', async () => {
+  it('fails with clear error when backend upload returns 404', async () => {
     const api = new HttpRuntimeApi()
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)
-      if (url.includes('/api/sentence-contract')) {
-        return new Response(JSON.stringify({ error: 'Not found' }), {
+      if (url.includes('/api/upload')) {
+        return new Response('404 Not Found', {
           status: 404,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain' },
         })
       }
       return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })
@@ -366,19 +412,13 @@ describe('HttpRuntimeApi', () => {
       mediaFileId: file.id,
       translationProvider: 'm2m100',
       subtitlesMode: 'bilingual_sequential',
+      voiceChoice: 'backend_dmitry',
     })
 
-    expect(submit.result.status).toBe('completed_local_no_contract')
-    expect((submit.result.stage_logs || []).join('\n')).toContain('Project service is unavailable')
-    expect((submit.result.stage_logs || []).join('\n')).not.toContain('HTTP 404')
-
+    expect(submit.result.status).toBe('rejected')
+    expect((submit.result.message || '')).toContain('Backend upload failed: HTTP 404')
     const history = await api.listAnalysisHistory(project.project_id || undefined)
-    expect(history.length).toBeGreaterThan(0)
-    const docId = String(history[0]?.document_id || '')
-    const artifacts = await api.listDocumentArtifacts(docId)
-    expect(artifacts.length).toBeGreaterThan(0)
-    expect(artifacts.every((a) => typeof a.download_url === 'string' && a.download_url.length > 0)).toBe(true)
-    expect(artifacts.some((a) => a.name === 'subtitles_bilingual.srt')).toBe(true)
+    expect(history.length).toBe(0)
   })
 
   it('exposes cached translated media artifacts for audio analyses', async () => {
