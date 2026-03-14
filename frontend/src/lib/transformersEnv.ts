@@ -11,9 +11,13 @@ export function browserCacheAvailable(): boolean {
 }
 
 export function configureTransformersEnv(env: unknown): void {
+  configureTransformersEnvForMode(env)
+}
+
+export function configureTransformersEnvForMode(env: unknown, mode: 'desktop' | 'pwa' = 'pwa'): void {
   if (!env || typeof env !== 'object') return
   const record = env as TransformersEnv
-  record.allowLocalModels = false
-  record.allowRemoteModels = true
+  record.allowLocalModels = mode === 'desktop'
+  record.allowRemoteModels = mode !== 'desktop'
   record.useBrowserCache = browserCacheAvailable()
 }

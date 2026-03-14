@@ -115,4 +115,5 @@ frontend/*.tsbuildinfo
 frontend/public/desktop-runtime/
 frontend/src-tauri/target/
 frontend/src-tauri/gen/
+frontend/src-tauri/resources/desktop-runtime/
 tmp_media_check/

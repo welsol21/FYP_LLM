@@ -1,3 +1,7 @@
+import { resolveDesktopRuntimeAssetUrl } from './desktopRuntime'
+import { recordRuntimeDiagnostic } from './runtimeDiagnostics'
+import { configureTransformersEnvForMode } from './transformersEnv'
+
 type SourceKind = 'text' | 'audio' | 'video' | 'other'
 
 type TimedSentence = {
@@ -208,11 +212,12 @@ async function ensureTtsPipeline(onProgress?: ProgressCb): Promise<TtsPipeline> 
         try {
           const transformers = await import('@huggingface/transformers')
           const env = (transformers as unknown as { env?: Record<string, unknown> }).env
-          configureTransformersEnv(env)
+          configureTransformersEnvForMode(env, 'desktop')
           const pipelineFactory = (transformers as unknown as {
             pipeline: (task: string, model: string, options?: Record<string, unknown>) => Promise<TtsPipeline>
           }).pipeline
-          const modelId = String(import.meta.env?.VITE_CLIENT_TTS_MODEL || 'Xenova/mms-tts-rus').trim()
+          const modelId = await resolveDesktopRuntimeAssetUrl('tts')
+          recordRuntimeDiagnostic('desktop.tts', 'model.path', { modelId })
           await yieldToBrowser()
           const tts = await pipelineFactory('text-to-speech', modelId, { quantized: true })
           progress(onProgress, 'Local TTS model loaded', 30)
@@ -245,7 +250,8 @@ async function ensureFfmpeg(onProgress?: ProgressCb): Promise<{ ffmpeg: FfmpegIn
         ]))
 
         const ffmpeg = new FFmpeg()
-        const baseUrl = String(import.meta.env?.VITE_CLIENT_FFMPEG_CORE_BASE_URL || 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm').trim()
+        const baseUrl = await resolveDesktopRuntimeAssetUrl('ffmpeg')
+        recordRuntimeDiagnostic('desktop.ffmpeg', 'core.path', { baseUrl })
         const coreURL = await util.toBlobURL(`${baseUrl}/ffmpeg-core.js`, 'text/javascript')
         const wasmURL = await util.toBlobURL(`${baseUrl}/ffmpeg-core.wasm`, 'application/wasm')
         const workerURL = await util.toBlobURL(`${baseUrl}/ffmpeg-core.worker.js`, 'text/javascript')
@@ -1043,4 +1049,3 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
 
   })
 }
-import { configureTransformersEnv } from './transformersEnv'

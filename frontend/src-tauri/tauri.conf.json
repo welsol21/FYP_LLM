@@ -6,7 +6,7 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://127.0.0.1:1420",
-    "beforeDevCommand": "npm run prepare:desktop-runtime && npx cross-env VITE_CLIENT_MODE=desktop VITE_CLIENT_ASR_MODEL=/desktop-runtime/models/whisper-base.en VITE_CLIENT_TRANSLATION_MODEL=/desktop-runtime/models/m2m100_418M VITE_CLIENT_TTS_MODEL=/desktop-runtime/models/mms-tts-rus VITE_CLIENT_FFMPEG_CORE_BASE_URL=/desktop-runtime/ffmpeg/esm npm run dev -- --host 127.0.0.1 --port 1420",
+    "beforeDevCommand": "npm run prepare:desktop-runtime && npx cross-env VITE_CLIENT_MODE=desktop npm run dev -- --host 127.0.0.1 --port 1420",
     "beforeBuildCommand": "npm run build:desktop"
   },
   "app": {
@@ -27,7 +27,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "deb"
+    ],
+    "resources": [
+      "resources/desktop-runtime/**/*"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

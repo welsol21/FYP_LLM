@@ -2,8 +2,11 @@ import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 const frontendRoot = process.cwd()
-const publicRoot = path.join(frontendRoot, 'public')
-const runtimeRoot = path.join(publicRoot, 'desktop-runtime')
+const targetMode = process.argv.includes('--bundle') ? 'bundle' : 'dev'
+const publicRuntimeRoot = path.join(frontendRoot, 'public', 'desktop-runtime')
+const runtimeRoot = targetMode === 'bundle'
+  ? path.join(frontendRoot, 'src-tauri', 'resources', 'desktop-runtime')
+  : path.join(frontendRoot, 'public', 'desktop-runtime')
 const ffmpegSource = path.join(frontendRoot, 'node_modules', '@ffmpeg', 'core', 'dist', 'esm')
 const ffmpegTarget = path.join(runtimeRoot, 'ffmpeg', 'esm')
 const translationSource = path.resolve(frontendRoot, '..', 'artifacts', 'models', 'm2m100_418M')
@@ -15,6 +18,9 @@ const ttsTarget = path.join(runtimeRoot, 'models', 'mms-tts-rus')
 const manifestPath = path.join(runtimeRoot, 'manifest.json')
 
 rmSync(runtimeRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+if (targetMode === 'bundle') {
+  rmSync(publicRuntimeRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+}
 mkdirSync(runtimeRoot, { recursive: true })
 
 if (!existsSync(ffmpegSource)) {
@@ -70,4 +76,9 @@ if (existsSync(ttsSource)) {
 }
 
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
-console.log(`Prepared desktop runtime assets in ${runtimeRoot}`)
+console.log(`[prepare-desktop-runtime] mode=${targetMode}`)
+console.log(`[prepare-desktop-runtime] root=${runtimeRoot}`)
+console.log(`[prepare-desktop-runtime] ffmpeg included=${manifest.ffmpeg.included}`)
+console.log(`[prepare-desktop-runtime] translation included=${manifest.translation.included}`)
+console.log(`[prepare-desktop-runtime] asr included=${manifest.asr.included}`)
+console.log(`[prepare-desktop-runtime] tts included=${manifest.tts.included}`)

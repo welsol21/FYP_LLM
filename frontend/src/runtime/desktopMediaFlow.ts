@@ -7,8 +7,9 @@ import type {
 import { LocalWorkspace } from '../lib/localWorkspace'
 import { prewarmLocalAsr, transcribeMediaBlobDetailed } from '../lib/clientAsr'
 import { prewarmLocalMediaRenderer, prewarmLocalTts, renderTranslatedMediaArtifacts } from '../lib/clientMediaRender'
-import { configureTransformersEnv } from '../lib/transformersEnv'
+import { resolveDesktopRuntimeAssetUrl } from '../lib/desktopRuntime'
 import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics'
+import { configureTransformersEnvForMode } from '../lib/transformersEnv'
 
 type SentenceContractPayload = {
   sentence_text?: string
@@ -387,8 +388,9 @@ async function getTranslationPipeline(): Promise<TranslationPipeline> {
     translationPipelinePromise = (async () => {
       const transformers = await import('@huggingface/transformers')
       const env = (transformers as unknown as { env?: Record<string, unknown> }).env
-      configureTransformersEnv(env)
-      const modelId = String(import.meta.env?.VITE_CLIENT_TRANSLATION_MODEL || 'Xenova/m2m100_418M').trim()
+      configureTransformersEnvForMode(env, 'desktop')
+      const modelId = await resolveDesktopRuntimeAssetUrl('translation')
+      recordRuntimeDiagnostic('desktop.translation', 'model.path', { modelId })
       const pipelineFactory = (transformers as unknown as {
         pipeline: (task: string, model: string, opts?: Record<string, unknown>) => Promise<TranslationPipeline>
       }).pipeline

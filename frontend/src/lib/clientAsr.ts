@@ -1,3 +1,7 @@
+import { resolveDesktopRuntimeAssetUrl } from './desktopRuntime'
+import { recordRuntimeDiagnostic } from './runtimeDiagnostics'
+import { configureTransformersEnvForMode } from './transformersEnv'
+
 type AsrProgressPayload = {
   message: string
   progress: number
@@ -91,8 +95,9 @@ async function getAsrPipeline(options?: AsrOptions): Promise<AsrPipeline> {
       try {
         const transformers = await import('@huggingface/transformers')
         const env = (transformers as unknown as { env?: Record<string, unknown> }).env
-        configureTransformersEnv(env)
-        const modelId = String(import.meta.env?.VITE_CLIENT_ASR_MODEL || 'Xenova/whisper-base.en').trim()
+        configureTransformersEnvForMode(env, 'desktop')
+        const modelId = await resolveDesktopRuntimeAssetUrl('asr')
+        recordRuntimeDiagnostic('desktop.asr', 'model.path', { modelId })
         const pipelineFactory = (transformers as unknown as {
           pipeline: (task: string, model: string, opts?: Record<string, unknown>) => Promise<AsrPipeline>
         }).pipeline
@@ -191,4 +196,3 @@ export async function transcribeMediaBlob(blob: Blob, options?: AsrOptions): Pro
   const result = await transcribeMediaBlobDetailed(blob, options)
   return result.text
 }
-import { configureTransformersEnv } from './transformersEnv'
