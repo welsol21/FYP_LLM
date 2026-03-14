@@ -15,6 +15,7 @@ import type {
 } from './runtimeApi'
 import { LocalWorkspace } from '../lib/localWorkspace'
 import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics'
+import { resolveClientMode } from '../lib/clientMode'
 
 type SentenceContractPayload = {
   sentence_text?: string
@@ -388,6 +389,7 @@ export class HttpRuntimeApi implements RuntimeApi {
   }): Promise<MediaSubmissionPayload> {
     recordRuntimeDiagnostic('api.media', 'submit.start', {
       mediaPath: input.mediaPath,
+      clientMode: resolveClientMode(),
       translationProvider: input.translationProvider,
       subtitlesMode: input.subtitlesMode,
       voiceChoice: input.voiceChoice,
@@ -474,31 +476,23 @@ export class HttpRuntimeApi implements RuntimeApi {
       })
     }
 
-    const normalizedVoiceChoice = String(input.voiceChoice || 'backend_dmitry').trim().toLowerCase()
-    if (normalizedVoiceChoice !== 'backend_dmitry' && normalizedVoiceChoice !== 'backend_svetlana') {
-      const detail = `Unsupported voice choice for PWA media flow: ${normalizedVoiceChoice}`
-      recordRuntimeDiagnostic('api.media', 'submit.reject', detail, 'error')
-      return finish({
-        result: {
-          route: 'reject',
-          status: 'rejected',
-          message: detail,
-          stage_name: 'loading_file',
-        },
-        ui_feedback: {
-          severity: 'error',
-          title: 'Processing failed',
-          message: detail,
-        },
+    const clientMode = resolveClientMode()
+    if (clientMode === 'pwa') {
+      recordRuntimeDiagnostic('api.media', 'submit.backend_path', { voiceChoice: input.voiceChoice, clientMode })
+      const { submitMediaPwa } = await import('../runtime/pwaMediaFlow')
+      return await submitMediaPwa({
+        ...input,
+        projectId: effectiveProjectId,
+        mediaBlob,
+        fileName,
+        settings,
       })
     }
-
-    recordRuntimeDiagnostic('api.media', 'submit.backend_path', { voiceChoice: normalizedVoiceChoice })
-    return await this.submitMediaViaBackend({
+    recordRuntimeDiagnostic('api.media', 'submit.desktop_path', { voiceChoice: input.voiceChoice, clientMode })
+    const { submitMediaDesktop } = await import('../runtime/desktopMediaFlow')
+    return await submitMediaDesktop({
       ...input,
       projectId: effectiveProjectId,
-      mediaFileId: input.mediaFileId,
-      mediaBlob,
       fileName,
       settings,
     })

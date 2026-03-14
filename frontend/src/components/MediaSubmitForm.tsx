@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApi } from '../api/apiContext'
 import type { MediaProgressPayload, MediaSubmissionPayload, TranslationProviderConfig } from '../api/runtimeApi'
+import { getDefaultVoiceLabel, getVoiceOptionsForClientMode, resolveClientMode } from '../lib/clientMode'
 
 type Props = {
   onSubmitted: (payload: MediaSubmissionPayload) => void
@@ -50,7 +51,9 @@ export function MediaSubmitForm({
   const [selectedFileName, setSelectedFileName] = useState('')
   const [translator, setTranslator] = useState(defaultTranslator || 'm2m100')
   const [subtitles, setSubtitles] = useState('Bilingual (sequential)')
-  const [voice, setVoice] = useState('Dmitry (Male)')
+  const online = typeof navigator !== 'undefined' ? navigator.onLine : true
+  const clientMode = resolveClientMode()
+  const [voice, setVoice] = useState(getDefaultVoiceLabel(clientMode, online))
   const [processingMode, setProcessingMode] = useState<'incremental' | 'force'>('incremental')
   const [submitting, setSubmitting] = useState(false)
   const currentControllerRef = useRef<AbortController | null>(null)
@@ -61,10 +64,7 @@ export function MediaSubmitForm({
     { label: 'Target only', value: 'target only' },
     { label: 'Source only', value: 'source only' },
   ]
-  const voiceOptions: Array<{ label: string; value: string }> = [
-    { label: 'Dmitry (Male)', value: 'backend_dmitry' },
-    { label: 'Svetlana (Female)', value: 'backend_svetlana' },
-  ]
+  const voiceOptions = getVoiceOptionsForClientMode(clientMode, online)
   const normalizedProjectLabel = String(projectLabel || '').trim()
   const showProjectLine = normalizedProjectLabel.length > 0 && normalizedProjectLabel !== '-'
   const normalizedFileLabel = String(selectedFileName || '').trim()
@@ -92,9 +92,9 @@ export function MediaSubmitForm({
 
   useEffect(() => {
     if (!voiceOptions.some((option) => option.label === voice)) {
-      setVoice(voiceOptions[0]?.label || 'Dmitry (Male)')
+      setVoice(voiceOptions[0]?.label || getDefaultVoiceLabel(clientMode, online))
     }
-  }, [voice, voiceOptions])
+  }, [clientMode, online, voice, voiceOptions])
 
   useEffect(() => {
     if (!enabledProviders.length) return
@@ -117,7 +117,7 @@ export function MediaSubmitForm({
         mediaFileId,
         translationProvider: translator,
         subtitlesMode: subtitleOptions.find((option) => option.label === subtitles)?.value || 'bilingual_sequential',
-        voiceChoice: voiceOptions.find((option) => option.label === voice)?.value || 'backend_dmitry',
+        voiceChoice: voiceOptions.find((option) => option.label === voice)?.value || getVoiceOptionsForClientMode(clientMode, online)[0]?.value || 'client_male',
         forceFullReprocess: processingMode === 'force',
         onProgress,
         signal: controller.signal,
