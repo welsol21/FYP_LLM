@@ -386,7 +386,40 @@ def _probe_audio_duration_ms(path: Path) -> int:
         return 0
 
 
-def _extract_audio_segment_mp3(*, source: Path, start_ms: int, end_ms: int, out_path: Path) -> bool:
+def _render_silence_wav(*, duration_ms: int, out_path: Path) -> bool:
+    dur_ms = max(0, int(duration_ms or 0))
+    if dur_ms <= 0:
+        return False
+    duration_sec = max(0.01, float(dur_ms) / 1000.0)
+    try:
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "anullsrc=r=24000:cl=mono",
+                "-t",
+                f"{duration_sec:.3f}",
+                "-c:a",
+                "pcm_s16le",
+                "-ar",
+                "24000",
+                "-ac",
+                "1",
+                str(out_path),
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return out_path.exists() and out_path.stat().st_size > 0
+    except Exception:
+        return False
+
+
+def _extract_audio_segment_wav(*, source: Path, start_ms: int, end_ms: int, out_path: Path) -> bool:
     if end_ms <= start_ms:
         return False
     start_sec = max(0.0, float(start_ms) / 1000.0)
@@ -404,9 +437,37 @@ def _extract_audio_segment_mp3(*, source: Path, start_ms: int, end_ms: int, out_
                 str(source),
                 "-vn",
                 "-acodec",
-                "libmp3lame",
-                "-q:a",
-                "3",
+                "pcm_s16le",
+                "-ar",
+                "24000",
+                "-ac",
+                "1",
+                str(out_path),
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return out_path.exists() and out_path.stat().st_size > 1024
+    except Exception:
+        return False
+
+
+def _normalize_audio_to_wav(*, source: Path, out_path: Path) -> bool:
+    try:
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(source),
+                "-vn",
+                "-acodec",
+                "pcm_s16le",
+                "-ar",
+                "24000",
+                "-ac",
+                "1",
                 str(out_path),
             ],
             check=True,
@@ -1873,7 +1934,7 @@ class RuntimeMediaService:
             sentence_windows: list[dict[str, Any]] = []
             segment_audio_files: list[Path] = []
             current_ms = 0
-            gap_ms = 120
+            source_target_pause_ms = 10
             voice_name = _voice_name_for_choice(voice_choice)
             with tempfile.TemporaryDirectory(prefix="ela_tts_") as tmpdir:
                 tmp = Path(tmpdir)
@@ -1899,11 +1960,11 @@ class RuntimeMediaService:
                     if include_source:
                         start_ms_raw = int(row.get("start_ms") or 0)
                         end_ms_raw = int(row.get("end_ms") or 0)
-                        source_seg = tmp / f"src_{idx:04d}.mp3"
+                        source_seg = tmp / f"src_{idx:04d}.wav"
                         if (
                             source.exists()
                             and end_ms_raw > start_ms_raw
-                            and _extract_audio_segment_mp3(
+                            and _extract_audio_segment_wav(
                                 source=source,
                                 start_ms=start_ms_raw,
                                 end_ms=end_ms_raw,
@@ -1933,21 +1994,36 @@ class RuntimeMediaService:
                             )
                             window["source_start_ms"] = start_ms
                             window["source_end_ms"] = end_ms
-                            current_ms = end_ms + gap_ms
+                            current_ms = end_ms
                             segment_audio_files.append(source_seg)
+
+                            if include_target:
+                                pause_1 = tmp / f"pause_src_tgt_{idx:04d}_a.wav"
+                                if _render_silence_wav(duration_ms=source_target_pause_ms, out_path=pause_1):
+                                    segment_audio_files.append(pause_1)
+                                    current_ms += source_target_pause_ms
 
                     if include_target:
                         text_for_tts = text_ru or text_en
                         if not text_for_tts:
                             continue
-                        target_seg = tmp / f"tgt_{idx:04d}.mp3"
+                        target_seg_mp3 = tmp / f"tgt_{idx:04d}.mp3"
+                        target_seg = tmp / f"tgt_{idx:04d}.wav"
 
-                        async def _save_segment(path: Path = target_seg, text: str = text_for_tts) -> None:
+                        if include_source and bilingual_simultaneous:
+                            pause_2 = tmp / f"pause_src_tgt_{idx:04d}_b.wav"
+                            if _render_silence_wav(duration_ms=source_target_pause_ms, out_path=pause_2):
+                                segment_audio_files.append(pause_2)
+                                current_ms += source_target_pause_ms
+
+                        async def _save_segment(path: Path = target_seg_mp3, text: str = text_for_tts) -> None:
                             await edge_tts.Communicate(text, voice_name).save(str(path))
 
                         asyncio.run(_save_segment())
-                        if not target_seg.exists() or target_seg.stat().st_size <= 1024:
+                        if not target_seg_mp3.exists() or target_seg_mp3.stat().st_size <= 1024:
                             raise RuntimeError(f"edge-tts synthesis failed for sentence {idx}.")
+                        if not _normalize_audio_to_wav(source=target_seg_mp3, out_path=target_seg):
+                            raise RuntimeError(f"Unable to normalize TTS audio for sentence {idx}.")
                         dur_ms = _probe_audio_duration_ms(target_seg)
                         if dur_ms <= 0:
                             raise RuntimeError(f"Unable to probe TTS duration for sentence {idx}.")
@@ -1971,9 +2047,20 @@ class RuntimeMediaService:
                         )
                         window["target_start_ms"] = start_ms
                         window["target_end_ms"] = end_ms
-                        current_ms = end_ms + gap_ms
+                        current_ms = end_ms
                         segment_audio_files.append(target_seg)
                     sentence_windows.append(window)
+
+                    if idx < len(media_sentences):
+                        next_row = media_sentences[idx]
+                        current_end_raw = int(row.get("end_ms") or 0)
+                        next_start_raw = int(next_row.get("start_ms") or 0)
+                        raw_gap_ms = max(0, next_start_raw - current_end_raw)
+                        inter_sentence_gap_ms = max(raw_gap_ms // 3, 10)
+                        gap_seg = tmp / f"gap_{idx:04d}.wav"
+                        if _render_silence_wav(duration_ms=inter_sentence_gap_ms, out_path=gap_seg):
+                            segment_audio_files.append(gap_seg)
+                            current_ms += inter_sentence_gap_ms
 
                 if not segment_audio_files:
                     return
@@ -1995,6 +2082,7 @@ class RuntimeMediaService:
                         "0",
                         "-i",
                         str(concat_txt),
+                        "-vn",
                         "-c:a",
                         "libmp3lame",
                         "-q:a",

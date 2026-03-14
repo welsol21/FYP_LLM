@@ -8,15 +8,15 @@ import type {
   VisualizerNode,
   VisualizerPayload,
 } from '../api/runtimeApi'
-import initSqlJs from 'sql.js'
-import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
 import { getTranslationProviderFromSettings } from './analysisSettings'
+import { recordRuntimeDiagnostic } from './runtimeDiagnostics'
 
-const STORAGE_KEY = 'ela_frontend_workspace_sqlite_b64_v1'
-const OPFS_DB_FILE = 'ela_frontend_workspace.sqlite'
+const IDB_DB_NAME = 'ela_frontend_workspace'
+const IDB_DB_VERSION = 1
+const IDB_STATE_STORE = 'kv_store'
+const IDB_BLOB_STORE = 'blob_store'
 const SQLITE_STATE_KEY = 'workspace_state_v1'
 const LEGACY_STORAGE_KEY = 'ela_frontend_workspace_v1'
-const SQLITE_MEDIA_TABLE = 'media_blob_store'
 
 type WorkspaceFile = MediaFileRow & {
   project_id: string
@@ -85,176 +85,204 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = ''
-  for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i])
-  return window.btoa(binary)
+type BlobRecord = {
+  key: string
+  mime_type: string
+  size_bytes: number
+  data_blob: Blob
+  updated_at: string
 }
 
-function base64ToBytes(value: string): Uint8Array {
-  const binary = window.atob(value)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
-  return bytes
+let idbPromise: Promise<IDBDatabase | null> | null = null
+let memoryState: WorkspaceState = emptyWorkspaceState()
+let memoryBlobs = new Map<string, BlobRecord>()
+
+function hasIndexedDb(): boolean {
+  return typeof indexedDB !== 'undefined'
 }
 
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+function openIndexedDb(): Promise<IDBDatabase | null> {
+  if (!hasIndexedDb()) return Promise.resolve(null)
+  if (!idbPromise) {
+    recordRuntimeDiagnostic('workspace.idb', 'open.start')
+    idbPromise = new Promise((resolve, reject) => {
+      const req = indexedDB.open(IDB_DB_NAME, IDB_DB_VERSION)
+      req.onupgradeneeded = () => {
+        const db = req.result
+        if (!db.objectStoreNames.contains(IDB_STATE_STORE)) db.createObjectStore(IDB_STATE_STORE)
+        if (!db.objectStoreNames.contains(IDB_BLOB_STORE)) db.createObjectStore(IDB_BLOB_STORE, { keyPath: 'key' })
+        recordRuntimeDiagnostic('workspace.idb', 'open.upgrade', { version: IDB_DB_VERSION })
+      }
+      req.onsuccess = () => {
+        recordRuntimeDiagnostic('workspace.idb', 'open.success')
+        resolve(req.result)
+      }
+      req.onerror = () => {
+        recordRuntimeDiagnostic('workspace.idb', 'open.error', req.error || 'Failed to open IndexedDB', 'error')
+        reject(req.error || new Error('Failed to open IndexedDB'))
+      }
+    })
+  }
+  return idbPromise
 }
 
-type SqlDatabase = {
-  run: (sql: string, params?: unknown[] | Record<string, unknown>) => void
-  exec: (sql: string, params?: unknown[] | Record<string, unknown>) => Array<{ columns: string[]; values: unknown[][] }>
-  export: () => Uint8Array
-  close: () => void
+async function withStore<T>(
+  storeName: string,
+  mode: IDBTransactionMode,
+  fn: (store: IDBObjectStore) => void | Promise<T>,
+): Promise<T | undefined> {
+  const db = await openIndexedDb()
+  if (!db) return undefined
+  return await new Promise<T>((resolve, reject) => {
+    const tx = db.transaction(storeName, mode)
+    const store = tx.objectStore(storeName)
+    Promise.resolve(fn(store)).then((value) => {
+      tx.oncomplete = () => resolve(value as T)
+      tx.onerror = () => {
+        recordRuntimeDiagnostic('workspace.idb', 'tx.error', { storeName, mode, error: tx.error || 'IndexedDB transaction failed' }, 'error')
+        reject(tx.error || new Error('IndexedDB transaction failed'))
+      }
+      tx.onabort = () => {
+        recordRuntimeDiagnostic('workspace.idb', 'tx.abort', { storeName, mode, error: tx.error || 'IndexedDB transaction aborted' }, 'error')
+        reject(tx.error || new Error('IndexedDB transaction aborted'))
+      }
+    }).catch(reject)
+  })
 }
 
-type SqlModule = {
-  Database: new (data?: Uint8Array) => SqlDatabase
+function requestToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => {
+      recordRuntimeDiagnostic('workspace.idb', 'request.error', request.error || 'IndexedDB request failed', 'error')
+      reject(request.error || new Error('IndexedDB request failed'))
+    }
+  })
 }
 
-let sqlModule: SqlModule | null = null
-let sqliteInitPromise: Promise<void> | null = null
-let sqliteDb: SqlDatabase | null = null
-
-function openDbFromSnapshot(snapshot?: Uint8Array | null): SqlDatabase {
-  if (!sqlModule) throw new Error('SQLite module not initialized')
-  const db = snapshot && snapshot.byteLength > 0 ? new sqlModule.Database(snapshot) : new sqlModule.Database()
-  db.run('CREATE TABLE IF NOT EXISTS kv_store (k TEXT PRIMARY KEY, v TEXT NOT NULL)')
-  db.run(`
-    CREATE TABLE IF NOT EXISTS ${SQLITE_MEDIA_TABLE} (
-      k TEXT PRIMARY KEY,
-      mime_type TEXT NOT NULL,
-      size_bytes INTEGER NOT NULL,
-      data_b64 TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-  `)
-  return db
-}
-
-async function getWorkspaceDirectory(): Promise<FileSystemDirectoryHandle | null> {
-  const storage = (navigator as Navigator & {
-    storage?: StorageManager & { getDirectory?: () => Promise<FileSystemDirectoryHandle> }
-  }).storage
-  if (!storage || typeof storage.getDirectory !== 'function') return null
+async function idbGetState(): Promise<WorkspaceState> {
+  const value = await withStore<string | undefined>(IDB_STATE_STORE, 'readonly', async (store) => {
+    return await requestToPromise(store.get(SQLITE_STATE_KEY))
+  })
+  if (typeof value !== 'string' || !value) return clone(memoryState)
   try {
-    return await storage.getDirectory()
+    return coerceWorkspaceState(JSON.parse(value) as Partial<WorkspaceState>)
   } catch {
-    return null
+    return emptyWorkspaceState()
   }
 }
 
-async function readPersistedSnapshot(): Promise<Uint8Array | null> {
-  const dir = await getWorkspaceDirectory()
-  if (dir) {
-    try {
-      const handle = await dir.getFileHandle(OPFS_DB_FILE, { create: false })
-      const file = await handle.getFile()
-      const buffer = await file.arrayBuffer()
-      return new Uint8Array(buffer)
-    } catch {
-      // fallback below
-    }
+async function idbPutState(state: WorkspaceState): Promise<void> {
+  memoryState = clone(state)
+  await withStore(IDB_STATE_STORE, 'readwrite', async (store) => {
+    await requestToPromise(store.put(JSON.stringify(state), SQLITE_STATE_KEY))
+  })
+}
+
+async function idbPutBlob(key: string, blob: Blob): Promise<void> {
+  const record: BlobRecord = {
+    key,
+    mime_type: String(blob.type || 'application/octet-stream'),
+    size_bytes: blob.size,
+    data_blob: blob,
+    updated_at: nowIso(),
   }
-  const encoded = String(window.localStorage.getItem(STORAGE_KEY) || '')
-  return encoded ? base64ToBytes(encoded) : null
+  memoryBlobs.set(key, record)
+  await withStore(IDB_BLOB_STORE, 'readwrite', async (store) => {
+    await requestToPromise(store.put(record))
+  })
 }
 
-async function writePersistedSnapshot(bytes: Uint8Array): Promise<void> {
-  const dir = await getWorkspaceDirectory()
-  if (dir) {
-    const handle = await dir.getFileHandle(OPFS_DB_FILE, { create: true })
-    const writable = await handle.createWritable()
-    await writable.write(toArrayBuffer(bytes))
-    await writable.close()
-    window.localStorage.removeItem(STORAGE_KEY)
-    return
-  }
-  window.localStorage.setItem(STORAGE_KEY, bytesToBase64(bytes))
-}
-
-async function clearPersistedSnapshot(): Promise<void> {
-  const dir = await getWorkspaceDirectory()
-  if (dir) {
-    try {
-      await dir.removeEntry(OPFS_DB_FILE)
-    } catch {
-      // ignore
-    }
-  }
-  window.localStorage.removeItem(STORAGE_KEY)
-}
-
-function readCell(rows: Array<{ values: unknown[][] }>, rowIndex = 0, colIndex = 0): unknown {
-  return rows?.[0]?.values?.[rowIndex]?.[colIndex]
-}
-
-async function persistDbSnapshot(): Promise<void> {
-  const exported = sqliteDb?.export() || new Uint8Array()
-  await writePersistedSnapshot(exported)
+async function idbGetBlobRecord(key: string): Promise<BlobRecord | null> {
+  const record = await withStore<BlobRecord | undefined>(IDB_BLOB_STORE, 'readonly', async (store) => {
+    return await requestToPromise(store.get(key))
+  })
+  if (record) return record
+  return memoryBlobs.get(key) || null
 }
 
 async function sqlitePutBlob(key: string, blob: Blob): Promise<void> {
-  await ensureDbReady()
-  await ensureDbFresh()
-  const arrayBuffer = typeof (blob as Blob & { arrayBuffer?: () => Promise<ArrayBuffer> }).arrayBuffer === 'function'
-    ? await (blob as Blob & { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer()
-    : await new Response(blob).arrayBuffer()
-  const bytes = new Uint8Array(arrayBuffer)
-  sqliteDb?.run(
-    `INSERT OR REPLACE INTO ${SQLITE_MEDIA_TABLE} (k, mime_type, size_bytes, data_b64, updated_at) VALUES (?, ?, ?, ?, ?)`,
-    [key, String(blob.type || 'application/octet-stream'), bytes.length, bytesToBase64(bytes), nowIso()],
-  )
-  await persistDbSnapshot()
+  if (!key || !(blob instanceof Blob)) return
+  if (!hasIndexedDb()) {
+    memoryBlobs.set(key, {
+      key,
+      mime_type: String(blob.type || 'application/octet-stream'),
+      size_bytes: blob.size,
+      data_blob: blob,
+      updated_at: nowIso(),
+    })
+    return
+  }
+  await idbPutBlob(key, blob)
 }
 
 async function sqliteGetBlob(key: string): Promise<Blob | null> {
-  await ensureDbReady()
-  await ensureDbFresh()
-  const rows = sqliteDb?.exec(`SELECT mime_type, data_b64 FROM ${SQLITE_MEDIA_TABLE} WHERE k = ? LIMIT 1`, [key]) || []
-  const mimeType = String(readCell(rows, 0, 0) || '')
-  const dataB64 = String(readCell(rows, 0, 1) || '')
-  if (!dataB64) return null
-  const bytes = base64ToBytes(dataB64)
-  return new Blob([toArrayBuffer(bytes)], { type: mimeType || 'application/octet-stream' })
+  if (!key) return null
+  if (!hasIndexedDb()) return memoryBlobs.get(key)?.data_blob || null
+  return (await idbGetBlobRecord(key))?.data_blob || null
 }
 
 async function sqliteDeleteBlob(key: string): Promise<void> {
-  await ensureDbReady()
-  await ensureDbFresh()
-  sqliteDb?.run(`DELETE FROM ${SQLITE_MEDIA_TABLE} WHERE k = ?`, [key])
-  await persistDbSnapshot()
+  memoryBlobs.delete(key)
+  if (!hasIndexedDb()) return
+  await withStore(IDB_BLOB_STORE, 'readwrite', async (store) => {
+    await requestToPromise(store.delete(key))
+  })
 }
 
 async function sqliteDeleteBlobPrefix(prefix: string): Promise<void> {
   const safe = String(prefix || '').trim()
   if (!safe) return
-  await ensureDbReady()
-  await ensureDbFresh()
-  sqliteDb?.run(`DELETE FROM ${SQLITE_MEDIA_TABLE} WHERE k LIKE ?`, [`${safe}%`])
-  await persistDbSnapshot()
+  for (const key of [...memoryBlobs.keys()]) {
+    if (key.startsWith(safe)) memoryBlobs.delete(key)
+  }
+  if (!hasIndexedDb()) return
+  await withStore(IDB_BLOB_STORE, 'readwrite', async (store) => {
+    const keys = await requestToPromise(store.getAllKeys())
+    await Promise.all(
+      keys
+        .map((value) => String(value || ''))
+        .filter((key) => key.startsWith(safe))
+        .map((key) => requestToPromise(store.delete(key))),
+    )
+  })
 }
 
 async function sqliteFindBlobByKeySuffix(suffix: string): Promise<{ key: string; blob: Blob } | null> {
   if (!suffix) return null
-  await ensureDbReady()
-  await ensureDbFresh()
-  const rows = sqliteDb?.exec(`SELECT k, mime_type, data_b64 FROM ${SQLITE_MEDIA_TABLE}`) || []
-  const values = rows?.[0]?.values || []
-  for (const row of values) {
-    const key = String(row?.[0] || '')
-    if (!key.endsWith(suffix)) continue
-    const mimeType = String(row?.[1] || '')
-    const dataB64 = String(row?.[2] || '')
-    if (!dataB64) continue
-    const bytes = base64ToBytes(dataB64)
-    return {
-      key,
-      blob: new Blob([toArrayBuffer(bytes)], { type: mimeType || 'application/octet-stream' }),
+  if (!hasIndexedDb()) {
+    for (const [key, record] of memoryBlobs.entries()) {
+      if (key.endsWith(suffix)) return { key, blob: record.data_blob }
     }
+    return null
+  }
+  const rows = await withStore<BlobRecord[]>(IDB_BLOB_STORE, 'readonly', async (store) => {
+    return await requestToPromise(store.getAll())
+  }) || []
+  for (const row of rows) {
+    const key = String(row?.key || '')
+    if (!key.endsWith(suffix)) continue
+    if (!(row?.data_blob instanceof Blob)) continue
+    return { key, blob: row.data_blob }
   }
   return null
+}
+
+async function resetIndexedDb(): Promise<void> {
+  memoryState = emptyWorkspaceState()
+  memoryBlobs = new Map<string, BlobRecord>()
+  const openDb = await openIndexedDb()
+  if (openDb) {
+    openDb.close()
+  }
+  idbPromise = null
+  if (!hasIndexedDb()) return
+  await new Promise<void>((resolve, reject) => {
+    const req = indexedDB.deleteDatabase(IDB_DB_NAME)
+    req.onsuccess = () => resolve()
+    req.onerror = () => reject(req.error || new Error('Failed to delete IndexedDB database'))
+    req.onblocked = () => resolve()
+  })
 }
 
 function analysisArtifactKey(documentId: string, artifactName: string): string {
@@ -262,38 +290,42 @@ function analysisArtifactKey(documentId: string, artifactName: string): string {
 }
 
 async function ensureDbReady(): Promise<void> {
-  if (!sqliteInitPromise) {
-    sqliteInitPromise = (async () => {
-      sqlModule = (await initSqlJs({
-        locateFile: () => {
-          const candidate = String(sqlWasmUrl || 'sql-wasm.wasm')
-          if (typeof process !== 'undefined' && process?.versions?.node && candidate.startsWith('/node_modules/')) {
-            return `${process.cwd()}${candidate}`
-          }
-          return candidate
-        },
-      })) as unknown as SqlModule
-      const snapshot = await readPersistedSnapshot()
-      sqliteDb = openDbFromSnapshot(snapshot)
-
-      // One-time migration from legacy JSON workspace to SQLite snapshot.
-      if (!snapshot || snapshot.byteLength === 0) {
-        const legacyRaw = String(window.localStorage.getItem(LEGACY_STORAGE_KEY) || '')
-        if (legacyRaw) {
-          try {
-            const parsed = JSON.parse(legacyRaw) as Partial<WorkspaceState>
-            const migrated = coerceWorkspaceState(parsed)
-            sqliteDb.run('INSERT OR REPLACE INTO kv_store (k, v) VALUES (?, ?)', [SQLITE_STATE_KEY, JSON.stringify(migrated)])
-            await persistDbSnapshot()
-            window.localStorage.removeItem(LEGACY_STORAGE_KEY)
-          } catch {
-            // ignore invalid legacy data
-          }
-        }
-      }
-    })()
+  if (idbPromise) {
+    await idbPromise
+    return
   }
-  await sqliteInitPromise
+  const legacyRaw = String(window.localStorage.getItem(LEGACY_STORAGE_KEY) || '')
+  if (!hasIndexedDb()) {
+    if (legacyRaw) {
+      try {
+        memoryState = coerceWorkspaceState(JSON.parse(legacyRaw) as Partial<WorkspaceState>)
+      } catch {
+        memoryState = emptyWorkspaceState()
+      }
+      window.localStorage.removeItem(LEGACY_STORAGE_KEY)
+    }
+    return
+  }
+  await openIndexedDb()
+  const state = await idbGetState()
+  const isEmpty =
+    state.projects.length === 0 &&
+    state.files.length === 0 &&
+    state.analyses.length === 0 &&
+    !state.translation_config &&
+    !state.selected_project_id
+  if (isEmpty && legacyRaw) {
+    try {
+      const migrated = coerceWorkspaceState(JSON.parse(legacyRaw) as Partial<WorkspaceState>)
+      await idbPutState(migrated)
+      memoryState = clone(migrated)
+      window.localStorage.removeItem(LEGACY_STORAGE_KEY)
+    } catch {
+      memoryState = state
+    }
+  } else {
+    memoryState = state
+  }
 }
 
 async function ensureDbFresh(): Promise<void> {
@@ -301,26 +333,20 @@ async function ensureDbFresh(): Promise<void> {
 }
 
 async function loadRawState(): Promise<WorkspaceState> {
-  const empty = emptyWorkspaceState()
-  try {
-    await ensureDbReady()
-    await ensureDbFresh()
-    const rows = sqliteDb?.exec('SELECT v FROM kv_store WHERE k = ?', [SQLITE_STATE_KEY]) || []
-    const raw = rows?.[0]?.values?.[0]?.[0]
-    if (typeof raw !== 'string' || !raw) return empty
-    const parsed = JSON.parse(raw) as Partial<WorkspaceState>
-    return coerceWorkspaceState(parsed)
-  } catch {
-    return empty
-  }
+  await ensureDbReady()
+  await ensureDbFresh()
+  if (!hasIndexedDb()) return clone(memoryState)
+  const state = await idbGetState()
+  memoryState = clone(state)
+  return state
 }
 
 async function saveRawState(state: WorkspaceState): Promise<void> {
+  memoryState = clone(state)
   await ensureDbReady()
   await ensureDbFresh()
-  const payload = JSON.stringify(state)
-  sqliteDb?.run('INSERT OR REPLACE INTO kv_store (k, v) VALUES (?, ?)', [SQLITE_STATE_KEY, payload])
-  await persistDbSnapshot()
+  if (!hasIndexedDb()) return
+  await idbPutState(state)
 }
 
 async function ensureState(): Promise<WorkspaceState> {
@@ -724,17 +750,7 @@ function buildContractArtifacts(documentId: string, contract: VisualizerPayload)
 
 export const LocalWorkspace = {
   async __resetForTests(): Promise<void> {
-    if (sqliteDb) {
-      try {
-        sqliteDb.close()
-      } catch {
-        // ignore
-      }
-    }
-    sqliteDb = null
-    sqliteInitPromise = null
-    sqlModule = null
-    await clearPersistedSnapshot()
+    await resetIndexedDb()
     window.localStorage.removeItem(LEGACY_STORAGE_KEY)
   },
 
@@ -789,6 +805,7 @@ export const LocalWorkspace = {
   },
 
   async createProject(name: string): Promise<ProjectRow> {
+    recordRuntimeDiagnostic('workspace.project', 'create.start', { name })
     const state = await ensureState()
     const trimmed = String(name || '').trim().replace(/\s+/g, ' ')
     if (!trimmed) {
@@ -809,10 +826,12 @@ export const LocalWorkspace = {
     state.projects.unshift(project)
     state.selected_project_id = project.id
     await saveRawState(state)
+    recordRuntimeDiagnostic('workspace.project', 'create.success', project)
     return clone(project)
   },
 
   async deleteProject(projectId: string): Promise<{ status: 'ok' | 'error'; message: string; project_id?: string }> {
+    recordRuntimeDiagnostic('workspace.project', 'delete.start', { projectId })
     const state = await ensureState()
     const id = String(projectId || '').trim()
     if (!id) return { status: 'error', message: 'project id is required' }
@@ -853,7 +872,9 @@ export const LocalWorkspace = {
       await sqliteDeleteBlobPrefix(`analysis_artifact:${String(row.document_id || '').trim()}:`)
     }
 
-    return { status: 'ok', message: 'Project and all related data deleted.', project_id: id }
+    const result = { status: 'ok', message: 'Project and all related data deleted.', project_id: id } as const
+    recordRuntimeDiagnostic('workspace.project', 'delete.success', result)
+    return result
   },
 
   async getSelectedProject(): Promise<SelectedProject> {
@@ -878,6 +899,7 @@ export const LocalWorkspace = {
     sizeBytes: number
     durationSec?: number
   }): Promise<WorkspaceFile> {
+    recordRuntimeDiagnostic('workspace.file', 'register.start', input)
     const state = await ensureState()
     const project = pickProject(state, input.projectId)
     if (!project) throw new Error('Project is required to register media file.')
@@ -899,6 +921,7 @@ export const LocalWorkspace = {
     const projectRow = state.projects.find((p) => p.id === project.id)
     if (projectRow) projectRow.updated_at = ts
     await saveRawState(state)
+    recordRuntimeDiagnostic('workspace.file', 'register.success', { id: file.id, name: file.name, path: file.path })
     return clone(file)
   },
 
@@ -917,6 +940,7 @@ export const LocalWorkspace = {
   },
 
   async deleteFile(fileId: string): Promise<{ status: 'ok' | 'error'; message: string; file_id?: string }> {
+    recordRuntimeDiagnostic('workspace.file', 'delete.start', { fileId })
     const state = await ensureState()
     const id = String(fileId || '').trim()
     if (!id) return { status: 'error', message: 'file id is required' }
@@ -932,7 +956,9 @@ export const LocalWorkspace = {
     for (const row of removedAnalyses) {
       await sqliteDeleteBlobPrefix(`analysis_artifact:${String(row.document_id || '').trim()}:`)
     }
-    return { status: 'ok', message: 'File deleted.', file_id: id }
+    const result = { status: 'ok', message: 'File deleted.', file_id: id } as const
+    recordRuntimeDiagnostic('workspace.file', 'delete.success', result)
+    return result
   },
 
   async upsertAnalysis(input: {
@@ -948,6 +974,12 @@ export const LocalWorkspace = {
     artifacts?: DocumentArtifact[]
     contractCurrent?: boolean
   }): Promise<AnalysisHistoryRow> {
+    recordRuntimeDiagnostic('workspace.analysis', 'upsert.start', {
+      documentId: input.documentId,
+      fileName: input.fileName,
+      contractCurrent: input.contractCurrent !== false,
+      artifacts: Array.isArray(input.artifacts) ? input.artifacts.length : 0,
+    })
     const state = await ensureState()
     const ts = nowIso()
     const project = pickProject(state, input.projectId)
@@ -982,6 +1014,11 @@ export const LocalWorkspace = {
     const projectRow = state.projects.find((p) => p.id === project.id)
     if (projectRow) projectRow.updated_at = ts
     await saveRawState(state)
+    recordRuntimeDiagnostic('workspace.analysis', 'upsert.success', {
+      documentId: row.document_id,
+      items: row.items_count,
+      contractCurrent: row.contract_current,
+    })
     return clone(row)
   },
 
@@ -1013,7 +1050,12 @@ export const LocalWorkspace = {
     const row = state.analyses.find((a) => a.document_id === docId || a.analysis_id === docId)
     if (row?.contract_current === false) return {}
     if (!row) return {}
-    return enrichContractTranslationsFromAnalyses(row.contract || {}, row, state.analyses)
+    const payload = enrichContractTranslationsFromAnalyses(row.contract || {}, row, state.analyses)
+    recordRuntimeDiagnostic('workspace.visualizer', 'payload.loaded', {
+      documentId: docId,
+      sentences: Object.keys(payload || {}).length,
+    })
+    return payload
   },
 
   async applyEdit(input: {

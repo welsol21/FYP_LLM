@@ -19,7 +19,7 @@ describe('ProjectsPage', () => {
     renderWithProviders(<ProjectsPage />)
     fireEvent.click(await screen.findByRole('button', { name: 'New Project' }))
     await waitFor(() => {
-      expect(screen.getByText('Custom Project')).toBeInTheDocument()
+      expect(screen.getAllByText('Custom Project').length).toBeGreaterThan(0)
     })
     promptSpy.mockRestore()
   })
@@ -54,7 +54,7 @@ describe('ProjectsPage', () => {
     promptSpy.mockReturnValueOnce('Unique Project')
     fireEvent.click(await screen.findByRole('button', { name: 'New Project' }))
     await waitFor(() => {
-      expect(screen.getByText('Unique Project')).toBeInTheDocument()
+      expect(screen.getAllByText('Unique Project').length).toBeGreaterThan(0)
     })
 
     promptSpy.mockReturnValueOnce('Unique Project')
@@ -62,7 +62,7 @@ describe('ProjectsPage', () => {
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalled()
     })
-    expect(screen.getAllByText('Unique Project').length).toBe(1)
+    expect(screen.getAllByText('Unique Project').length).toBe(2)
     promptSpy.mockRestore()
     alertSpy.mockRestore()
   })

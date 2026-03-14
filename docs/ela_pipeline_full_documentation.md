@@ -50,7 +50,7 @@ Allowed types only:
 - `schema_version`
 - `translations` object (required):
   - provider-keyed map: `{ [provider_key]: {source_lang, target_lang, text, ...} }`
-  - canonical backend provider key: `backend_m2m100`
+  - canonical backend provider key: `m2m100`
   - optional helper field: `active_translation_provider`
 - `phonetic` object: `{uk, us}`
 - `synonyms` list: `[string, ...]`
@@ -117,7 +117,7 @@ Translation validation rules:
   - `source_lang`
   - `target_lang`
   - `text`
-- canonical backend row (`backend_m2m100`) is used as strict fallback in runtime/UI.
+- canonical backend row (`m2m100`) is used as strict fallback in runtime/UI.
 
 CLI exposure:
 ```bash
@@ -160,8 +160,8 @@ If `--model-dir` is omitted:
   - if `--translation-model` is default (`facebook/m2m100_418M`) and local `artifacts/models/m2m100_418M` exists, local directory is used;
   - explicit custom `--translation-model` value always takes priority.
 - Current output fields:
-  - sentence-level `translations[backend_m2m100]`: `{source_lang, target_lang, text, ...}`
-  - node-level `translations[backend_m2m100]`: `{source_lang, target_lang, text, ...}` (when node translation is enabled)
+  - sentence-level `translations[m2m100]`: `{source_lang, target_lang, text, ...}`
+  - node-level `translations[m2m100]`: `{source_lang, target_lang, text, ...}` (when node translation is enabled)
 - Optional dual-channel mode (`--translation-dual-channels`):
   - kept as provider-specific metadata in runtime outputs;
   - canonical contract field remains `translations` (provider-keyed).
@@ -527,7 +527,7 @@ Simple usage pattern:
   - critical grammar tags (`tense`, `aspect`, `mood`, `voice`, `finiteness`, `grammatical_role`, `tam_construction`, `part_of_speech`, `dep_label`, `features`)
 - Path examples accepted:
   - `notes[0].text`
-  - `translations.backend_m2m100.text`
+  - `translations.m2m100.text`
   - `phonetic.uk`
   - `features.number`
 - Integrated in feedback export quality gates:

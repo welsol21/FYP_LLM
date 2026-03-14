@@ -21,13 +21,13 @@
     },
     "grammatical_role": "clause",
     "translations": {
-      "backend_m2m100": {
+      "m2m100": {
         "source_lang": "en",
         "target_lang": "ru",
         "text": "Она пришла к нему под утро."
       }
     },
-    "active_translation_provider": "backend_m2m100",
+    "active_translation_provider": "m2m100",
     "phonetic": {
       "uk": "ʃi keɪm tə hɪm təˈwɔːdz ˈmɔːnɪŋ",
       "us": "ʃi keɪm tə hɪm təˈwɔɹdz ˈmɔɹnɪŋ"
@@ -69,13 +69,13 @@
         },
         "grammatical_role": "predicate",
         "translations": {
-          "backend_m2m100": {
+          "m2m100": {
             "source_lang": "en",
             "target_lang": "ru",
             "text": "Она пришла к нему"
           }
         },
-        "active_translation_provider": "backend_m2m100",
+        "active_translation_provider": "m2m100",
         "phonetic": {
           "uk": "ʃi keɪm tə hɪm",
           "us": "ʃi keɪm tə hɪm"
@@ -119,13 +119,13 @@
             "dep_label": "nsubj",
             "head_id": "n4",
             "translations": {
-              "backend_m2m100": {
+              "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "Она"
               }
             },
-            "active_translation_provider": "backend_m2m100",
+            "active_translation_provider": "m2m100",
             "phonetic": {
               "uk": "ʃi",
               "us": "ʃi"
@@ -172,13 +172,13 @@
             "dep_label": "ROOT",
             "head_id": null,
             "translations": {
-              "backend_m2m100": {
+              "m2m100": {
                 "source_lang": "en",
                 "target_lang": "ru",
                 "text": "пришла"
               }
             },
-            "active_translation_provider": "backend_m2m100",
+            "active_translation_provider": "m2m100",
             "phonetic": {
               "uk": "keɪm",
               "us": "keɪm"
@@ -225,13 +225,13 @@
         },
         "grammatical_role": "adjunct",
         "translations": {
-          "backend_m2m100": {
+          "m2m100": {
             "source_lang": "en",
             "target_lang": "ru",
             "text": "к утру"
           }
         },
-        "active_translation_provider": "backend_m2m100",
+        "active_translation_provider": "m2m100",
         "phonetic": {
           "uk": "təˈwɔːdz ˈmɔːnɪŋ",
           "us": "təˈwɔɹdz ˈmɔɹnɪŋ"

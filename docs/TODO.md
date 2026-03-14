@@ -163,11 +163,11 @@
 - [x] Introduce provider-keyed translation storage in contract:
   - [x] add `translations: { [provider_key]: { text, source_lang, target_lang, created_at, origin } }`
   - [x] remove legacy `translation` field from strict contract surfaces after migration.
-- [x] Define canonical backend provider key (e.g. `backend_m2m100`) and enforce it in sentence-contract response handling.
+- [x] Define canonical backend provider key (e.g. `m2m100`) and enforce it in sentence-contract response handling.
 - [x] Save user-selected translator outputs in the same `translations` map (client-side), without overwriting backend canonical translation.
 - [x] Update visualizer rendering logic:
   - [x] show active user-selected provider translation as primary
-  - [x] fallback to `backend_m2m100` when selected provider translation is absent
+  - [x] fallback to `m2m100` when selected provider translation is absent
   - [x] keep other provider translations collapsed under "More translations".
 - [x] Update Vocabulary export JSON/CSV to include `translation_provider` + selected translation text (with optional full translations map in JSON export).
 - [x] Add migration/adapter layer (`translation` -> `translations`) at contract boundaries.
@@ -539,7 +539,7 @@
 
 - [x] Add editable-review schema for key fields in contract (`notes`, `translations`, `phonetic`, `synonyms`, `cefr_level`, critical grammar tags).
   - [x] Added schema module: `ela_pipeline/hil/review_schema.py`.
-  - [x] Added dynamic field-path validation by root (`notes[0].text`, `translations.backend_m2m100.text`, `phonetic.uk`, etc.).
+  - [x] Added dynamic field-path validation by root (`notes[0].text`, `translations.m2m100.text`, `phonetic.uk`, etc.).
   - [x] Integrated schema checks in feedback quality gates (`ela_pipeline/hil/export_feedback.py`).
   - [x] Added tests: `tests/test_hil_review_schema.py` + updated `tests/test_hil_repository.py`.
   - [x] Persistence base added: `review_events` + `node_edits` tables for sentence/node-level corrections.

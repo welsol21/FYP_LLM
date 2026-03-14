@@ -54,7 +54,6 @@ type TtsPipeline = (text: string, options?: Record<string, unknown>) => Promise<
 let ffmpegReadyPromise: Promise<{ ffmpeg: FfmpegInstance; util: FfmpegUtilModule }> | null = null
 let ffmpegRunQueue: Promise<void> = Promise.resolve()
 let ttsPipelinePromise: Promise<TtsPipeline> | null = null
-let ttsWarmupStarted = false
 
 function progress(cb: ProgressCb | undefined, message: string, pct: number): void {
   cb?.(message, Math.max(0, Math.min(100, Math.round(pct))))
@@ -229,12 +228,6 @@ async function ensureTtsPipeline(onProgress?: ProgressCb): Promise<TtsPipeline> 
     })()
   }
   return await ttsPipelinePromise
-}
-
-function warmupTtsPipeline(): void {
-  if (ttsWarmupStarted) return
-  ttsWarmupStarted = true
-  void ensureTtsPipeline().catch(() => undefined)
 }
 
 async function ensureFfmpeg(onProgress?: ProgressCb): Promise<{ ffmpeg: FfmpegInstance; util: FfmpegUtilModule }> {
@@ -1041,9 +1034,5 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
     }
 
   })
-}
-
-if (import.meta.env.MODE !== 'test') {
-  warmupTtsPipeline()
 }
 import { configureTransformersEnv } from './transformersEnv'

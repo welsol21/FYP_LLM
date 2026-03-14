@@ -92,58 +92,110 @@ export function ProjectsPage() {
   }
 
   return (
-    <section className="screen-block">
+    <section className="screen-block projects-page">
       <div className="page-head">
         <h2 className="page-title">Projects</h2>
         <button type="button" className="secondary-btn" onClick={onNewProject} disabled={creatingProject}>
           {creatingProject ? 'Creating...' : 'New Project'}
         </button>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Created</th>
-            <th>Updated</th>
-            <th>Analyzed</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const stat = stats[row.id] ?? { analyzed: 0, total: 0 }
-            return (
-              <tr
-                key={row.id}
-                onClick={() => onRowTap(row)}
-                aria-label={`project-row-${row.id}`}
-                style={{ cursor: 'pointer', outline: selectedId === row.id ? '1px solid #f3d13b' : 'none' }}
-              >
-                <td>{row.name}</td>
-                <td>{new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                <td>{new Date(row.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                <td>{`${stat.analyzed}/${stat.total}`}</td>
-                <td>
-                  {typeof api.deleteProject === 'function' ? (
+      <div className="desktop-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Created</th>
+              <th>Updated</th>
+              <th>Analyzed</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const stat = stats[row.id] ?? { analyzed: 0, total: 0 }
+              return (
+                <tr
+                  key={row.id}
+                  onClick={() => onRowTap(row)}
+                  aria-label={`project-row-${row.id}`}
+                  style={{ cursor: 'pointer', outline: selectedId === row.id ? '1px solid #f3d13b' : 'none' }}
+                >
+                  <td>{row.name}</td>
+                  <td>{new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                  <td>{new Date(row.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                  <td>{`${stat.analyzed}/${stat.total}`}</td>
+                  <td>
+                    {typeof api.deleteProject === 'function' ? (
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void onDeleteProject(row)
+                        }}
+                        disabled={Boolean(deletingByProjectId[row.id])}
+                        aria-label={`delete-project-${row.id}`}
+                      >
+                        {deletingByProjectId[row.id] ? 'Deleting...' : 'Delete'}
+                      </button>
+                    ) : null}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mobile-records">
+        {rows.map((row) => {
+          const stat = stats[row.id] ?? { analyzed: 0, total: 0 }
+          return (
+            <article
+              key={`mobile-${row.id}`}
+              className={`mobile-record-card${selectedId === row.id ? ' is-selected' : ''}`}
+              onClick={() => onRowTap(row)}
+              aria-label={`mobile-project-row-${row.id}`}
+            >
+              <div className="mobile-record-head">
+                <h3 className="mobile-record-title">{row.name}</h3>
+              </div>
+              <div className="mobile-record-meta">
+                <div className="mobile-record-field">
+                  <span className="mobile-record-label">Created</span>
+                  <span>{new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                </div>
+                <div className="mobile-record-field">
+                  <span className="mobile-record-label">Updated</span>
+                  <span>{new Date(row.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                </div>
+                <div className="mobile-record-field">
+                  <span className="mobile-record-label">Analyzed</span>
+                  <span>{`${stat.analyzed}/${stat.total}`}</span>
+                </div>
+                {typeof api.deleteProject === 'function' ? (
+                  <div className="mobile-record-field mobile-record-field-delete">
                     <button
                       type="button"
-                      className="secondary-btn"
+                      className="secondary-btn mobile-project-delete-btn"
                       onClick={(e) => {
                         e.stopPropagation()
                         void onDeleteProject(row)
                       }}
                       disabled={Boolean(deletingByProjectId[row.id])}
-                      aria-label={`delete-project-${row.id}`}
+                      aria-label={`mobile-delete-project-${row.id}`}
                     >
-                      {deletingByProjectId[row.id] ? 'Deleting...' : 'Delete'}
+                      <span className="mobile-project-delete-btn-text">
+                        {deletingByProjectId[row.id] ? 'Deleting...' : 'Delete'}
+                      </span>
                     </button>
-                  ) : null}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                  </div>
+                ) : null}
+              </div>
+            </article>
+          )
+        })}
+      </div>
     </section>
   )
 }
