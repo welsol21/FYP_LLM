@@ -155,9 +155,18 @@ def _run_media_pipeline_warmup() -> None:
         print("[runtime-api] media warmup disabled", flush=True)
         return
     warmup_asr = _env_bool("ELA_MEDIA_WARMUP_ASR", True)
-    print(f"[runtime-api] media warmup started (asr={str(warmup_asr).lower()})", flush=True)
+    warmup_translation = _env_bool("ELA_MEDIA_WARMUP_TRANSLATION", True)
+    print(
+        f"[runtime-api] media warmup started "
+        f"(asr={str(warmup_asr).lower()}, translation={str(warmup_translation).lower()})",
+        flush=True,
+    )
     try:
-        warmup_media_models(spacy_model="en_core_web_sm", warmup_asr=warmup_asr)
+        warmup_media_models(
+            spacy_model="en_core_web_sm",
+            warmup_asr=warmup_asr,
+            warmup_translation=warmup_translation,
+        )
         print("[runtime-api] media warmup completed", flush=True)
     except Exception as exc:
         print(f"[runtime-api] media warmup failed: {exc}", flush=True)

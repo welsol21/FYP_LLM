@@ -39,23 +39,46 @@ def _get_whisper_model_cached(model_name: str, asr_cache_dir: str):
     return whisper.load_model(model_name, download_root=asr_cache_dir)
 
 
-def warmup_media_models(*, spacy_model: str = "en_core_web_sm", warmup_asr: bool = True) -> None:
+def warmup_media_models(
+    *,
+    spacy_model: str = "en_core_web_sm",
+    warmup_asr: bool = True,
+    warmup_translation: bool = True,
+) -> None:
     """Preload runtime media models so first user request avoids cold starts."""
     _get_spacy_nlp_cached(spacy_model)
     if not warmup_asr:
+        pass
+    else:
+        model_name = os.getenv("ELA_MEDIA_ASR_MODEL", "base").strip() or "base"
+        asr_cache_dir = Path(
+            os.getenv("ELA_MEDIA_ASR_CACHE_DIR", "artifacts/models/whisper")
+        ).resolve()
+        asr_cache_dir.mkdir(parents=True, exist_ok=True)
+        if _runtime_downloads_disabled():
+            expected_model_path = asr_cache_dir / f"{model_name}.pt"
+            if not expected_model_path.is_file():
+                raise RuntimeError(
+                    f"ASR model '{model_name}' is not bundled. Expected local file: {expected_model_path}."
+                )
+        _get_whisper_model_cached(model_name, str(asr_cache_dir))
+
+    if not warmup_translation:
         return
-    model_name = os.getenv("ELA_MEDIA_ASR_MODEL", "base").strip() or "base"
-    asr_cache_dir = Path(
-        os.getenv("ELA_MEDIA_ASR_CACHE_DIR", "artifacts/models/whisper")
-    ).resolve()
-    asr_cache_dir.mkdir(parents=True, exist_ok=True)
-    if _runtime_downloads_disabled():
-        expected_model_path = asr_cache_dir / f"{model_name}.pt"
-        if not expected_model_path.is_file():
-            raise RuntimeError(
-                f"ASR model '{model_name}' is not bundled. Expected local file: {expected_model_path}."
-            )
-    _get_whisper_model_cached(model_name, str(asr_cache_dir))
+
+    provider = str(os.getenv("ELA_MEDIA_TRANSLATION_PROVIDER", "m2m100")).strip().lower() or "m2m100"
+    if provider not in {"m2m100", "hf"}:
+        return
+
+    model_name = os.getenv("ELA_MEDIA_TRANSLATION_MODEL", "").strip() or "facebook/m2m100_418M"
+    if model_name == "facebook/m2m100_418M" and os.path.isdir(DEFAULT_LOCAL_TRANSLATION_MODEL_DIR):
+        model_name = DEFAULT_LOCAL_TRANSLATION_MODEL_DIR
+    device = os.getenv("ELA_MEDIA_TRANSLATION_DEVICE", "cpu").strip() or "cpu"
+    if _runtime_downloads_disabled() and model_name == "facebook/m2m100_418M":
+        raise RuntimeError(
+            f"Translation model is not bundled. Expected local directory: {DEFAULT_LOCAL_TRANSLATION_MODEL_DIR}."
+        )
+    _get_m2m100_media_translator_cached(model_name, device)
 
 
 @dataclass(frozen=True)
@@ -465,6 +488,11 @@ class _LaraTranslator:
         return str(translated or "").strip()
 
 
+@lru_cache(maxsize=8)
+def _get_m2m100_media_translator_cached(model_name: str, device: str) -> M2M100Translator:
+    return M2M100Translator(model_name=model_name, device=device)
+
+
 def _resolve_media_translator(
     *,
     provider_override: str | None = None,
@@ -512,7 +540,7 @@ def _resolve_media_translator(
         if downloads_disabled:
             os.environ.setdefault("HF_HUB_OFFLINE", "1")
             os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-        return M2M100Translator(model_name=model_name, device=device)
+        return _get_m2m100_media_translator_cached(model_name, device)
     except Exception:
         if downloads_disabled:
             raise
@@ -663,33 +691,22 @@ def run_media_pipeline(
     sentence_stream: list[str] = []
     sentence_timeline: list[dict[str, float] | None] = []
     if extracted_sentence_chunks:
-        raw_sentence_stream, raw_sentence_timeline = _sentenceize_timed_chunks(
-            chunks=extracted_sentence_chunks,
-            nlp=nlp,
-        )
-        sentence_stream = list(raw_sentence_stream)
-        sentence_timeline = list(raw_sentence_timeline)
-        filtered_stream: list[str] = []
-        filtered_timeline: list[dict[str, float] | None] = []
-        for idx, text in enumerate(sentence_stream):
-            text_resolved = str(text or "").strip()
-            if not text_resolved:
+        # Keep ASR chunk timing intact for media pipeline.
+        # The 2026-02-24 backend path used Whisper segments directly here,
+        # and later subtitle/audio assembly relied on those original windows.
+        # Re-sentenceizing via spaCy shifts sentence boundaries and breaks
+        # subtitle timing in generated video.
+        for row in extracted_sentence_chunks:
+            text = str(row.get("sentence_text") or "").strip()
+            if not text:
                 continue
-            doc = nlp(text_resolved)
-            if _is_metadata_like_sentence(text_resolved, doc):
-                continue
-            filtered_stream.append(text_resolved)
-            filtered_timeline.append(sentence_timeline[idx] if idx < len(sentence_timeline) else None)
-        sentence_stream = filtered_stream
-        sentence_timeline = filtered_timeline
-        if not sentence_stream:
-            fallback_stream = [str(text or "").strip() for text in raw_sentence_stream if str(text or "").strip()]
-            if fallback_stream:
-                sentence_stream = fallback_stream
-                sentence_timeline = list(raw_sentence_timeline)[: len(sentence_stream)]
-            elif full_text:
-                sentence_stream = [full_text]
-                sentence_timeline = [None]
+            sentence_stream.append(text)
+            sentence_timeline.append(
+                {
+                    "start_sec": float(row.get("start_sec") or 0.0),
+                    "end_sec": float(row.get("end_sec") or 0.0),
+                }
+            )
     else:
         skeleton = build_skeleton(full_text, nlp)
         fallback_stream = [str(text or "").strip() for text in skeleton.keys() if str(text or "").strip()]
