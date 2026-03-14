@@ -1,0 +1,39 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "ELA Desktop",
+  "version": "0.1.0",
+  "identifier": "com.ela.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeDevCommand": "npm run prepare:desktop-runtime && npx cross-env VITE_CLIENT_MODE=desktop VITE_CLIENT_ASR_MODEL=/desktop-runtime/models/whisper-base.en VITE_CLIENT_TRANSLATION_MODEL=/desktop-runtime/models/m2m100_418M VITE_CLIENT_TTS_MODEL=/desktop-runtime/models/mms-tts-rus VITE_CLIENT_FFMPEG_CORE_BASE_URL=/desktop-runtime/ffmpeg/esm npm run dev -- --host 127.0.0.1 --port 1420",
+    "beforeBuildCommand": "npm run build:desktop"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "ELA Desktop",
+        "width": 1440,
+        "height": 960,
+        "minWidth": 1280,
+        "minHeight": 820,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

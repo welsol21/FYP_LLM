@@ -230,6 +230,10 @@ async function ensureTtsPipeline(onProgress?: ProgressCb): Promise<TtsPipeline> 
   return await ttsPipelinePromise
 }
 
+export async function prewarmLocalTts(onProgress?: ProgressCb): Promise<void> {
+  await ensureTtsPipeline(onProgress)
+}
+
 async function ensureFfmpeg(onProgress?: ProgressCb): Promise<{ ffmpeg: FfmpegInstance; util: FfmpegUtilModule }> {
   if (!ffmpegReadyPromise) {
     ffmpegReadyPromise = (async () => {
@@ -258,6 +262,10 @@ async function ensureFfmpeg(onProgress?: ProgressCb): Promise<{ ffmpeg: FfmpegIn
     })()
   }
   return await ffmpegReadyPromise
+}
+
+export async function prewarmLocalMediaRenderer(onProgress?: ProgressCb): Promise<void> {
+  await ensureFfmpeg(onProgress)
 }
 
 function extensionForBlob(blob: Blob, fallback = 'bin'): string {

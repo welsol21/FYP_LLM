@@ -5,8 +5,8 @@ import type {
   VisualizerPayload,
 } from '../api/runtimeApi'
 import { LocalWorkspace } from '../lib/localWorkspace'
-import { transcribeMediaBlobDetailed } from '../lib/clientAsr'
-import { renderTranslatedMediaArtifacts } from '../lib/clientMediaRender'
+import { prewarmLocalAsr, transcribeMediaBlobDetailed } from '../lib/clientAsr'
+import { prewarmLocalMediaRenderer, prewarmLocalTts, renderTranslatedMediaArtifacts } from '../lib/clientMediaRender'
 import { configureTransformersEnv } from '../lib/transformersEnv'
 import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics'
 
@@ -398,6 +398,21 @@ async function getTranslationPipeline(): Promise<TranslationPipeline> {
     })()
   }
   return translationPipelinePromise
+}
+
+export async function prewarmDesktopMediaRuntime(onProgress?: (message: string, progress: number) => void): Promise<void> {
+  const progress = (message: string, pct: number): void => {
+    onProgress?.(message, Math.max(0, Math.min(100, Math.round(pct))))
+  }
+  progress('Loading desktop translation model', 10)
+  await getTranslationPipeline()
+  progress('Loading desktop ASR model', 40)
+  await prewarmLocalAsr({ onProgress: ({ message, progress: pct }) => progress(message, 40 + Math.round(pct * 0.2)) })
+  progress('Loading desktop media renderer', 70)
+  await prewarmLocalMediaRenderer((message, pct) => progress(message, 70 + Math.round(pct * 0.15)))
+  progress('Loading desktop TTS model', 88)
+  await prewarmLocalTts((message, pct) => progress(message, 88 + Math.round(pct * 0.1)))
+  progress('Desktop runtime ready', 100)
 }
 
 async function translateSentencesForArtifacts(

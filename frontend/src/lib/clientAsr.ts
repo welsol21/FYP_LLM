@@ -109,6 +109,10 @@ async function getAsrPipeline(options?: AsrOptions): Promise<AsrPipeline> {
   return pipelinePromise
 }
 
+export async function prewarmLocalAsr(options?: AsrOptions): Promise<void> {
+  await getAsrPipeline(options)
+}
+
 function chunkText(value: unknown): string {
   return String(value || '').replace(/\s+/g, ' ').trim()
 }

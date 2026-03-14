@@ -11,6 +11,8 @@ import { NewFilePage } from './pages/NewFilePage'
 import { AnalyzeListPage } from './pages/AnalyzeListPage'
 import { PwaInstallButton } from './components/PwaInstallButton'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { resolveClientMode } from './lib/clientMode'
+import { ensureDesktopBootstrap } from './lib/desktopBootstrap'
 import { recordRuntimeDiagnostic } from './lib/runtimeDiagnostics'
 
 function MenuLink({ to, label }: { to: string; label: string }) {
@@ -37,6 +39,7 @@ export default function App() {
     '/new-file': 'New File',
   }
   const pageTitle = pageTitleByPath[location.pathname] ?? 'ELA'
+  const clientMode = resolveClientMode()
 
   useEffect(() => {
     recordRuntimeDiagnostic('router', 'location.change', {
@@ -45,6 +48,11 @@ export default function App() {
       hash: location.hash,
     })
   }, [location.pathname, location.search, location.hash])
+
+  useEffect(() => {
+    if (clientMode !== 'desktop') return
+    void ensureDesktopBootstrap()
+  }, [clientMode])
 
   return (
     <div className="app-shell">
@@ -60,7 +68,7 @@ export default function App() {
         </button>
         <h1 className="top-title">{pageTitle}</h1>
         <div className="top-actions">
-          <PwaInstallButton />
+          {clientMode === 'pwa' ? <PwaInstallButton /> : null}
           <NavLink to="/config" className={({ isActive }) => (isActive ? 'top-link active' : 'top-link')}>
             Config
           </NavLink>

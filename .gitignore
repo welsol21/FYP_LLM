@@ -112,4 +112,7 @@ frontend/dist/
 frontend/.vite/
 frontend/coverage/
 frontend/*.tsbuildinfo
+frontend/public/desktop-runtime/
+frontend/src-tauri/target/
+frontend/src-tauri/gen/
 tmp_media_check/
