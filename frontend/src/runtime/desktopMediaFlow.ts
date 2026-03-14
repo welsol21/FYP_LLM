@@ -56,11 +56,21 @@ function apiUrl(path: string): string {
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(apiUrl(url), init)
+  const contentType = String(res.headers.get('content-type') || '').toLowerCase()
+  const text = await res.text()
   if (!res.ok) {
-    const text = await res.text()
     throw new Error(`HTTP ${res.status}: ${text}`)
   }
-  return (await res.json()) as T
+  if (!contentType.includes('application/json')) {
+    const preview = text.slice(0, 160).trim()
+    throw new Error(`Non-JSON response from ${url}: ${preview || '(empty response)'}`)
+  }
+  try {
+    return JSON.parse(text) as T
+  } catch (error) {
+    const preview = text.slice(0, 160).trim()
+    throw new Error(`Invalid JSON response from ${url}: ${preview || (error instanceof Error ? error.message : 'unknown parse error')}`)
+  }
 }
 
 function inferSourceKind(mediaPath: string, mimeType?: string): 'text' | 'audio' | 'video' | 'other' {
