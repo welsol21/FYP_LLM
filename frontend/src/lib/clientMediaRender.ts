@@ -212,7 +212,7 @@ async function ensureTtsPipeline(onProgress?: ProgressCb): Promise<TtsPipeline> 
         try {
         const transformers = await import('@huggingface/transformers')
         const env = (transformers as unknown as { env?: Record<string, unknown> }).env
-        configureTransformersEnvForMode(env, 'desktop')
+        await configureTransformersEnvForMode(env, 'desktop')
         const pipelineFactory = (transformers as unknown as {
           pipeline: (task: string, model: string, options?: Record<string, unknown>) => Promise<TtsPipeline>
         }).pipeline

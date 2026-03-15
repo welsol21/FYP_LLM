@@ -95,7 +95,7 @@ async function getAsrPipeline(options?: AsrOptions): Promise<AsrPipeline> {
       try {
         const transformers = await import('@huggingface/transformers')
         const env = (transformers as unknown as { env?: Record<string, unknown> }).env
-        configureTransformersEnvForMode(env, 'desktop')
+        await configureTransformersEnvForMode(env, 'desktop')
         const modelsRoot = await resolveDesktopRuntimeAssetUrl('modelsRoot')
         const modelId = 'whisper-base.en'
         if (env && typeof env === 'object') {

@@ -192,7 +192,7 @@ async function getTranslationPipeline(): Promise<TranslationPipeline> {
     translationPipelinePromise = (async () => {
       const transformers = await import('@huggingface/transformers')
       const env = (transformers as unknown as { env?: Record<string, unknown> }).env
-      configureTransformersEnvForMode(env, 'desktop')
+      await configureTransformersEnvForMode(env, 'desktop')
       const modelsRoot = await resolveDesktopRuntimeAssetUrl('modelsRoot')
       const modelId = 'm2m100_418M'
       if (env && typeof env === 'object') {
