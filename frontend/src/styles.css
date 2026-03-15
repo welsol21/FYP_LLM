@@ -27,7 +27,16 @@ body {
   min-height: 100dvh;
   height: 100dvh;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
+}
+
+.bootstrap-error-banner {
+  background: #5a1a1a;
+  border-bottom: 1px solid var(--err);
+  color: var(--err);
+  font-size: 0.82rem;
+  padding: 8px 16px;
+  text-align: center;
 }
 
 .top-bar {
@@ -1477,4 +1486,24 @@ button {
   .screen {
     padding: 18px;
   }
+}
+
+.config-log-preview {
+  border: 1px solid rgba(255, 214, 10, 0.2);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(7, 13, 28, 0.55);
+}
+
+.log-preview {
+  margin: 10px 0 0;
+  max-height: 340px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #d7e6ff;
+  overscroll-behavior: contain;
 }

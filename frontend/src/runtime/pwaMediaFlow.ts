@@ -5,78 +5,9 @@ import type {
   MediaSubmissionPayload,
   VisualizerPayload,
 } from '../api/runtimeApi'
+import { blobToDataUrl, fetchWithRetry, requestBlob, requestJson, shouldRetryBackendRequest, sleepMs } from '../lib/apiUtils'
 import { LocalWorkspace } from '../lib/localWorkspace'
 import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics'
-
-function normalizedApiBaseUrl(): string {
-  const raw = String(import.meta.env?.VITE_API_BASE_URL || '').trim()
-  if (!raw) return ''
-  return raw.replace(/\/+$/, '')
-}
-
-function apiUrl(path: string): string {
-  if (/^(https?:|data:|blob:)/i.test(path)) return path
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  const base = normalizedApiBaseUrl()
-  return base ? `${base}${normalizedPath}` : normalizedPath
-}
-
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(apiUrl(url), init)
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`HTTP ${res.status}: ${text}`)
-  }
-  return (await res.json()) as T
-}
-
-async function requestBlob(url: string, init?: RequestInit): Promise<Blob> {
-  const res = await fetch(apiUrl(url), init)
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`HTTP ${res.status}: ${text}`)
-  }
-  return await res.blob()
-}
-
-function shouldRetryBackendRequest(status: number): boolean {
-  return status === 502 || status === 503 || status === 504
-}
-
-async function sleepMs(ms: number): Promise<void> {
-  await new Promise<void>((resolve) => window.setTimeout(resolve, ms))
-}
-
-async function fetchWithRetry(
-  input: string,
-  init: RequestInit,
-  options?: { retries?: number; retryDelayMs?: number },
-): Promise<Response> {
-  const retries = Math.max(0, options?.retries ?? 1)
-  const retryDelayMs = Math.max(0, options?.retryDelayMs ?? 1200)
-  let lastError: unknown = null
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    try {
-      const res = await fetch(apiUrl(input), init)
-      if (!shouldRetryBackendRequest(res.status) || attempt >= retries) return res
-      lastError = new Error(`HTTP ${res.status}`)
-    } catch (error) {
-      lastError = error
-      if (attempt >= retries) throw error
-    }
-    await sleepMs(retryDelayMs)
-  }
-  throw lastError instanceof Error ? lastError : new Error('Backend request failed.')
-}
-
-async function blobToDataUrl(blob: Blob): Promise<string> {
-  return await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(reader.error || new Error('Failed to read blob.'))
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.readAsDataURL(blob)
-  })
-}
 
 export async function submitMediaPwa(input: {
   mediaPath: string
