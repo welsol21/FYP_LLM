@@ -216,12 +216,12 @@ async function ensureTtsPipeline(onProgress?: ProgressCb): Promise<TtsPipeline> 
         const pipelineFactory = (transformers as unknown as {
           pipeline: (task: string, model: string, options?: Record<string, unknown>) => Promise<TtsPipeline>
         }).pipeline
-        const modelsRoot = await resolveDesktopRuntimeAssetUrl('modelsRoot')
-        const modelId = 'mms-tts-rus'
+        const ttsUrl = await resolveDesktopRuntimeAssetUrl('tts')
+        const modelId = ttsUrl.replace(/^asset:\/\/[^/]*/, '')
         if (env && typeof env === 'object') {
-          ;(env as Record<string, unknown>).localModelPath = modelsRoot
+          ;(env as Record<string, unknown>).localModelPath = 'asset://localhost'
         }
-        recordRuntimeDiagnostic('desktop.tts', 'model.path', { modelsRoot, modelId })
+        recordRuntimeDiagnostic('desktop.tts', 'model.path', { ttsUrl, modelId })
         await yieldToBrowser()
         const tts = await pipelineFactory('text-to-speech', modelId, { quantized: true, local_files_only: true })
           progress(onProgress, 'Local TTS model loaded', 30)
@@ -258,10 +258,9 @@ async function ensureFfmpeg(onProgress?: ProgressCb): Promise<{ ffmpeg: FfmpegIn
         recordRuntimeDiagnostic('desktop.ffmpeg', 'core.path', { baseUrl })
         const coreURL = await util.toBlobURL(`${baseUrl}/ffmpeg-core.js`, 'text/javascript')
         const wasmURL = await util.toBlobURL(`${baseUrl}/ffmpeg-core.wasm`, 'application/wasm')
-        const workerURL = await util.toBlobURL(`${baseUrl}/ffmpeg-core.worker.js`, 'text/javascript')
 
         await yieldToBrowser()
-        await ffmpeg.load({ coreURL, wasmURL, workerURL })
+        await ffmpeg.load({ coreURL, wasmURL })
         progress(onProgress, 'Local media renderer loaded', 12)
         await yieldToBrowser()
         return { ffmpeg, util }
