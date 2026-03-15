@@ -96,13 +96,18 @@ async function getAsrPipeline(options?: AsrOptions): Promise<AsrPipeline> {
         const transformers = await import('@huggingface/transformers')
         const env = (transformers as unknown as { env?: Record<string, unknown> }).env
         configureTransformersEnvForMode(env, 'desktop')
-        const modelId = await resolveDesktopRuntimeAssetUrl('asr')
-        recordRuntimeDiagnostic('desktop.asr', 'model.path', { modelId })
+        const modelsRoot = await resolveDesktopRuntimeAssetUrl('modelsRoot')
+        const modelId = 'whisper-base.en'
+        if (env && typeof env === 'object') {
+          ;(env as Record<string, unknown>).localModelPath = modelsRoot
+        }
+        recordRuntimeDiagnostic('desktop.asr', 'model.path', { modelsRoot, modelId })
         const pipelineFactory = (transformers as unknown as {
           pipeline: (task: string, model: string, opts?: Record<string, unknown>) => Promise<AsrPipeline>
         }).pipeline
         const pipe = await pipelineFactory('automatic-speech-recognition', modelId, {
           quantized: true,
+          local_files_only: true,
         })
         notify(options, 'ASR model loaded', 46)
         return pipe

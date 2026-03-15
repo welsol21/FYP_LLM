@@ -4,13 +4,14 @@ import { resolveResource } from '@tauri-apps/api/path'
 import { resolveClientMode } from './clientMode'
 import { recordRuntimeDiagnostic } from './runtimeDiagnostics'
 
-type DesktopRuntimeKey = 'asr' | 'translation' | 'tts' | 'ffmpeg'
+type DesktopRuntimeKey = 'asr' | 'translation' | 'tts' | 'ffmpeg' | 'modelsRoot'
 
 const DESKTOP_RUNTIME_RELATIVE_PATHS: Record<DesktopRuntimeKey, string> = {
   asr: 'desktop-runtime/models/whisper-base.en',
   translation: 'desktop-runtime/models/m2m100_418M',
   tts: 'desktop-runtime/models/mms-tts-rus',
   ffmpeg: 'desktop-runtime/ffmpeg/esm',
+  modelsRoot: 'desktop-runtime/models',
 }
 
 let resolvedPathsPromise: Promise<Record<DesktopRuntimeKey, string>> | null = null
@@ -19,37 +20,60 @@ function envFallback(key: DesktopRuntimeKey): string {
   if (key === 'asr') return '/desktop-runtime/models/whisper-base.en'
   if (key === 'translation') return '/desktop-runtime/models/m2m100_418M'
   if (key === 'tts') return '/desktop-runtime/models/mms-tts-rus'
+  if (key === 'modelsRoot') return '/desktop-runtime/models'
   return '/desktop-runtime/ffmpeg/esm'
 }
 
+function normalizeTauriLinuxResourcePath(filePath: string): string {
+  const raw = String(filePath || '').trim()
+  if (!raw) return raw
+  if (raw.includes('/resources/')) return raw
+  if (!raw.startsWith('/usr/lib/ELA Desktop/')) return raw
+  return raw.replace('/usr/lib/ELA Desktop/', '/usr/lib/ELA Desktop/resources/')
+}
+
 async function resolveDesktopRuntimePaths(): Promise<Record<DesktopRuntimeKey, string>> {
-  if (resolveClientMode() !== 'desktop' || typeof window === 'undefined' || !('__TAURI__' in window)) {
+  if (resolveClientMode() !== 'desktop' || typeof window === 'undefined') {
     return {
       asr: envFallback('asr'),
       translation: envFallback('translation'),
       tts: envFallback('tts'),
       ffmpeg: envFallback('ffmpeg'),
+      modelsRoot: envFallback('modelsRoot'),
     }
   }
 
   if (!resolvedPathsPromise) {
     resolvedPathsPromise = (async () => {
       recordRuntimeDiagnostic('desktop.runtime', 'resolve.start')
-      const entries = await Promise.all(
-        Object.entries(DESKTOP_RUNTIME_RELATIVE_PATHS).map(async ([key, relativePath]) => {
-          const filePath = await resolveResource(relativePath)
-          const assetUrl = convertFileSrc(filePath)
-          recordRuntimeDiagnostic('desktop.runtime', 'resolve.path', {
-            key,
-            relativePath,
-            filePath,
-            assetUrl,
-          })
-          return [key, assetUrl] as const
-        }),
-      )
-      recordRuntimeDiagnostic('desktop.runtime', 'resolve.ready')
-      return Object.fromEntries(entries) as Record<DesktopRuntimeKey, string>
+      try {
+        const entries = await Promise.all(
+          Object.entries(DESKTOP_RUNTIME_RELATIVE_PATHS).map(async ([key, relativePath]) => {
+            const resolvedFilePath = await resolveResource(relativePath)
+            const filePath = normalizeTauriLinuxResourcePath(resolvedFilePath)
+            const assetUrl = convertFileSrc(filePath)
+            recordRuntimeDiagnostic('desktop.runtime', 'resolve.path', {
+              key,
+              relativePath,
+              resolvedFilePath,
+              filePath,
+              assetUrl,
+            })
+            return [key, assetUrl] as const
+          }),
+        )
+        recordRuntimeDiagnostic('desktop.runtime', 'resolve.ready')
+        return Object.fromEntries(entries) as Record<DesktopRuntimeKey, string>
+      } catch (error) {
+        recordRuntimeDiagnostic('desktop.runtime', 'resolve.fallback', error, 'warning')
+        return {
+          asr: envFallback('asr'),
+          translation: envFallback('translation'),
+          tts: envFallback('tts'),
+          ffmpeg: envFallback('ffmpeg'),
+          modelsRoot: envFallback('modelsRoot'),
+        }
+      }
     })().catch((error) => {
       resolvedPathsPromise = null
       recordRuntimeDiagnostic('desktop.runtime', 'resolve.error', error, 'error')

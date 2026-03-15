@@ -210,16 +210,20 @@ async function ensureTtsPipeline(onProgress?: ProgressCb): Promise<TtsPipeline> 
           progress(onProgress, `Loading local TTS model (${elapsedSec}s)`, 22)
         }, 3000)
         try {
-          const transformers = await import('@huggingface/transformers')
-          const env = (transformers as unknown as { env?: Record<string, unknown> }).env
-          configureTransformersEnvForMode(env, 'desktop')
-          const pipelineFactory = (transformers as unknown as {
-            pipeline: (task: string, model: string, options?: Record<string, unknown>) => Promise<TtsPipeline>
-          }).pipeline
-          const modelId = await resolveDesktopRuntimeAssetUrl('tts')
-          recordRuntimeDiagnostic('desktop.tts', 'model.path', { modelId })
-          await yieldToBrowser()
-          const tts = await pipelineFactory('text-to-speech', modelId, { quantized: true })
+        const transformers = await import('@huggingface/transformers')
+        const env = (transformers as unknown as { env?: Record<string, unknown> }).env
+        configureTransformersEnvForMode(env, 'desktop')
+        const pipelineFactory = (transformers as unknown as {
+          pipeline: (task: string, model: string, options?: Record<string, unknown>) => Promise<TtsPipeline>
+        }).pipeline
+        const modelsRoot = await resolveDesktopRuntimeAssetUrl('modelsRoot')
+        const modelId = 'mms-tts-rus'
+        if (env && typeof env === 'object') {
+          ;(env as Record<string, unknown>).localModelPath = modelsRoot
+        }
+        recordRuntimeDiagnostic('desktop.tts', 'model.path', { modelsRoot, modelId })
+        await yieldToBrowser()
+        const tts = await pipelineFactory('text-to-speech', modelId, { quantized: true, local_files_only: true })
           progress(onProgress, 'Local TTS model loaded', 30)
           await yieldToBrowser()
           return tts

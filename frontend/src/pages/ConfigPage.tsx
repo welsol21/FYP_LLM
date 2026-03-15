@@ -17,6 +17,22 @@ function downloadTextFile(fileName: string, text: string): void {
   URL.revokeObjectURL(url)
 }
 
+async function copyText(text: string): Promise<void> {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+  const area = document.createElement('textarea')
+  area.value = text
+  area.setAttribute('readonly', 'true')
+  area.style.position = 'fixed'
+  area.style.opacity = '0'
+  document.body.appendChild(area)
+  area.select()
+  document.execCommand('copy')
+  area.remove()
+}
+
 export function ConfigPage() {
   const api = useApi()
   const [uiState, setUiState] = useState<RuntimeUiState | null>(null)
@@ -64,6 +80,22 @@ export function ConfigPage() {
   const providerIds = useMemo(
     () => new Set((translationConfig?.providers || []).map((p) => p.id.toLowerCase())),
     [translationConfig],
+  )
+  const runtimeLogText = useMemo(
+    () => runtimeDiagnostics
+      .slice()
+      .reverse()
+      .map((entry) => `${entry.at} [${entry.session}] ${entry.level.toUpperCase()} ${entry.scope}.${entry.event}${entry.details ? ` :: ${entry.details}` : ''}`)
+      .join('\n'),
+    [runtimeDiagnostics],
+  )
+  const pwaLogText = useMemo(
+    () => pwaDiagnostics
+      .slice()
+      .reverse()
+      .map((entry) => `${entry.at} [${entry.session}] ${entry.event}${entry.details ? ` :: ${entry.details}` : ''}`)
+      .join('\n'),
+    [pwaDiagnostics],
   )
 
   function missingCredentialFields(provider: TranslationProviderConfig): string[] {
@@ -220,12 +252,7 @@ export function ConfigPage() {
             type="button"
             className="touch-option-btn"
             onClick={() => {
-              const text = runtimeDiagnostics
-                .slice()
-                .reverse()
-                .map((entry) => `${entry.at} [${entry.session}] ${entry.level.toUpperCase()} ${entry.scope}.${entry.event}${entry.details ? ` :: ${entry.details}` : ''}`)
-                .join('\n')
-              downloadTextFile('runtime_diagnostics.log', text || 'No runtime diagnostics.')
+              downloadTextFile('runtime_diagnostics.log', runtimeLogText || 'No runtime diagnostics.')
             }}
           >
             Export Runtime Logs
@@ -234,15 +261,19 @@ export function ConfigPage() {
             type="button"
             className="touch-option-btn"
             onClick={() => {
-              const text = pwaDiagnostics
-                .slice()
-                .reverse()
-                .map((entry) => `${entry.at} [${entry.session}] ${entry.event}${entry.details ? ` :: ${entry.details}` : ''}`)
-                .join('\n')
-              downloadTextFile('pwa_diagnostics.log', text || 'No PWA diagnostics.')
+              downloadTextFile('pwa_diagnostics.log', pwaLogText || 'No PWA diagnostics.')
             }}
           >
             Export PWA Logs
+          </button>
+          <button
+            type="button"
+            className="touch-option-btn"
+            onClick={() => {
+              void copyText(runtimeLogText || 'No runtime diagnostics.')
+            }}
+          >
+            Copy Runtime Logs
           </button>
           <button
             type="button"
@@ -256,6 +287,18 @@ export function ConfigPage() {
           >
             Clear Logs
           </button>
+        </div>
+        <div className="config-log-preview" style={{ marginTop: 16 }}>
+          <strong>Recent Runtime Logs</strong>
+          <pre className="log-preview">
+            {runtimeDiagnostics.length
+              ? runtimeDiagnostics
+                .slice(-20)
+                .reverse()
+                .map((entry) => `${entry.at} [${entry.level}] ${entry.scope}.${entry.event}${entry.details ? ` :: ${entry.details}` : ''}`)
+                .join('\n')
+              : 'No runtime diagnostics yet.'}
+          </pre>
         </div>
       </section>
     </section>

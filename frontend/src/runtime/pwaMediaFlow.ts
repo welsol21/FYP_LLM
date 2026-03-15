@@ -46,7 +46,16 @@ async function requestBlob(url: string, init?: RequestInit): Promise<Blob> {
     const text = await res.text()
     throw new Error(`HTTP ${res.status}: ${text}`)
   }
-  return await res.blob()
+  return await normalizeBlobLike(await res.blob())
+}
+
+async function normalizeBlobLike(value: unknown): Promise<Blob> {
+  if (value instanceof Blob) return value
+  if (value && typeof (value as { arrayBuffer?: unknown }).arrayBuffer === 'function') {
+    const blobLike = value as { arrayBuffer: () => Promise<ArrayBuffer>; type?: string }
+    return new Blob([await blobLike.arrayBuffer()], { type: String(blobLike.type || '') })
+  }
+  return new Blob([value == null ? '' : String(value)])
 }
 
 function shouldRetryBackendRequest(status: number): boolean {
@@ -84,7 +93,9 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
     const reader = new FileReader()
     reader.onerror = () => reject(reader.error || new Error('Failed to read blob.'))
     reader.onload = () => resolve(String(reader.result || ''))
-    reader.readAsDataURL(blob)
+    normalizeBlobLike(blob)
+      .then((normalized) => reader.readAsDataURL(normalized))
+      .catch(reject)
   })
 }
 

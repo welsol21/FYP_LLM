@@ -487,7 +487,9 @@ export class HttpRuntimeApi implements RuntimeApi {
     }
 
     const clientMode = resolveClientMode()
-    if (clientMode === 'pwa') {
+    const normalizedVoiceChoice = String(input.voiceChoice || '').trim().toLowerCase()
+    const forceBackendVoice = normalizedVoiceChoice === 'backend_dmitry' || normalizedVoiceChoice === 'backend_svetlana'
+    if (clientMode === 'pwa' || forceBackendVoice) {
       recordRuntimeDiagnostic('api.media', 'submit.backend_path', { voiceChoice: input.voiceChoice, clientMode })
       const { submitMediaPwa } = await import('../runtime/pwaMediaFlow')
       return await submitMediaPwa({
