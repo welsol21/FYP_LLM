@@ -34,8 +34,11 @@ function normalizeTauriLinuxResourcePath(filePath: string): string {
   const raw = String(filePath || '').trim()
   if (!raw) return raw
   if (raw.includes('/resources/')) return raw
-  if (!raw.startsWith('/usr/lib/ELA Desktop/')) return raw
-  return raw.replace('/usr/lib/ELA Desktop/', '/usr/lib/ELA Desktop/resources/')
+  // Tauri DEB resolveResource returns /usr/lib/{productName}/{relativePath}
+  // but files are actually installed at /usr/lib/{productName}/resources/{relativePath}
+  const m = raw.match(/^(\/usr\/lib\/[^/]+\/)(.+)$/)
+  if (m) return m[1] + 'resources/' + m[2]
+  return raw
 }
 
 async function resolveDesktopRuntimePaths(): Promise<Record<DesktopRuntimeKey, string>> {
