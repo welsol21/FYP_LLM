@@ -32,9 +32,19 @@ async function patchOnnxJsepBlobUrl(record: TransformersEnv): Promise<void> {
     return r.text()
   })
   const blobUrl = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }))
-  const wasmPaths = (wasm.wasmPaths as Record<string, unknown> | undefined) ?? {}
-  wasmPaths.mjs = blobUrl
-  wasm.wasmPaths = wasmPaths
+
+  // env.backends.onnx.wasm properties may be defined as non-writable via
+  // Object.defineProperty in ONNX Runtime. Use defineProperty to override.
+  const existing = wasm.wasmPaths
+  const merged = (existing && typeof existing === 'object')
+    ? { ...(existing as Record<string, unknown>), mjs: blobUrl }
+    : { mjs: blobUrl }
+  Object.defineProperty(wasm, 'wasmPaths', {
+    value: merged,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  })
 }
 
 export async function configureTransformersEnv(env: unknown): Promise<void> {
