@@ -20,7 +20,13 @@ pub fn run() {
       let resource_dir = ctx.app_handle().path().resource_dir()
         .expect("failed to resolve resource dir");
       let rel = request.uri().path().trim_start_matches('/');
-      let file_path = resource_dir.join(rel);
+      // Tauri's resource_dir() on Linux DEB returns /usr/lib/{name} (without
+      // the "resources" subdirectory where files are actually installed).
+      // Try with "resources/" prefix first, fall back to direct join.
+      let file_path = {
+        let with_resources = resource_dir.join("resources").join(rel);
+        if with_resources.exists() { with_resources } else { resource_dir.join(rel) }
+      };
       match std::fs::read(&file_path) {
         Ok(data) => tauri::http::Response::builder()
           .status(200)
