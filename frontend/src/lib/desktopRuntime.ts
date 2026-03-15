@@ -1,4 +1,3 @@
-import { convertFileSrc } from '@tauri-apps/api/core'
 import { resolveResource } from '@tauri-apps/api/path'
 
 import { resolveClientMode } from './clientMode'
@@ -22,6 +21,13 @@ function envFallback(key: DesktopRuntimeKey): string {
   if (key === 'tts') return '/desktop-runtime/models/mms-tts-rus'
   if (key === 'modelsRoot') return '/desktop-runtime/models'
   return '/desktop-runtime/ffmpeg/esm'
+}
+
+// convertFileSrc encodes ALL slashes as %2F, which breaks transformers.js
+// (it appends filenames with literal slashes, creating mixed-encoding URLs).
+// We build the asset URL manually: encode each path component, keep slashes as separators.
+function buildProperAssetUrl(filesystemPath: string): string {
+  return 'asset://localhost' + filesystemPath.split('/').map(encodeURIComponent).join('/')
 }
 
 function normalizeTauriLinuxResourcePath(filePath: string): string {
@@ -51,7 +57,7 @@ async function resolveDesktopRuntimePaths(): Promise<Record<DesktopRuntimeKey, s
           Object.entries(DESKTOP_RUNTIME_RELATIVE_PATHS).map(async ([key, relativePath]) => {
             const resolvedFilePath = await resolveResource(relativePath)
             const filePath = normalizeTauriLinuxResourcePath(resolvedFilePath)
-            const assetUrl = convertFileSrc(filePath)
+            const assetUrl = buildProperAssetUrl(filePath)
             recordRuntimeDiagnostic('desktop.runtime', 'resolve.path', {
               key,
               relativePath,
