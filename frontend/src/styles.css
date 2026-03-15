@@ -1488,6 +1488,37 @@ button {
   }
 }
 
+.log-toasts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.log-toast {
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  animation: toast-in 0.15s ease;
+}
+
+.log-toast-ok {
+  background: rgba(30, 80, 40, 0.85);
+  border: 1px solid #3ecf6a;
+  color: #a8f0c0;
+}
+
+.log-toast-err {
+  background: rgba(80, 20, 20, 0.85);
+  border: 1px solid var(--err);
+  color: #f0a8a8;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .config-log-preview {
   border: 1px solid rgba(255, 214, 10, 0.2);
   border-radius: 12px;

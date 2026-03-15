@@ -33,6 +33,9 @@ async function copyText(text: string): Promise<void> {
   area.remove()
 }
 
+type LogToast = { id: number; message: string; ok: boolean }
+let toastSeq = 0
+
 export function ConfigPage() {
   const api = useApi()
   const [uiState, setUiState] = useState<RuntimeUiState | null>(null)
@@ -43,6 +46,22 @@ export function ConfigPage() {
   const [newCredentialFields, setNewCredentialFields] = useState('')
   const [pwaDiagnostics, setPwaDiagnostics] = useState(getPwaDiagnostics())
   const [runtimeDiagnostics, setRuntimeDiagnostics] = useState(getRuntimeDiagnostics())
+  const [toasts, setToasts] = useState<LogToast[]>([])
+  const [activeBtn, setActiveBtn] = useState<string | null>(null)
+
+  function showToast(message: string, ok: boolean) {
+    const id = ++toastSeq
+    setToasts((prev) => [...prev, { id, message, ok }])
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id))
+    }, 3500)
+  }
+
+  function pressBtn(key: string, action: () => void | Promise<void>) {
+    setActiveBtn(key)
+    window.setTimeout(() => setActiveBtn(null), 180)
+    void Promise.resolve(action()).catch(() => undefined)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -247,43 +266,70 @@ export function ConfigPage() {
         <div className="top-tabs" style={{ marginBottom: 8 }}>
           <h2 style={{ margin: 0 }}>Diagnostics</h2>
         </div>
+        {toasts.length > 0 && (
+          <div className="log-toasts">
+            {toasts.map((t) => (
+              <div key={t.id} className={`log-toast ${t.ok ? 'log-toast-ok' : 'log-toast-err'}`}>
+                {t.message}
+              </div>
+            ))}
+          </div>
+        )}
         <div className="touch-options-grid">
           <button
             type="button"
-            className="touch-option-btn"
-            onClick={() => {
-              downloadTextFile('runtime_diagnostics.log', runtimeLogText || 'No runtime diagnostics.')
-            }}
+            className={`touch-option-btn${activeBtn === 'export-runtime' ? ' active' : ''}`}
+            onClick={() =>
+              pressBtn('export-runtime', () => {
+                const text = runtimeLogText || 'No runtime diagnostics.'
+                downloadTextFile('runtime_diagnostics.log', text)
+                showToast('Runtime logs saved → runtime_diagnostics.log', true)
+              })
+            }
           >
             Export Runtime Logs
           </button>
           <button
             type="button"
-            className="touch-option-btn"
-            onClick={() => {
-              downloadTextFile('pwa_diagnostics.log', pwaLogText || 'No PWA diagnostics.')
-            }}
+            className={`touch-option-btn${activeBtn === 'export-pwa' ? ' active' : ''}`}
+            onClick={() =>
+              pressBtn('export-pwa', () => {
+                const text = pwaLogText || 'No PWA diagnostics.'
+                downloadTextFile('pwa_diagnostics.log', text)
+                showToast('PWA logs saved → pwa_diagnostics.log', true)
+              })
+            }
           >
             Export PWA Logs
           </button>
           <button
             type="button"
-            className="touch-option-btn"
-            onClick={() => {
-              void copyText(runtimeLogText || 'No runtime diagnostics.')
-            }}
+            className={`touch-option-btn${activeBtn === 'copy-runtime' ? ' active' : ''}`}
+            onClick={() =>
+              pressBtn('copy-runtime', async () => {
+                try {
+                  await copyText(runtimeLogText || 'No runtime diagnostics.')
+                  showToast('Runtime logs copied to clipboard', true)
+                } catch {
+                  showToast('Failed to copy to clipboard', false)
+                }
+              })
+            }
           >
             Copy Runtime Logs
           </button>
           <button
             type="button"
-            className="touch-option-btn"
-            onClick={() => {
-              clearRuntimeDiagnostics()
-              clearPwaDiagnostics()
-              setRuntimeDiagnostics(getRuntimeDiagnostics())
-              setPwaDiagnostics(getPwaDiagnostics())
-            }}
+            className={`touch-option-btn${activeBtn === 'clear-logs' ? ' active' : ''}`}
+            onClick={() =>
+              pressBtn('clear-logs', () => {
+                clearRuntimeDiagnostics()
+                clearPwaDiagnostics()
+                setRuntimeDiagnostics(getRuntimeDiagnostics())
+                setPwaDiagnostics(getPwaDiagnostics())
+                showToast('All logs cleared', true)
+              })
+            }
           >
             Clear Logs
           </button>
