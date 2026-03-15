@@ -193,12 +193,12 @@ async function getTranslationPipeline(): Promise<TranslationPipeline> {
       const transformers = await import('@huggingface/transformers')
       const env = (transformers as unknown as { env?: Record<string, unknown> }).env
       configureTransformersEnvForMode(env, 'desktop')
-      const translationUrl = await resolveDesktopRuntimeAssetUrl('translation')
-      const modelId = translationUrl.replace(/^asset:\/\/[^/]*/, '')
+      const modelsRoot = await resolveDesktopRuntimeAssetUrl('modelsRoot')
+      const modelId = 'm2m100_418M'
       if (env && typeof env === 'object') {
-        ;(env as Record<string, unknown>).localModelPath = 'asset://localhost'
+        ;(env as Record<string, unknown>).localModelPath = modelsRoot
       }
-      recordRuntimeDiagnostic('desktop.translation', 'model.path', { translationUrl, modelId })
+      recordRuntimeDiagnostic('desktop.translation', 'model.path', { modelsRoot, modelId })
       const pipelineFactory = (transformers as unknown as {
         pipeline: (task: string, model: string, opts?: Record<string, unknown>) => Promise<TranslationPipeline>
       }).pipeline

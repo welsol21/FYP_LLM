@@ -216,12 +216,12 @@ async function ensureTtsPipeline(onProgress?: ProgressCb): Promise<TtsPipeline> 
         const pipelineFactory = (transformers as unknown as {
           pipeline: (task: string, model: string, options?: Record<string, unknown>) => Promise<TtsPipeline>
         }).pipeline
-        const ttsUrl = await resolveDesktopRuntimeAssetUrl('tts')
-        const modelId = ttsUrl.replace(/^asset:\/\/[^/]*/, '')
+        const modelsRoot = await resolveDesktopRuntimeAssetUrl('modelsRoot')
+        const modelId = 'mms-tts-rus'
         if (env && typeof env === 'object') {
-          ;(env as Record<string, unknown>).localModelPath = 'asset://localhost'
+          ;(env as Record<string, unknown>).localModelPath = modelsRoot
         }
-        recordRuntimeDiagnostic('desktop.tts', 'model.path', { ttsUrl, modelId })
+        recordRuntimeDiagnostic('desktop.tts', 'model.path', { modelsRoot, modelId })
         await yieldToBrowser()
         const tts = await pipelineFactory('text-to-speech', modelId, { quantized: true, local_files_only: true })
           progress(onProgress, 'Local TTS model loaded', 30)
