@@ -1,5 +1,5 @@
 import { NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { FilesPage } from './pages/FilesPage'
 import { AnalyzePage } from './pages/AnalyzePage'
 import { ProjectsPage } from './pages/ProjectsPage'
@@ -12,7 +12,6 @@ import { AnalyzeListPage } from './pages/AnalyzeListPage'
 import { PwaInstallButton } from './components/PwaInstallButton'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { resolveClientMode } from './lib/clientMode'
-import { ensureDesktopBootstrap, subscribeDesktopBootstrap } from './lib/desktopBootstrap'
 import { recordRuntimeDiagnostic } from './lib/runtimeDiagnostics'
 
 function MenuLink({ to, label }: { to: string; label: string }) {
@@ -40,7 +39,6 @@ export default function App() {
   }
   const pageTitle = pageTitleByPath[location.pathname] ?? 'ELA'
   const clientMode = resolveClientMode()
-  const [bootstrapError, setBootstrapError] = useState<string>('')
 
   useEffect(() => {
     recordRuntimeDiagnostic('router', 'location.change', {
@@ -50,21 +48,8 @@ export default function App() {
     })
   }, [location.pathname, location.search, location.hash])
 
-  useEffect(() => {
-    if (clientMode !== 'desktop') return
-    void ensureDesktopBootstrap()
-    return subscribeDesktopBootstrap((s) => {
-      setBootstrapError(s.status === 'error' ? s.error : '')
-    })
-  }, [clientMode])
-
   return (
     <div className="app-shell">
-      {bootstrapError ? (
-        <div className="bootstrap-error-banner" role="alert">
-          Desktop runtime failed to load: {bootstrapError}
-        </div>
-      ) : null}
       <header className="top-bar">
         <button
           type="button"
