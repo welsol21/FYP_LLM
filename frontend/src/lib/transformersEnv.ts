@@ -27,10 +27,15 @@ async function patchOnnxJsepBlobUrl(record: TransformersEnv): Promise<void> {
 
   // The .mjs file is served at the same path relative to the bundle.
   const mjsUrl = new URL('/assets/ort-wasm-simd-threaded.jsep.mjs', location.href).href
-  const text = await fetch(mjsUrl).then((r) => {
+  let text = await fetch(mjsUrl).then((r) => {
     if (!r.ok) throw new Error(`fetch ${mjsUrl}: ${r.status}`)
     return r.text()
   })
+  // Patch relative .wasm references inside the module so they resolve correctly
+  // when imported from a blob: URL (blob URLs have no directory base).
+  const wasmUrl = new URL('/assets/ort-wasm-simd-threaded.jsep.wasm', location.href).href
+  text = text.replace(/"ort-wasm-simd-threaded\.jsep\.wasm"/g, JSON.stringify(wasmUrl))
+  text = text.replace(/'ort-wasm-simd-threaded\.jsep\.wasm'/g, JSON.stringify(wasmUrl))
   const blobUrl = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }))
 
   // env.backends.onnx.wasm properties may be defined as non-writable via
