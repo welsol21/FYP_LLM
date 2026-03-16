@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "ela-desktop",
   "mainBinaryName": "ela",
-  "version": "0.11.0",
+  "version": "0.13.0",
   "identifier": "com.ela.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' model: asset: https://asset.localhost; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' model: asset: https://asset.localhost; img-src 'self' asset: https://asset.localhost data: blob:; media-src 'self' asset: https://asset.localhost blob:; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self' model:; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; connect-src 'self' blob: model:; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'"
     }
   },
   "bundle": {
@@ -31,9 +31,7 @@
     "targets": [
       "deb"
     ],
-    "resources": [
-      "resources/desktop-runtime/**/*"
-    ],
+    "resources": ["resources/desktop-runtime/**/*"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+use tauri::http::{Response, StatusCode};
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -13,39 +15,45 @@ pub fn run() {
       }
       Ok(())
     })
-    // Custom protocol: model://localhost/<path-relative-to-resources/>
-    // Serves bundled model files directly from the resource directory.
-    // Bypasses asset:// protocol scope/glob/encoding issues on Linux.
     .register_uri_scheme_protocol("model", |ctx, request| {
-      let resource_dir = ctx.app_handle().path().resource_dir()
-        .expect("failed to resolve resource dir");
-      let rel = request.uri().path().trim_start_matches('/');
-      // Tauri's resource_dir() on Linux DEB returns /usr/lib/{name} (without
-      // the "resources" subdirectory where files are actually installed).
-      // Try with "resources/" prefix first, fall back to direct join.
-      let file_path = {
-        let with_resources = resource_dir.join("resources").join(rel);
-        if with_resources.exists() { with_resources } else { resource_dir.join(rel) }
-      };
+      let uri_path = request.uri().path().trim_start_matches('/').to_string();
+      let resource_dir = ctx
+        .app_handle()
+        .path()
+        .resource_dir()
+        .unwrap_or_else(|_| PathBuf::from("."));
+      let file_path = resource_dir
+        .join("resources")
+        .join("desktop-runtime")
+        .join(&uri_path);
+
       match std::fs::read(&file_path) {
-        Ok(data) => tauri::http::Response::builder()
-          .status(200)
-          .header("Content-Type", mime_for_path(rel))
-          .header("Access-Control-Allow-Origin", "*")
-          .body(data)
-          .unwrap(),
-        Err(_) => tauri::http::Response::builder()
-          .status(404)
-          .body(vec![])
+        Ok(data) => {
+          let content_type = if uri_path.ends_with(".json") {
+            "application/json; charset=utf-8"
+          } else if uri_path.ends_with(".mjs") || uri_path.ends_with(".js") {
+            "text/javascript; charset=utf-8"
+          } else if uri_path.ends_with(".txt") {
+            "text/plain; charset=utf-8"
+          } else if uri_path.ends_with(".wasm") {
+            "application/wasm"
+          } else {
+            "application/octet-stream"
+          };
+          Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", content_type)
+            .header("Access-Control-Allow-Origin", "tauri://localhost")
+            .body(data)
+            .unwrap()
+        }
+        Err(_) => Response::builder()
+          .status(StatusCode::NOT_FOUND)
+          .header("Content-Type", "text/plain; charset=utf-8")
+          .body(b"404 Not Found".to_vec())
           .unwrap(),
       }
     })
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
-}
-
-fn mime_for_path(path: &str) -> &'static str {
-  if path.ends_with(".json") { "application/json" }
-  else if path.ends_with(".txt") { "text/plain" }
-  else { "application/octet-stream" }
 }

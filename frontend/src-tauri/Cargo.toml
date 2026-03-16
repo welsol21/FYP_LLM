@@ -12,7 +12,6 @@ rust-version = "1.77.2"
 
 [lib]
 name = "app_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2.5.6", features = [] }
@@ -23,3 +22,15 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.10.3", features = [] }
 tauri-plugin-log = "2"
+
+# The Rust shell is a thin GTK/WebKit wrapper — runtime optimization is
+# pointless since all heavy work runs in JS/WASM. opt-level=0 cuts build
+# time from hours to minutes.
+[profile.release]
+opt-level = 0
+codegen-units = 1
+
+# Our app crate needs opt-level=1 to prevent LLVM OOM during monomorphization
+# of Tauri generics — opt-level=0 emits all IR unoptimized, consuming ~10GB RAM
+[profile.release.package.app]
+opt-level = 1
