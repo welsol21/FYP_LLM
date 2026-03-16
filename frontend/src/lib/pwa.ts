@@ -1,4 +1,5 @@
 import { recordRuntimeDiagnostic } from './runtimeDiagnostics'
+import { isTauriRuntime } from './clientMode'
 
 type DeferredInstallPrompt = Event & {
   prompt: () => Promise<void>
@@ -115,7 +116,7 @@ export function initPwaSupport(): void {
     recordDiagnostic('visibilitychange')
   })
 
-  if ('serviceWorker' in navigator) {
+  if (!isTauriRuntime() && 'serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       recordDiagnostic('sw.controllerchange')
     })
@@ -131,6 +132,8 @@ export function initPwaSupport(): void {
           recordDiagnostic('sw.register_failed', diagDetails(error instanceof Error ? error.message : String(error)))
         })
     })
+  } else if (isTauriRuntime()) {
+    recordDiagnostic('sw.skipped', diagDetails('tauri_runtime=true'))
   }
 }
 

@@ -12,6 +12,7 @@ describe('HttpRuntimeApi', () => {
   })
 
   it('uploads media to backend and persists finalized analysis locally', async () => {
+    vi.stubEnv('VITE_CLIENT_MODE', 'pwa')
     const api = new HttpRuntimeApi()
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)
@@ -88,6 +89,7 @@ describe('HttpRuntimeApi', () => {
   })
 
   it('keeps visualizer payload and artifacts fully local after backend finalize', async () => {
+    vi.stubEnv('VITE_CLIENT_MODE', 'pwa')
     const api = new HttpRuntimeApi()
     let visualizerCalls = 0
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -382,6 +384,7 @@ describe('HttpRuntimeApi', () => {
   })
 
   it('fails with clear error when backend upload returns 404', async () => {
+    vi.stubEnv('VITE_CLIENT_MODE', 'pwa')
     const api = new HttpRuntimeApi()
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)

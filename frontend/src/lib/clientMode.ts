@@ -5,6 +5,11 @@ export type VoiceOption = {
   value: string
 }
 
+export function isTauriRuntime(): boolean {
+  return typeof window !== 'undefined'
+    && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
+}
+
 function normalizedEnvMode(): string {
   return String(import.meta.env?.VITE_CLIENT_MODE || '')
     .trim()
@@ -15,7 +20,7 @@ export function resolveClientMode(): ClientMode {
   const envMode = normalizedEnvMode()
   if (envMode === 'pwa' || envMode === 'desktop') return envMode
 
-  if (typeof window !== 'undefined' && '__TAURI__' in window) return 'desktop'
+  if (isTauriRuntime()) return 'desktop'
 
   const standalone = typeof window !== 'undefined'
     && typeof window.matchMedia === 'function'
