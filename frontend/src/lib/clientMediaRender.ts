@@ -1,4 +1,6 @@
+import { isTauriRuntime } from './clientMode'
 import { resolveDesktopRuntimeAssetUrl } from './desktopRuntime'
+import { mlWorkerClient } from './mlWorkerClient'
 import { recordRuntimeDiagnostic } from './runtimeDiagnostics'
 import { configureTransformersEnvForMode } from './transformersEnv'
 
@@ -424,12 +426,28 @@ function prepareRussianTtsText(text: string): string {
 }
 
 async function synthesizeTargetSegment(textForTts: string, sentenceIdx: number, sentenceTotal: number, onProgress?: ProgressCb): Promise<{ wav: Blob; durationMs: number; text: string }> {
-  const tts = await ensureTtsPipeline(onProgress)
   const text = String(textForTts || '').trim()
   if (!text) {
     throw new Error(`Translated sentence ${sentenceIdx + 1} is empty, TTS cannot continue.`)
   }
   const preparedText = prepareRussianTtsText(text)
+
+  // In Tauri desktop mode, run TTS in the ML worker to keep the UI responsive.
+  if (isTauriRuntime()) {
+    const modelPath = await resolveDesktopRuntimeAssetUrl('tts')
+    progress(onProgress, `Synthesizing speech ${sentenceIdx + 1}/${sentenceTotal}`, 30 + Math.round(((sentenceIdx + 1) / Math.max(1, sentenceTotal)) * 24))
+    const results = await mlWorkerClient.runTts([preparedText], modelPath, onProgress)
+    const raw = results[0]
+    if (!raw) throw new Error(`TTS worker returned no output for sentence ${sentenceIdx + 1}.`)
+    const sampleRate = Number(raw.sampling_rate || 16000)
+    const samples = raw.audio instanceof Float32Array ? raw.audio : new Float32Array(0)
+    if (!samples.length) throw new Error(`TTS returned empty audio for sentence ${sentenceIdx + 1}.`)
+    const wavBlob = rawAudioToWavBlob(samples, sampleRate)
+    const durMs = Math.max(350, Math.round((samples.length / Math.max(1, sampleRate)) * 1000))
+    return { wav: wavBlob, durationMs: durMs, text }
+  }
+
+  const tts = await ensureTtsPipeline(onProgress)
   progress(onProgress, `Synthesizing speech ${sentenceIdx + 1}/${sentenceTotal}`, 30 + Math.round(((sentenceIdx + 1) / Math.max(1, sentenceTotal)) * 24))
   await yieldToBrowser()
   const raw = await tts(preparedText)

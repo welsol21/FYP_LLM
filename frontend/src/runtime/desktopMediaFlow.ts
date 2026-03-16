@@ -7,6 +7,7 @@ import type {
 import { requestJson } from '../lib/apiUtils'
 import { LocalWorkspace } from '../lib/localWorkspace'
 import { prewarmLocalAsr, transcribeMediaBlobDetailed } from '../lib/clientAsr'
+import { isTauriRuntime } from '../lib/clientMode'
 import { prewarmLocalMediaRenderer, prewarmLocalTts, renderTranslatedMediaArtifacts } from '../lib/clientMediaRender'
 import { resolveDesktopRuntimeAssetUrl } from '../lib/desktopRuntime'
 import type { ArtifactSentenceRow, TimedSentenceRow } from '../lib/mediaArtifacts'
@@ -24,6 +25,7 @@ import {
   simpleHash,
   splitIntoSentences,
 } from '../lib/mediaArtifacts'
+import { mlWorkerClient } from '../lib/mlWorkerClient'
 import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics'
 import { configureTransformersEnvForMode } from '../lib/transformersEnv'
 
@@ -235,6 +237,16 @@ async function translateSentencesForArtifacts(
   if (!providerId || providerId === 'original' || providerId === 'none') return sentences.map(() => '')
   if (!['m2m100', 'hf', 'huggingface'].includes(providerId)) return sentences.map(() => '')
   if (import.meta.env.MODE === 'test') return sentences.map((s) => s)
+
+  // In Tauri desktop mode, offload translation to the ML worker thread.
+  if (isTauriRuntime()) {
+    const modelPath = await resolveDesktopRuntimeAssetUrl('translation')
+    log?.('Loading local translation model', 20)
+    const results = await mlWorkerClient.runTranslate(sentences, modelPath, log)
+    log?.('Translation completed', 100)
+    return results
+  }
+
   const loadTimeoutMs = Number(import.meta.env?.VITE_CLIENT_TRANSLATION_LOAD_TIMEOUT_MS || 45000)
   const sentenceTimeoutMs = Number(import.meta.env?.VITE_CLIENT_TRANSLATION_SENTENCE_TIMEOUT_MS || 15000)
   log?.(translationPipelineReady ? 'Using cached local translation model' : 'Loading local translation model', translationPipelineReady ? 40 : 20)

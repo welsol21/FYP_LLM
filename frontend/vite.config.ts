@@ -10,9 +10,15 @@ function copyOnnxJsep() {
   return {
     name: 'copy-onnx-jsep',
     writeBundle() {
-      const src = resolve(__dirname, 'node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs')
-      const dest = resolve(__dirname, 'dist/assets/ort-wasm-simd-threaded.jsep.mjs')
-      if (existsSync(src)) copyFileSync(src, dest)
+      const distAssets = resolve(__dirname, 'dist/assets')
+      const onnxDist = resolve(__dirname, 'node_modules/onnxruntime-web/dist')
+      for (const f of [
+        'ort-wasm-simd-threaded.jsep.mjs',
+        'ort-wasm-simd-threaded.jsep.wasm',
+      ]) {
+        const src = resolve(onnxDist, f)
+        if (existsSync(src)) copyFileSync(src, resolve(distAssets, f))
+      }
     },
   }
 }

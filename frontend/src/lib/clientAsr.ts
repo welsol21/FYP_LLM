@@ -1,4 +1,6 @@
+import { isTauriRuntime } from './clientMode'
 import { resolveDesktopRuntimeAssetUrl } from './desktopRuntime'
+import { mlWorkerClient } from './mlWorkerClient'
 import { recordRuntimeDiagnostic } from './runtimeDiagnostics'
 import { configureTransformersEnvForMode } from './transformersEnv'
 
@@ -177,6 +179,20 @@ function buildTimedSentencesFromResult(result: unknown): TimedSentence[] {
 
 export async function transcribeMediaBlobDetailed(blob: Blob, options?: AsrOptions): Promise<DetailedAsrResult> {
   const mono16k = await decodeTo16kMono(blob, options)
+
+  // In Tauri desktop mode run inference in a Web Worker to keep the UI responsive.
+  if (isTauriRuntime()) {
+    const modelPath = await resolveDesktopRuntimeAssetUrl('asr')
+    return mlWorkerClient.runAsr(
+      mono16k,
+      16000,
+      modelPath,
+      options?.onProgress
+        ? (message, progress) => options.onProgress?.({ message, progress })
+        : undefined,
+    )
+  }
+
   const asr = await getAsrPipeline(options)
   notify(options, 'Running local ASR', 62)
   const result = await asr(mono16k, {
