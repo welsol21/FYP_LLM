@@ -6,7 +6,7 @@
 // support code-splitting (dynamic import()). All dependencies must be imported
 // at the top level.
 
-import { pipeline, env } from '@huggingface/transformers'
+import { pipeline, env, VitsModel, VitsTokenizer, TextToAudioPipeline } from '@huggingface/transformers'
 
 type WorkerRequest =
   | { id: string; type: 'ASR'; audioData: Float32Array; sampleRate: number; modelPath: string }
@@ -240,7 +240,21 @@ async function getTtsPipeline(modelPath: string, id: string): Promise<TtsPipelin
         const modelsRoot = modelPath.replace(/\/[^/]+\/?$/, '')
         record.localModelPath = modelsRoot
         const modelId = modelPath.split('/').pop() || 'mms-tts-rus'
-        const tts = await pipeline('text-to-speech', modelId, { quantized: true, local_files_only: true } as Record<string, unknown>)
+        const opts = { quantized: true, local_files_only: true } as Record<string, unknown>
+        // Load VitsModel and VitsTokenizer directly to bypass AutoProcessor.
+        // MMS-TTS (VitsModel) has no preprocessor_config.json and does not need
+        // a processor — TextToAudioPipeline routes to _call_text_to_waveform when
+        // processor is null, which is the correct path for VITS models.
+        const [model, tokenizer] = await Promise.all([
+          VitsModel.from_pretrained(modelId, opts),
+          VitsTokenizer.from_pretrained(modelId, { local_files_only: true } as Record<string, unknown>),
+        ])
+        const tts = new TextToAudioPipeline({
+          task: 'text-to-audio',
+          model: model as unknown as ConstructorParameters<typeof TextToAudioPipeline>[0]['model'],
+          tokenizer: tokenizer as unknown as ConstructorParameters<typeof TextToAudioPipeline>[0]['tokenizer'],
+          processor: null as unknown as ConstructorParameters<typeof TextToAudioPipeline>[0]['processor'],
+        })
         sendProgress(id, 'Local TTS model loaded', 30)
         return tts as unknown as TtsPipeline
       } finally {
