@@ -72,6 +72,14 @@ if (existsSync(asrSource)) {
 if (existsSync(ttsSource)) {
   mkdirSync(path.dirname(ttsTarget), { recursive: true })
   cpSync(ttsSource, ttsTarget, { recursive: true })
+  // transformers.js v3 requires preprocessor_config.json for VitsProcessor.
+  // This file is absent from the facebook/mms-tts-* HuggingFace repos, so we
+  // synthesise a minimal one if the source directory does not already contain it.
+  const preprocessorTarget = path.join(ttsTarget, 'preprocessor_config.json')
+  const preprocessorSource = path.join(ttsSource, 'preprocessor_config.json')
+  if (!existsSync(preprocessorSource)) {
+    writeFileSync(preprocessorTarget, '{\n  "processor_class": "VitsProcessor"\n}\n', 'utf8')
+  }
   manifest.tts.included = true
 } else {
   manifest.tts.reason = 'Local TTS model files are not present on disk yet.'
