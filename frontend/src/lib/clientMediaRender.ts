@@ -1006,42 +1006,87 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
       progress(input.onProgress, 'Preparing translated video track', 74)
       await yieldToBrowser()
       const audioBlob = await readFsBlob(ffmpeg, audioFile, 'audio/mpeg')
-      const renderedVideo = await renderVideoWithCanvas({
-        sourceBlob: input.sourceBlob,
-        sourceKind: input.sourceKind,
-        translatedAudio: audioBlob,
-        subtitleRows: selectedSubtitleRows,
-        mode,
-        onProgress: input.onProgress,
-      })
-      const renderedVideoInput = 'translated_video_input.webm'
-      await ffmpeg.writeFile(renderedVideoInput, await util.fetchFile(renderedVideo))
-      progress(input.onProgress, 'Encoding mp4 container', 92)
-      await yieldToBrowser()
-      await runWithProgressPulse(
-        runCommand(
-          ffmpeg,
-          [
-            '-y',
-            '-i', renderedVideoInput,
-            '-c:v', 'libx264',
-            '-pix_fmt', 'yuv420p',
-            '-preset', 'ultrafast',
-            '-crf', '24',
-            '-c:a', 'aac',
-            '-b:a', '192k',
-            '-movflags', '+faststart',
-            videoFile,
-          ],
-          'Video remuxing',
-        ),
-        input.onProgress,
-        'Encoding mp4 container',
-        92,
-        95,
-        1200,
-      )
-      await safeDelete(ffmpeg, renderedVideoInput)
+
+      if (isTauriRuntime()) {
+        // WebKitGTK does not support canvas.captureStream() + MediaRecorder WebM.
+        // Compose the output video directly with ffmpeg instead.
+        progress(input.onProgress, 'Composing video track', 78)
+        await yieldToBrowser()
+        const tauriVideoArgs = input.sourceKind === 'video'
+          ? [
+              '-y',
+              '-i', sourceFile,
+              '-i', audioFile,
+              '-map', '0:v',
+              '-map', '1:a',
+              '-c:v', 'copy',
+              '-c:a', 'aac',
+              '-b:a', '192k',
+              '-shortest',
+              '-movflags', '+faststart',
+              videoFile,
+            ]
+          : [
+              '-y',
+              '-f', 'lavfi',
+              '-i', 'color=c=black:size=1280x720:rate=25',
+              '-i', audioFile,
+              '-shortest',
+              '-c:v', 'libx264',
+              '-pix_fmt', 'yuv420p',
+              '-preset', 'ultrafast',
+              '-crf', '28',
+              '-c:a', 'aac',
+              '-b:a', '192k',
+              '-movflags', '+faststart',
+              videoFile,
+            ]
+        await runWithProgressPulse(
+          runCommand(ffmpeg, tauriVideoArgs, 'Video composition'),
+          input.onProgress,
+          'Composing video track',
+          78,
+          95,
+          1200,
+        )
+      } else {
+        const renderedVideo = await renderVideoWithCanvas({
+          sourceBlob: input.sourceBlob,
+          sourceKind: input.sourceKind,
+          translatedAudio: audioBlob,
+          subtitleRows: selectedSubtitleRows,
+          mode,
+          onProgress: input.onProgress,
+        })
+        const renderedVideoInput = 'translated_video_input.webm'
+        await ffmpeg.writeFile(renderedVideoInput, await util.fetchFile(renderedVideo))
+        progress(input.onProgress, 'Encoding mp4 container', 92)
+        await yieldToBrowser()
+        await runWithProgressPulse(
+          runCommand(
+            ffmpeg,
+            [
+              '-y',
+              '-i', renderedVideoInput,
+              '-c:v', 'libx264',
+              '-pix_fmt', 'yuv420p',
+              '-preset', 'ultrafast',
+              '-crf', '24',
+              '-c:a', 'aac',
+              '-b:a', '192k',
+              '-movflags', '+faststart',
+              videoFile,
+            ],
+            'Video remuxing',
+          ),
+          input.onProgress,
+          'Encoding mp4 container',
+          92,
+          95,
+          1200,
+        )
+        await safeDelete(ffmpeg, renderedVideoInput)
+      }
       progress(input.onProgress, 'Finalizing media artifacts', 96)
       await yieldToBrowser()
 
