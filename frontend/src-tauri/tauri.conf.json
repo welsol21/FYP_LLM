@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "ela-desktop",
   "mainBinaryName": "ela",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "identifier": "com.ela.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' model:; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; connect-src 'self' blob: model:; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'"
+      "csp": "default-src 'self' http://127.0.0.1:*; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; connect-src 'self' blob: http://127.0.0.1:*; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'"
     }
   },
   "bundle": {
