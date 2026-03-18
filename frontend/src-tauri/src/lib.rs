@@ -103,6 +103,23 @@ fn get_model_server_url() -> String {
   format!("http://127.0.0.1:{}", port)
 }
 
+#[tauri::command]
+fn save_to_downloads(filename: String, bytes: Vec<u8>) -> Result<String, String> {
+  let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+  let downloads = std::path::PathBuf::from(&home).join("Downloads");
+  if !downloads.exists() {
+    std::fs::create_dir_all(&downloads).map_err(|e| e.to_string())?;
+  }
+  let safe_name = std::path::Path::new(&filename)
+    .file_name()
+    .and_then(|n| n.to_str())
+    .unwrap_or("artifact")
+    .to_string();
+  let dest = downloads.join(&safe_name);
+  std::fs::write(&dest, &bytes).map_err(|e| e.to_string())?;
+  Ok(format!("~/Downloads/{}", safe_name))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -125,7 +142,7 @@ pub fn run() {
       MODEL_SERVER_PORT.set(port).ok();
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![get_model_server_url])
+    .invoke_handler(tauri::generate_handler![get_model_server_url, save_to_downloads])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }

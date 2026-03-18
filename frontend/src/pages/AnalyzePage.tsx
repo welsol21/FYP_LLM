@@ -11,6 +11,16 @@ import type {
   TranslationConfig,
 } from '../api/runtimeApi'
 import { MediaSubmitForm } from '../components/MediaSubmitForm'
+import { isTauriRuntime } from '../lib/clientMode'
+
+async function downloadArtifactDesktop(url: string, name: string): Promise<void> {
+  const resp = await fetch(url)
+  const arrayBuffer = await resp.arrayBuffer()
+  const bytes = Array.from(new Uint8Array(arrayBuffer))
+  const { invoke } = await import('@tauri-apps/api/core')
+  const savedPath = await invoke<string>('save_to_downloads', { filename: name, bytes })
+  console.log(`[desktop.artifact.saved] ${savedPath}`)
+}
 
 type AnalyzeRouteState = {
   analyzeEntry?: 'direct' | 'files'
@@ -529,9 +539,20 @@ export function AnalyzePage() {
                     <div className="artifact-actions">
                       {item.artifacts.length > 0 ? (
                         item.artifacts.map((artifact) => (
-                          <a key={`${item.file_id}-${artifact.name}`} className="top-link" href={artifact.download_url} download={artifact.name}>
-                            Download {artifact.name}
-                          </a>
+                          isTauriRuntime() ? (
+                            <button
+                              key={`${item.file_id}-${artifact.name}`}
+                              type="button"
+                              className="top-link"
+                              onClick={() => { void downloadArtifactDesktop(artifact.download_url, artifact.name) }}
+                            >
+                              Download {artifact.name}
+                            </button>
+                          ) : (
+                            <a key={`${item.file_id}-${artifact.name}`} className="top-link" href={artifact.download_url} download={artifact.name}>
+                              Download {artifact.name}
+                            </a>
+                          )
                         ))
                       ) : (
                         <span className="muted">Artifacts are not ready yet.</span>
