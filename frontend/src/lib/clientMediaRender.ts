@@ -263,6 +263,19 @@ async function ensureFfmpeg(onProgress?: ProgressCb): Promise<{ ffmpeg: FfmpegIn
 
         await yieldToBrowser()
         await ffmpeg.load({ coreURL, wasmURL })
+
+        // Write subtitle font to WASM VFS so libass can render Cyrillic text
+        if (isTauriRuntime()) {
+          try {
+            const fontUrl = await resolveDesktopRuntimeAssetUrl('subtitleFont')
+            const fontBytes = await util.fetchFile(fontUrl)
+            await ffmpeg.writeFile('/DejaVuSans.ttf', fontBytes)
+            recordRuntimeDiagnostic('desktop.ffmpeg', 'font.loaded', { size: fontBytes.byteLength })
+          } catch (err) {
+            recordRuntimeDiagnostic('desktop.ffmpeg', 'font.error', String(err), 'warning')
+          }
+        }
+
         progress(onProgress, 'Local media renderer loaded', 12)
         await yieldToBrowser()
         return { ffmpeg, util }
@@ -354,6 +367,73 @@ async function createSilentWavSegment(ffmpeg: FfmpegInstance, durationMs: number
     ],
     `Silent wav rendering ${outPath}`,
   )
+}
+
+function escapeDtText(raw: string): string {
+  return String(raw || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '%%')
+    .replace(/:/g, '\\:')
+    .replace(/'/g, "'\\''")
+}
+
+const DT_MARGIN_BOTTOM = 70   // px from bottom edge to last subtitle line
+const DT_LINE_HEIGHT = 38     // px between subtitle lines (fontsize 28 + padding)
+const DT_BLOCK_GAP = 12       // px between eng block and ru block when both shown
+const DT_MAX_CHARS = 48       // max chars per wrapped line
+
+function wrapSubtitleText(text: string): string[] {
+  const normalized = String(text || '').replace(/\s+/g, ' ').trim()
+  if (!normalized) return []
+  const words = normalized.split(' ')
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word
+    if (candidate.length <= DT_MAX_CHARS) {
+      current = candidate
+    } else {
+      if (current) lines.push(current)
+      current = word.length > DT_MAX_CHARS ? word.slice(0, DT_MAX_CHARS) : word
+    }
+  }
+  if (current) lines.push(current)
+  return lines.slice(0, 3)
+}
+
+function buildDrawtextFilter(rows: SubtitleRow[], fontFile: string): string {
+  const base = `fontfile=${fontFile}:fontsize=28:fontcolor=white:box=1:boxcolor=black@0.7:borderw=2:bordercolor=black@0.5`
+  const filters: string[] = []
+
+  // Push each wrapped line as a separate drawtext filter.
+  // bottomOffset is the distance from the bottom edge to the LAST (lowest) line of the block.
+  const pushLines = (lines: string[], enable: string, bottomOffset: number): void => {
+    for (let i = 0; i < lines.length; i += 1) {
+      const distFromBottom = bottomOffset + (lines.length - 1 - i) * DT_LINE_HEIGHT
+      const escaped = escapeDtText(lines[i])
+      filters.push(`drawtext=${base}:text='${escaped}':enable='${enable}':x=(w-text_w)/2:y=h-${distFromBottom}`)
+    }
+  }
+
+  for (const row of rows.slice(0, 120)) {
+    const t0 = (Math.max(0, row.start_ms) / 1000).toFixed(3)
+    const t1 = (Math.max(0, row.end_ms) / 1000).toFixed(3)
+    const enable = `between(t,${t0},${t1})`
+    const engLines = String(row.text_eng || '').trim() ? wrapSubtitleText(row.text_eng) : []
+    const ruLines = String(row.text_ru || '').trim() ? wrapSubtitleText(row.text_ru) : []
+
+    if (engLines.length > 0 && ruLines.length > 0) {
+      // ru block at the bottom, eng block above it
+      pushLines(ruLines, enable, DT_MARGIN_BOTTOM)
+      const engBottom = DT_MARGIN_BOTTOM + ruLines.length * DT_LINE_HEIGHT + DT_BLOCK_GAP
+      pushLines(engLines, enable, engBottom)
+    } else if (ruLines.length > 0) {
+      pushLines(ruLines, enable, DT_MARGIN_BOTTOM)
+    } else if (engLines.length > 0) {
+      pushLines(engLines, enable, DT_MARGIN_BOTTOM)
+    }
+  }
+  return filters.join(',')
 }
 
 async function runCommand(ffmpeg: FfmpegInstance, args: string[], errorLabel: string): Promise<void> {
@@ -1009,17 +1089,24 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
 
       if (isTauriRuntime()) {
         // WebKitGTK does not support canvas.captureStream() + MediaRecorder WebM.
-        // Compose the output video directly with ffmpeg instead.
+        // Compose the output video directly with ffmpeg, burning subtitles via drawtext.
+        // (@ffmpeg/core WASM does not include the 'subtitles' filter; drawtext is available.)
         progress(input.onProgress, 'Composing video track', 78)
         await yieldToBrowser()
+        const subsFilter = buildDrawtextFilter(selectedSubtitleRows, '/DejaVuSans.ttf')
+        const videoVfArgs = subsFilter ? ['-vf', subsFilter] : []
         const tauriVideoArgs = input.sourceKind === 'video'
           ? [
               '-y',
               '-i', sourceFile,
               '-i', audioFile,
+              ...videoVfArgs,
               '-map', '0:v',
               '-map', '1:a',
-              '-c:v', 'copy',
+              '-c:v', 'libx264',
+              '-pix_fmt', 'yuv420p',
+              '-preset', 'ultrafast',
+              '-crf', '23',
               '-c:a', 'aac',
               '-b:a', '192k',
               '-shortest',
@@ -1031,10 +1118,12 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
               '-f', 'lavfi',
               '-i', 'color=c=black:size=1280x720:rate=25',
               '-i', audioFile,
+              ...videoVfArgs,
               '-shortest',
               '-c:v', 'libx264',
               '-pix_fmt', 'yuv420p',
               '-preset', 'ultrafast',
+              '-tune', 'stillimage',
               '-crf', '28',
               '-c:a', 'aac',
               '-b:a', '192k',

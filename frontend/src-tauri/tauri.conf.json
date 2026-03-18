@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "ela-desktop",
   "mainBinaryName": "ela",
-  "version": "0.15.0",
+  "version": "0.15.8",
   "identifier": "com.ela.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -32,6 +32,12 @@
       "deb"
     ],
     "resources": ["resources/desktop-runtime/**/*"],
+    "linux": {
+      "deb": {
+        "preInstallScript": "debian/preinst.sh",
+        "postInstallScript": "debian/postinst.sh"
+      }
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

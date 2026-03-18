@@ -1,7 +1,7 @@
 import { isTauriRuntime, resolveClientMode } from './clientMode'
 import { recordRuntimeDiagnostic } from './runtimeDiagnostics'
 
-type DesktopRuntimeKey = 'asr' | 'translation' | 'tts' | 'ffmpeg' | 'modelsRoot'
+type DesktopRuntimeKey = 'asr' | 'translation' | 'tts' | 'ffmpeg' | 'modelsRoot' | 'subtitleFont'
 
 // Desktop runtime URLs used for browser-desktop mode (no Tauri).
 const DESKTOP_RUNTIME_URLS: Record<DesktopRuntimeKey, string> = {
@@ -10,12 +10,14 @@ const DESKTOP_RUNTIME_URLS: Record<DesktopRuntimeKey, string> = {
   tts: '/desktop-runtime/models/mms-tts-rus',
   ffmpeg: '/desktop-runtime/ffmpeg/esm',
   modelsRoot: '/desktop-runtime/models',
+  subtitleFont: '/desktop-runtime/fonts/DejaVuSans.ttf',
 }
 
 const MODEL_NAMES: Record<Exclude<DesktopRuntimeKey, 'ffmpeg' | 'modelsRoot'>, string> = {
   asr: 'whisper-base.en',
   translation: 'm2m100_418M',
   tts: 'mms-tts-rus',
+  subtitleFont: '../fonts/DejaVuSans.ttf',
 }
 
 // Cache the model server URL after the first Tauri command call.
@@ -47,7 +49,9 @@ export async function resolveDesktopRuntimeAssetUrl(key: DesktopRuntimeKey): Pro
   const url =
     key === 'modelsRoot'
       ? `${serverUrl}/models`
-      : `${serverUrl}/models/${MODEL_NAMES[key]}`
+      : key === 'subtitleFont'
+        ? `${serverUrl}/fonts/DejaVuSans.ttf`
+        : `${serverUrl}/models/${MODEL_NAMES[key]}`
 
   recordRuntimeDiagnostic('desktop.runtime', 'resolve.path', { key, url })
   return url

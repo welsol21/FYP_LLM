@@ -8,6 +8,10 @@ const tauriRuntimeRoot = path.join(frontendRoot, 'src-tauri', 'resources', 'desk
 const modelsRoot = targetMode === 'bundle' ? tauriRuntimeRoot : publicRuntimeRoot
 const ffmpegSource = path.join(frontendRoot, 'node_modules', '@ffmpeg', 'core', 'dist', 'esm')
 const ffmpegTarget = path.join(publicRuntimeRoot, 'ffmpeg', 'esm')
+// Font for ffmpeg WASM subtitle rendering (libass needs a font file in the VFS)
+const fontSource = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+const fontTarget = path.join(publicRuntimeRoot, 'fonts', 'DejaVuSans.ttf')
+const fontTargetTauri = path.join(tauriRuntimeRoot, 'fonts', 'DejaVuSans.ttf')
 const translationSource = path.resolve(frontendRoot, '..', 'artifacts', 'models', 'm2m100_418M')
 const translationTarget = path.join(modelsRoot, 'models', 'm2m100_418M')
 const asrSource = path.resolve(frontendRoot, '..', 'artifacts', 'models', 'whisper-base.en')
@@ -23,7 +27,9 @@ if (targetMode === 'bundle') {
 mkdirSync(publicRuntimeRoot, { recursive: true })
 if (targetMode === 'bundle') {
   mkdirSync(path.join(tauriRuntimeRoot, 'models'), { recursive: true })
+  mkdirSync(path.join(tauriRuntimeRoot, 'fonts'), { recursive: true })
 }
+mkdirSync(path.join(publicRuntimeRoot, 'fonts'), { recursive: true })
 
 if (!existsSync(ffmpegSource)) {
   throw new Error(`FFmpeg core not found: ${ffmpegSource}`)
@@ -75,6 +81,15 @@ if (existsSync(ttsSource)) {
   manifest.tts.included = true
 } else {
   manifest.tts.reason = 'Local TTS model files are not present on disk yet.'
+}
+
+// Copy subtitle font for ffmpeg WASM VFS
+if (existsSync(fontSource)) {
+  cpSync(fontSource, fontTarget)
+  if (targetMode === 'bundle') cpSync(fontSource, fontTargetTauri)
+  console.log(`[prepare-desktop-runtime] font included=true (${fontSource})`)
+} else {
+  console.warn(`[prepare-desktop-runtime] font NOT found at ${fontSource} — subtitles may not render`)
 }
 
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
