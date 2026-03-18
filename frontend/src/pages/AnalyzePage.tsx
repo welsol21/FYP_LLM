@@ -14,9 +14,27 @@ import { MediaSubmitForm } from '../components/MediaSubmitForm'
 import { isTauriRuntime } from '../lib/clientMode'
 
 async function downloadArtifactDesktop(url: string, name: string, onSaved: (path: string) => void): Promise<void> {
-  const resp = await fetch(url)
-  const arrayBuffer = await resp.arrayBuffer()
-  const bytes = Array.from(new Uint8Array(arrayBuffer))
+  let bytes: number[]
+  if (url.startsWith('data:')) {
+    // WebKitGTK may not support fetch() for data: URLs — parse directly
+    const comma = url.indexOf(',')
+    const meta = url.slice(5, comma)
+    const isBase64 = meta.endsWith(';base64')
+    const payload = url.slice(comma + 1)
+    let uint8: Uint8Array
+    if (isBase64) {
+      const bin = atob(payload)
+      uint8 = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) uint8[i] = bin.charCodeAt(i)
+    } else {
+      uint8 = new TextEncoder().encode(decodeURIComponent(payload))
+    }
+    bytes = Array.from(uint8)
+  } else {
+    const resp = await fetch(url)
+    const arrayBuffer = await resp.arrayBuffer()
+    bytes = Array.from(new Uint8Array(arrayBuffer))
+  }
   const { invoke } = await import('@tauri-apps/api/core')
   const savedPath = await invoke<string>('save_to_downloads', { filename: name, bytes })
   console.log(`[desktop.artifact.saved] ${savedPath}`)
@@ -475,9 +493,9 @@ export function AnalyzePage() {
         </section>
       ) : null}
       {downloadToast ? (
-        <section className="card feedback info" aria-label="download-toast">
-          <p>Saved: {downloadToast}</p>
-        </section>
+        <div className="log-toast log-toast-ok" aria-label="download-toast">
+          Saved: {downloadToast}
+        </div>
       ) : null}
       <section className="card compact-card" aria-label="analyze-history">
         <p className="stage-log-title">Analysis history</p>
