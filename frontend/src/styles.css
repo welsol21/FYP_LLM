@@ -1484,6 +1484,7 @@ button {
 @media (min-width: 1000px) {
   .screen {
     padding: 18px;
+    padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
   }
 }
 
