@@ -353,8 +353,15 @@ async function ensureState(): Promise<WorkspaceState> {
   const state = await loadRawState()
   const hasSelected = Boolean(state.selected_project_id && state.projects.some((p) => p.id === state.selected_project_id))
   const nextSelected = hasSelected ? state.selected_project_id : (state.projects[0]?.id || null)
-  if (state.selected_project_id !== nextSelected) {
+  let needsSave = state.selected_project_id !== nextSelected
+  if (needsSave) {
     state.selected_project_id = nextSelected
+  }
+  // Sync file document_ids from analyses — also repairs state corrupted by past bugs
+  const prevDocIds = state.files.map((f) => f.document_id ?? '').join('\0')
+  syncFileAnalysisFlags(state)
+  if (state.files.map((f) => f.document_id ?? '').join('\0') !== prevDocIds) needsSave = true
+  if (needsSave) {
     await saveRawState(state)
   }
   return state
@@ -528,7 +535,9 @@ function syncFileAnalysisFlags(state: WorkspaceState): void {
     const latest = matches[0]
     if (latest.contract_current === false) {
       file.analyzed = false
-      file.document_id = undefined
+      // Preserve document_id so Incremental Reuse can find this analysis even without a contract.
+      // The backend contract is unavailable in desktop mode, but artifacts (audio/video) are saved.
+      file.document_id = String(latest.document_id || '').trim() || undefined
       file.settings = normalizeSettings(latest.settings)
       continue
     }
