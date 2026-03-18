@@ -13,13 +13,14 @@ import type {
 import { MediaSubmitForm } from '../components/MediaSubmitForm'
 import { isTauriRuntime } from '../lib/clientMode'
 
-async function downloadArtifactDesktop(url: string, name: string): Promise<void> {
+async function downloadArtifactDesktop(url: string, name: string, onSaved: (path: string) => void): Promise<void> {
   const resp = await fetch(url)
   const arrayBuffer = await resp.arrayBuffer()
   const bytes = Array.from(new Uint8Array(arrayBuffer))
   const { invoke } = await import('@tauri-apps/api/core')
   const savedPath = await invoke<string>('save_to_downloads', { filename: name, bytes })
   console.log(`[desktop.artifact.saved] ${savedPath}`)
+  onSaved(savedPath)
 }
 
 type AnalyzeRouteState = {
@@ -78,6 +79,7 @@ export function AnalyzePage() {
   const [historyError, setHistoryError] = useState('')
   const [historyReloadKey, setHistoryReloadKey] = useState(0)
   const [deletingByDocumentId, setDeletingByDocumentId] = useState<Record<string, boolean>>({})
+  const [downloadToast, setDownloadToast] = useState<string>('')
   const [isSubmittingPipeline, setIsSubmittingPipeline] = useState(false)
   const [analysisStartedAt, setAnalysisStartedAt] = useState<number | null>(null)
   const [nowTs, setNowTs] = useState<number>(Date.now())
@@ -472,6 +474,11 @@ export function AnalyzePage() {
           ) : null}
         </section>
       ) : null}
+      {downloadToast ? (
+        <section className="card feedback info" aria-label="download-toast">
+          <p>Saved: {downloadToast}</p>
+        </section>
+      ) : null}
       <section className="card compact-card" aria-label="analyze-history">
         <p className="stage-log-title">Analysis history</p>
         {historyLoading ? (
@@ -544,7 +551,12 @@ export function AnalyzePage() {
                               key={`${item.file_id}-${artifact.name}`}
                               type="button"
                               className="top-link"
-                              onClick={() => { void downloadArtifactDesktop(artifact.download_url, artifact.name) }}
+                              onClick={() => {
+                                void downloadArtifactDesktop(artifact.download_url, artifact.name, (path) => {
+                                  setDownloadToast(path)
+                                  setTimeout(() => setDownloadToast(''), 5000)
+                                })
+                              }}
                             >
                               Download {artifact.name}
                             </button>
