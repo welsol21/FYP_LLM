@@ -1,0 +1,249 @@
+"""Merge a base projected corpus with a delta corpus and preserve new fallback rows.
+
+This is the generic follow-up to the v12 promotion script:
+
+- merge matched rows by sentence identity,
+- keep all base rows,
+- append delta-only rows when they are explicit book-sentence fallbacks carrying
+  at least one note candidate.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+from typing import Any
+
+from ela_pipeline.dataset.merge_projected_book_corpora import _candidate_key
+
+
+def _iter_jsonl(path: str):
+    with Path(path).open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if line:
+                yield json.loads(line)
+
+
+def _write_json(path: str, payload: dict[str, Any]) -> None:
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _write_jsonl(path: str, rows: list[dict[str, Any]]) -> None:
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def _norm(value: Any) -> str:
+    return " ".join(str(value or "").strip().split())
+
+
+def _row_key(row: dict[str, Any]) -> tuple[str, int, int]:
+    span = row.get("source_span") or {}
+    return (
+        _norm(row.get("sentence_text")),
+        int(span.get("start", -1)),
+        int(span.get("end", -1)),
+    )
+
+
+def _has_any_notes(row: dict[str, Any]) -> bool:
+    if row.get("sentence_note_candidates"):
+        return True
+    for phrase in row.get("phrase_entries") or []:
+        if phrase.get("note_candidates"):
+            return True
+    return False
+
+
+def _merge_candidates(base: list[dict[str, Any]], delta: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    merged = list(base)
+    seen = {_candidate_key(candidate) for candidate in merged}
+    added = 0
+    for candidate in delta:
+        key = _candidate_key(candidate)
+        if key in seen:
+            continue
+        merged.append(candidate)
+        seen.add(key)
+        added += 1
+    return merged, added
+
+
+def _phrase_key(phrase: dict[str, Any]) -> tuple[str, str, str]:
+    return (
+        _norm(phrase.get("content")),
+        _norm(phrase.get("part_of_speech")).lower(),
+        _norm(phrase.get("grammatical_role")).lower(),
+    )
+
+
+def _merge_rows(
+    base_row: dict[str, Any],
+    delta_row: dict[str, Any],
+    *,
+    phrase_mode: str,
+) -> tuple[dict[str, Any], dict[str, int]]:
+    stats = {
+        "sentence_candidates_added": 0,
+        "phrase_candidates_added": 0,
+        "phrase_rows_matched_by_key": 0,
+    }
+    merged = dict(base_row)
+
+    sentence_candidates, added = _merge_candidates(
+        list(base_row.get("sentence_note_candidates") or []),
+        list(delta_row.get("sentence_note_candidates") or []),
+    )
+    merged["sentence_note_candidates"] = sentence_candidates
+    stats["sentence_candidates_added"] += added
+
+    base_phrases = list(base_row.get("phrase_entries") or [])
+    delta_phrases = list(delta_row.get("phrase_entries") or [])
+    merged_phrases = [dict(phrase) for phrase in base_phrases]
+    delta_by_key = {_phrase_key(phrase): phrase for phrase in delta_phrases}
+
+    for idx, base_phrase in enumerate(base_phrases):
+        key = _phrase_key(base_phrase)
+        delta_phrase = delta_by_key.get(key)
+        if delta_phrase is None and idx < len(delta_phrases):
+            fallback = delta_phrases[idx]
+            if _phrase_key(fallback) == key:
+                delta_phrase = fallback
+        if delta_phrase is None:
+            continue
+
+        base_candidates = list(base_phrase.get("note_candidates") or [])
+        delta_candidates = list(delta_phrase.get("note_candidates") or [])
+        if phrase_mode == "fill_empty_only" and base_candidates:
+            merged_phrases[idx]["note_candidates"] = base_candidates
+            stats["phrase_rows_matched_by_key"] += 1
+            continue
+
+        merged_candidates, added = _merge_candidates(base_candidates, delta_candidates)
+        merged_phrases[idx]["note_candidates"] = merged_candidates
+        stats["phrase_candidates_added"] += added
+        stats["phrase_rows_matched_by_key"] += 1
+
+    merged["phrase_entries"] = merged_phrases
+    return merged, stats
+
+
+def build_merged_corpus(
+    *,
+    base_input: str,
+    delta_input: str,
+    phrase_mode: str,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    base_rows = list(_iter_jsonl(base_input))
+    delta_rows = list(_iter_jsonl(delta_input))
+
+    delta_by_key = {_row_key(row): row for row in delta_rows}
+    merged_rows: list[dict[str, Any]] = []
+    merge_report = {
+        "base_rows_total": len(base_rows),
+        "delta_rows_total": len(delta_rows),
+        "matched_sentence_rows": 0,
+        "sentence_candidates_added": 0,
+        "phrase_candidates_added": 0,
+        "phrase_rows_matched_by_key": 0,
+        "base_only_rows_preserved": 0,
+        "delta_only_rows_ignored": 0,
+    }
+    matched_keys: set[tuple[str, int, int]] = set()
+
+    for base_row in base_rows:
+        key = _row_key(base_row)
+        delta_row = delta_by_key.get(key)
+        if delta_row is None:
+            merged_rows.append(base_row)
+            merge_report["base_only_rows_preserved"] += 1
+            continue
+        merged, stats = _merge_rows(base_row, delta_row, phrase_mode=phrase_mode)
+        merged_rows.append(merged)
+        matched_keys.add(key)
+        merge_report["matched_sentence_rows"] += 1
+        merge_report["sentence_candidates_added"] += stats["sentence_candidates_added"]
+        merge_report["phrase_candidates_added"] += stats["phrase_candidates_added"]
+        merge_report["phrase_rows_matched_by_key"] += stats["phrase_rows_matched_by_key"]
+
+    merge_report["delta_only_rows_ignored"] = sum(1 for key in delta_by_key if key not in matched_keys)
+    merge_report["merged_rows_total"] = len(merged_rows)
+    merged_keys = {_row_key(row) for row in merged_rows}
+
+    appended_fallbacks: list[dict[str, Any]] = []
+    for row in delta_rows:
+        key = _row_key(row)
+        if key in merged_keys:
+            continue
+        augmentation = row.get("augmentation_meta") or {}
+        if _norm(augmentation.get("augmentation_type")) != "book_sentence_fallback":
+            continue
+        if not _has_any_notes(row):
+            continue
+        appended_fallbacks.append(row)
+        merged_keys.add(key)
+
+    final_rows = merged_rows + appended_fallbacks
+    report = {
+        "merge_version": "projected_corpus_with_fallbacks_v1",
+        "base_input": str(Path(base_input).resolve()),
+        "delta_input": str(Path(delta_input).resolve()),
+        "phrase_mode": phrase_mode,
+        **merge_report,
+        "delta_only_fallback_rows_appended": len(appended_fallbacks),
+        "output_rows_total": len(final_rows),
+        "appended_source_document_ids": sorted(
+            {
+                _norm((row.get("augmentation_meta") or {}).get("source_document_id"))
+                for row in appended_fallbacks
+                if _norm((row.get("augmentation_meta") or {}).get("source_document_id"))
+            }
+        ),
+    }
+    return final_rows, report
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Merge a projected corpus delta into a base corpus and keep fallback rows.")
+    parser.add_argument("--base-input", required=True)
+    parser.add_argument("--delta-input", required=True)
+    parser.add_argument("--output-jsonl", required=True)
+    parser.add_argument("--report-json", required=True)
+    parser.add_argument(
+        "--phrase-mode",
+        choices=("fill_empty_only", "merge_all"),
+        default="fill_empty_only",
+        help="How to integrate phrase note candidates from the delta corpus.",
+    )
+    args = parser.parse_args()
+
+    rows, report = build_merged_corpus(
+        base_input=args.base_input,
+        delta_input=args.delta_input,
+        phrase_mode=args.phrase_mode,
+    )
+    _write_jsonl(args.output_jsonl, rows)
+    _write_json(args.report_json, report)
+    print(
+        json.dumps(
+            {
+                "status": "ok",
+                "rows": len(rows),
+                "appended_fallback_rows": report["delta_only_fallback_rows_appended"],
+                "output_jsonl": str(Path(args.output_jsonl).resolve()),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()
