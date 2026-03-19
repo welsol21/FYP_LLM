@@ -51,8 +51,8 @@ type SentenceContractPayload = {
 
 function formatVoiceSetting(voiceChoice: string | undefined): string {
   const value = String(voiceChoice || '').trim().toLowerCase()
-  if (value === 'backend_dmitry') return 'dmitry'
-  if (value === 'backend_svetlana') return 'svetlana'
+  if (value === 'backend_dmitry' || value === 'client_dmitry') return 'dmitry'
+  if (value === 'backend_svetlana' || value === 'client_svetlana') return 'svetlana'
   return 'male'
 }
 
