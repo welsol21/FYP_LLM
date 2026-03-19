@@ -28,6 +28,7 @@ import {
 import { mlWorkerClient } from '../lib/mlWorkerClient'
 import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics'
 import { configureTransformersEnvForMode } from '../lib/transformersEnv'
+import { parseAnalysisSettings } from '../lib/analysisSettings'
 
 type SentenceContractPayload = {
   sentence_text?: string
@@ -345,7 +346,21 @@ export async function submitMediaDesktop(input: {
   if ((sourceKind === 'audio' || sourceKind === 'video') && !input.forceFullReprocess) {
     const fallbackFile = input.mediaFileId ? await LocalWorkspace.getFileById(input.mediaFileId) : null
     const fallbackDocId = String(fallbackFile?.document_id || '').trim()
-    if (fallbackDocId) {
+    let settingsMatch = false
+    if (fallbackDocId && fallbackFile?.settings) {
+      const cached = parseAnalysisSettings(fallbackFile.settings)
+      const current = parseAnalysisSettings(input.settings)
+      settingsMatch = cached.translator === current.translator && cached.voice === current.voice
+    }
+    recordRuntimeDiagnostic('desktop.reuse', 'check', {
+      mediaFileId: input.mediaFileId,
+      fileDocId: fallbackFile?.document_id ?? null,
+      fallbackDocId: settingsMatch ? fallbackDocId : '',
+      willReuse: Boolean(fallbackDocId && settingsMatch),
+      settingsMatch,
+      sourceKind,
+    })
+    if (fallbackDocId && settingsMatch) {
       log(2, 'Incremental reuse: reusing last client analysis for this media file', 100)
       return finish({
         result: {
