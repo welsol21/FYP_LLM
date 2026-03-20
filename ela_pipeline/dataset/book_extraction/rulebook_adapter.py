@@ -16,7 +16,7 @@ _ROMAN_PAGE_RE = re.compile(r"^[ivxlcdm]+$", re.IGNORECASE)
 _ENTRY_EXAMPLE_RE = re.compile(r"\b(e\.g\.|for example|example:|examples:)\b", re.IGNORECASE)
 _ENTRY_HEAD_SPLIT_RE = re.compile(r"\s+(?:See\b|see\b|1\.)")
 _INLINE_HEAD_RE = re.compile(
-    r"^([A-Za-z][A-Za-z0-9'/.&-]*(?: [A-Za-z][A-Za-z0-9'/.&-]*){0,4})(?: \([^)]{1,48}\))?\s+(?=(?:[A-Z*(]|\d+\.))"
+    r"^([A-Za-z][A-Za-z0-9'/.&, -]*(?: [A-Za-z][A-Za-z0-9'/.&, -]*){0,4})(?: \([^)]{1,48}\))?\s+(?=(?:[A-Z*(]|\d+\.))"
 )
 _FALSE_HEAD_PREFIXES = (
     "see also ",

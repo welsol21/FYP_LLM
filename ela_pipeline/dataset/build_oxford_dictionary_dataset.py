@@ -161,6 +161,8 @@ def _pair_quality_ok(topic_key: str, context_text: str) -> bool:
     if topic_key == "that_clause":
         return lowered.startswith("that ") or "(that)" in lowered or " ø " in f" {lowered} "
     if topic_key == "prepositions":
+        if len(words) > 6 and context_text[-1] not in ".?!'\"":
+            return False
         return bool("?" in context_text or "!" in context_text or _PREP_OBJECT_RE.search(context_text) or _TO_OBJECT_RE.search(context_text))
     if topic_key == "prepositional_phrases":
         return bool(_PREP_OBJECT_RE.search(context_text) or _TO_OBJECT_RE.search(context_text))

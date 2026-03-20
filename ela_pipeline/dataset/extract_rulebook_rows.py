@@ -7,6 +7,14 @@ import json
 from pathlib import Path
 
 from ela_pipeline.dataset.book_extraction import UniversalBookExtractionEngine, build_default_parsers
+from ela_pipeline.dataset.book_extraction.cambridge_dictionary_adapter import (
+    CAMBRIDGE_DICTIONARY_CONFIG,
+    extract_cambridge_dictionary_rows,
+)
+from ela_pipeline.dataset.book_extraction.leech_glossary_adapter import (
+    LEECH_GLOSSARY_CONFIG,
+    extract_leech_glossary_rows,
+)
 from ela_pipeline.dataset.book_extraction.oxford_dictionary_adapter import (
     OXFORD_DICTIONARY_CONFIG,
     extract_oxford_dictionary_rows,
@@ -28,6 +36,8 @@ def _write_json(path: str, payload: dict) -> None:
 
 
 PROFILE_HANDLERS = {
+    CAMBRIDGE_DICTIONARY_CONFIG.name: extract_cambridge_dictionary_rows,
+    LEECH_GLOSSARY_CONFIG.name: extract_leech_glossary_rows,
     OXFORD_DICTIONARY_CONFIG.name: extract_oxford_dictionary_rows,
 }
 
