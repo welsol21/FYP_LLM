@@ -347,13 +347,21 @@ def _ffmpeg_escape_filter_path(path: Path) -> str:
     return raw.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
 
 
-def _subtitle_path_for_mode(*, doc_dir: Path, subtitles_mode: str) -> Path:
+def _artifact_name(stem: str, name: str) -> str:
+    """Prefix artifact filename with the original media stem, e.g. 'recording-subtitles_en.srt'."""
+    if stem:
+        base, _, ext = name.rpartition(".")
+        return f"{stem}-{base}.{ext}" if base else f"{stem}-{name}"
+    return name
+
+
+def _subtitle_path_for_mode(*, doc_dir: Path, subtitles_mode: str, stem: str = "") -> Path:
     mode = str(subtitles_mode or "bilingual").strip().lower()
     if mode in {"source", "source_only", "source only", "en"}:
-        return doc_dir / "subtitles_en.srt"
+        return doc_dir / _artifact_name(stem, "subtitles_en.srt")
     if mode in {"target", "target_only", "target only", "ru"}:
-        return doc_dir / "subtitles_target.srt"
-    return doc_dir / "subtitles_bilingual.srt"
+        return doc_dir / _artifact_name(stem, "subtitles_target.srt")
+    return doc_dir / _artifact_name(stem, "subtitles_bilingual.srt")
 
 
 def _voice_name_for_choice(voice_choice: str) -> str:
@@ -1783,6 +1791,7 @@ class RuntimeMediaService:
         base = Path(os.getenv("MEDIA_CONTRACT_ARTIFACTS_DIR", "artifacts/media_contracts"))
         doc_dir = base / document_id
         doc_dir.mkdir(parents=True, exist_ok=True)
+        stem = Path(media_path).stem
 
         links = [
             {"sentence_idx": row["sentence_idx"], "sentence_hash": row["sentence_hash"]}
@@ -1825,37 +1834,37 @@ class RuntimeMediaService:
         )
         if stage_callback is not None:
             stage_callback("generating_media", 0.5, "Writing sentence_link.json")
-        (doc_dir / "sentence_link.json").write_text(
+        (doc_dir / _artifact_name(stem, "sentence_link.json")).write_text(
             json.dumps(links, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         if stage_callback is not None:
             stage_callback("generating_media", 0.56, "Writing semantic_units_runtime.json")
-        (doc_dir / "semantic_units_runtime.json").write_text(
+        (doc_dir / _artifact_name(stem, "semantic_units_runtime.json")).write_text(
             json.dumps(legacy_segments, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         if stage_callback is not None:
             stage_callback("generating_media", 0.62, "Writing bilingual_objects_runtime.json")
-        (doc_dir / "bilingual_objects_runtime.json").write_text(
+        (doc_dir / _artifact_name(stem, "bilingual_objects_runtime.json")).write_text(
             json.dumps(legacy_segments, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         if stage_callback is not None:
             stage_callback("generating_media", 0.68, "Writing source subtitles")
-        (doc_dir / "subtitles_en.srt").write_text(
+        (doc_dir / _artifact_name(stem, "subtitles_en.srt")).write_text(
             _build_srt(media_sentences, bilingual=False),
             encoding="utf-8",
         )
         if stage_callback is not None:
             stage_callback("generating_media", 0.72, "Writing bilingual subtitles")
-        (doc_dir / "subtitles_bilingual.srt").write_text(
+        (doc_dir / _artifact_name(stem, "subtitles_bilingual.srt")).write_text(
             _build_srt(media_sentences, bilingual=True),
             encoding="utf-8",
         )
         if stage_callback is not None:
             stage_callback("generating_media", 0.76, "Writing target subtitles")
-        (doc_dir / "subtitles_target.srt").write_text(
+        (doc_dir / _artifact_name(stem, "subtitles_target.srt")).write_text(
             _build_srt([{**row, "text_eng": ""} for row in media_sentences], bilingual=True),
             encoding="utf-8",
         )
@@ -1868,6 +1877,7 @@ class RuntimeMediaService:
             media_sentences=media_sentences,
             subtitles_mode=subtitles_mode,
             voice_choice=voice_choice,
+            stem=stem,
             stage_callback=stage_callback,
         )
         if stage_callback is not None:
@@ -1908,12 +1918,13 @@ class RuntimeMediaService:
         media_sentences: list[dict[str, Any]],
         subtitles_mode: str = "bilingual",
         voice_choice: str = "male",
+        stem: str = "",
         stage_callback: Callable[[str, float | None, str | None], None] | None = None,
     ) -> None:
         if source_type not in {"audio", "video"}:
             return
 
-        tts_mp3 = doc_dir / "translated_audio_ru.mp3"
+        tts_mp3 = doc_dir / _artifact_name(stem, "translated_audio_ru.mp3")
         source = Path(source_path)
         try:
             import edge_tts  # type: ignore
@@ -2117,24 +2128,24 @@ class RuntimeMediaService:
             if not bilingual_subtitle_segments:
                 bilingual_subtitle_segments = timeline_segments
 
-            (doc_dir / "subtitles_en.srt").write_text(
+            (doc_dir / _artifact_name(stem, "subtitles_en.srt")).write_text(
                 _build_srt(source_subtitle_segments if source_subtitle_segments else timeline_segments, bilingual=False),
                 encoding="utf-8",
             )
-            (doc_dir / "subtitles_bilingual.srt").write_text(
+            (doc_dir / _artifact_name(stem, "subtitles_bilingual.srt")).write_text(
                 _build_srt(bilingual_subtitle_segments, bilingual=True),
                 encoding="utf-8",
             )
             target_rows = target_subtitle_segments if target_subtitle_segments else [{**row, "text_eng": ""} for row in timeline_segments]
-            (doc_dir / "subtitles_target.srt").write_text(
+            (doc_dir / _artifact_name(stem, "subtitles_target.srt")).write_text(
                 _build_srt(target_rows, bilingual=True),
                 encoding="utf-8",
             )
 
             if stage_callback is not None:
                 stage_callback("exporting_files", 0.84, "Rendering final video")
-            out_video = doc_dir / "translated_video_ru.mp4"
-            subtitle_path = _subtitle_path_for_mode(doc_dir=doc_dir, subtitles_mode=subtitles_mode)
+            out_video = doc_dir / _artifact_name(stem, "translated_video_ru.mp4")
+            subtitle_path = _subtitle_path_for_mode(doc_dir=doc_dir, subtitles_mode=subtitles_mode, stem=stem)
             escaped_subs = _ffmpeg_escape_filter_path(subtitle_path)
             if source_type == "video" and source.exists():
                 subprocess.run(

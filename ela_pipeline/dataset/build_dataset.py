@@ -33,7 +33,7 @@ LOW_QUALITY_NOTE_PATTERNS = (
     re.compile(r"^\s*sentence:\s*", re.IGNORECASE),
 )
 
-PROMPT_TEMPLATE_VERSION = "v1"
+PROMPT_TEMPLATE_VERSION = "v2"
 CEFR_LEVELS = {"A1", "A2", "B1", "B2", "C1", "C2"}
 CANONICAL_CEFR_CORPUS_PATH = "linguistic_hierarchical_3000_v5_cefr_balanced.json"
 
