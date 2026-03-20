@@ -18,7 +18,7 @@ from ela_pipeline.annotate.template_registry import (
 from ela_pipeline.validation.notes_quality import sanitize_note
 
 CONTRACT_TEMPLATE_VERSION = "v1"
-CONTRACT_PROMPT_TEMPLATE_VERSION = "contract_template_v1"
+CONTRACT_PROMPT_TEMPLATE_VERSION = "contract_template_v2"
 CONTRACT_CLASSIFIER_PROMPT_TEMPLATE_VERSION = "contract_template_classifier_v1"
 _SLOT_RE = re.compile(r"{{([A-Z_]+)}}")
 _TAG_RE = re.compile(r",\s*([A-Za-z]+(?:n't)?)\s+([A-Za-z]+)\?\s*$", re.IGNORECASE)
@@ -288,6 +288,51 @@ def _allowed_slots(template_text: str) -> list[str]:
     return seen
 
 
+def normalize_template_text(template_text: str) -> str:
+    return sanitize_note(str(template_text or ""))
+
+
+def _looks_like_prompt_leakage(template_text: str) -> bool:
+    lowered = normalize_template_text(template_text).lower()
+    if not lowered:
+        return False
+    leak_markers = (
+        "keep exactly the same placeholders",
+        "return template text only",
+        "do not invent placeholders",
+        "payload:",
+        "template_text field",
+        "audience level:",
+        "rewrite this contract-safe linguistic note template",
+        "rewrite_linguistic_note_template_from_contract_template",
+    )
+    return any(marker in lowered for marker in leak_markers)
+
+
+def template_uses_allowed_slots(template_text: str, allowed_slots: list[str] | tuple[str, ...] | None) -> bool:
+    normalized = normalize_template_text(template_text)
+    expected = [str(slot).strip() for slot in (allowed_slots or []) if str(slot).strip()]
+    actual = _allowed_slots(normalized)
+    return set(actual) == set(expected) and len(actual) == len(expected)
+
+
+def resolve_generated_template_text(
+    generated_template_text: str,
+    *,
+    default_template_text: str,
+    allowed_slots: list[str] | tuple[str, ...] | None,
+) -> tuple[str, str]:
+    candidate = normalize_template_text(generated_template_text)
+    default = normalize_template_text(default_template_text)
+    if not candidate:
+        return default, "template_fallback_empty"
+    if _looks_like_prompt_leakage(candidate):
+        return default, "template_fallback_prompt_leakage"
+    if not template_uses_allowed_slots(candidate, allowed_slots):
+        return default, "template_fallback_slot_mismatch"
+    return candidate, "template_generated"
+
+
 def _selection_to_dict(selection: TemplateSelection, *, semantic_rejects: list[dict[str, str]] | None = None) -> dict[str, Any]:
     payload = {
         "level": selection.level,
@@ -483,7 +528,7 @@ def build_contract_template_training_prompt(
     audience_level: str = "intermediate",
 ) -> str:
     brief = {
-        "task": "write_linguistic_note_from_contract_template",
+        "task": "rewrite_linguistic_note_template_from_contract_template",
         "prompt_template_version": CONTRACT_PROMPT_TEMPLATE_VERSION,
         "node_level": str(node_level or "").strip() or "Unknown",
         "audience_level": str(audience_level or "").strip() or "intermediate",
@@ -496,7 +541,10 @@ def build_contract_template_training_prompt(
         "selection": payload.get("selection"),
         "context": payload.get("note_template_input"),
     }
-    return f"task: write_linguistic_note_from_contract_template payload: {json.dumps(brief, ensure_ascii=False, sort_keys=True)}"
+    return (
+        "task: rewrite_linguistic_note_template_from_contract_template "
+        f"payload: {json.dumps(brief, ensure_ascii=False, sort_keys=True)}"
+    )
 
 
 def build_contract_template_classifier_prompt(

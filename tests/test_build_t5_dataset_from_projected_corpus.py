@@ -21,14 +21,21 @@ class BuildT5DatasetFromProjectedCorpusTests(unittest.TestCase):
             "origin_unit": "u1",
             "match_level": "sentence",
             "note_text": "Question tags repeat didn't and use you as the pronoun subject.",
+            "slot_template_text": 'Question tags repeat "{{TAG_AUXILIARY}}" and use "{{TAG_PRONOUN}}" as the pronoun subject.',
+            "slot_templated": True,
             "slot_rendered_note": "Question tags repeat didn't and use you as the pronoun subject.",
         }
 
         built = _make_sentence_row(row, candidate)
-        self.assertEqual(built["prompt_template_version"], "contract_template_v1")
+        self.assertEqual(built["prompt_template_version"], "contract_template_v2")
         self.assertEqual(built["template_id"], "SENT_QUESTION_TAG")
         self.assertIn('"template_id": "SENT_QUESTION_TAG"', built["input"])
-        self.assertIn("write_linguistic_note_from_contract_template", built["input"])
+        self.assertIn("rewrite_linguistic_note_template_from_contract_template", built["input"])
+        self.assertEqual(
+            built["target"],
+            'Question tags repeat "{{TAG_AUXILIARY}}" and use "{{TAG_PRONOUN}}" as the pronoun subject.',
+        )
+        self.assertEqual(built["note_target_variant"], "slot_template")
 
     def test_phrase_row_uses_contract_template_prompt(self):
         row = {
@@ -57,10 +64,15 @@ class BuildT5DatasetFromProjectedCorpusTests(unittest.TestCase):
         }
 
         built = _make_phrase_row(row, row["phrase_entries"][0], candidate)
-        self.assertEqual(built["prompt_template_version"], "contract_template_v1")
+        self.assertEqual(built["prompt_template_version"], "contract_template_v2")
         self.assertEqual(built["template_id"], "PHRASE_PP_LOCATION")
         self.assertIn('"template_id": "PHRASE_PP_LOCATION"', built["input"])
-        self.assertIn("write_linguistic_note_from_contract_template", built["input"])
+        self.assertIn("rewrite_linguistic_note_template_from_contract_template", built["input"])
+        self.assertEqual(
+            built["target"],
+            "This {{PART_OF_SPEECH}} works as a {{GRAMMATICAL_ROLE}} and expresses location or spatial position.",
+        )
+        self.assertEqual(built["note_target_variant"], "contract_template")
 
 
 if __name__ == "__main__":

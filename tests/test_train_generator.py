@@ -46,12 +46,12 @@ class TrainGeneratorTests(unittest.TestCase):
             train = base / "train.jsonl"
             dev = base / "dev.jsonl"
             stats = base / "stats.json"
-            train.write_text('{"input":"a","target":"b","level":"Sentence","tam_bucket":"none","prompt_template_version":"contract_template_v1"}\n', encoding="utf-8")
-            dev.write_text('{"input":"a","target":"b","level":"Sentence","tam_bucket":"none","prompt_template_version":"contract_template_v1"}\n', encoding="utf-8")
+            train.write_text('{"input":"a","target":"b","level":"Sentence","tam_bucket":"none","prompt_template_version":"contract_template_v2"}\n', encoding="utf-8")
+            dev.write_text('{"input":"a","target":"b","level":"Sentence","tam_bucket":"none","prompt_template_version":"contract_template_v2"}\n', encoding="utf-8")
             stats.write_text(
                 json.dumps(
                     {
-                        "prompt_template_version": "contract_template_v1",
+                        "prompt_template_version": "contract_template_v2",
                         "total_after_balance": 2,
                     }
                 ),
@@ -59,7 +59,7 @@ class TrainGeneratorTests(unittest.TestCase):
             )
 
             payload = _validate_processed_freshness(str(train), str(dev))
-            self.assertEqual(payload["prompt_template_version"], "contract_template_v1")
+            self.assertEqual(payload["prompt_template_version"], "contract_template_v2")
 
     def test_validate_processed_freshness_accepts_mixed_prompt_version(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -67,12 +67,12 @@ class TrainGeneratorTests(unittest.TestCase):
             train = base / "train.jsonl"
             dev = base / "dev.jsonl"
             stats = base / "stats.json"
-            train.write_text('{"input":"a","target":"b","level":"Sentence","tam_bucket":"none","prompt_template_version":"contract_template_v1"}\n', encoding="utf-8")
+            train.write_text('{"input":"a","target":"b","level":"Sentence","tam_bucket":"none","prompt_template_version":"contract_template_v2"}\n', encoding="utf-8")
             dev.write_text('{"input":"a","target":"b","level":"Word","tam_bucket":"none","prompt_template_version":"v2"}\n', encoding="utf-8")
             stats.write_text(
                 json.dumps(
                     {
-                        "prompt_template_version": "mixed::contract_template_v1+v2",
+                        "prompt_template_version": "mixed::contract_template_v2+v2",
                         "total_after_balance": 2,
                     }
                 ),
@@ -80,7 +80,7 @@ class TrainGeneratorTests(unittest.TestCase):
             )
 
             payload = _validate_processed_freshness(str(train), str(dev))
-            self.assertEqual(payload["prompt_template_version"], "mixed::contract_template_v1+v2")
+            self.assertEqual(payload["prompt_template_version"], "mixed::contract_template_v2+v2")
 
 
 if __name__ == "__main__":

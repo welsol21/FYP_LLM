@@ -20,6 +20,8 @@ from ela_pipeline.annotate.contract_template_builder import (
     CONTRACT_PROMPT_TEMPLATE_VERSION,
     build_contract_template_payload,
     build_contract_template_training_prompt,
+    normalize_template_text,
+    template_uses_allowed_slots,
 )
 from ela_pipeline.dataset.build_dataset import (
     _count_by,
@@ -91,6 +93,17 @@ def _candidate_target_text(candidate: Dict[str, Any]) -> str:
     if slot_text:
         return slot_text
     return str(candidate.get("note_text") or "").strip()
+
+
+def _candidate_target_template(candidate: Dict[str, Any], payload: Dict[str, Any] | None) -> tuple[str, str]:
+    canonical_template = normalize_template_text((payload or {}).get("template_text"))
+    allowed_slots = list((payload or {}).get("allowed_slots") or [])
+    slot_template = normalize_template_text(candidate.get("slot_template_text"))
+    if slot_template and bool(candidate.get("slot_templated")) and template_uses_allowed_slots(slot_template, allowed_slots):
+        return slot_template, "slot_template"
+    if canonical_template:
+        return canonical_template, "contract_template"
+    return "", "missing_template"
 
 
 def _candidate_risk_flags(candidate: Dict[str, Any]) -> List[str]:
@@ -338,10 +351,11 @@ def _make_sentence_row(row: Dict[str, Any], candidate: Dict[str, Any]) -> Dict[s
         sibling_count=1,
     )
     prompt = build_contract_template_training_prompt(payload or {}, node_level="Sentence")
+    target_template, target_variant = _candidate_target_template(candidate, payload)
     source_document = row.get("source_document") or {}
     return {
         "input": prompt,
-        "target": _candidate_target_text(candidate),
+        "target": target_template,
         "level": "Sentence",
         "tam_bucket": "none",
         "prompt_template_version": CONTRACT_PROMPT_TEMPLATE_VERSION,
@@ -355,7 +369,7 @@ def _make_sentence_row(row: Dict[str, Any], candidate: Dict[str, Any]) -> Dict[s
         "note_origin_unit": candidate.get("origin_unit"),
         "note_match_level": candidate.get("match_level"),
         "note_selection_mode": "book_preferred",
-        "note_target_variant": "slot_rendered" if candidate.get("slot_rendered_note") else "note_text",
+        "note_target_variant": target_variant,
         "note_source_tier": "internal_fallback"
         if candidate.get("source_book") == "internal_pedagogical_grammar"
         else "book",
@@ -379,10 +393,11 @@ def _make_phrase_row(row: Dict[str, Any], phrase_entry: Dict[str, Any], candidat
         sibling_count=sibling_count,
     )
     prompt = build_contract_template_training_prompt(payload or {}, node_level="Phrase")
+    target_template, target_variant = _candidate_target_template(candidate, payload)
     source_document = row.get("source_document") or {}
     return {
         "input": prompt,
-        "target": _candidate_target_text(candidate),
+        "target": target_template,
         "level": "Phrase",
         "tam_bucket": "none",
         "prompt_template_version": CONTRACT_PROMPT_TEMPLATE_VERSION,
@@ -396,7 +411,7 @@ def _make_phrase_row(row: Dict[str, Any], phrase_entry: Dict[str, Any], candidat
         "note_origin_unit": candidate.get("origin_unit"),
         "note_match_level": candidate.get("match_level"),
         "note_selection_mode": "book_preferred",
-        "note_target_variant": "slot_rendered" if candidate.get("slot_rendered_note") else "note_text",
+        "note_target_variant": target_variant,
         "note_source_tier": "internal_fallback"
         if candidate.get("source_book") == "internal_pedagogical_grammar"
         else "book",

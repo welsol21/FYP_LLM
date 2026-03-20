@@ -11,6 +11,7 @@ from typing import Any
 
 from ela_pipeline.annotate.contract_template_builder import (
     build_contract_template_payload,
+    render_contract_template,
 )
 from ela_pipeline.classifier.grammar_blueprints import build_note_blueprints
 from ela_pipeline.classifier.grammar_rules import map_pedagogical_grammar_classes
@@ -962,6 +963,7 @@ def _apply_contract_template_notes(doc: dict, renderer: Any | None = None) -> No
         )
         if isinstance(payload, dict):
             deterministic_note = str(payload.get("rendered_note_text") or payload.get("fallback_note_text") or "").strip()
+            active_template_text = str(payload.get("template_text") or "").strip()
             notes = _empty_linguistic_notes()
             render_status = str(payload.get("render_status") or "template_rendered")
             render_source = "contract_template"
@@ -974,7 +976,7 @@ def _apply_contract_template_notes(doc: dict, renderer: Any | None = None) -> No
                 t5_used = False
                 t5_fallback = False
                 for level in key_to_level.values():
-                    rendered = str(
+                    generated_template_text = str(
                         renderer.render_note(
                             blueprint_text=str((node.get("note_blueprints") or {}).get(f"{level}_text") or ""),
                             level=level,
@@ -990,12 +992,21 @@ def _apply_contract_template_notes(doc: dict, renderer: Any | None = None) -> No
                         )
                         or ""
                     ).strip()
-                    if rendered:
-                        notes[level] = rendered
-                        if rendered == deterministic_note:
-                            t5_fallback = True
-                        else:
+                    resolved_note, template_status = render_contract_template(
+                        generated_template_text or active_template_text,
+                        slot_values=dict(payload.get("slot_values") or {}),
+                        fallback_note=deterministic_note,
+                    )
+                    notes[level] = resolved_note
+                    if template_status == "template_rendered":
+                        normalized_generated = str(generated_template_text or "").strip()
+                        if normalized_generated and normalized_generated != active_template_text:
+                            active_template_text = normalized_generated
                             t5_used = True
+                        else:
+                            t5_fallback = True
+                    else:
+                        t5_fallback = True
                 if t5_used:
                     render_status = "rendered_with_t5"
                 elif t5_fallback:
@@ -1003,7 +1014,7 @@ def _apply_contract_template_notes(doc: dict, renderer: Any | None = None) -> No
             node["linguistic_notes"] = _coerce_linguistic_notes(notes)
             node["note_template_version"] = str(payload.get("note_template_version") or "")
             node["note_template_id"] = str(payload.get("template_id") or "")
-            node["note_template_text"] = str(payload.get("template_text") or "")
+            node["note_template_text"] = active_template_text
             node["note_template_slots"] = dict(payload.get("slot_values") or {})
             node["note_template_input"] = dict(payload.get("note_template_input") or {})
             node["note_render_source"] = render_source

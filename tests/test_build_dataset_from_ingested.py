@@ -57,11 +57,11 @@ class BuildDatasetFromIngestedTests(unittest.TestCase):
 
         self.assertEqual(counters["rows_emitted"], 3)
         by_level = {row["level"]: row for row in rows}
-        self.assertEqual(by_level["Sentence"]["prompt_template_version"], "contract_template_v1")
-        self.assertEqual(by_level["Phrase"]["prompt_template_version"], "contract_template_v1")
+        self.assertEqual(by_level["Sentence"]["prompt_template_version"], "contract_template_v2")
+        self.assertEqual(by_level["Phrase"]["prompt_template_version"], "contract_template_v2")
         self.assertEqual(by_level["Word"]["prompt_template_version"], "v2")
-        self.assertIn("write_linguistic_note_from_contract_template", by_level["Sentence"]["input"])
-        self.assertIn("write_linguistic_note_from_contract_template", by_level["Phrase"]["input"])
+        self.assertIn("rewrite_linguistic_note_template_from_contract_template", by_level["Sentence"]["input"])
+        self.assertIn("rewrite_linguistic_note_template_from_contract_template", by_level["Phrase"]["input"])
         self.assertIn("template_version: v2", by_level["Word"]["input"])
 
 

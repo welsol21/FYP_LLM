@@ -3,6 +3,7 @@ import unittest
 from ela_pipeline.annotate.contract_template_builder import (
     build_contract_template_payload,
     build_contract_template_training_prompt,
+    resolve_generated_template_text,
 )
 
 
@@ -151,10 +152,34 @@ class ContractTemplateBuilderTests(unittest.TestCase):
         )
 
         prompt = build_contract_template_training_prompt(payload or {}, node_level="Sentence")
-        self.assertIn("write_linguistic_note_from_contract_template", prompt)
-        self.assertIn('"prompt_template_version": "contract_template_v1"', prompt)
+        self.assertIn("rewrite_linguistic_note_template_from_contract_template", prompt)
+        self.assertIn('"prompt_template_version": "contract_template_v2"', prompt)
         self.assertIn('"template_id": "SENT_QUESTION_TAG"', prompt)
         self.assertIn('"deterministic_note": "Question tags repeat didn\'t and use you as the pronoun subject."', prompt)
+
+    def test_generated_template_text_falls_back_when_slots_do_not_match(self):
+        resolved, status = resolve_generated_template_text(
+            'Here, "{{OBJECT_NP}}" is linked by "{{PREPOSITION}}".',
+            default_template_text='This {{PART_OF_SPEECH}} works as a {{GRAMMATICAL_ROLE}} and expresses location.',
+            allowed_slots=["PART_OF_SPEECH", "GRAMMATICAL_ROLE"],
+        )
+        self.assertEqual(
+            resolved,
+            "This {{PART_OF_SPEECH}} works as a {{GRAMMATICAL_ROLE}} and expresses location.",
+        )
+        self.assertEqual(status, "template_fallback_slot_mismatch")
+
+    def test_generated_template_text_falls_back_on_prompt_leakage(self):
+        resolved, status = resolve_generated_template_text(
+            "Keep exactly the same placeholders as in the template_text field. Return template text only.",
+            default_template_text='This {{PART_OF_SPEECH}} works as a {{GRAMMATICAL_ROLE}} and expresses location.',
+            allowed_slots=["PART_OF_SPEECH", "GRAMMATICAL_ROLE"],
+        )
+        self.assertEqual(
+            resolved,
+            "This {{PART_OF_SPEECH}} works as a {{GRAMMATICAL_ROLE}} and expresses location.",
+        )
+        self.assertEqual(status, "template_fallback_prompt_leakage")
 
 
 if __name__ == "__main__":

@@ -204,6 +204,35 @@ def _note_prompt_for_contract_node(
     return prompt, PROMPT_TEMPLATE_VERSION
 
 
+def _template_target_for_contract_node(
+    *,
+    node: Dict[str, Any],
+    parent: Dict[str, Any] | None,
+    sentence_node: Dict[str, Any],
+    path_types: list[str],
+    depth: int,
+    sibling_index: int,
+    sibling_count: int,
+    level: str,
+) -> str | None:
+    if level not in {"Sentence", "Phrase"}:
+        return None
+    payload = build_contract_template_payload(
+        node=node,
+        parent=parent,
+        sentence_node=sentence_node,
+        path_types=path_types,
+        depth=depth,
+        sibling_index=sibling_index,
+        sibling_count=sibling_count,
+    )
+    if isinstance(payload, dict):
+        template_text = str(payload.get("template_text") or "").strip()
+        if template_text:
+            return template_text
+    return None
+
+
 POS_LABELS = {
     "ADJ": "adjective",
     "ADP": "preposition",
@@ -650,6 +679,18 @@ def iter_examples(
         sentence_note = _extract_note_from_targets(sent_targets, counters=counters)
 
     if task == "linguistic_note" and sentence_note:
+        template_target = None
+        if not use_template_id_targets:
+            template_target = _template_target_for_contract_node(
+                node=sentence_stub,
+                parent=None,
+                sentence_node=sentence_stub,
+                path_types=[str(item.get("type") or "").strip() or "Sentence"],
+                depth=0,
+                sibling_index=0,
+                sibling_count=1,
+                level="Sentence",
+            )
         prompt, prompt_template_version = _note_prompt_for_contract_node(
             node=sentence_stub,
             parent=None,
@@ -662,7 +703,7 @@ def iter_examples(
         )
         yield {
             "input": prompt,
-            "target": sentence_note,
+            "target": template_target or sentence_note,
             "level": "Sentence",
             "tam_bucket": sent_tam,
             "prompt_template_version": prompt_template_version,
@@ -677,6 +718,7 @@ def iter_examples(
             phrase_tam = _extract_tam_bucket(node)
             phrase_text = _node_input_text(node)
             phrase_features = node.get("features", {})
+            template_target = None
             if task == "cefr_level":
                 phrase_cefr = _extract_cefr_level(node)
                 p_note = phrase_cefr
@@ -713,6 +755,17 @@ def iter_examples(
                         if isinstance(parent, dict)
                         else None
                     )
+                    if not use_template_id_targets:
+                        template_target = _template_target_for_contract_node(
+                            node=phrase_stub,
+                            parent=parent_stub,
+                            sentence_node=sentence_stub,
+                            path_types=path_types,
+                            depth=depth,
+                            sibling_index=sibling_index,
+                            sibling_count=sibling_count,
+                            level="Phrase",
+                        )
                     prompt, prompt_template_version = _note_prompt_for_contract_node(
                         node=phrase_stub,
                         parent=parent_stub,
@@ -725,7 +778,7 @@ def iter_examples(
                     )
                 yield {
                     "input": prompt,
-                    "target": p_note,
+                    "target": template_target or p_note,
                     "level": "Phrase",
                     "tam_bucket": phrase_tam,
                     "prompt_template_version": prompt_template_version,
