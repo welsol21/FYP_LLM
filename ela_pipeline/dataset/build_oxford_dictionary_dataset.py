@@ -6,6 +6,7 @@ import argparse
 import copy
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,38 @@ TERM_TO_TOPIC_KEY = {
     "conditional": "conditional_sentences",
     "questions and negatives": "questions_and_negatives",
     "negative": "questions_and_negatives",
+}
+
+_COMMON_PREPOSITIONS = {
+    "about",
+    "above",
+    "across",
+    "after",
+    "against",
+    "along",
+    "around",
+    "at",
+    "before",
+    "behind",
+    "below",
+    "beside",
+    "between",
+    "by",
+    "for",
+    "from",
+    "in",
+    "inside",
+    "into",
+    "near",
+    "of",
+    "off",
+    "on",
+    "out",
+    "over",
+    "through",
+    "to",
+    "under",
+    "with",
 }
 
 
@@ -91,6 +124,28 @@ def _row_id(row: dict[str, Any]) -> str:
     return f"oxford_pair_{digest}"
 
 
+def _pair_quality_ok(topic_key: str, context_text: str) -> bool:
+    context_text = _norm(context_text)
+    if not context_text:
+        return False
+    lowered = context_text.lower()
+    words = re.findall(r"[A-Za-z']+", context_text)
+    first = words[0].lower() if words else ""
+    if "*" in context_text:
+        return False
+    if lowered.startswith(("see ", "compare ", "also called ", "inserted, e.g.", "is different:", "that, provided")):
+        return False
+    if topic_key == "conditional_sentences":
+        return any(marker in lowered for marker in ("if ", "unless ", "provided ", "providing "))
+    if topic_key == "that_clause":
+        return lowered.startswith("that ") or "(that)" in lowered or " ø " in f" {lowered} "
+    if topic_key == "prepositions":
+        return bool("?" in context_text or "!" in context_text or first in _COMMON_PREPOSITIONS)
+    if topic_key == "prepositional_phrases":
+        return bool(first in _COMMON_PREPOSITIONS or lowered.startswith("the "))
+    return True
+
+
 def _load_pair_rows(pairs_jsonl: str | list[str] | tuple[str, ...]) -> list[dict[str, Any]]:
     if isinstance(pairs_jsonl, str):
         paths = [pairs_jsonl]
@@ -100,6 +155,27 @@ def _load_pair_rows(pairs_jsonl: str | list[str] | tuple[str, ...]) -> list[dict
     for path in paths:
         rows.extend(list(_iter_jsonl(path)))
     return rows
+
+
+def _clean_context_text(text: Any) -> str:
+    value = _norm(text)
+    if not value:
+        return ""
+    for marker in (" (compare:", " Compare ", " See also ", " See "):
+        idx = value.find(marker)
+        if idx > 0:
+            value = _norm(value[:idx])
+    return value.rstrip(" ,;:")
+
+
+def _clean_notation_text(text: Any) -> str:
+    value = _norm(text)
+    if not value:
+        return ""
+    for prefix in ("congruence ", "conditioning ", "question tag ", "preposition "):
+        if value.lower().startswith(prefix):
+            value = _norm(value[len(prefix) :])
+    return value
 
 
 def build_oxford_dictionary_dataset(
@@ -129,9 +205,11 @@ def build_oxford_dictionary_dataset(
         )
         if not topic_key:
             continue
+        context_text = _clean_context_text(pair.get("context_text"))
+        if not _pair_quality_ok(topic_key, context_text):
+            continue
         stats["topic_mapped_rows"] += 1
 
-        context_text = _norm(pair.get("context_text"))
         try:
             contract_doc = build_skeleton(context_text, nlp)
         except Exception:
@@ -167,6 +245,7 @@ def build_oxford_dictionary_dataset(
                             "topic_key": topic_key,
                             "entry_head": pair.get("entry_head"),
                             "notation_text": pair.get("notation_text"),
+                            "notation_text_clean": _clean_notation_text(pair.get("notation_text")),
                             "pair_method": pair.get("pair_method"),
                             "book_template_id": sentence_template,
                             "template_text": sentence_payload.get("template_text"),
@@ -183,6 +262,7 @@ def build_oxford_dictionary_dataset(
                             "node_level": "Sentence",
                             "context_text": context_text,
                             "notation_text": pair.get("notation_text"),
+                            "notation_text_clean": _clean_notation_text(pair.get("notation_text")),
                             "pair_method": pair.get("pair_method"),
                             "matched_template_id": sentence_payload.get("template_id"),
                             "book_template_id": sentence_template,
@@ -222,6 +302,7 @@ def build_oxford_dictionary_dataset(
                                 "topic_key": topic_key,
                                 "entry_head": pair.get("entry_head"),
                                 "notation_text": pair.get("notation_text"),
+                                "notation_text_clean": _clean_notation_text(pair.get("notation_text")),
                                 "pair_method": pair.get("pair_method"),
                                 "book_template_id": phrase_template,
                                 "template_text": payload.get("template_text"),
@@ -238,6 +319,7 @@ def build_oxford_dictionary_dataset(
                                 "node_level": "Phrase",
                                 "context_text": context_text,
                                 "notation_text": pair.get("notation_text"),
+                                "notation_text_clean": _clean_notation_text(pair.get("notation_text")),
                                 "pair_method": pair.get("pair_method"),
                                 "matched_template_id": payload.get("template_id"),
                                 "book_template_id": phrase_template,
@@ -255,6 +337,7 @@ def build_oxford_dictionary_dataset(
                 "entry_head": pair.get("entry_head"),
                 "topic_key": topic_key,
                 "notation_text": pair.get("notation_text"),
+                "notation_text_clean": _clean_notation_text(pair.get("notation_text")),
                 "context_text": context_text,
                 "pair_method": pair.get("pair_method"),
                 "book_template_id_sentence": sentence_template,

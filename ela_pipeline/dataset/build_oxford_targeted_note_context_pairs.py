@@ -257,14 +257,19 @@ def _topic_allows_context(spec: OxfordTopicBlock, text: str, nlp: Any) -> bool:
     if spec.topic_key == "conditional_sentences":
         return any(marker in lowered for marker in ("if ", "unless ", "provided ", "providing ")) and has_verb
     if spec.topic_key == "that_clause":
-        return (lowered.startswith("that ") or " that " in f" {lowered} ") and has_verb
+        if "*" in text:
+            return False
+        return has_verb and (
+            lowered.startswith("that ")
+            or "(that)" in lowered
+            or " ø " in f" {lowered} "
+        )
     if spec.topic_key == "prepositions":
         first = words[0].lower() if words else ""
         return bool(
             "?" in text
             or "!" in text
-            or (len(words) <= 6 and first in _COMMON_PREPOSITIONS)
-            or (len(words) <= 5 and text[:1].islower())
+            or (len(words) <= 8 and first in _COMMON_PREPOSITIONS)
         )
     if spec.topic_key == "prepositional_phrases":
         first = words[0].lower() if words else ""
