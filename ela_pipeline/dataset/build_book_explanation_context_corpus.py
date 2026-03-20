@@ -99,6 +99,13 @@ META_CONTEXT_PREFIXES = (
     "term ",
     "terms ",
 )
+REFERENCE_SOURCE_MARKERS = (
+    "dictionary",
+    "quick reference",
+    "handbook",
+    "glossary",
+    "reference",
+)
 
 
 def _norm(value: Any) -> str:
@@ -111,6 +118,8 @@ def _clean_candidate_text(text: str) -> str:
     text = TRAILING_NOTE_RE.sub("", text).strip()
     text = text.rstrip("([")
     text = re.sub(r"\s+\)", ")", text)
+    text = re.sub(r"[\]\)]+[.?!]?$", "", text).strip()
+    text = text.rstrip(">").strip()
     return _norm(text)
 
 
@@ -189,6 +198,29 @@ def _has_subject(text: str, nlp: Any) -> bool:
     return any(token.dep_ in {"nsubj", "nsubjpass", "expl", "csubj"} for token in doc)
 
 
+def _source_style(source_path: str) -> str:
+    lowered = str(source_path or "").lower()
+    if any(marker in lowered for marker in REFERENCE_SOURCE_MARKERS):
+        return "reference"
+    return "teaching"
+
+
+def _topic_terms(topic_key: str) -> list[str]:
+    parts = [part for part in re.split(r"[_\s]+", str(topic_key or "").lower()) if part]
+    specials = {
+        "relative_clauses": ["relative", "clause", "relative clause"],
+        "passive_voice": ["passive", "passive voice"],
+        "prepositional_phrases": ["preposition", "prepositional", "prepositional phrase"],
+        "question_tags": ["question tag", "question tags", "tag question"],
+    }
+    return specials.get(str(topic_key or "").lower(), parts)
+
+
+def _mentions_topic(text: str, topic_key: str) -> bool:
+    lowered = str(text or "").lower()
+    return any(term in lowered for term in _topic_terms(topic_key) if len(term) >= 4)
+
+
 def _starts_like_example_clause(text: str, nlp: Any) -> bool:
     doc = nlp(text)
     tokens = [token for token in doc if not token.is_space]
@@ -202,6 +234,12 @@ def _starts_like_example_clause(text: str, nlp: Any) -> bool:
     if first.pos_ in {"PRON", "PROPN", "DET", "NOUN"}:
         return True
     return False
+
+
+def _segment_candidates(text: str) -> list[str]:
+    text = _norm(text)
+    parts = re.split(r"[;•]|(?<=[.?!])\s+|(?<=\))\s+", text)
+    return [_clean_candidate_text(part) for part in parts if _clean_candidate_text(part)]
 
 
 def _ends_incomplete(text: str) -> bool:
@@ -249,14 +287,13 @@ def _extract_explicit_contexts(text: str, nlp: Any) -> list[str]:
         if idx < 0:
             continue
         tail = _norm(text_norm[idx + len(marker) :].lstrip(" :-,"))
-        for part in re.split(r"[:;•]|(?<=\.)\s+", tail):
-            candidate = _clean_candidate_text(part)
-            if _looks_like_context_material(candidate, nlp):
+        for candidate in _segment_candidates(tail):
+            if _looks_like_context_material(candidate, nlp) and _starts_like_example_clause(candidate, nlp):
                 contexts.append(candidate)
     return list(dict.fromkeys(contexts))
 
 
-def _looks_explanatory(sentence: str, topic_key: str, nlp: Any) -> bool:
+def _looks_explanatory(sentence: str, topic_key: str, nlp: Any, *, source_style: str) -> bool:
     lowered = str(sentence or "").lower()
     if not _looks_like_usable_text(sentence, require_sentence=True):
         return False
@@ -264,9 +301,11 @@ def _looks_explanatory(sentence: str, topic_key: str, nlp: Any) -> bool:
         return False
     if not _has_predicate(sentence, nlp):
         return False
-    topic_terms = [token for token in re.split(r"[_\s]+", str(topic_key or "").lower()) if token]
-    if any(term in lowered for term in topic_terms if len(term) > 3):
+    mentions_topic = _mentions_topic(sentence, topic_key)
+    if mentions_topic:
         return True
+    if source_style == "reference":
+        return False
     return any(hint in lowered for hint in PEDAGOGICAL_HINTS)
 
 
@@ -286,6 +325,7 @@ def build_note_context_rows(snippet_rows: list[dict[str, Any]], *, spacy_model: 
         stats["source_rows"] += 1
         snippet_text = str(snippet_row.get("snippet_text") or "")
         topic_key = _norm(snippet_row.get("topic_key")).lower()
+        source_style = _source_style(str(snippet_row.get("source_path") or ""))
         book_template_id_sentence = topic_to_template_id("Sentence", topic_key)
         book_template_id_phrase = topic_to_template_id("Phrase", topic_key)
         if not (book_template_id_sentence or book_template_id_phrase):
@@ -300,7 +340,9 @@ def build_note_context_rows(snippet_rows: list[dict[str, Any]], *, spacy_model: 
             continue
 
         explicit_contexts = _extract_explicit_contexts(snippet_text, nlp)
-        explanation_candidates = [sent for sent in sentences if _looks_explanatory(sent, topic_key, nlp)]
+        explanation_candidates = [
+            sent for sent in sentences if _looks_explanatory(sent, topic_key, nlp, source_style=source_style)
+        ]
         if not explanation_candidates:
             explanation_candidates = [
                 sent
@@ -312,7 +354,7 @@ def build_note_context_rows(snippet_rows: list[dict[str, Any]], *, spacy_model: 
             ctx for ctx in explicit_contexts if ctx not in explanation_candidates and _looks_like_context_material(ctx, nlp)
         ]
         pair_method = "explicit_context"
-        if not context_candidates:
+        if not context_candidates and source_style != "reference":
             context_candidates = [
                 sent
                 for sent in sentences
