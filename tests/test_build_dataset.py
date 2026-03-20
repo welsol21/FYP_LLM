@@ -133,10 +133,13 @@ class BuildDatasetTests(unittest.TestCase):
 
         rows = list(iter_examples(item))
         self.assertEqual(len(rows), 3)
-        for row in rows:
-            self.assertIn("prompt_template_version", row)
-            self.assertEqual(row["prompt_template_version"], "v1")
-            self.assertIn("template_version: v1", row["input"])
+        by_level = {row["level"]: row for row in rows}
+        self.assertEqual(by_level["Sentence"]["prompt_template_version"], "contract_template_v1")
+        self.assertEqual(by_level["Phrase"]["prompt_template_version"], "contract_template_v1")
+        self.assertEqual(by_level["Word"]["prompt_template_version"], "v2")
+        self.assertIn("write_linguistic_note_from_contract_template", by_level["Sentence"]["input"])
+        self.assertIn("write_linguistic_note_from_contract_template", by_level["Phrase"]["input"])
+        self.assertIn("template_version: v2", by_level["Word"]["input"])
         targets = {row["target"] for row in rows}
         self.assertIn("Model sentence note", targets)
         self.assertIn("Model phrase note", targets)
@@ -160,6 +163,8 @@ class BuildDatasetTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["target"], "Legacy note")
         self.assertEqual(rows[0]["level"], "Sentence")
+        self.assertEqual(rows[0]["prompt_template_version"], "contract_template_v1")
+        self.assertIn("write_linguistic_note_from_contract_template", rows[0]["input"])
 
     def test_iter_examples_excludes_telemetry_like_note_text(self):
         item = {

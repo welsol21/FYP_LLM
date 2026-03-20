@@ -334,21 +334,11 @@ def _phrase_candidates(sent) -> List[Tuple[int, int, str]]:
             if pair in COLLOCATION_VERB_OBJECT_LEMMA_PAIRS:
                 add_span(min(token.i, child.left_edge.i), max(token.i, child.right_edge.i) + 1, "collocation")
 
-    # 4) Verb phrases around verbal heads and local dependents
+    # 4) Noun phrases around nominal heads.
     for token in sent:
-        if token.pos_ not in {"VERB", "AUX"}:
+        if token.pos_ not in {"NOUN", "PROPN", "PRON"}:
             continue
-        token_ids = {token.i}
-        for child in token.children:
-            dep = child.dep_.lower()
-            if dep not in VP_DIRECT_CHILD_DEPS:
-                continue
-            if dep in VP_SUBTREE_CHILD_DEPS:
-                token_ids.update(tok.i for tok in child.subtree if not tok.is_space and not tok.is_punct)
-            elif not child.is_space and not child.is_punct:
-                token_ids.add(child.i)
-        if len(token_ids) >= 2:
-            add_span(min(token_ids), max(token_ids) + 1, "verb phrase")
+        add_span(token.left_edge.i, token.right_edge.i + 1, "noun phrase")
 
     # 5) Prepositional phrases
     for token in sent:
@@ -440,6 +430,22 @@ def _is_sentence_content_duplicate_span(sent, start: int, end: int, doc) -> bool
         return False
     span_token_ids = [tok.i for tok in doc[start:end] if not tok.is_space and not tok.is_punct]
     return span_token_ids == sent_token_ids
+
+
+def _is_clause_like_sentence(sent) -> bool:
+    has_subject = False
+    has_finite_predicate = False
+    for token in sent:
+        if token.is_space or token.is_punct:
+            continue
+        dep = token.dep_.lower()
+        if dep in {"nsubj", "nsubjpass", "csubj", "csubjpass", "expl"}:
+            has_subject = True
+        if token.pos_ in {"VERB", "AUX"} and "Fin" in token.morph.get("VerbForm"):
+            has_finite_predicate = True
+        if dep == "root" and token.pos_ in {"VERB", "AUX"} and "Fin" in token.morph.get("VerbForm"):
+            return True
+    return has_subject and has_finite_predicate
 
 
 def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
@@ -606,6 +612,22 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
             if _is_simple_determiner_np(span, phrase_pos):
                 continue
             phrase_spans.append((start, end, phrase_pos))
+
+        if _is_clause_like_sentence(sent):
+            covered_token_ids: set[int] = set()
+            for start, end, _ in phrase_spans:
+                covered_token_ids.update(
+                    token.i
+                    for token in doc[start:end]
+                    if not token.is_space and not token.is_punct
+                )
+            sentence_token_ids = {
+                token.i
+                for token in sent
+                if not token.is_space and not token.is_punct
+            }
+            if not phrase_spans or covered_token_ids != sentence_token_ids:
+                phrase_spans.append((sent.start, sent.end, "clause chunk"))
 
         parent_by_idx = _phrase_parent_map(phrase_spans)
         children_by_idx: Dict[int, List[int]] = {}

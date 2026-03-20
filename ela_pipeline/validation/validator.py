@@ -321,6 +321,43 @@ def _validate_optional_trace_fields(node: Dict[str, Any], path: str, errors: Lis
                 f"{field} items must be string",
             )
 
+    for field in (
+        "note_template_version",
+        "note_template_id",
+        "note_template_text",
+        "note_render_source",
+        "note_render_model",
+        "note_render_status",
+    ):
+        if field not in node:
+            continue
+        value = node.get(field)
+        _expect(isinstance(value, str), errors, f"{path}.{field}", f"{field} must be string")
+        if isinstance(value, str):
+            _expect(value.strip() != "", errors, f"{path}.{field}", f"{field} must be non-empty")
+
+    if "note_template_input" in node:
+        payload = node.get("note_template_input")
+        _expect(
+            isinstance(payload, dict),
+            errors,
+            f"{path}.note_template_input",
+            "note_template_input must be object",
+        )
+
+    if "note_template_slots" in node:
+        slots = node.get("note_template_slots")
+        _expect(isinstance(slots, dict), errors, f"{path}.note_template_slots", "note_template_slots must be object")
+        if isinstance(slots, dict):
+            for key, value in slots.items():
+                _expect(isinstance(key, str) and key.strip() != "", errors, f"{path}.note_template_slots", "slot keys must be non-empty strings")
+                _expect(
+                    value is None or isinstance(value, str),
+                    errors,
+                    f"{path}.note_template_slots.{key}",
+                    "slot values must be string or null",
+                )
+
 
 def _is_tam_relevant_node(node: Dict[str, Any]) -> bool:
     node_type = str(node.get("type") or "").strip().lower()

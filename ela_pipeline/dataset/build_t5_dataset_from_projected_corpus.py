@@ -1,8 +1,9 @@
 """Build T5 train/dev/test datasets from projected book->corpus JSONL.
 
 The exporter selects one note candidate per eligible Sentence/Phrase node,
-renders the current flat note-context prompt, deduplicates exact pairs, caps
-over-repeated targets, and splits data by source document to reduce leakage.
+serializes the same contract-template payload used by runtime controlled notes,
+deduplicates exact pairs, caps over-repeated targets, and splits data by source
+document to reduce leakage.
 """
 
 from __future__ import annotations
@@ -15,9 +16,12 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
-from ela_pipeline.annotate.note_context import build_note_context_prompt
+from ela_pipeline.annotate.contract_template_builder import (
+    CONTRACT_PROMPT_TEMPLATE_VERSION,
+    build_contract_template_payload,
+    build_contract_template_training_prompt,
+)
 from ela_pipeline.dataset.build_dataset import (
-    PROMPT_TEMPLATE_VERSION,
     _count_by,
     _count_level_tam,
     _sanitize_training_target_text,
@@ -324,27 +328,28 @@ def _choose_candidate(
 
 def _make_sentence_row(row: Dict[str, Any], candidate: Dict[str, Any]) -> Dict[str, Any]:
     sentence_stub = _build_sentence_stub(row)
-    prompt = build_note_context_prompt(
+    payload = build_contract_template_payload(
         node=sentence_stub,
-        parent=None,
         sentence_node=sentence_stub,
+        parent=None,
         path_types=["Sentence"],
         depth=0,
         sibling_index=0,
         sibling_count=1,
-        template_version=PROMPT_TEMPLATE_VERSION,
     )
+    prompt = build_contract_template_training_prompt(payload or {}, node_level="Sentence")
     source_document = row.get("source_document") or {}
     return {
         "input": prompt,
         "target": _candidate_target_text(candidate),
         "level": "Sentence",
         "tam_bucket": "none",
-        "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+        "prompt_template_version": CONTRACT_PROMPT_TEMPLATE_VERSION,
         "source_document_id": source_document.get("id"),
         "source_name": source_document.get("source_name"),
         "sentence_text": row.get("sentence_text"),
         "target_content": row.get("sentence_text"),
+        "template_id": (payload or {}).get("template_id"),
         "note_source_book": candidate.get("source_book"),
         "note_topic": candidate.get("topic"),
         "note_origin_unit": candidate.get("origin_unit"),
@@ -364,7 +369,7 @@ def _make_phrase_row(row: Dict[str, Any], phrase_entry: Dict[str, Any], candidat
         row,
         phrase_entry,
     )
-    prompt = build_note_context_prompt(
+    payload = build_contract_template_payload(
         node=phrase_stub,
         parent=parent_stub,
         sentence_node=sentence_stub,
@@ -372,19 +377,20 @@ def _make_phrase_row(row: Dict[str, Any], phrase_entry: Dict[str, Any], candidat
         depth=depth,
         sibling_index=sibling_index,
         sibling_count=sibling_count,
-        template_version=PROMPT_TEMPLATE_VERSION,
     )
+    prompt = build_contract_template_training_prompt(payload or {}, node_level="Phrase")
     source_document = row.get("source_document") or {}
     return {
         "input": prompt,
         "target": _candidate_target_text(candidate),
         "level": "Phrase",
         "tam_bucket": "none",
-        "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+        "prompt_template_version": CONTRACT_PROMPT_TEMPLATE_VERSION,
         "source_document_id": source_document.get("id"),
         "source_name": source_document.get("source_name"),
         "sentence_text": row.get("sentence_text"),
         "target_content": phrase_entry.get("content"),
+        "template_id": (payload or {}).get("template_id"),
         "note_source_book": candidate.get("source_book"),
         "note_topic": candidate.get("topic"),
         "note_origin_unit": candidate.get("origin_unit"),
@@ -580,7 +586,7 @@ def main() -> None:
         "task": "linguistic_note",
         "builder": "build_t5_dataset_from_projected_corpus.py",
         "mode": args.mode,
-        "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+        "prompt_template_version": CONTRACT_PROMPT_TEMPLATE_VERSION,
         "input_path": str(projected_path.resolve()),
         "total_before_dedup": len(rows_before_dedup),
         "total_after_dedup": len(rows_after_dedup),

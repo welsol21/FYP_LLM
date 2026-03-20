@@ -58,7 +58,8 @@ def _validate_processed_freshness(train_path: str, dev_path: str) -> Dict:
         raise ValueError(f"Missing processed stats file: {stats_path}")
     with open(stats_path, "r", encoding="utf-8") as f:
         stats = json.load(f)
-    if str(stats.get("prompt_template_version") or "").strip() not in {"v1", "v2"}:
+    prompt_template_version = str(stats.get("prompt_template_version") or "").strip()
+    if prompt_template_version not in {"v1", "v2", "contract_template_v1"} and not prompt_template_version.startswith("mixed::"):
         raise ValueError("Incompatible processed stats: unexpected prompt_template_version")
     if int(stats.get("total_after_balance", 0)) <= 0:
         raise ValueError("Processed stats indicate zero training rows")

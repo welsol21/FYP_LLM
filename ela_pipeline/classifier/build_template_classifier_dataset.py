@@ -14,9 +14,13 @@ if __package__ in {None, ""}:
 
     sys.path.append(str(Path(__file__).resolve().parents[2]))
 
-from ela_pipeline.annotate.note_context import build_note_context_prompt
+from ela_pipeline.annotate.contract_template_builder import (
+    CONTRACT_CLASSIFIER_PROMPT_TEMPLATE_VERSION,
+    build_contract_template_classifier_prompt,
+    build_contract_template_payload,
+)
 from ela_pipeline.annotate.template_registry import render_template_note
-from ela_pipeline.dataset.build_dataset import PROMPT_TEMPLATE_VERSION, write_jsonl
+from ela_pipeline.dataset.build_dataset import write_jsonl
 from ela_pipeline.dataset.build_t5_dataset_from_projected_corpus import (
     BOOK_PRIORITY,
     BOOK_WHITELIST,
@@ -99,19 +103,20 @@ def _mapped_phrase_candidate(
 
 def _make_sentence_row(row: Dict[str, Any], candidate: Dict[str, Any], template_id: str) -> Dict[str, Any]:
     sentence_stub = _build_sentence_stub(row)
-    prompt = build_note_context_prompt(
+    payload = build_contract_template_payload(
         node=sentence_stub,
-        parent=None,
         sentence_node=sentence_stub,
+        parent=None,
         path_types=["Sentence"],
         depth=0,
         sibling_index=0,
         sibling_count=1,
-        template_version=PROMPT_TEMPLATE_VERSION,
     )
+    prompt = build_contract_template_classifier_prompt(payload or {}, node_level="Sentence")
     source_document = row.get("source_document") or {}
     return {
         "input": prompt,
+        "prompt_template_version": CONTRACT_CLASSIFIER_PROMPT_TEMPLATE_VERSION,
         "template_id": template_id,
         "level": "Sentence",
         "sentence_text": row.get("sentence_text"),
@@ -134,7 +139,7 @@ def _make_phrase_row(row: Dict[str, Any], phrase_entry: Dict[str, Any], candidat
         row,
         phrase_entry,
     )
-    prompt = build_note_context_prompt(
+    payload = build_contract_template_payload(
         node=phrase_stub,
         parent=parent_stub,
         sentence_node=sentence_stub,
@@ -142,11 +147,12 @@ def _make_phrase_row(row: Dict[str, Any], phrase_entry: Dict[str, Any], candidat
         depth=depth,
         sibling_index=sibling_index,
         sibling_count=sibling_count,
-        template_version=PROMPT_TEMPLATE_VERSION,
     )
+    prompt = build_contract_template_classifier_prompt(payload or {}, node_level="Phrase")
     source_document = row.get("source_document") or {}
     return {
         "input": prompt,
+        "prompt_template_version": CONTRACT_CLASSIFIER_PROMPT_TEMPLATE_VERSION,
         "template_id": template_id,
         "level": "Phrase",
         "sentence_text": row.get("sentence_text"),
@@ -318,7 +324,7 @@ def build_template_classifier_dataset(
         "task": "template_id_classification",
         "builder": "build_template_classifier_dataset.py",
         "input_path": str(projected_path.resolve()),
-        "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+        "prompt_template_version": CONTRACT_CLASSIFIER_PROMPT_TEMPLATE_VERSION,
         "include_sentence": include_sentence,
         "include_phrase": include_phrase,
         "total_before_dedup": len(rows),

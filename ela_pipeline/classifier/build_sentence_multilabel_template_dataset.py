@@ -14,8 +14,12 @@ if __package__ in {None, ""}:
 
     sys.path.append(str(Path(__file__).resolve().parents[2]))
 
-from ela_pipeline.annotate.note_context import build_note_context_prompt
-from ela_pipeline.dataset.build_dataset import PROMPT_TEMPLATE_VERSION, write_jsonl
+from ela_pipeline.annotate.contract_template_builder import (
+    CONTRACT_CLASSIFIER_PROMPT_TEMPLATE_VERSION,
+    build_contract_template_classifier_prompt,
+    build_contract_template_payload,
+)
+from ela_pipeline.dataset.build_dataset import write_jsonl
 from ela_pipeline.dataset.build_t5_dataset_from_projected_corpus import (
     BOOK_WHITELIST,
     _build_sentence_stub,
@@ -68,15 +72,19 @@ def _phrase_templates(item: Dict[str, Any]) -> List[str]:
 
 def _make_row(item: Dict[str, Any]) -> Dict[str, Any] | None:
     sentence_stub = _build_sentence_stub(item)
-    prompt = build_note_context_prompt(
+    payload = build_contract_template_payload(
         node=sentence_stub,
-        parent=None,
         sentence_node=sentence_stub,
+        parent=None,
         path_types=["Sentence"],
         depth=0,
         sibling_index=0,
         sibling_count=1,
-        template_version=PROMPT_TEMPLATE_VERSION,
+    )
+    prompt = build_contract_template_classifier_prompt(
+        payload or {},
+        node_level="Sentence",
+        task_name="predict_multilabel_template_ids_from_contract_context",
     )
     sentence_templates = _sentence_templates(item)
     phrase_templates = _phrase_templates(item)
@@ -86,6 +94,7 @@ def _make_row(item: Dict[str, Any]) -> Dict[str, Any] | None:
     source_document = item.get("source_document") or {}
     return {
         "input": prompt,
+        "prompt_template_version": CONTRACT_CLASSIFIER_PROMPT_TEMPLATE_VERSION,
         "level": "Sentence",
         "sentence_text": item.get("sentence_text"),
         "template_ids": template_ids,
@@ -245,7 +254,7 @@ def build_sentence_multilabel_template_dataset(
         "task": "sentence_multilabel_template_classification",
         "builder": "build_sentence_multilabel_template_dataset.py",
         "input_path": str(projected_path.resolve()),
-        "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+        "prompt_template_version": CONTRACT_CLASSIFIER_PROMPT_TEMPLATE_VERSION,
         "total_before_dedup": len(rows),
         "total_after_dedup": len(deduped),
         "total_after_filter": len(filtered),

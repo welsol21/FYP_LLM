@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 
 import torch
@@ -46,6 +47,8 @@ class ControlledT5NoteRenderer:
     def _build_prompt(
         self,
         *,
+        template_payload: dict | None,
+        deterministic_note: str,
         blueprint_text: str,
         level: str,
         node: dict,
@@ -56,6 +59,24 @@ class ControlledT5NoteRenderer:
         sibling_index: int,
         sibling_count: int,
     ) -> str:
+        if isinstance(template_payload, dict):
+            template_brief = {
+                "note_template_version": template_payload.get("note_template_version"),
+                "template_id": template_payload.get("template_id"),
+                "template_text": template_payload.get("template_text"),
+                "allowed_slots": template_payload.get("allowed_slots"),
+                "slot_values": template_payload.get("slot_values"),
+                "selection": template_payload.get("selection"),
+                "deterministic_note": deterministic_note,
+                "context": template_payload.get("note_template_input"),
+            }
+            return (
+                "Rewrite this contract-safe linguistic note into one short educational note in natural English. "
+                "Keep all structural facts from the template and slot values. "
+                "Do not invent placeholders, new structure, JSON, labels, or extra fields. "
+                f"Audience level: {level}. "
+                f"Payload: {json.dumps(template_brief, ensure_ascii=False, sort_keys=True)}"
+            )
         context = build_note_context_prompt(
             node=node,
             parent=parent,
@@ -78,7 +99,7 @@ class ControlledT5NoteRenderer:
     def render_note(
         self,
         *,
-        blueprint_text: str,
+        blueprint_text: str = "",
         level: str,
         node: dict,
         parent: dict | None,
@@ -87,8 +108,12 @@ class ControlledT5NoteRenderer:
         depth: int,
         sibling_index: int,
         sibling_count: int,
+        template_payload: dict | None = None,
+        deterministic_note: str = "",
     ) -> str:
         prompt = self._build_prompt(
+            template_payload=template_payload,
+            deterministic_note=deterministic_note,
             blueprint_text=blueprint_text,
             level=level,
             node=node,
@@ -115,5 +140,7 @@ class ControlledT5NoteRenderer:
             )
         note = sanitize_note(self.tokenizer.decode(out[0], skip_special_tokens=True))
         if not note:
+            if deterministic_note:
+                return str(deterministic_note or "").strip()
             return str(blueprint_text or "").strip()
         return note
