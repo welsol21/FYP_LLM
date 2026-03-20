@@ -106,10 +106,6 @@ artifacts/
 
 temp/
 
-# Frontend
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-frontend/coverage/
-frontend/*.tsbuildinfo
+# Frontend (lives only in tauri_app and android_pwa_release_v2 branches)
+frontend/
 tmp_media_check/
