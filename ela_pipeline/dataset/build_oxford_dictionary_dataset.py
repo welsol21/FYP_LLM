@@ -72,6 +72,25 @@ _COMMON_PREPOSITIONS = {
     "under",
     "with",
 }
+_PREP_OBJECT_RE = re.compile(
+    r"\b(?:about|above|across|after|against|along|around|at|before|behind|below|beside|between|by|for|from|"
+    r"in|inside|into|near|of|off|on|out|over|through|under|with)\b\s+"
+    r"(?:the|a|an|this|that|these|those|my|your|his|her|its|our|their|me|him|her|us|them|[A-Za-z][A-Za-z'-]*)\b",
+    re.IGNORECASE,
+)
+_TO_OBJECT_RE = re.compile(
+    r"\bto\b\s+(?:the|a|an|this|that|these|those|my|your|his|her|its|our|their|me|him|her|us|them|[A-Z][a-z]+)\b"
+)
+_SENTENCE_LIKE_TOPICS = {
+    "conditional_sentences",
+    "modal",
+    "passive_voice",
+    "perfect",
+    "progressive",
+    "question_tags",
+    "that_clause",
+    "wh_clause",
+}
 
 
 def _norm(value: Any) -> str:
@@ -133,6 +152,8 @@ def _pair_quality_ok(topic_key: str, context_text: str) -> bool:
     first = words[0].lower() if words else ""
     if "*" in context_text:
         return False
+    if topic_key in _SENTENCE_LIKE_TOPICS and context_text[:1].islower():
+        return False
     if lowered.startswith(("see ", "compare ", "also called ", "inserted, e.g.", "is different:", "that, provided")):
         return False
     if topic_key == "conditional_sentences":
@@ -140,9 +161,9 @@ def _pair_quality_ok(topic_key: str, context_text: str) -> bool:
     if topic_key == "that_clause":
         return lowered.startswith("that ") or "(that)" in lowered or " ø " in f" {lowered} "
     if topic_key == "prepositions":
-        return bool("?" in context_text or "!" in context_text or first in _COMMON_PREPOSITIONS)
+        return bool("?" in context_text or "!" in context_text or _PREP_OBJECT_RE.search(context_text) or _TO_OBJECT_RE.search(context_text))
     if topic_key == "prepositional_phrases":
-        return bool(first in _COMMON_PREPOSITIONS or lowered.startswith("the "))
+        return bool(_PREP_OBJECT_RE.search(context_text) or _TO_OBJECT_RE.search(context_text))
     return True
 
 
