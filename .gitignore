@@ -24,7 +24,7 @@ env/
 # -------------------------
 .vscode/
 .history/
-
+.claude/
 # -------------------------
 # HuggingFace / Transformers
 # -------------------------
