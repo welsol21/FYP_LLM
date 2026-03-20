@@ -23,6 +23,7 @@ from ela_pipeline.annotate.contract_template_builder import (
     normalize_template_text,
     template_uses_allowed_slots,
 )
+from ela_pipeline.dataset.template_topic_mapping import topic_to_template_id
 from ela_pipeline.dataset.build_dataset import (
     _count_by,
     _count_level_tam,
@@ -98,8 +99,39 @@ def _candidate_target_text(candidate: Dict[str, Any]) -> str:
 def _candidate_target_template(candidate: Dict[str, Any], payload: Dict[str, Any] | None) -> tuple[str, str]:
     canonical_template = normalize_template_text((payload or {}).get("template_text"))
     allowed_slots = list((payload or {}).get("allowed_slots") or [])
+    payload_template_id = str((payload or {}).get("template_id") or "").strip()
+    payload_level = ""
+    if payload_template_id.startswith("SENT"):
+        payload_level = "Sentence"
+    elif payload_template_id.startswith("PHRASE"):
+        payload_level = "Phrase"
     slot_template = normalize_template_text(candidate.get("slot_template_text"))
-    if slot_template and bool(candidate.get("slot_templated")) and template_uses_allowed_slots(slot_template, allowed_slots):
+    candidate_topic = str(candidate.get("topic") or "")
+    mapped_template_id = topic_to_template_id(payload_level, candidate_topic)
+    compatible = True
+    if mapped_template_id and payload_template_id:
+        compatible = mapped_template_id == payload_template_id
+        if not compatible and mapped_template_id == "SENT_NEGATION_GENERAL" and payload_template_id.startswith("SENT_NEGATION_"):
+            compatible = True
+        if not compatible and mapped_template_id == "SENT_CONDITIONAL_GENERAL" and payload_template_id.startswith("SENT_CONDITIONAL_"):
+            compatible = True
+        if not compatible and mapped_template_id == "SENT_PASSIVE_GENERAL" and payload_template_id.startswith("SENT_PASSIVE_"):
+            compatible = True
+        if not compatible and mapped_template_id == "SENT_QUESTION_WH" and payload_template_id in {"SENT_QUESTION_WH", "SENT_QUESTION_WH_DO_SUPPORT"}:
+            compatible = True
+        if not compatible and mapped_template_id == "PHRASE_PP_GENERAL" and payload_template_id.startswith("PHRASE_PP_"):
+            compatible = True
+        if not compatible and mapped_template_id == "PHRASE_RELATIVE_CLAUSE" and payload_template_id.startswith("PHRASE_RELATIVE_CLAUSE"):
+            compatible = True
+        if not compatible and mapped_template_id == "PHRASE_VP_GENERAL" and payload_template_id.startswith("PHRASE_VP_"):
+            compatible = True
+
+    if (
+        slot_template
+        and bool(candidate.get("slot_templated"))
+        and compatible
+        and template_uses_allowed_slots(slot_template, allowed_slots)
+    ):
         return slot_template, "slot_template"
     if canonical_template:
         return canonical_template, "contract_template"

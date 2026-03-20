@@ -288,6 +288,10 @@ def _allowed_slots(template_text: str) -> list[str]:
     return seen
 
 
+def allowed_slots_for_template_text(template_text: str) -> list[str]:
+    return _allowed_slots(template_text)
+
+
 def normalize_template_text(template_text: str) -> str:
     return sanitize_note(str(template_text or ""))
 
@@ -389,6 +393,14 @@ def _template_text_for(node: dict[str, Any], template_id: str) -> str:
     if not variants:
         return ""
     return str(variants[0]).replace("{content}", "{{CONTENT}}")
+
+
+def canonical_template_text_for_template_id(
+    template_id: str,
+    *,
+    node: dict[str, Any] | None = None,
+) -> str:
+    return _template_text_for(node or {}, _norm(template_id))
 
 
 def _slot_values(
