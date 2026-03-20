@@ -39,6 +39,7 @@ let toastSeq = 0
 export function ConfigPage() {
   const api = useApi()
   const [uiState, setUiState] = useState<RuntimeUiState | null>(null)
+  const [uiStateStatus, setUiStateStatus] = useState<'loading' | 'ok' | 'unavailable'>('loading')
   const [translationConfig, setTranslationConfig] = useState<TranslationConfig | null>(null)
   const [providerErrors, setProviderErrors] = useState<Record<string, string>>({})
   const [newProviderId, setNewProviderId] = useState('')
@@ -66,35 +67,16 @@ export function ConfigPage() {
   useEffect(() => {
     let cancelled = false
     api.getUiState()
-      .then((value) => {
-        if (!cancelled) setUiState(value)
-      })
-      .catch(() => {
-        if (!cancelled) setUiState(null)
-      })
+      .then((value) => { if (!cancelled) { setUiState(value); setUiStateStatus('ok') } })
+      .catch(() => { if (!cancelled) setUiStateStatus('unavailable') })
     api.getTranslationConfig()
-      .then((value) => {
-        if (!cancelled) setTranslationConfig(value)
-      })
-      .catch(() => {
-        if (!cancelled) setTranslationConfig(null)
-      })
-    return () => {
-      cancelled = true
-    }
+      .then((value) => { if (!cancelled) setTranslationConfig(value) })
+      .catch(() => { if (!cancelled) setTranslationConfig(null) })
+    return () => { cancelled = true }
   }, [api])
 
-  useEffect(() => {
-    return subscribePwaDiagnostics(() => {
-      setPwaDiagnostics(getPwaDiagnostics())
-    })
-  }, [])
-
-  useEffect(() => {
-    return subscribeRuntimeDiagnostics(() => {
-      setRuntimeDiagnostics(getRuntimeDiagnostics())
-    })
-  }, [])
+  useEffect(() => subscribePwaDiagnostics(() => setPwaDiagnostics(getPwaDiagnostics())), [])
+  useEffect(() => subscribeRuntimeDiagnostics(() => setRuntimeDiagnostics(getRuntimeDiagnostics())), [])
 
   const providerIds = useMemo(
     () => new Set((translationConfig?.providers || []).map((p) => p.id.toLowerCase())),
@@ -168,14 +150,7 @@ export function ConfigPage() {
       ...translationConfig,
       providers: [
         ...translationConfig.providers,
-        {
-          id,
-          label: label || id,
-          kind: 'custom',
-          enabled: true,
-          credential_fields: fields,
-          credentials,
-        },
+        { id, label: label || id, kind: 'custom', enabled: true, credential_fields: fields, credentials },
       ],
     })
     setNewProviderId('')
@@ -192,161 +167,167 @@ export function ConfigPage() {
 
   return (
     <section>
-      <RuntimeStatusCard uiState={uiState} />
-      <section className="card">
-        <h2>Translation Providers</h2>
-        {translationConfig ? (
-          <>
-            <label className="analyze-label">Default Provider</label>
-            <div className="touch-options-grid">
-              {translationConfig.providers
-                .filter((p) => p.enabled)
-                .map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className={`touch-option-btn${translationConfig.default_provider === p.id ? ' active' : ''}`}
-                    onClick={() => persistConfig({ ...translationConfig, default_provider: p.id })}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-            </div>
+      <RuntimeStatusCard uiState={uiState} status={uiStateStatus} />
 
-            <div className="card compact-card">
-              <h3>Add Custom Provider</h3>
-              <input className="flat-input" placeholder="Provider ID (e.g. myapi)" value={newProviderId} onChange={(e) => setNewProviderId(e.target.value)} />
-              <input className="flat-input" placeholder="Label" value={newProviderLabel} onChange={(e) => setNewProviderLabel(e.target.value)} />
-              <input
-                className="flat-input"
-                placeholder="Credential fields (comma-separated)"
-                value={newCredentialFields}
-                onChange={(e) => setNewCredentialFields(e.target.value)}
-              />
-              <button type="button" onClick={addCustomProvider} disabled={!newProviderId.trim() || providerIds.has(newProviderId.trim().toLowerCase())}>
-                Add Provider
-              </button>
-            </div>
-
-            {translationConfig.providers.map((p) => (
-              <div key={p.id} className="card compact-card">
-                <div className="top-tabs" style={{ marginBottom: 8 }}>
-                  <strong>{p.label}</strong>
-                  <span className="badge">{p.id}</span>
+      {/* ── Translation Providers ── */}
+      <details className="config-group" open>
+        <summary>Translation Providers</summary>
+        <div className="config-group-body">
+          {translationConfig ? (
+            <>
+              {/* Default provider */}
+              <div>
+                <label className="analyze-label">Default Provider</label>
+                <div className="touch-options-grid">
+                  {translationConfig.providers
+                    .filter((p) => p.enabled)
+                    .map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className={`touch-option-btn${translationConfig.default_provider === p.id ? ' active' : ''}`}
+                        onClick={() => persistConfig({ ...translationConfig, default_provider: p.id })}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
                 </div>
-                <label className="touch-checkbox">
-                  <input type="checkbox" checked={p.enabled} onChange={(e) => patchProvider(p.id, { enabled: e.target.checked })} />
-                  Enabled
-                </label>
-                {providerErrors[p.id] ? <p className="config-error">{providerErrors[p.id]}</p> : null}
-                {p.credential_fields.map((field) => (
-                  <div key={`${p.id}-${field}`}>
-                    <label className="analyze-label">{field}</label>
-                    <input
-                      className="flat-input"
-                      value={p.credentials[field] || ''}
-                      onChange={(e) => patchProviderCred(p.id, field, e.target.value)}
-                      placeholder={`${p.label} ${field}`}
-                    />
+              </div>
+
+              {/* Individual providers */}
+              {translationConfig.providers.map((p) => (
+                <details key={p.id} className="config-subgroup" open={p.enabled}>
+                  <summary>
+                    {p.label}
+                    <span className="badge">{p.id}</span>
+                    {p.enabled && <span className="badge" style={{ background: '#1a3a2a', color: '#5fca8a', borderColor: '#2a5a3a' }}>on</span>}
+                  </summary>
+                  <div className="config-subgroup-body">
+                    <label className="touch-checkbox">
+                      <input type="checkbox" checked={p.enabled} onChange={(e) => patchProvider(p.id, { enabled: e.target.checked })} />
+                      Enabled
+                    </label>
+                    {providerErrors[p.id] ? <p className="config-error">{providerErrors[p.id]}</p> : null}
+                    {p.credential_fields.map((field) => (
+                      <div key={`${p.id}-${field}`}>
+                        <label className="analyze-label">{field}</label>
+                        <input
+                          className="flat-input"
+                          value={p.credentials[field] || ''}
+                          onChange={(e) => patchProviderCred(p.id, field, e.target.value)}
+                          placeholder={`${p.label} ${field}`}
+                        />
+                      </div>
+                    ))}
+                    {p.kind === 'custom' && (
+                      <button type="button" onClick={() => removeCustomProvider(p.id)}>
+                        Remove Provider
+                      </button>
+                    )}
                   </div>
-                ))}
-                {p.kind === 'custom' ? (
-                  <button type="button" onClick={() => removeCustomProvider(p.id)}>
-                    Remove Provider
+                </details>
+              ))}
+
+              {/* Add custom provider */}
+              <details className="config-subgroup">
+                <summary>Add Custom Provider</summary>
+                <div className="config-subgroup-body">
+                  <input className="flat-input" placeholder="Provider ID (e.g. myapi)" value={newProviderId} onChange={(e) => setNewProviderId(e.target.value)} />
+                  <input className="flat-input" placeholder="Label" value={newProviderLabel} onChange={(e) => setNewProviderLabel(e.target.value)} />
+                  <input
+                    className="flat-input"
+                    placeholder="Credential fields (comma-separated)"
+                    value={newCredentialFields}
+                    onChange={(e) => setNewCredentialFields(e.target.value)}
+                  />
+                  <button type="button" onClick={addCustomProvider} disabled={!newProviderId.trim() || providerIds.has(newProviderId.trim().toLowerCase())}>
+                    Add Provider
                   </button>
-                ) : null}
-              </div>
-            ))}
-          </>
-        ) : (
-          <p>Loading translation config...</p>
-        )}
-      </section>
-      <section className="card">
-        <div className="top-tabs" style={{ marginBottom: 8 }}>
-          <h2 style={{ margin: 0 }}>Diagnostics</h2>
+                </div>
+              </details>
+            </>
+          ) : (
+            <p>Loading translation config...</p>
+          )}
         </div>
-        {toasts.length > 0 && (
-          <div className="log-toasts">
-            {toasts.map((t) => (
-              <div key={t.id} className={`log-toast ${t.ok ? 'log-toast-ok' : 'log-toast-err'}`}>
-                {t.message}
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="touch-options-grid">
-          <button
-            type="button"
-            className={`touch-option-btn${activeBtn === 'export-runtime' ? ' active' : ''}`}
-            onClick={() =>
-              pressBtn('export-runtime', () => {
-                const text = runtimeLogText || 'No runtime diagnostics.'
-                downloadTextFile('runtime_diagnostics.log', text)
+      </details>
+
+      {/* ── Diagnostics ── */}
+      <details className="config-group">
+        <summary>Diagnostics</summary>
+        <div className="config-group-body">
+          {toasts.length > 0 && (
+            <div className="log-toasts">
+              {toasts.map((t) => (
+                <div key={t.id} className={`log-toast ${t.ok ? 'log-toast-ok' : 'log-toast-err'}`}>
+                  {t.message}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="touch-options-grid">
+            <button
+              type="button"
+              className={`touch-option-btn${activeBtn === 'export-runtime' ? ' active' : ''}`}
+              onClick={() => pressBtn('export-runtime', () => {
+                downloadTextFile('runtime_diagnostics.log', runtimeLogText || 'No runtime diagnostics.')
                 showToast('Runtime logs saved → runtime_diagnostics.log', true)
-              })
-            }
-          >
-            Export Runtime Logs
-          </button>
-          <button
-            type="button"
-            className={`touch-option-btn${activeBtn === 'export-pwa' ? ' active' : ''}`}
-            onClick={() =>
-              pressBtn('export-pwa', () => {
-                const text = pwaLogText || 'No PWA diagnostics.'
-                downloadTextFile('pwa_diagnostics.log', text)
+              })}
+            >
+              Export Runtime Logs
+            </button>
+            <button
+              type="button"
+              className={`touch-option-btn${activeBtn === 'export-pwa' ? ' active' : ''}`}
+              onClick={() => pressBtn('export-pwa', () => {
+                downloadTextFile('pwa_diagnostics.log', pwaLogText || 'No PWA diagnostics.')
                 showToast('PWA logs saved → pwa_diagnostics.log', true)
-              })
-            }
-          >
-            Export PWA Logs
-          </button>
-          <button
-            type="button"
-            className={`touch-option-btn${activeBtn === 'copy-runtime' ? ' active' : ''}`}
-            onClick={() =>
-              pressBtn('copy-runtime', async () => {
+              })}
+            >
+              Export PWA Logs
+            </button>
+            <button
+              type="button"
+              className={`touch-option-btn${activeBtn === 'copy-runtime' ? ' active' : ''}`}
+              onClick={() => pressBtn('copy-runtime', async () => {
                 try {
                   await copyText(runtimeLogText || 'No runtime diagnostics.')
                   showToast('Runtime logs copied to clipboard', true)
                 } catch {
                   showToast('Failed to copy to clipboard', false)
                 }
-              })
-            }
-          >
-            Copy Runtime Logs
-          </button>
-          <button
-            type="button"
-            className={`touch-option-btn${activeBtn === 'clear-logs' ? ' active' : ''}`}
-            onClick={() =>
-              pressBtn('clear-logs', () => {
+              })}
+            >
+              Copy Runtime Logs
+            </button>
+            <button
+              type="button"
+              className={`touch-option-btn${activeBtn === 'clear-logs' ? ' active' : ''}`}
+              onClick={() => pressBtn('clear-logs', () => {
                 clearRuntimeDiagnostics()
                 clearPwaDiagnostics()
                 setRuntimeDiagnostics(getRuntimeDiagnostics())
                 setPwaDiagnostics(getPwaDiagnostics())
                 showToast('All logs cleared', true)
-              })
-            }
-          >
-            Clear Logs
-          </button>
+              })}
+            >
+              Clear Logs
+            </button>
+          </div>
+          <div className="config-log-preview">
+            <strong>Recent Runtime Logs</strong>
+            <pre className="log-preview">
+              {runtimeDiagnostics.length
+                ? runtimeDiagnostics
+                  .slice(-20)
+                  .reverse()
+                  .map((entry) => `${entry.at} [${entry.level}] ${entry.scope}.${entry.event}${entry.details ? ` :: ${entry.details}` : ''}`)
+                  .join('\n')
+                : 'No runtime diagnostics yet.'}
+            </pre>
+          </div>
         </div>
-        <div className="config-log-preview" style={{ marginTop: 16 }}>
-          <strong>Recent Runtime Logs</strong>
-          <pre className="log-preview">
-            {runtimeDiagnostics.length
-              ? runtimeDiagnostics
-                .slice(-20)
-                .reverse()
-                .map((entry) => `${entry.at} [${entry.level}] ${entry.scope}.${entry.event}${entry.details ? ` :: ${entry.details}` : ''}`)
-                .join('\n')
-              : 'No runtime diagnostics yet.'}
-          </pre>
-        </div>
-      </section>
+      </details>
     </section>
   )
 }

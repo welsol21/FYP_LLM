@@ -33,9 +33,20 @@ def _load_jsonl(path: str) -> list[dict[str, Any]]:
 
 def _load_metadata(model_path: str) -> dict[str, Any]:
     path = Path(model_path) / "multilabel_metadata.json"
-    if not path.is_file():
+    if path.is_file():
+        return json.loads(path.read_text(encoding="utf-8"))
+    config_path = Path(model_path) / "config.json"
+    if not config_path.is_file():
         raise FileNotFoundError(f"Missing metadata file: {path}")
-    return json.loads(path.read_text(encoding="utf-8"))
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    id2label = config.get("id2label") or {}
+    label_space = [str(id2label[str(i)]) for i in sorted(int(key) for key in id2label.keys())] if id2label else []
+    if not label_space:
+        raise FileNotFoundError(f"Missing metadata file: {path}")
+    return {
+        "label_space": label_space,
+        "recommended_threshold": 0.5,
+    }
 
 
 def _render_template_preview(template_id: str) -> str:

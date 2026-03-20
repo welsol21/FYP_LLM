@@ -150,6 +150,7 @@ def train_deberta_multilabel_classifier(
     *,
     train_path: str,
     dev_path: str,
+    test_path: str = "",
     output_dir: str,
     model_name: str = "microsoft/deberta-v3-base",
     epochs: int = 3,
@@ -188,11 +189,13 @@ def train_deberta_multilabel_classifier(
 
     train_rows = _load_jsonl(train_path)
     dev_rows = _load_jsonl(dev_path)
+    test_rows = _load_jsonl(test_path) if str(test_path or "").strip() else []
     if len(train_rows) == 0 or len(dev_rows) == 0:
         raise ValueError("train/dev datasets must be non-empty")
 
     train_norm = _normalize_rows(train_rows, label_field=label_field)
     dev_norm = _normalize_rows(dev_rows, label_field=label_field)
+    test_norm = _normalize_rows(test_rows, label_field=label_field) if test_rows else []
     label_space = _build_label_space(train_norm + dev_norm)
     if len(label_space) < 2:
         raise ValueError(f"Need at least 2 labels in dataset for {label_field}, got: {label_space}")
@@ -202,6 +205,7 @@ def train_deberta_multilabel_classifier(
 
     train_encoded = _encode_rows(train_norm, label_to_id=label_to_id)
     dev_encoded = _encode_rows(dev_norm, label_to_id=label_to_id)
+    test_encoded = _encode_rows(test_norm, label_to_id=label_to_id) if test_norm else []
     pos_weight = _compute_pos_weight(train_encoded, num_labels=len(label_space), strategy=loss_weighting)
 
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -211,6 +215,7 @@ def train_deberta_multilabel_classifier(
 
     train_ds = Dataset.from_list(train_encoded).map(tokenize, batched=True)
     dev_ds = Dataset.from_list(dev_encoded).map(tokenize, batched=True)
+    test_ds = Dataset.from_list(test_encoded).map(tokenize, batched=True) if test_encoded else None
 
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
@@ -232,9 +237,7 @@ def train_deberta_multilabel_classifier(
         "seed": seed,
         "save_strategy": "epoch",
         "logging_steps": 50,
-        "load_best_model_at_end": True,
-        "metric_for_best_model": "eval_micro_f1",
-        "greater_is_better": True,
+        "load_best_model_at_end": False,
         "report_to": "none",
     }
     ta_params = inspect.signature(TrainingArguments.__init__).parameters
@@ -296,6 +299,42 @@ def train_deberta_multilabel_classifier(
         np.asarray(dev_pred.predictions, dtype=np.float32),
         np.asarray(dev_pred.label_ids, dtype=np.int32),
     )
+    test_metrics: dict[str, float] | None = None
+    test_sample_predictions: list[dict[str, Any]] = []
+    if test_ds is not None and test_rows:
+        test_pred = trainer.predict(test_ds)
+        test_metrics = _multilabel_metrics(
+            np.asarray(test_pred.predictions, dtype=np.float32),
+            np.asarray(test_pred.label_ids, dtype=np.int32),
+            threshold=best_threshold,
+        )
+        probs = 1.0 / (1.0 + np.exp(-np.asarray(test_pred.predictions, dtype=np.float32)))
+        for idx, row in enumerate(test_rows[:20]):
+            row_probs = probs[idx]
+            pred_ids = [
+                label_space[i]
+                for i, value in enumerate(row_probs.tolist())
+                if value >= best_threshold
+            ]
+            if not pred_ids:
+                pred_ids = [label_space[int(np.argmax(row_probs))]]
+            top_scores = sorted(
+                [
+                    {"template_id": label_space[i], "score": float(row_probs[i])}
+                    for i in range(len(label_space))
+                ],
+                key=lambda item: item["score"],
+                reverse=True,
+            )[:8]
+            test_sample_predictions.append(
+                {
+                    "sentence_text": row.get("sentence_text"),
+                    "gold_template_ids": row.get(label_field) or [],
+                    "pred_template_ids": pred_ids,
+                    "top_scores": top_scores,
+                }
+            )
+
     trainer.save_model(output_dir)
     tokenizer.save_pretrained(output_dir)
 
@@ -306,6 +345,9 @@ def train_deberta_multilabel_classifier(
         "label_to_id": label_to_id,
         "recommended_threshold": best_threshold,
         "dev_threshold_metrics": best_threshold_metrics,
+        "test_path": test_path,
+        "test_metrics": test_metrics,
+        "test_sample_predictions": test_sample_predictions,
     }
     (Path(output_dir) / "multilabel_metadata.json").write_text(
         json.dumps(metadata, ensure_ascii=False, indent=2),
@@ -321,9 +363,11 @@ def train_deberta_multilabel_classifier(
         "loss_weighting": loss_weighting,
         "train_samples": len(train_encoded),
         "dev_samples": len(dev_encoded),
+        "test_samples": len(test_encoded),
         "metrics": metrics,
         "recommended_threshold": best_threshold,
         "dev_threshold_metrics": best_threshold_metrics,
+        "test_metrics": test_metrics,
     }
     summary_path = Path(output_dir) / "train_summary.json"
     summary_path.parent.mkdir(parents=True, exist_ok=True)
@@ -335,6 +379,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Train DeBERTa multi-label classifier (GPU-only).")
     parser.add_argument("--train-path", required=True)
     parser.add_argument("--dev-path", required=True)
+    parser.add_argument("--test-path", default="")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--model-name", default="microsoft/deberta-v3-base")
     parser.add_argument("--epochs", type=int, default=3)
@@ -353,6 +398,7 @@ def main() -> None:
     summary = train_deberta_multilabel_classifier(
         train_path=args.train_path,
         dev_path=args.dev_path,
+        test_path=args.test_path,
         output_dir=args.output_dir,
         model_name=args.model_name,
         epochs=args.epochs,
