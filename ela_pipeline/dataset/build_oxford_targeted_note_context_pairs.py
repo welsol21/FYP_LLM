@@ -104,6 +104,8 @@ _COMMON_PREPOSITIONS = {
     "under",
     "with",
 }
+_RELATIVE_OPENERS = {"who", "whom", "whose", "which", "that", "where", "when"}
+_PASSIVE_AUX_HINTS = (" am ", " is ", " are ", " was ", " were ", " be ", " been ", " being ", " get ", " got ")
 
 
 def _write_json(path: str, payload: dict[str, Any]) -> None:
@@ -150,6 +152,25 @@ def _block_slice(lines: list[str], spec: OxfordTopicBlock) -> tuple[int, int] | 
     return start_idx, end_idx
 
 
+def _merge_parenthetical_continuations(lines: list[str]) -> list[str]:
+    merged: list[str] = []
+    idx = 0
+    while idx < len(lines):
+        current = _norm(lines[idx])
+        if not current:
+            idx += 1
+            continue
+        balance = current.count("(") - current.count(")")
+        idx += 1
+        while balance > 0 and idx < len(lines):
+            nxt = _norm(lines[idx])
+            current = _norm(f"{current} {nxt}")
+            balance += nxt.count("(") - nxt.count(")")
+            idx += 1
+        merged.append(current)
+    return merged
+
+
 def _extract_pairs_from_block(
     *,
     lines: list[str],
@@ -157,6 +178,7 @@ def _extract_pairs_from_block(
     source_path: str,
     nlp: Any,
 ) -> list[dict[str, Any]]:
+    lines = _merge_parenthetical_continuations(lines)
     notation_buffer: list[str] = []
     pairs: list[dict[str, Any]] = []
     idx = 0
@@ -177,8 +199,9 @@ def _extract_pairs_from_block(
             after = _norm(line[split_at + len(marker_text) :])
             notation = _notation_from_buffer(notation_buffer + ([before] if before else []))
             examples = _split_explicit_tail_into_examples(after, nlp)
+            examples.extend(_extract_inline_topic_examples(spec, after, nlp))
             j = idx + 1
-            while j < len(lines) and _looks_example_candidate(lines[j], nlp):
+            while j < len(lines) and _topic_looks_example_candidate(spec, lines[j], nlp):
                 examples.append(_norm(lines[j]))
                 j += 1
             for context_text in list(dict.fromkeys([item for item in examples if item])):
@@ -201,7 +224,7 @@ def _extract_pairs_from_block(
             notation_buffer.append(line)
             j = idx + 1
             block_examples: list[str] = []
-            while j < len(lines) and _looks_example_candidate(lines[j], nlp):
+            while j < len(lines) and _topic_looks_example_candidate(spec, lines[j], nlp):
                 block_examples.append(_norm(lines[j]))
                 j += 1
             if block_examples:
@@ -220,7 +243,7 @@ def _extract_pairs_from_block(
                         )
                 idx = j
                 continue
-        elif _looks_example_candidate(line, nlp):
+        elif _topic_looks_example_candidate(spec, line, nlp):
             notation = _notation_from_buffer(notation_buffer)
             if notation and _topic_allows_context(spec, line, nlp):
                 pairs.append(
@@ -245,6 +268,44 @@ def _extract_pairs_from_block(
         )
         deduped[key] = row
     return list(deduped.values())
+
+
+def _topic_looks_example_candidate(spec: OxfordTopicBlock, text: str, nlp: Any) -> bool:
+    text = _norm(text)
+    if not text:
+        return False
+    if _looks_example_candidate(text, nlp):
+        return True
+    words = re.findall(r"[A-Za-z']+", text)
+    first = words[0].lower() if words else ""
+    if spec.topic_key == "relative_clauses":
+        return len(words) <= 12 and bool(first in _RELATIVE_OPENERS or text.lower().startswith("the "))
+    if spec.topic_key in {"prepositions", "prepositional_phrases"}:
+        return len(words) <= 12 and bool(first in _COMMON_PREPOSITIONS or text.lower().startswith("the "))
+    return False
+
+
+def _extract_inline_topic_examples(spec: OxfordTopicBlock, text: str, nlp: Any) -> list[str]:
+    text = _norm(text)
+    if not text:
+        return []
+    candidates: list[str] = []
+    for match in re.finditer(r"\(([^()]{4,160})\)", text):
+        candidate = _norm(match.group(1).replace("e.g.", "").replace("i.e.", ""))
+        if _topic_allows_context(spec, candidate, nlp):
+            candidates.append(candidate)
+    if ";" in text:
+        for chunk in text.split(";"):
+            candidate = _norm(chunk.strip(" ,"))
+            if _topic_allows_context(spec, candidate, nlp):
+                candidates.append(candidate)
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for item in candidates:
+        if item and item not in seen:
+            seen.add(item)
+            deduped.append(item)
+    return deduped
 
 
 def _topic_allows_context(spec: OxfordTopicBlock, text: str, nlp: Any) -> bool:
@@ -273,12 +334,26 @@ def _topic_allows_context(spec: OxfordTopicBlock, text: str, nlp: Any) -> bool:
         )
     if spec.topic_key == "prepositional_phrases":
         first = words[0].lower() if words else ""
-        return len(words) <= 8 and bool(first in _COMMON_PREPOSITIONS or text[:1].islower())
+        return len(words) <= 14 and bool(
+            first in _COMMON_PREPOSITIONS
+            or text[:1].islower()
+            or any(f" {prep} " in f" {lowered} " for prep in _COMMON_PREPOSITIONS)
+        )
+    if spec.topic_key == "passive_voice":
+        if "*" in text:
+            return False
+        if " by " in f" {lowered} ":
+            return True
+        if not any(hint in f" {lowered} " for hint in _PASSIVE_AUX_HINTS):
+            return False
+        return bool(has_verb and any(suffix in lowered for suffix in ("ed ", "en ", "t to ", "n in ")))
     if spec.topic_key == "question_tags":
         return bool("?" in text or re.search(r",\s*[A-Za-z].+\?$", text))
     if spec.topic_key == "relative_clauses":
-        first = words[0].lower() if words else ""
-        return bool(first in {"who", "which", "that", "whom", "whose", "where", "when"} or lowered.startswith("the "))
+        return len(words) <= 16 and bool(
+            any(f" {marker} " in f" {lowered} " for marker in _RELATIVE_OPENERS)
+            or lowered.startswith("the ")
+        )
     return True
 
 
