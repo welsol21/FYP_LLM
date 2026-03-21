@@ -44,12 +44,59 @@ _SUSPICIOUS_OCR_TOKEN_RE = re.compile(
 _CHOICE_SLASH_RE = re.compile(r"\b[A-Za-z][A-Za-z'-]*\s*/\s*[A-Za-z][A-Za-z'-]*\b")
 
 _TOPIC_HINTS = {
+    # Passive
     "passive_voice": ("passive",),
-    "conditional_sentences": ("conditional",),
+    # Conditionals
+    "conditional_sentences": ("conditional", "wishes and regrets", "future possibilities"),
+    # Questions
     "question_tags": ("question tags",),
-    "relative_clauses": ("relative",),
-    "prepositions": ("preposition",),
-    "modal": ("modal", "ability", "permission", "obligations", "possibility", "suggestions"),
+    "yes_no_question": (
+        "present simple questions", "past simple questions", "forming questions",
+        "short questions", "object and subject questions",
+    ),
+    "wh_question": (
+        "question words", "open questions", "indirect questions",
+        "reported questions", "question words with",
+    ),
+    # Relative clauses
+    "relative_clauses": ("relative", "other relative"),
+    # Prepositions
+    "prepositional_phrases": ("prepositions of place", "prepositions of time", "dependent prepositions"),
+    "prepositions": ("preposition", "other prepositions"),
+    # Modal
+    "modal": (
+        "modal", "ability", "permission", "obligations", "possibility",
+        "suggestions", "deciding and hedging", "making deductions",
+        "permission, requests",
+    ),
+    # Perfect
+    "perfect": (
+        "present perfect", "past perfect", "the present perfect", "the past perfect",
+    ),
+    # Progressive / continuous
+    "progressive": (
+        "present continuous", "past continuous", "future continuous",
+        "the present continuous", "the past continuous", "the future continuous",
+        "present perfect continuous", "past perfect continuous",
+    ),
+    # Declarative (present/past simple)
+    "declarative": (
+        "the present simple", "the past simple",
+        "present tenses overview", "past tenses overview", "past tenses review",
+        "types of verbs", "action and state verbs",
+    ),
+    # Negatives
+    "questions_and_negatives": (
+        "negative", "questions review",
+    ),
+    # Reported speech / that-clause
+    "that_clause": ("reported speech", "tenses in reported speech", "reporting verbs"),
+    # Imperatives
+    "imperative": ("imperatives",),
+    # Existential there
+    "existential_there": ('"there"', "there"),
+    # Cleft / focus
+    "it_cleft": ("shifting focus", 'introductory "it"', "inversion"),
 }
 _COMMON_STARTERS = {
     "a",

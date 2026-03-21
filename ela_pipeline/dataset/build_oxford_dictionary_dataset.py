@@ -18,27 +18,76 @@ from ela_pipeline.skeleton.builder import build_skeleton
 
 
 TERM_TO_TOPIC_KEY = {
+    # Questions / negatives
     "question tags": "question_tags",
     "question tag": "question_tags",
-    "relative clauses": "relative_clauses",
-    "relative clause": "relative_clauses",
-    "prepositional phrases": "prepositional_phrases",
-    "prepositional phrase": "prepositional_phrases",
-    "prepositions": "prepositions",
-    "preposition": "prepositions",
+    "yes-no question": "yes_no_question",
+    "yes/no question": "yes_no_question",
+    "yes-no questions": "yes_no_question",
+    "wh-question": "wh_question",
+    "wh question": "wh_question",
+    "wh-questions": "wh_question",
+    "interrogative": "wh_question",
+    "questions and negatives": "questions_and_negatives",
+    "negative": "questions_and_negatives",
+    "negation": "questions_and_negatives",
+    "negative clause": "questions_and_negatives",
+    "negative sentences": "questions_and_negatives",
+    # Passive / active
     "passive voice": "passive_voice",
     "passive": "passive_voice",
+    "active voice": "active",
+    # Modal
+    "modal": "modal",
+    "modal verb": "modal",
+    "modal verbs": "modal",
+    "modal auxiliary": "modal",
+    "modality": "modal",
+    "modal auxiliaries": "modal",
+    # Perfect
+    "perfect": "perfect",
+    "present perfect": "perfect",
+    "past perfect": "perfect",
+    "perfect aspect": "perfect",
+    "have + past participle": "perfect",
+    # Progressive / continuous
+    "progressive": "progressive",
+    "continuous": "progressive",
+    "progressive aspect": "progressive",
+    "present progressive": "progressive",
+    "past progressive": "progressive",
+    "present continuous": "progressive",
+    "past continuous": "progressive",
+    # Clause types
+    "relative clauses": "relative_clauses",
+    "relative clause": "relative_clauses",
     "that-clause": "that_clause",
     "that clause": "that_clause",
     "wh-clause": "wh_clause",
     "wh clause": "wh_clause",
-    "wh-question": "wh_question",
-    "wh question": "wh_question",
     "conditional sentences": "conditional_sentences",
     "conditional sentence": "conditional_sentences",
     "conditional": "conditional_sentences",
-    "questions and negatives": "questions_and_negatives",
-    "negative": "questions_and_negatives",
+    "if-clause": "conditional_sentences",
+    "if clause": "conditional_sentences",
+    # Prepositions / phrases
+    "prepositional phrases": "prepositional_phrases",
+    "prepositional phrase": "prepositional_phrases",
+    "prepositions": "prepositions",
+    "preposition": "prepositions",
+    # Existential
+    "existential there": "existential_there",
+    "there is": "existential_there",
+    "there + be": "existential_there",
+    # Declarative
+    "declarative": "declarative",
+    "simple declarative": "declarative",
+    # Cleft
+    "it-cleft": "it_cleft",
+    "it cleft": "it_cleft",
+    "what-cleft": "what_cleft",
+    "what cleft": "what_cleft",
+    "cleft sentence": "it_cleft",
 }
 
 _COMMON_PREPOSITIONS = {
@@ -82,14 +131,22 @@ _TO_OBJECT_RE = re.compile(
     r"\bto\b\s+(?:the|a|an|this|that|these|those|my|your|his|her|its|our|their|me|him|her|us|them|[A-Z][a-z]+)\b"
 )
 _SENTENCE_LIKE_TOPICS = {
+    "active",
     "conditional_sentences",
+    "declarative",
+    "existential_there",
+    "it_cleft",
     "modal",
     "passive_voice",
     "perfect",
     "progressive",
     "question_tags",
+    "questions_and_negatives",
     "that_clause",
     "wh_clause",
+    "wh_question",
+    "what_cleft",
+    "yes_no_question",
 }
 
 
