@@ -66,6 +66,49 @@ _ALLOWED_LOWERCASE_START_RE = re.compile(
     re.IGNORECASE,
 )
 _WS_RE = re.compile(r"\s+")
+_MYSTERIES_BANNED_START_RE = re.compile(
+    r"^(?:setting the scene|wrapping up|what should i read\??|some more|english prepositions|"
+    r"masses of quantifiers|how to deal|the first of these|both of these|of most interest|"
+    r"in other|because this|we assume that speakers|according to walker, speakers|"
+    r"in misunderstandings|linguistic logic is not mathematical|so if someone asks you|"
+    r"in more functions than previously assumed|of time, not just|but when we look|"
+    r"similarly with|we can push this further|this is interesting|but we do not know|"
+    r"to doing so|new zealand\) effects|greek, latin and romance|london: allison|"
+    r"aarts et al\.|the list given here|the same thing\.|we can tell which|now we turn|"
+    r"we might want to treat|with the other cases|there is some hint|and in this,|"
+    r"i will come to these reasons|of is has had the prescriptive public|why do we have|"
+    r"the no-man's land|so, let’s look|so, let's look|but in other cases|who refers does|"
+    r"with good lab data|in spite of all this work|i have to accept that)\b",
+    re.IGNORECASE,
+)
+_MYSTERIES_BANNED_ANYWHERE_RE = re.compile(
+    r"\b(?:setting the scene|wrapping up|what should i read|doi:|mouton de gruyter)\b",
+    re.IGNORECASE,
+)
+_MYSTERIES_DISCOURSE_START_RE = re.compile(
+    r"^(?:although|but|if|now|of|to|which|because|while|when|whereas|therefore|thus)\b",
+    re.IGNORECASE,
+)
+_MYSTERIES_REFERENCE_RE = re.compile(
+    r"\b(?:et al\.|university press|cambridge|routledge|language log|dissertation|journal of|working papers)\b",
+    re.IGNORECASE,
+)
+_MYSTERIES_CTX_ARTIFACT_RE = re.compile(r"\[…\]|\[\.{2,}\]|/\*|\*/")
+_MYSTERIES_NOTE_PAGE_NUM_RE = re.compile(r"^\d+\s+[A-Z]")
+_MYSTERIES_NOTE_CHAPTER_REF_RE = re.compile(
+    r"^(?:this factor (?:has been|was)|see chapter|chapter \d|in chapter|"
+    r"aarts et al\.|for a longer|for those who want|in general,\s+the \d{4})\b",
+    re.IGNORECASE,
+)
+_MYSTERIES_META_RE = re.compile(
+    r"\b(?:grammar|grammatical|language|languages|speaker|speakers|linguist|linguists|construction|constructions|"
+    r"pattern|patterns|system|systems|meaning|meanings|usage|usages|research|chapter|chapters|table|tables|"
+    r"question|questions|problem|problems|development|developments|corpus|corpora|book|books|word|words|"
+    r"english|tense|tenses|aspect|aspects|article|articles|noun|nouns|verb|verbs|adjective|adjectives|"
+    r"preposition|prepositions|pronoun|pronouns|clause|clauses|sentence|sentences|countability|comparative|"
+    r"comparatives|superlative|superlatives|progressive|passive|perfect|agreement|possession|case)\b",
+    re.IGNORECASE,
+)
 _INCOMPLETE_LAST_WORDS = {
     "a",
     "an",
@@ -114,7 +157,48 @@ def _norm(text: str) -> str:
     return _WS_RE.sub(" ", str(text or "").strip())
 
 
-def _looks_clean_context(text: str, *, pair_method: str = "") -> bool:
+def _looks_clean_mysteries_context(text: str, *, topic_key: str = "") -> bool:
+    cleaned = _norm(text)
+    lowered = cleaned.lower()
+    words = re.findall(r"[A-Za-z']+", cleaned)
+    if not cleaned:
+        return False
+    if _MYSTERIES_BANNED_START_RE.search(cleaned):
+        return False
+    if _MYSTERIES_BANNED_ANYWHERE_RE.search(cleaned):
+        return False
+    if _MYSTERIES_REFERENCE_RE.search(cleaned):
+        return False
+    if _MYSTERIES_CTX_ARTIFACT_RE.search(cleaned):
+        return False
+    if len(words) < 3:
+        return False
+    if words and words[-1].lower() in _INCOMPLETE_LAST_WORDS:
+        return False
+    if _MYSTERIES_DISCOURSE_START_RE.search(cleaned) and not cleaned.endswith((".", "!", "?")):
+        return False
+    if cleaned[:1].islower() and not _ALLOWED_LOWERCASE_START_RE.search(cleaned):
+        return False
+    if not any(ch in cleaned for ch in ".?!") and len(words) < 6:
+        return False
+    explicit_example_signal = bool("*" in cleaned or "…" in cleaned or "..." in cleaned or "'" in cleaned or "‘" in cleaned or "’" in cleaned or '"' in cleaned)
+    if _MYSTERIES_META_RE.search(cleaned) and not explicit_example_signal:
+        return False
+    if len(words) < 5 and not re.search(r"\b(?:is|are|was|were|be|been|being|am|have|has|had|do|does|did|can|could|will|would|should|may|might|must|[A-Za-z]+ed|[A-Za-z]+ing|[A-Za-z]+s)\b", cleaned):
+        if topic_key not in {"prepositions", "possession", "comparatives"}:
+            return False
+    if topic_key == "prepositions":
+        if len(words) <= 5:
+            if not re.search(
+                r"\b(?:about|above|across|after|against|along|around|at|before|behind|below|beside|between|by|for|from|"
+                r"in|inside|into|near|of|off|on|out|over|through|to|under|with)\b",
+                lowered,
+            ):
+                return False
+    return True
+
+
+def _looks_clean_context(text: str, *, pair_method: str = "", source_path: str = "", topic_key: str = "") -> bool:
     cleaned = _norm(text)
     lowered = cleaned.lower()
     words = re.findall(r"[A-Za-z']+", cleaned)
@@ -145,7 +229,7 @@ def _looks_clean_context(text: str, *, pair_method: str = "") -> bool:
             return False
         if len(words) < 4:
             return False
-    if pair_method == "rulebook_source_first":
+    if pair_method in {"rulebook_source_first", "quick_solutions_source_first"}:
         if len(words) < 3:
             return False
         if _LOW_INFO_RULEBOOK_RE.search(cleaned):
@@ -174,6 +258,9 @@ def _looks_clean_context(text: str, *, pair_method: str = "") -> bool:
             return False
         if words and words[-1].lower() in _INCOMPLETE_LAST_WORDS:
             return False
+    if "mysteries of english grammar" in str(source_path).lower():
+        if not _looks_clean_mysteries_context(cleaned, topic_key=topic_key):
+            return False
     return True
 
 
@@ -188,10 +275,22 @@ def build_clean_note_context_pairs(rows: list[dict[str, Any]]) -> tuple[list[dic
     for row in rows:
         context_text = str(row.get("context_text") or "")
         pair_method = str(row.get("pair_method") or "")
-        if not _looks_clean_context(context_text, pair_method=pair_method):
+        source_path = str(row.get("source_path") or "")
+        topic_key = str(row.get("topic_key") or "")
+        if not _looks_clean_context(context_text, pair_method=pair_method, source_path=source_path, topic_key=topic_key):
             stats["dropped_rows"] += 1
             stats["dropped_bad_context"] += 1
             continue
+        if "mysteries of english grammar" in str(row.get("source_path") or "").lower():
+            notation_text = _norm(str(row.get("notation_text") or ""))
+            if _MYSTERIES_NOTE_PAGE_NUM_RE.search(notation_text):
+                stats["dropped_rows"] += 1
+                stats["dropped_bad_context"] += 1
+                continue
+            if _MYSTERIES_NOTE_CHAPTER_REF_RE.search(notation_text):
+                stats["dropped_rows"] += 1
+                stats["dropped_bad_context"] += 1
+                continue
         kept.append(row)
         stats["kept_rows"] += 1
     report = {
