@@ -47,3 +47,48 @@ def test_handbook_pairs_prioritize_topic_explicit_notation_sentences(tmp_path: P
 
     assert pairs
     assert "Prepositions head phrases and take complements." in pairs[0]["notation_text"]
+
+
+def test_handbook_pairs_strip_teaching_prefixes_and_dialogue_labels(tmp_path: Path):
+    rows_path = tmp_path / "rows.jsonl"
+    rows_path.write_text(
+        '{"source_path":"book.pdf","row_type":"egu_unit_section","topic_key":"modal","heading":"Unit 30 may and might 2","text":"Modal verbs such as may and might express possibility.\\n\\nSo you can say: I may go to Ireland.\\na: What shall we do tonight?\\nb: We could go to the cinema."}\n',
+        encoding="utf-8",
+    )
+
+    pairs, report = build_handbook_note_context_pairs(rows_jsonl=str(rows_path))
+
+    assert report["pairs_total"] >= 2
+    contexts = {row["context_text"] for row in pairs}
+    assert "I may go to Ireland." in contexts
+    assert "We could go to the cinema." in contexts
+    assert "So you can say: I may go to Ireland." not in contexts
+    assert "a: What shall we do tonight?" not in contexts
+    assert "b: We could go to the cinema." not in contexts
+
+
+def test_handbook_pairs_reject_all_caps_workbook_fragments(tmp_path: Path):
+    rows_path = tmp_path / "rows.jsonl"
+    rows_path.write_text(
+        "{\"source_path\":\"book.pdf\",\"row_type\":\"practice_book_section\",\"topic_key\":\"modal\",\"heading\":\"Obligations\",\"text\":\"Obligations In English, must and have to express obligation.\\n\\nMUST NOT\\nDON'T HAVE TO\"}\n",
+        encoding="utf-8",
+    )
+
+    pairs, report = build_handbook_note_context_pairs(rows_jsonl=str(rows_path))
+
+    assert report["pairs_total"] == 0
+
+
+def test_handbook_pairs_source_first_handles_rows_without_topic_key(tmp_path: Path):
+    rows_path = tmp_path / "rows.jsonl"
+    rows_path.write_text(
+        '{"source_path":"book.pdf","row_type":"egt_article_window","topic_key":"","heading":"A/an and the","anchor":"A/an and the","text":"A/an and the are articles. They are a type of determiner.\\n\\nDo you have a car?"}\n',
+        encoding="utf-8",
+    )
+
+    pairs, report = build_handbook_note_context_pairs(rows_jsonl=str(rows_path), source_first=True)
+
+    assert report["pairs_total"] == 1
+    assert pairs[0]["notation_text"] == "A/an and the are articles. They are a type of determiner."
+    assert pairs[0]["context_text"] == "Do you have a car?"
+    assert pairs[0]["pair_method"] == "handbook_window_source_first"

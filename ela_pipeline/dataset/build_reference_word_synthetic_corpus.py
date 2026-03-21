@@ -372,7 +372,7 @@ def _topic_template_match_is_strict(
     if topic_key == "word_ing_form":
         return template_id == "WORD_VERB_ING" and pos == "VERB" and _looks_gerund(features, lowered)
     if topic_key == "word_common_noun":
-        return template_id == "WORD_NOUN_COMMON" and pos in {"NOUN", "PROPN"}
+        return template_id == "WORD_NOUN_COMMON" and pos == "NOUN"
     return False
 
 

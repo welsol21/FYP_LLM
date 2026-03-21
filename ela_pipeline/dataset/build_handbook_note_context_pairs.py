@@ -27,6 +27,7 @@ _VERBISH_RE = re.compile(
 _EXPLANATION_HINTS = (
     " is ",
     " are ",
+    " type of ",
     " refers ",
     " can be ",
     " may be ",
@@ -40,6 +41,16 @@ _META_PREFIXES = ("see ", "cf.", "compare ", "references", "chapter ")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+|\n{2,}")
 _EXPLICIT_EXAMPLE_MARKERS = ("e.g.", "for example", "for instance", "example:", "examples:", "illustrated by")
 _INLINE_ENUM_RE = re.compile(r"^\(?[0-9]{0,3}[a-z]?\)?\s*[a-z]\.\s+", re.IGNORECASE)
+_LEADING_DIALOGUE_RE = re.compile(r"^(?:[A-Za-z]|[0-9]{1,2})\s*:\s+")
+_MID_DIALOGUE_RE = re.compile(r"\b(?:[A-Za-z]|[0-9]{1,2})\s*:\s+")
+_ALL_CAPS_CONTEXT_RE = re.compile(r"^[A-Z0-9 '\"/-]+$")
+_INSTRUCTIONAL_PREFIX_RE = re.compile(
+    r"^(?:"
+    r"so you can say|we also use|we use|the structure is|study this example|listen|"
+    r"for the past we use|the negative forms are|examples?|for example|for instance"
+    r")\s*:?\s+",
+    re.IGNORECASE,
+)
 _INCOMPLETE_ENDINGS = {
     "a",
     "an",
@@ -204,18 +215,33 @@ def _looks_explanatory_sentence(text: str, topic_key: str) -> bool:
     return topic_terms in lowered or any(hint in lowered for hint in _EXPLANATION_HINTS)
 
 
+def _looks_explanatory_sentence_source_first(text: str) -> bool:
+    lowered = f" {_norm(text).lower()} "
+    if not lowered.strip():
+        return False
+    if any(lowered.startswith(prefix) for prefix in _META_PREFIXES):
+        return False
+    if len(re.findall(r"[A-Za-z]{2,}", lowered)) < 4:
+        return False
+    return any(hint in lowered for hint in _EXPLANATION_HINTS)
+
+
 def _sentence_mentions_topic(text: str, topic_key: str) -> bool:
     lowered = _norm(text).lower()
     return any(term in lowered for term in _TOPIC_TERM_HINTS.get(topic_key, (topic_key.replace("_", " "),)))
 
 
 def _looks_context_candidate(text: str) -> bool:
-    text = _norm(text.strip(" ,;:"))
+    text = _sanitize_context_text(text)
     if not text:
+        return False
+    if _ALL_CAPS_CONTEXT_RE.fullmatch(text) and len(re.findall(r"[A-Za-z']+", text)) <= 5:
         return False
     if not text[0].isalnum() and text[0] not in {'"', "'", "*"}:
         return False
     lowered = text.lower()
+    if lowered.startswith("not:"):
+        return False
     if any(lowered.startswith(prefix) for prefix in _META_PREFIXES):
         return False
     if _DISCOURSE_START_RE.match(text):
@@ -244,6 +270,21 @@ def _sanitize_context_text(text: str) -> str:
     value = _norm(str(text or "").strip(" ,;:"))
     if not value:
         return ""
+    value = _LEADING_DIALOGUE_RE.sub("", value).strip()
+    while True:
+        updated = _INSTRUCTIONAL_PREFIX_RE.sub("", value).strip()
+        if updated == value:
+            break
+        value = updated
+    if not value:
+        return ""
+    mid_dialogue = list(_MID_DIALOGUE_RE.finditer(value))
+    if mid_dialogue:
+        tail = value[mid_dialogue[-1].end() :].strip()
+        if tail and len(re.findall(r"[A-Za-z']+", tail)) >= 2:
+            value = tail
+    if value.lower().startswith("not:"):
+        return ""
     value = _TRAILING_CITATION_RE.sub("", value).strip(" ,;:")
     return _norm(value)
 
@@ -252,7 +293,7 @@ def _topic_context_ok(topic_key: str, context_text: str) -> bool:
     text = _sanitize_context_text(context_text)
     lowered = text.lower()
     words = re.findall(r"[A-Za-z']+", text)
-    if not text or "*" in text:
+    if not text or "*" in text or lowered.startswith("not:"):
         return False
     if _DISCOURSE_START_RE.match(text):
         return False
@@ -408,6 +449,7 @@ def build_handbook_note_context_pairs(
     *,
     rows_jsonl: str,
     spacy_model: str = "en_core_web_sm",
+    source_first: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     nlp: Any | None = None
     rows = list(_iter_jsonl(rows_jsonl))
@@ -416,28 +458,47 @@ def build_handbook_note_context_pairs(
     for row in rows:
         text = str(row.get("text") or "")
         topic_key = str(row.get("topic_key") or "").strip()
-        if not text or not topic_key:
+        if not text or (not source_first and not topic_key):
             continue
         if len(text) > 2500 or len(re.findall(r"[A-Za-z]{2,}", text)) > 380:
             continue
-        notation_sentences = [
-            sent_text
-            for sent_text in _fast_sentence_split(text)
-            if _looks_explanatory_sentence(sent_text, topic_key)
-        ]
+        if source_first:
+            notation_sentences = [
+                sent_text
+                for sent_text in _fast_sentence_split(text)
+                if _looks_explanatory_sentence_source_first(sent_text)
+                or (topic_key and _looks_explanatory_sentence(sent_text, topic_key))
+            ]
+        else:
+            notation_sentences = [
+                sent_text
+                for sent_text in _fast_sentence_split(text)
+                if _looks_explanatory_sentence(sent_text, topic_key)
+            ]
         if not notation_sentences:
             if nlp is None:
                 nlp = load_nlp(spacy_model)
             doc = nlp(text.replace("\n", " "))
-            notation_sentences = [
-                _norm(sent.text)
-                for sent in doc.sents
-                if _looks_explanatory_sentence(sent.text, topic_key)
-            ]
+            if source_first:
+                notation_sentences = [
+                    _norm(sent.text)
+                    for sent in doc.sents
+                    if _looks_explanatory_sentence_source_first(sent.text)
+                    or (topic_key and _looks_explanatory_sentence(sent.text, topic_key))
+                ]
+            else:
+                notation_sentences = [
+                    _norm(sent.text)
+                    for sent in doc.sents
+                    if _looks_explanatory_sentence(sent.text, topic_key)
+                ]
         if not notation_sentences:
             continue
-        topic_sentences = [sent_text for sent_text in notation_sentences if _sentence_mentions_topic(sent_text, topic_key)]
-        ordered_notation = topic_sentences + [sent_text for sent_text in notation_sentences if sent_text not in topic_sentences]
+        if source_first and not topic_key:
+            ordered_notation = notation_sentences
+        else:
+            topic_sentences = [sent_text for sent_text in notation_sentences if topic_key and _sentence_mentions_topic(sent_text, topic_key)]
+            ordered_notation = topic_sentences + [sent_text for sent_text in notation_sentences if sent_text not in topic_sentences]
         notation_text = _norm(" ".join(ordered_notation[:2]))
         contexts = _extract_contexts(text, nlp)
         for context_text in contexts:
@@ -450,23 +511,23 @@ def build_handbook_note_context_pairs(
                 continue
             if _word_overlap(notation_text, context_text) >= 0.7 and len(context_text) > 24:
                 continue
-            if not _topic_context_ok(topic_key, context_text):
+            if not source_first and not _topic_context_ok(topic_key, context_text):
                 continue
             pairs.append(
                 {
                     "source_path": row.get("source_path"),
                     "row_type": row.get("row_type"),
-                    "entry_head": row.get("heading") or row.get("topic_key"),
+                    "entry_head": row.get("heading") or row.get("anchor") or row.get("topic_key"),
                     "heading": row.get("heading"),
                     "topic_key": topic_key,
                     "notation_text": notation_text,
                     "context_text": context_text,
-                    "pair_method": "handbook_window",
+                    "pair_method": "handbook_window_source_first" if source_first else "handbook_window",
                 }
             )
 
     report = {
-        "pipeline_version": "handbook_note_context_v1",
+        "pipeline_version": "handbook_note_context_source_first_v1" if source_first else "handbook_note_context_v1",
         "rows_jsonl": str(Path(rows_jsonl).resolve()),
         "rows_seen": len(rows),
         "pairs_total": len(pairs),
@@ -484,11 +545,13 @@ def main() -> None:
     parser.add_argument("--output-jsonl", required=True)
     parser.add_argument("--report-json", required=True)
     parser.add_argument("--spacy-model", default="en_core_web_sm")
+    parser.add_argument("--source-first", action="store_true")
     args = parser.parse_args()
 
     rows, report = build_handbook_note_context_pairs(
         rows_jsonl=args.rows_jsonl,
         spacy_model=args.spacy_model,
+        source_first=args.source_first,
     )
     _write_jsonl(args.output_jsonl, rows)
     _write_json(args.report_json, report)

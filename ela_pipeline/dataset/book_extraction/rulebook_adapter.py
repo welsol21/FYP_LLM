@@ -32,10 +32,18 @@ _FALSE_HEAD_FIRST_WORDS = {
     "as",
     "if",
     "in",
+    "it",
+    "more",
+    "most",
     "of",
+    "other",
     "or",
     "some",
+    "that",
     "the",
+    "these",
+    "this",
+    "those",
     "to",
     "typically",
     "when",
@@ -71,6 +79,14 @@ _FUNCTION_WORDS = {
     "the",
     "to",
     "with",
+}
+_ALLOWED_SHORT_PUNCT_HEADS = {
+    "cf.",
+    "e.g.",
+    "etc.",
+    "ff.",
+    "fr.",
+    "st.",
 }
 
 
@@ -207,9 +223,23 @@ def _looks_plausible_head_candidate(text: str) -> bool:
     return True
 
 
+def _has_allowed_short_punct_head(text: str) -> bool:
+    lowered = _norm(text).lower()
+    if lowered in _ALLOWED_SHORT_PUNCT_HEADS:
+        return True
+    words = [token for token in lowered.split() if token]
+    return bool(
+        words
+        and len(words) <= 2
+        and all(token in _ALLOWED_SHORT_PUNCT_HEADS for token in words)
+    )
+
+
 def _is_probable_headword(text: str, config: RulebookAdapterConfig) -> bool:
     text = _norm(text)
     if not text:
+        return False
+    if text.startswith(("(", "[", "{", "“", "\"", "'")):
         return False
     if _PAGE_NUMBER_RE.fullmatch(text) or _ROMAN_PAGE_RE.fullmatch(text):
         return False
@@ -217,10 +247,18 @@ def _is_probable_headword(text: str, config: RulebookAdapterConfig) -> bool:
         return False
     if len(text) > 90:
         return False
+    if any(ch.isdigit() for ch in text):
+        return False
+    if "?" in text or "!" in text:
+        return False
     if text.endswith((".", ";", ":")):
         return False
     words = text.split()
     if not (1 <= len(words) <= 8):
+        return False
+    if words[0][:1].islower() and len(words) > 3:
+        return False
+    if words[0][:1].isupper() and len(words) > 4 and not any(ch in text for ch in "/-"):
         return False
     if words[0][:1].isdigit():
         return False
@@ -239,6 +277,13 @@ def _extract_inline_entry_head(text: str) -> str:
     if not match:
         return ""
     candidate = _norm(match.group(1))
+    words = [token for token in candidate.split() if token]
+    if len(words) > 4:
+        return ""
+    if candidate.endswith((".", ",", ";", ":")) and not _has_allowed_short_punct_head(candidate):
+        return ""
+    if len(words) > 4 and words[0][:1].islower():
+        return ""
     if not _looks_plausible_head_candidate(candidate):
         return ""
     return candidate
@@ -341,6 +386,24 @@ def _extract_entry_rows(
     current_start = 0
     current_end = 0
 
+    def _inside_example_block() -> bool:
+        recent = " ".join(part.lower() for part in current_parts[-4:] if part)
+        return bool(_ENTRY_EXAMPLE_RE.search(recent))
+
+    def _looks_definition_start(text: str) -> bool:
+        text = _norm(text)
+        if not text:
+            return False
+        if _is_letter_heading(text) or _PAGE_NUMBER_RE.fullmatch(text) or _ROMAN_PAGE_RE.fullmatch(text):
+            return False
+        if any(ch.isdigit() for ch in text):
+            return False
+        words = text.split()
+        if len(words) < 4:
+            return False
+        first = words[0]
+        return bool(first[:1].isupper() or first.startswith(("(", "[", "\"", "“")))
+
     def flush() -> None:
         nonlocal current_head, current_parts, current_start, current_end
         if not current_head and not current_parts:
@@ -377,6 +440,11 @@ def _extract_entry_rows(
             continue
         inline_head = _extract_inline_entry_head(text)
         if inline_head:
+            next_line = _next_nonblank_line(lines, absolute_index)
+            if current_head and current_parts and _inside_example_block() and not _looks_definition_start(next_line):
+                current_parts.append(text)
+                current_end = absolute_index + 1
+                continue
             flush()
             current_head = inline_head
             current_parts = [text]
@@ -384,6 +452,11 @@ def _extract_entry_rows(
             current_end = absolute_index + 1
             continue
         if _is_probable_headword(text, config):
+            next_line = _next_nonblank_line(lines, absolute_index)
+            if current_head and current_parts and _inside_example_block() and not _looks_definition_start(next_line):
+                current_parts.append(text)
+                current_end = absolute_index + 1
+                continue
             flush()
             current_head = text
             current_parts = []
