@@ -473,6 +473,7 @@ def _build_word_nodes(span, *, parent_id: str, next_id) -> List[Dict]:
             end=token.idx + len(token.text),
         )
         word_node["grammatical_role"] = _word_role(token)
+        word_node["lemma"] = token.lemma_.lower()
         word_node["dep_label"] = token.dep_
         word_node["head_id"] = None
         words.append(word_node)
@@ -627,7 +628,21 @@ def build_skeleton(text: str, nlp) -> Dict[str, Dict]:
                 if not token.is_space and not token.is_punct
             }
             if not phrase_spans or covered_token_ids != sentence_token_ids:
-                phrase_spans.append((sent.start, sent.end, "clause chunk"))
+                # Only add the clause chunk if it does NOT span the entire sentence;
+                # a full-sentence span duplicates the parent Sentence node.
+                non_space_punct = [
+                    t for t in sent if not t.is_space and not t.is_punct
+                ]
+                uncovered = [t for t in non_space_punct if t.i not in covered_token_ids]
+                if uncovered:
+                    first_unc = min(t.i for t in uncovered)
+                    last_unc = max(t.i for t in uncovered)
+                    # Shrink to only the uncovered span when it differs from full sentence
+                    if first_unc != sent.start or last_unc + 1 != sent.end:
+                        phrase_spans.append((first_unc, last_unc + 1, "clause chunk"))
+                    elif not phrase_spans:
+                        # No phrases at all — keep the full-span chunk as sole child
+                        phrase_spans.append((sent.start, sent.end, "clause chunk"))
 
         parent_by_idx = _phrase_parent_map(phrase_spans)
         children_by_idx: Dict[int, List[int]] = {}

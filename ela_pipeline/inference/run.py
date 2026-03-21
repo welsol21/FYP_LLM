@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 from typing import Any
 
+from ela_pipeline.annotate.wordnet_lookup import get_wordnet_note
 from ela_pipeline.annotate.contract_template_builder import (
     build_contract_template_payload,
     render_contract_template,
@@ -757,16 +758,27 @@ def _attach_note_blueprints(doc: dict) -> None:
                 class_id = str(item.get("class_id") or "").strip()
                 if class_id:
                     class_ids.append(class_id)
-        return build_note_blueprints(
+        pos = str(node.get("part_of_speech") or "").strip().lower()
+        blueprints = build_note_blueprints(
             grammar_classes=class_ids,
             cefr_level=cefr,
             node_type=node_type,
             content=content,
             grammatical_role=role,
             tam_construction=tam,
-            part_of_speech=str(node.get("part_of_speech") or "").strip().lower(),
+            part_of_speech=pos,
             tense=str(node.get("tense") or "").strip().lower(),
         )
+        if not blueprints and node_type == "word":
+            wn_note = get_wordnet_note(
+                lemma=str(node.get("lemma") or content).strip().lower(),
+                part_of_speech=pos,
+                grammatical_role=role,
+                surface=content,
+            )
+            if wn_note:
+                return wn_note
+        return blueprints
 
     def walk(node: dict) -> None:
         generated = build_notes(node)
@@ -968,17 +980,28 @@ def _apply_contract_template_notes(doc: dict, renderer: Any | None = None) -> No
             render_status = str(payload.get("render_status") or "template_rendered")
             render_source = "contract_template"
             render_model = "deterministic"
+            blueprints = node.get("note_blueprints") or {}
             for level in key_to_level.values():
-                notes[level] = deterministic_note
+                if level in ("elementary", "advanced"):
+                    blueprint_note = str(blueprints.get(f"{level}_text") or "").strip()
+                    notes[level] = blueprint_note or deterministic_note
+                else:
+                    notes[level] = deterministic_note
             if renderer is not None:
                 render_source = "contract_template_t5"
                 render_model = type(renderer).__name__
                 t5_used = False
                 t5_fallback = False
                 for level in key_to_level.values():
+                    # elementary and advanced use blueprint notes directly;
+                    # only intermediate goes through T5 contract template rewrite.
+                    if level in ("elementary", "advanced"):
+                        blueprint_note = str(blueprints.get(f"{level}_text") or "").strip()
+                        notes[level] = blueprint_note or deterministic_note
+                        continue
                     generated_template_text = str(
                         renderer.render_note(
-                            blueprint_text=str((node.get("note_blueprints") or {}).get(f"{level}_text") or ""),
+                            blueprint_text=str(blueprints.get(f"{level}_text") or ""),
                             level=level,
                             node=node,
                             parent=parent,
