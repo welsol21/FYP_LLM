@@ -41,6 +41,7 @@ services:
       ELA_SENTENCE_CONTRACT_BACKEND_URL: ${ELA_SENTENCE_CONTRACT_BACKEND_URL:-http://127.0.0.1:8000}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ELA_RAZBOR_OPENAI_MODEL: ${ELA_RAZBOR_OPENAI_MODEL:-gpt-4o-mini}
+      ELA_CONTROLLED_T5_MODEL_DIR: ${ELA_CONTROLLED_T5_MODEL_DIR:-}
     volumes:
       - inference_results:/app/inference_results
       - artifacts_data:/app/artifacts
