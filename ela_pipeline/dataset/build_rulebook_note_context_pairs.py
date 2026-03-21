@@ -29,6 +29,7 @@ _PAREN_EXAMPLE_RE = re.compile(r"\((?:e\.g\.|i\.e\.)\s*([^)]{4,})\)", re.IGNOREC
 _PAREN_META_TAIL_RE = re.compile(r"\s+\((?:where|in which|that is|i\.e\.|e\.g\.).*?\)\.?$", re.IGNORECASE)
 _CAPITALIZED_CLAUSE_TAIL_RE = re.compile(r"\b(?:in|as in)\s+([A-Z][^.!?]*[.!?]?)$")
 _TRAILING_EXPLANATORY_TAIL_RE = re.compile(r"\)\s*,\s*(?:so|and|but|which|where)\b.*$", re.IGNORECASE)
+_TRAILING_POS_GLOSS_RE = re.compile(r"\s*\((?:verb|noun|adjective|adverb|pronoun|preposition|conjunction|article|determiner|auxiliary|modal)[^)]*\)\s*$", re.IGNORECASE)
 _LABEL_PREFIX_RE = re.compile(r"^(?:[A-Z][A-Z-]{2,}\s+)+")
 _CROSS_REF_RE = re.compile(
     r"\b(?:see(?:\s+also|\s+further\s+under)?|compare|cf\.?|section\s+\d+|under\s+[A-Za-z-]+)\b",
@@ -493,8 +494,84 @@ def _normalize_example_candidate(text: str) -> str:
             if tail:
                 text = tail
     text = _PAREN_META_TAIL_RE.sub("", text)
+    text = _TRAILING_POS_GLOSS_RE.sub("", text)
     text = _TRAILING_EXPLANATORY_TAIL_RE.sub("", text).rstrip(" )")
     return _norm(text)
+
+
+def _is_quick_solutions_source(row: dict[str, Any]) -> bool:
+    lowered = _norm(row.get("source_path") or "").lower()
+    return "quick solutions to common errors in english" in lowered
+
+
+def _extract_pairs_from_quick_solutions_row(row: dict[str, Any], nlp: Any) -> list[dict[str, Any]]:
+    row_type = str(row.get("row_type") or "")
+    if row_type != "dictionary_entry":
+        return []
+    entry_head = _norm(row.get("entry_head") or row.get("heading"))
+    row_text = _strip_entry_head_prefix(_norm(row.get("text") or ""), entry_head)
+    if not row_text:
+        return []
+
+    notation_text = ""
+    contexts: list[str] = []
+
+    marker = "Use these exemplar sentences as a guide:"
+    lower = row_text.lower()
+    marker_idx = lower.find(marker.lower())
+    if marker_idx >= 0:
+        notation_source = _norm(row_text[:marker_idx])
+        tail = _norm(row_text[marker_idx + len(marker) :])
+        notation_sentences = [sent for sent in _fast_sentence_split(notation_source) if _looks_explanatory_source_first(sent) or _looks_definition_like(sent)]
+        notation_text = _norm(" ".join(notation_sentences[:2])) or notation_source
+        for sent in _fast_sentence_split(tail):
+            cleaned = _normalize_example_candidate(sent)
+            if not cleaned:
+                continue
+            if _looks_source_first_context(cleaned, nlp) and cleaned[-1:] in {".", "!", "?"}:
+                contexts.append(cleaned)
+    elif "incorrect." in lower and "write:" in lower:
+        parts = re.split(r"\bwrite:\b", row_text, maxsplit=1, flags=re.IGNORECASE)
+        if len(parts) == 2:
+            notation_source = _norm(parts[0])
+            fixed = _normalize_example_candidate(parts[1])
+            notation_sentences = [sent for sent in _fast_sentence_split(notation_source) if _looks_explanatory_source_first(sent) or _looks_definition_like(sent)]
+            notation_text = _norm(" ".join(notation_sentences[:2])) or notation_source
+            if _looks_source_first_context(fixed, nlp):
+                contexts.append(fixed)
+    elif "there is a difference in meaning." in lower:
+        notation_text = "There is a difference in meaning."
+        for sent in _fast_sentence_split(row_text):
+            cleaned = _normalize_example_candidate(sent)
+            if not cleaned or cleaned.lower() == notation_text.lower():
+                continue
+            if _looks_source_first_context(cleaned, nlp) and cleaned[-1:] in {".", "!", "?"}:
+                contexts.append(cleaned)
+    else:
+        return []
+
+    notation_text = _norm(notation_text)
+    if not notation_text:
+        return []
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for context_text in contexts:
+        key = context_text.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(
+            {
+                "source_path": row.get("source_path"),
+                "row_type": row_type,
+                "entry_head": row.get("entry_head") or row.get("heading"),
+                "heading": row.get("heading"),
+                "notation_text": notation_text,
+                "context_text": context_text,
+                "pair_method": "quick_solutions_source_first",
+            }
+        )
+    return out
 
 
 def _notation_from_buffer(buffer: list[str]) -> str:
@@ -600,6 +677,8 @@ def _extract_source_first_examples_from_text(text: str, entry_head: str, nlp: An
 
 
 def _extract_pairs_from_row_source_first(row: dict[str, Any], payload_lines: list[str], nlp: Any) -> list[dict[str, Any]]:
+    if _is_quick_solutions_source(row):
+        return _extract_pairs_from_quick_solutions_row(row, nlp)
     row_type = str(row.get("row_type") or "")
     if row_type not in _SOURCE_FIRST_RULE_TYPES:
         return []

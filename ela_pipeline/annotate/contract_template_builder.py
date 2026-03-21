@@ -320,13 +320,32 @@ def template_uses_allowed_slots(template_text: str, allowed_slots: list[str] | t
     return set(actual) == set(expected) and len(actual) == len(expected)
 
 
+def _repair_bare_allowed_slots(
+    template_text: str,
+    *,
+    allowed_slots: list[str] | tuple[str, ...] | None,
+) -> str:
+    repaired = normalize_template_text(template_text)
+    if not repaired:
+        return repaired
+    for slot in [str(item).strip() for item in (allowed_slots or []) if str(item).strip()]:
+        # Recover model outputs like `PART_OF_SPEECH` -> `{{PART_OF_SPEECH}}`
+        # but do not touch slots already wrapped in braces.
+        pattern = re.compile(rf"(?<!\{{\{{)\b{re.escape(slot)}\b(?!\}}\}})")
+        repaired = pattern.sub("{{" + slot + "}}", repaired)
+    return repaired
+
+
 def resolve_generated_template_text(
     generated_template_text: str,
     *,
     default_template_text: str,
     allowed_slots: list[str] | tuple[str, ...] | None,
 ) -> tuple[str, str]:
-    candidate = normalize_template_text(generated_template_text)
+    candidate = _repair_bare_allowed_slots(
+        generated_template_text,
+        allowed_slots=allowed_slots,
+    )
     default = normalize_template_text(default_template_text)
     if not candidate:
         return default, "template_fallback_empty"
@@ -334,6 +353,8 @@ def resolve_generated_template_text(
         return default, "template_fallback_prompt_leakage"
     if not template_uses_allowed_slots(candidate, allowed_slots):
         return default, "template_fallback_slot_mismatch"
+    if candidate != normalize_template_text(generated_template_text):
+        return candidate, "template_generated_slot_repaired"
     return candidate, "template_generated"
 
 

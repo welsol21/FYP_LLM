@@ -41,6 +41,7 @@ _SUSPICIOUS_OCR_TOKEN_RE = re.compile(
     r"\b(?:workes|finishs|brushs|watchs|washs|teachs|playes|gos|acomputer|youa|nota|amn't)\b",
     re.IGNORECASE,
 )
+_CHOICE_SLASH_RE = re.compile(r"\b[A-Za-z][A-Za-z'-]*\s*/\s*[A-Za-z][A-Za-z'-]*\b")
 
 _TOPIC_HINTS = {
     "passive_voice": ("passive",),
@@ -322,6 +323,8 @@ def _extract_heading_and_rule(lines: list[str], expected_heading: str = "") -> t
 def _clean_sentence_candidate(text: str) -> str:
     text = _norm(text)
     text = _LEADING_GARBAGE_RE.sub("", text)
+    text = re.sub(r"^[0-9]+[.)-]?\s*", "", text)
+    text = re.sub(r"^[a-z],[ ]+", "", text, flags=re.IGNORECASE)
     text = _UNDERSCORE_RE.sub(" ", text)
     text = _PAREN_ANSWER_RE.sub("", text)
     text = _TRAILING_MARK_RE.sub("", text)
@@ -481,6 +484,8 @@ def _extract_examples_from_page(page_text: str, *, nlp: Any) -> list[dict[str, A
     for line in lines:
         raw_line = _norm(line)
         if not raw_line or _PAGE_ONLY_RE.fullmatch(raw_line) or _EXERCISE_MARKER_RE.search(raw_line):
+            continue
+        if _CHOICE_SLASH_RE.search(raw_line):
             continue
 
         if "(" in raw_line or "_" in raw_line:

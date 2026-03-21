@@ -181,6 +181,18 @@ class ContractTemplateBuilderTests(unittest.TestCase):
         )
         self.assertEqual(status, "template_fallback_prompt_leakage")
 
+    def test_generated_template_text_repairs_bare_allowed_slots(self):
+        resolved, status = resolve_generated_template_text(
+            "This PART_OF_SPEECH works as a GRAMMATICAL_ROLE and expresses means, method, or instrument.",
+            default_template_text='This {{PART_OF_SPEECH}} works as a {{GRAMMATICAL_ROLE}} and expresses means, method, or instrument.',
+            allowed_slots=["PART_OF_SPEECH", "GRAMMATICAL_ROLE"],
+        )
+        self.assertEqual(
+            resolved,
+            "This {{PART_OF_SPEECH}} works as a {{GRAMMATICAL_ROLE}} and expresses means, method, or instrument.",
+        )
+        self.assertEqual(status, "template_generated_slot_repaired")
+
 
 if __name__ == "__main__":
     unittest.main()

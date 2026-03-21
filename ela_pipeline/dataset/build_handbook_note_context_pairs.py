@@ -41,6 +41,8 @@ _META_PREFIXES = ("see ", "cf.", "compare ", "references", "chapter ")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+|\n{2,}")
 _EXPLICIT_EXAMPLE_MARKERS = ("e.g.", "for example", "for instance", "example:", "examples:", "illustrated by")
 _INLINE_ENUM_RE = re.compile(r"^\(?[0-9]{0,3}[a-z]?\)?\s*[a-z]\.\s+", re.IGNORECASE)
+_STANDALONE_ENUM_RE = re.compile(r"^\(?\d{1,3}[a-z]?\)?$|^[a-z]\.$", re.IGNORECASE)
+_NUMBERED_LINE_RE = re.compile(r"^\(?\d{1,3}[a-z]?\)?\s+")
 _LEADING_DIALOGUE_RE = re.compile(r"^(?:[A-Za-z]|[0-9]{1,2})\s*:\s+")
 _MID_DIALOGUE_RE = re.compile(r"\b(?:[A-Za-z]|[0-9]{1,2})\s*:\s+")
 _ALL_CAPS_CONTEXT_RE = re.compile(r"^[A-Z0-9 '\"/-]+$")
@@ -137,6 +139,7 @@ _TO_OBJECT_RE = re.compile(
     r"\bto\b\s+(?:the|a|an|this|that|these|those|my|your|his|her|its|our|their|me|him|her|us|them|[A-Z][a-z]+)\b"
 )
 _TRAILING_CITATION_RE = re.compile(r"\s*\([A-Za-z][^)]*[:;][^)]*\)\.?\s*$")
+_LOWER_LABEL_TAIL_RE = re.compile(r"(?:^|[\s:;])([A-Z][^.!?]*[.!?]?)$")
 _PREP_META_TERMS = {
     "work",
     "works",
@@ -286,6 +289,12 @@ def _sanitize_context_text(text: str) -> str:
     if value.lower().startswith("not:"):
         return ""
     value = _TRAILING_CITATION_RE.sub("", value).strip(" ,;:")
+    if value[:1].islower():
+        tail_match = _LOWER_LABEL_TAIL_RE.search(value)
+        if tail_match:
+            tail = _norm(tail_match.group(1))
+            if tail:
+                value = tail
     return _norm(value)
 
 
@@ -352,9 +361,12 @@ def _word_overlap(left: str, right: str) -> float:
 def _extract_explicit_examples(text: str) -> list[str]:
     out: list[str] = []
     lines = str(text or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    in_example_block = False
+    pending_enum = False
     for raw_line in lines:
         line = _norm(raw_line)
         if not line:
+            pending_enum = False
             continue
         lowered = line.lower()
         marker_tail = ""
@@ -367,17 +379,45 @@ def _extract_explicit_examples(text: str) -> list[str]:
             out.extend(_fast_sentence_split(marker_tail))
             continue
 
+        if _STANDALONE_ENUM_RE.fullmatch(line):
+            in_example_block = True
+            pending_enum = True
+            continue
+
+        numbered = _NUMBERED_LINE_RE.sub("", line).strip()
+        if numbered != line and numbered:
+            out.extend(_fast_sentence_split(numbered))
+            in_example_block = True
+            pending_enum = False
+            continue
+
         if _INLINE_ENUM_RE.match(line):
             stripped = _INLINE_ENUM_RE.sub("", line).strip()
             if stripped:
                 out.append(_norm(stripped))
+            in_example_block = True
+            pending_enum = False
             continue
 
         if line.startswith("( )"):
             stripped = _norm(line[3:])
             if stripped:
                 out.append(stripped)
+            in_example_block = True
+            pending_enum = False
             continue
+
+        if in_example_block:
+            if pending_enum:
+                if line:
+                    out.extend(_fast_sentence_split(line))
+                pending_enum = False
+                continue
+            if len(re.findall(r"[A-Za-z']+", line)) <= 25 and any(ch in line for ch in ".?!'\"*…"):
+                out.extend(_fast_sentence_split(line))
+                continue
+            if _looks_explanatory_sentence_source_first(line):
+                in_example_block = False
     deduped: list[str] = []
     seen: set[str] = set()
     for item in out:

@@ -48,7 +48,15 @@ WORD_TOPIC_TO_TEMPLATE_IDS: dict[str, set[str]] = {
     "word_common_noun": {"WORD_NOUN_COMMON"},
 }
 
-REFERENCE_MARKERS = ("dictionary", "glossary", "handbook", "reference", "grammar today")
+REFERENCE_MARKERS = (
+    "dictionary",
+    "glossary",
+    "handbook",
+    "reference",
+    "grammar today",
+    "quick solutions",
+    "common errors in english",
+)
 EXAMPLE_MARKERS = ("for example", "for instance", "e.g.", "example:", "examples:")
 QUOTED_RE = re.compile(r"[\"“'`](.{5,}?)['\"”`]")
 TRAILING_NOTE_RE = re.compile(r"(\(cf\..*$|\[i\.e\..*$|\[cf\..*$|>\s.*$)", re.IGNORECASE)

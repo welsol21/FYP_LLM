@@ -90,3 +90,20 @@ do they know your address?
     assert "have a garage?" not in contexts
     assert "Are you a chef?" in contexts
     assert "do they know your address?" in contexts
+
+
+def test_extract_examples_skips_choice_candidates_with_slash_alternatives():
+    nlp = load_nlp("en_core_web_sm")
+    page_text = """
+The past simple is used to talk about completed actions in the past.
+a, The waiter dropped / droped the dishes onto the floor.
+i Ber Megan carryed / carried the files into the office.
+He visited his uncle yesterday.
+"""
+
+    examples = _extract_examples_from_page(page_text, nlp=nlp)
+    contexts = {item["context_text"] for item in examples}
+
+    assert "He visited his uncle yesterday." in contexts
+    assert not any("dropped / droped" in item for item in contexts)
+    assert not any("carryed / carried" in item for item in contexts)

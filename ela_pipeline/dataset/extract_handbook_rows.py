@@ -25,6 +25,14 @@ from ela_pipeline.dataset.book_extraction.english_grammar_in_use_adapter import 
 from ela_pipeline.dataset.book_extraction.english_grammar_today_adapter import extract_english_grammar_today_rows
 from ela_pipeline.dataset.book_extraction.gswe_adapter import GSWE_CONFIG, extract_gswe_rows
 from ela_pipeline.dataset.book_extraction.handbook_adapter import supports_payload
+from ela_pipeline.dataset.book_extraction.introducing_english_grammar_adapter import (
+    INTRODUCING_ENGLISH_GRAMMAR_CONFIG,
+    extract_introducing_english_grammar_rows,
+)
+from ela_pipeline.dataset.book_extraction.mysteries_english_grammar_adapter import (
+    MYSTERIES_ENGLISH_GRAMMAR_CONFIG,
+    extract_mysteries_english_grammar_rows,
+)
 from ela_pipeline.dataset.book_extraction.oxford_handbook_adapter import (
     OXFORD_HANDBOOK_CONFIG,
     extract_oxford_handbook_rows,
@@ -39,6 +47,8 @@ COLLINS_COBUILD_2011_PROFILE = COLLINS_COBUILD_2011_CONFIG.name
 COBUILD_GRAMMAR_PROFILE = COBUILD_GRAMMAR_CONFIG.name
 OXFORD_HANDBOOK_PROFILE = OXFORD_HANDBOOK_CONFIG.name
 GSWE_PROFILE = GSWE_CONFIG.name
+INTRODUCING_ENGLISH_GRAMMAR_PROFILE = INTRODUCING_ENGLISH_GRAMMAR_CONFIG.name
+MYSTERIES_ENGLISH_GRAMMAR_PROFILE = MYSTERIES_ENGLISH_GRAMMAR_CONFIG.name
 
 
 def _supports_english_grammar_today(payload: BookTextPayload) -> bool:
@@ -81,6 +91,14 @@ PROFILE_HANDLERS = {
     GSWE_PROFILE: (
         lambda payload: supports_payload(payload, GSWE_CONFIG),
         extract_gswe_rows,
+    ),
+    MYSTERIES_ENGLISH_GRAMMAR_PROFILE: (
+        lambda payload: supports_payload(payload, MYSTERIES_ENGLISH_GRAMMAR_CONFIG),
+        extract_mysteries_english_grammar_rows,
+    ),
+    INTRODUCING_ENGLISH_GRAMMAR_PROFILE: (
+        lambda payload: supports_payload(payload, INTRODUCING_ENGLISH_GRAMMAR_CONFIG),
+        extract_introducing_english_grammar_rows,
     ),
     ENGLISH_GRAMMAR_IN_USE_PROFILE: (
         _supports_english_grammar_in_use,

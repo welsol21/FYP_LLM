@@ -3,6 +3,10 @@
 ## 1. Purpose
 `ELA Pipeline` builds contract-compliant hierarchical linguistic JSON for English text.
 
+Canonical book-derived note process:
+- See `docs/book_to_dataset_inference_canonical_process_2026-03-21.md`.
+- This checklist is the required source-first process for book extraction, dataset enrichment, templated-note training, and inference.
+
 End-to-end flow:
 1. spaCy parsing
 2. deterministic skeleton building

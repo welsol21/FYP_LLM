@@ -92,3 +92,20 @@ def test_handbook_pairs_source_first_handles_rows_without_topic_key(tmp_path: Pa
     assert pairs[0]["notation_text"] == "A/an and the are articles. They are a type of determiner."
     assert pairs[0]["context_text"] == "Do you have a car?"
     assert pairs[0]["pair_method"] == "handbook_window_source_first"
+
+
+def test_handbook_pairs_strip_lowercase_subsection_labels_from_context(tmp_path: Path):
+    rows_path = tmp_path / "rows.jsonl"
+    rows_path.write_text(
+        '{"source_path":"book.pdf","row_type":"egt_article_window","topic_key":"modal","heading":"Might","text":"may She may be a friend of Richard’s.\\n\\nodality: meanings and uses 209 very likely should The traffic isn’t heavy.\\nstrong must You must arrive at 6 to pick up the tickets.\\nneed to We need to win this game to get into the final."}\n',
+        encoding="utf-8",
+    )
+
+    pairs, _report = build_handbook_note_context_pairs(rows_jsonl=str(rows_path))
+    contexts = {row["context_text"] for row in pairs}
+
+    assert "You must arrive at 6 to pick up the tickets." in contexts
+    assert "We need to win this game to get into the final." in contexts
+    assert "The traffic isn’t heavy." not in contexts
+    assert not any(item.startswith("odality: meanings and uses") for item in contexts)
+    assert not any(item.startswith("strong must") for item in contexts)

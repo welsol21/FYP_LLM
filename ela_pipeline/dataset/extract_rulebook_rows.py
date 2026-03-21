@@ -19,6 +19,10 @@ from ela_pipeline.dataset.book_extraction.oxford_dictionary_adapter import (
     OXFORD_DICTIONARY_CONFIG,
     extract_oxford_dictionary_rows,
 )
+from ela_pipeline.dataset.book_extraction.quick_solutions_adapter import (
+    QUICK_SOLUTIONS_CONFIG,
+    extract_quick_solutions_rows,
+)
 
 
 def _write_jsonl(path: str, rows: list[dict]) -> None:
@@ -39,6 +43,7 @@ PROFILE_HANDLERS = {
     CAMBRIDGE_DICTIONARY_CONFIG.name: extract_cambridge_dictionary_rows,
     LEECH_GLOSSARY_CONFIG.name: extract_leech_glossary_rows,
     OXFORD_DICTIONARY_CONFIG.name: extract_oxford_dictionary_rows,
+    QUICK_SOLUTIONS_CONFIG.name: extract_quick_solutions_rows,
 }
 
 
