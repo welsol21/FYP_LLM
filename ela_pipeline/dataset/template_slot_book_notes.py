@@ -18,6 +18,11 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from ela_pipeline.annotate.contract_template_builder import (
+    allowed_slots_for_template_text,
+    canonical_template_text_for_template_id,
+)
+from ela_pipeline.dataset.template_topic_mapping import topic_to_template_id
 from ela_pipeline.parse.spacy_parser import load_nlp
 from ela_pipeline.skeleton.builder import build_skeleton
 
@@ -90,6 +95,7 @@ UNSAFE_HEAD_WORDS = RELATIVE_MARKERS | {
     "them",
 }
 WORD_RE = re.compile(r"[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)?")
+QUESTION_TAG_RE = re.compile(r",\s*([A-Za-z]+(?:n't)?)\s+([A-Za-z]+)\?\s*$", re.IGNORECASE)
 
 
 def _norm(value: Any) -> str:
@@ -270,6 +276,60 @@ def _render(template: str, slots: dict[str, Any]) -> str:
     return rendered
 
 
+def _extract_question_tag_slots(sentence_text: str) -> dict[str, str]:
+    match = QUESTION_TAG_RE.search(_norm(sentence_text))
+    if not match:
+        return {}
+    return {
+        "TAG_AUXILIARY": _norm(match.group(1)),
+        "TAG_PRONOUN": _norm(match.group(2)),
+    }
+
+
+def _topic_template_projection(
+    *,
+    node_type: str,
+    topic: str,
+    sentence_text: str,
+    phrase_context: dict[str, Any] | None = None,
+) -> tuple[str, str, dict[str, Any], list[str], bool]:
+    flags: list[str] = []
+    level = "Sentence" if _norm_lower(node_type) == "sentence" else "Phrase"
+    template_id = topic_to_template_id(level, topic)
+    if not template_id:
+        return "passthrough", "", {}, flags, False
+
+    node_stub = {
+        "type": "Sentence" if level == "Sentence" else "Phrase",
+        "part_of_speech": (phrase_context or {}).get("part_of_speech"),
+        "grammatical_role": (phrase_context or {}).get("grammatical_role"),
+        "tam_construction": None,
+    }
+    template_text = canonical_template_text_for_template_id(template_id, node=node_stub)
+    if not template_text:
+        return "passthrough", "", {}, flags, False
+
+    slot_values: dict[str, Any] = {}
+    if level == "Sentence":
+        slot_values.update(_extract_question_tag_slots(sentence_text))
+    else:
+        slot_values.update(
+            {
+                "CONTENT": _norm((phrase_context or {}).get("content")) or None,
+                "PART_OF_SPEECH": _norm((phrase_context or {}).get("part_of_speech")) or None,
+                "GRAMMATICAL_ROLE": _norm((phrase_context or {}).get("grammatical_role")) or None,
+            }
+        )
+
+    required_slots = allowed_slots_for_template_text(template_text)
+    if any(not _norm(slot_values.get(slot)) for slot in required_slots):
+        flags.append("unresolved_template_slots")
+        rendered = template_text
+    else:
+        rendered = _render(template_text, slot_values)
+    return f"topic_template::{template_id.lower()}", template_text, slot_values, flags, True
+
+
 def _template_phrase_note(topic: str, note_text: str, slots: dict[str, Any]) -> tuple[str, str, list[str]]:
     topic_lower = _norm_lower(topic)
     note_lower = _norm_lower(note_text)
@@ -401,9 +461,28 @@ def _template_row(row: dict[str, Any], nlp: Any) -> tuple[dict[str, Any], list[s
         "templated": False,
     }
 
-    if _norm(context.get("node_type")).lower() != "phrase":
+    node_type = _norm(context.get("node_type")).lower()
+
+    if node_type != "phrase":
+        sentence_text = _norm(context.get("sentence_text") or context.get("content"))
+        template_kind, note_template, slot_values, template_flags, templated = _topic_template_projection(
+            node_type=node_type,
+            topic=topic,
+            sentence_text=sentence_text,
+        )
+        if templated:
+            projection.update(
+                {
+                    "template_kind": template_kind,
+                    "note_template": note_template,
+                    "slot_values": slot_values,
+                    "rendered_note": _render(note_template, slot_values) if note_template else note_text,
+                    "template_risk_flags": sorted(set(risk_flags + template_flags)),
+                    "templated": True,
+                }
+            )
         out["template_projection"] = projection
-        return out, risk_flags
+        return out, projection["template_risk_flags"]
 
     sentence_text = _norm(context.get("sentence_text"))
     if not sentence_text:
@@ -419,6 +498,18 @@ def _template_row(row: dict[str, Any], nlp: Any) -> tuple[dict[str, Any], list[s
 
     slots = _slot_values(sentence_node, target_node, context)
     template_kind, note_template, template_flags = _template_phrase_note(topic, note_text, slots)
+    if template_kind == "phrase_passthrough":
+        generic_kind, generic_template, generic_slots, generic_flags, generic_templated = _topic_template_projection(
+            node_type="phrase",
+            topic=topic,
+            sentence_text=sentence_text,
+            phrase_context=context,
+        )
+        if generic_templated and generic_template:
+            template_kind = generic_kind
+            note_template = generic_template
+            slots = {**slots, **generic_slots}
+            template_flags = template_flags + generic_flags
     projection.update(
         {
             "template_kind": template_kind,

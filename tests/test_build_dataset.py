@@ -133,19 +133,33 @@ class BuildDatasetTests(unittest.TestCase):
 
         rows = list(iter_examples(item))
         self.assertEqual(len(rows), 3)
-        for row in rows:
-            self.assertIn("prompt_template_version", row)
-            self.assertEqual(row["prompt_template_version"], "v1")
-            self.assertIn("template_version: v1", row["input"])
+        by_level = {row["level"]: row for row in rows}
+        self.assertEqual(by_level["Sentence"]["prompt_template_version"], "contract_template_v2")
+        self.assertEqual(by_level["Phrase"]["prompt_template_version"], "contract_template_v2")
+        self.assertEqual(by_level["Word"]["prompt_template_version"], "v2")
+        self.assertIn("rewrite_linguistic_note_template_from_contract_template", by_level["Sentence"]["input"])
+        self.assertIn("rewrite_linguistic_note_template_from_contract_template", by_level["Phrase"]["input"])
+        self.assertIn("template_version: v2", by_level["Word"]["input"])
         targets = {row["target"] for row in rows}
-        self.assertIn("Model sentence note", targets)
-        self.assertIn("Model phrase note", targets)
+        self.assertIn(
+            "This sentence uses a modal auxiliary to add meaning such as possibility, necessity, prediction, or obligation.",
+            targets,
+        )
+        self.assertIn(
+            "This phrase is a perfect verb phrase linking an earlier event to a later reference point.",
+            targets,
+        )
         self.assertIn("Model word note", targets)
-        self.assertNotIn("Fallback sentence note", targets)
         self.assertNotIn("Fallback word note", targets)
         tam_by_target = {row["target"]: row["tam_bucket"] for row in rows}
-        self.assertEqual(tam_by_target["Model sentence note"], "modal_perfect")
-        self.assertEqual(tam_by_target["Model phrase note"], "modal_perfect")
+        self.assertEqual(
+            tam_by_target["This sentence uses a modal auxiliary to add meaning such as possibility, necessity, prediction, or obligation."],
+            "modal_perfect",
+        )
+        self.assertEqual(
+            tam_by_target["This phrase is a perfect verb phrase linking an earlier event to a later reference point."],
+            "modal_perfect",
+        )
         self.assertEqual(tam_by_target["Model word note"], "modal")
 
     def test_iter_examples_supports_legacy_linguistic_notes_schema(self):
@@ -158,8 +172,13 @@ class BuildDatasetTests(unittest.TestCase):
 
         rows = list(iter_examples(item))
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["target"], "Legacy note")
+        self.assertEqual(
+            rows[0]["target"],
+            "This sentence is a declarative clause used to present information or make a statement.",
+        )
         self.assertEqual(rows[0]["level"], "Sentence")
+        self.assertEqual(rows[0]["prompt_template_version"], "contract_template_v2")
+        self.assertIn("rewrite_linguistic_note_template_from_contract_template", rows[0]["input"])
 
     def test_iter_examples_excludes_telemetry_like_note_text(self):
         item = {
@@ -287,7 +306,7 @@ class BuildDatasetTests(unittest.TestCase):
         rows = list(iter_examples(item, use_reference_templates=True))
         self.assertEqual(len(rows), 3)
         self.assertTrue(all(row["target"] for row in rows))
-        self.assertTrue(any("prepositional phrase" in row["target"] for row in rows if row["level"] == "Phrase"))
+        self.assertTrue(any("{{PART_OF_SPEECH}}" in row["target"] for row in rows if row["level"] == "Phrase"))
 
     def test_iter_examples_template_id_mode(self):
         item = {

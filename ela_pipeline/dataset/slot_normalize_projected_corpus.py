@@ -25,6 +25,12 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from ela_pipeline.annotate.contract_template_builder import (
+    allowed_slots_for_template_text,
+    canonical_template_text_for_template_id,
+)
+from ela_pipeline.dataset.template_topic_mapping import topic_to_template_id
+
 
 PREPOSITIONS = {
     "about",
@@ -115,6 +121,11 @@ def _render(template: str, slots: dict[str, Any]) -> str:
     rendered = rendered.replace(" .", ".")
     rendered = rendered.replace(" ,", ",")
     return rendered
+
+
+def _has_all_required_slots(template_text: str, slot_values: dict[str, Any]) -> bool:
+    required = allowed_slots_for_template_text(template_text)
+    return all(_norm(slot_values.get(slot)) for slot in required)
 
 
 def _extract_preposition_object(phrase_text: str) -> tuple[str | None, str | None]:
@@ -237,6 +248,33 @@ def _normalize_phrase_candidate(
         if not all(_sentence_has_fragment(phrase_text, fragment) for fragment in quoted):
             payload["slot_risk_flags"].append("quoted_relative_reference_unresolved")
 
+    else:
+        template_id = topic_to_template_id("Phrase", topic)
+        template_text = canonical_template_text_for_template_id(
+            template_id,
+            node={
+                "type": "Phrase",
+                "part_of_speech": phrase_entry.get("part_of_speech"),
+                "grammatical_role": phrase_entry.get("grammatical_role"),
+                "tam_construction": None,
+            },
+        )
+        slot_values = {
+            "CONTENT": phrase_text or None,
+            "PART_OF_SPEECH": _norm(phrase_entry.get("part_of_speech")) or None,
+            "GRAMMATICAL_ROLE": _norm(phrase_entry.get("grammatical_role")) or None,
+            "PREPOSITION": prep,
+            "OBJECT_NP": obj,
+            "RELATIVE_MARKER": rel,
+        }
+        if template_id and template_text and _has_all_required_slots(template_text, slot_values):
+            payload["slot_template_kind"] = f"topic_template::{template_id.lower()}"
+            payload["slot_template_text"] = template_text
+            payload["slot_values"] = slot_values
+            payload["slot_rendered_note"] = _render(template_text, slot_values)
+            payload["slot_templated"] = True
+            counters["phrase_slot_templated"] += 1
+
     out.update(payload)
     if repaired_text and repaired_text != note_text:
         out["lexicalized_note_text"] = note_text
@@ -266,6 +304,20 @@ def _normalize_sentence_candidate(
         payload["slot_rendered_note"] = _render(payload["slot_template_text"], payload["slot_values"])
         payload["slot_templated"] = True
         counters["sentence_slot_templated"] += 1
+    else:
+        template_id = topic_to_template_id("Sentence", topic)
+        template_text = canonical_template_text_for_template_id(
+            template_id,
+            node={"type": "Sentence", "tam_construction": None},
+        )
+        slot_values = tag_slots or {}
+        if template_id and template_text and _has_all_required_slots(template_text, slot_values):
+            payload["slot_template_kind"] = f"topic_template::{template_id.lower()}"
+            payload["slot_template_text"] = template_text
+            payload["slot_values"] = slot_values
+            payload["slot_rendered_note"] = _render(template_text, slot_values)
+            payload["slot_templated"] = True
+            counters["sentence_slot_templated"] += 1
 
     out.update(payload)
     return out

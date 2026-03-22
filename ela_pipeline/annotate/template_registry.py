@@ -517,6 +517,11 @@ TEMPLATE_VARIANTS.update(
             "The negative meaning is attached to an auxiliary element in the clause.",
             "This clause uses an auxiliary-based negative pattern instead of plain do-support.",
         ],
+        "SENT_MODAL_PERFECT": [
+            "This sentence uses a modal perfect form to express regret or criticism about a past unrealized action.",
+            "The sentence shows modal perfect meaning, often evaluating what should have happened in the past.",
+            "This sentence encodes modal perfect interpretation about a past action that did not occur as expected.",
+        ],
         "SENT_MODAL_GENERAL": [
             "This sentence uses a modal auxiliary to add meaning such as possibility, necessity, prediction, or obligation.",
             "A modal auxiliary shapes the speaker's stance toward the event in this clause.",
@@ -973,6 +978,8 @@ def is_template_semantically_compatible(node: Dict[str, object], template_id: st
             return bool(re.search(r"\b(do|does|did)\s+not\b", content)) or bool(re.search(r"\b(do|does|did)n't\b", content))
         if template_id == "SENT_NEGATION_AUXILIARY":
             return (" not " in f" {content} " or "n't" in content) and _has_modal(raw_content)
+        if template_id == "SENT_MODAL_PERFECT":
+            return _tam(node) == "modal_perfect" or (_has_modal(raw_content) and _has_perfect(raw_content))
         if template_id == "SENT_MODAL_GENERAL":
             return _has_modal(raw_content)
         if template_id == "SENT_PERFECT_GENERAL":

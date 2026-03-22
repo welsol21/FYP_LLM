@@ -12,6 +12,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
+from ela_pipeline.annotate.contract_template_builder import (
+    CONTRACT_PROMPT_TEMPLATE_VERSION,
+    build_contract_template_payload,
+    build_contract_template_training_prompt,
+)
 from ela_pipeline.annotate.note_context import build_note_context_prompt
 from ela_pipeline.corpus import validate_cefr_corpus
 
@@ -79,6 +84,153 @@ def _node_input_text(node: Dict[str, Any]) -> str:
     if isinstance(content, str):
         return content
     return ""
+
+
+def _infer_phrase_pos(node: Dict[str, Any]) -> str:
+    explicit = str(node.get("part_of_speech") or "").strip()
+    if explicit:
+        return explicit
+    pos = [str(item).upper() for item in (node.get("features", {}) or {}).get("pos", [])]
+    if pos and pos[0] == "ADP":
+        return "prepositional phrase"
+    if "VERB" in pos or "AUX" in pos:
+        return "verb phrase"
+    if "NOUN" in pos or "PROPN" in pos or "DET" in pos:
+        return "noun phrase"
+    if "ADJ" in pos:
+        return "adjectival phrase"
+    if "ADV" in pos:
+        return "adverbial phrase"
+    return "phrase"
+
+
+def _infer_grammatical_role(node: Dict[str, Any], *, default: str) -> str:
+    explicit = str(node.get("grammatical_role") or "").strip()
+    if explicit:
+        return explicit
+    dep_items = [str(item).strip() for item in (node.get("features", {}) or {}).get("dep", []) if str(item).strip()]
+    if dep_items:
+        return dep_items[0]
+    return default
+
+
+def _grammar_classes_stub(node: Dict[str, Any]) -> list[Dict[str, Any]]:
+    classes = node.get("grammar_classes")
+    if isinstance(classes, list):
+        return [item for item in classes if isinstance(item, dict)]
+    return []
+
+
+def _targets_tam(node: Dict[str, Any]) -> Any:
+    targets = node.get("targets")
+    if isinstance(targets, dict):
+        return targets.get("tam_construction")
+    return None
+
+
+def _dataset_node_to_contract_stub(node: Dict[str, Any], *, default_type: str) -> Dict[str, Any]:
+    node_type = str(node.get("type") or "").strip() or default_type
+    content = _node_input_text(node)
+    if node_type == "Sentence":
+        part_of_speech = str(node.get("part_of_speech") or "").strip() or "sentence"
+        grammatical_role = _infer_grammatical_role(node, default="clause")
+    elif node_type == "Phrase":
+        part_of_speech = _infer_phrase_pos(node)
+        grammatical_role = _infer_grammatical_role(node, default="modifier")
+    else:
+        part_of_speech = str(node.get("part_of_speech") or "").strip() or "word"
+        grammatical_role = _infer_grammatical_role(node, default="dep")
+    children = []
+    for child in node.get("linguistic_elements", []):
+        if isinstance(child, dict):
+            child_default = str(child.get("type") or "").strip() or "Word"
+            children.append(_dataset_node_to_contract_stub(child, default_type=child_default))
+    return {
+        "type": node_type,
+        "content": content,
+        "part_of_speech": part_of_speech,
+        "grammatical_role": grammatical_role,
+        "cefr_level": node.get("cefr_level"),
+        "tense": node.get("tense"),
+        "aspect": node.get("aspect"),
+        "mood": node.get("mood"),
+        "voice": node.get("voice"),
+        "finiteness": node.get("finiteness"),
+        "tam_construction": node.get("tam_construction") or _targets_tam(node),
+        "grammar_classes": _grammar_classes_stub(node),
+        "dep_label": node.get("dep_label"),
+        "head_id": node.get("head_id"),
+        "source_span": node.get("source_span"),
+        "linguistic_elements": children,
+    }
+
+
+def _note_prompt_for_contract_node(
+    *,
+    node: Dict[str, Any],
+    parent: Dict[str, Any] | None,
+    sentence_node: Dict[str, Any],
+    path_types: list[str],
+    depth: int,
+    sibling_index: int,
+    sibling_count: int,
+    level: str,
+) -> tuple[str, str]:
+    if level in {"Sentence", "Phrase"}:
+        payload = build_contract_template_payload(
+            node=node,
+            parent=parent,
+            sentence_node=sentence_node,
+            path_types=path_types,
+            depth=depth,
+            sibling_index=sibling_index,
+            sibling_count=sibling_count,
+        )
+        if isinstance(payload, dict):
+            return (
+                build_contract_template_training_prompt(payload, node_level=level),
+                CONTRACT_PROMPT_TEMPLATE_VERSION,
+            )
+    prompt = build_note_context_prompt(
+        node=node,
+        parent=parent,
+        sentence_node=sentence_node,
+        path_types=path_types,
+        depth=depth,
+        sibling_index=sibling_index,
+        sibling_count=sibling_count,
+        template_version=PROMPT_TEMPLATE_VERSION,
+    )
+    return prompt, PROMPT_TEMPLATE_VERSION
+
+
+def _template_target_for_contract_node(
+    *,
+    node: Dict[str, Any],
+    parent: Dict[str, Any] | None,
+    sentence_node: Dict[str, Any],
+    path_types: list[str],
+    depth: int,
+    sibling_index: int,
+    sibling_count: int,
+    level: str,
+) -> str | None:
+    if level not in {"Sentence", "Phrase"}:
+        return None
+    payload = build_contract_template_payload(
+        node=node,
+        parent=parent,
+        sentence_node=sentence_node,
+        path_types=path_types,
+        depth=depth,
+        sibling_index=sibling_index,
+        sibling_count=sibling_count,
+    )
+    if isinstance(payload, dict):
+        template_text = str(payload.get("template_text") or "").strip()
+        if template_text:
+            return template_text
+    return None
 
 
 POS_LABELS = {
@@ -489,6 +641,7 @@ def iter_examples(
     sent_targets = item.get("targets", {})
 
     sent_tam = _extract_tam_bucket(item)
+    sentence_stub = _dataset_node_to_contract_stub(item, default_type="Sentence")
     if task == "cefr_level":
         sentence_cefr = _extract_cefr_level(item)
         if sentence_cefr:
@@ -526,22 +679,34 @@ def iter_examples(
         sentence_note = _extract_note_from_targets(sent_targets, counters=counters)
 
     if task == "linguistic_note" and sentence_note:
-        prompt = build_note_context_prompt(
-            node=item,
+        template_target = None
+        if not use_template_id_targets:
+            template_target = _template_target_for_contract_node(
+                node=sentence_stub,
+                parent=None,
+                sentence_node=sentence_stub,
+                path_types=[str(item.get("type") or "").strip() or "Sentence"],
+                depth=0,
+                sibling_index=0,
+                sibling_count=1,
+                level="Sentence",
+            )
+        prompt, prompt_template_version = _note_prompt_for_contract_node(
+            node=sentence_stub,
             parent=None,
-            sentence_node=item,
+            sentence_node=sentence_stub,
             path_types=[str(item.get("type") or "").strip() or "Sentence"],
             depth=0,
             sibling_index=0,
             sibling_count=1,
-            template_version=PROMPT_TEMPLATE_VERSION,
+            level="Sentence",
         )
         yield {
             "input": prompt,
-            "target": sentence_note,
+            "target": template_target or sentence_note,
             "level": "Sentence",
             "tam_bucket": sent_tam,
-            "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+            "prompt_template_version": prompt_template_version,
             "task": task,
         }
         if counters is not None:
@@ -553,6 +718,7 @@ def iter_examples(
             phrase_tam = _extract_tam_bucket(node)
             phrase_text = _node_input_text(node)
             phrase_features = node.get("features", {})
+            template_target = None
             if task == "cefr_level":
                 phrase_cefr = _extract_cefr_level(node)
                 p_note = phrase_cefr
@@ -581,23 +747,41 @@ def iter_examples(
                         dep_text=format_feature_list(phrase_features.get("dep", [])),
                         tam_bucket=phrase_tam,
                     )
+                    prompt_template_version = PROMPT_TEMPLATE_VERSION
                 else:
-                    prompt = build_note_context_prompt(
-                        node=node,
-                        parent=parent,
-                        sentence_node=item,
+                    phrase_stub = _dataset_node_to_contract_stub(node, default_type="Phrase")
+                    parent_stub = (
+                        _dataset_node_to_contract_stub(parent, default_type=str(parent.get("type") or "").strip() or "Sentence")
+                        if isinstance(parent, dict)
+                        else None
+                    )
+                    if not use_template_id_targets:
+                        template_target = _template_target_for_contract_node(
+                            node=phrase_stub,
+                            parent=parent_stub,
+                            sentence_node=sentence_stub,
+                            path_types=path_types,
+                            depth=depth,
+                            sibling_index=sibling_index,
+                            sibling_count=sibling_count,
+                            level="Phrase",
+                        )
+                    prompt, prompt_template_version = _note_prompt_for_contract_node(
+                        node=phrase_stub,
+                        parent=parent_stub,
+                        sentence_node=sentence_stub,
                         path_types=path_types,
                         depth=depth,
                         sibling_index=sibling_index,
                         sibling_count=sibling_count,
-                        template_version=PROMPT_TEMPLATE_VERSION,
+                        level="Phrase",
                     )
                 yield {
                     "input": prompt,
-                    "target": p_note,
+                    "target": template_target or p_note,
                     "level": "Phrase",
                     "tam_bucket": phrase_tam,
-                    "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+                    "prompt_template_version": prompt_template_version,
                     "task": task,
                 }
                 if counters is not None:
@@ -701,6 +885,15 @@ def _iter_descendants_with_context(
             path_types=current_path,
         )
         idx += 1
+
+
+def _resolved_prompt_template_version(rows: List[Dict[str, str]]) -> str:
+    versions = sorted({str(row.get("prompt_template_version") or "").strip() for row in rows if str(row.get("prompt_template_version") or "").strip()})
+    if not versions:
+        return PROMPT_TEMPLATE_VERSION
+    if len(versions) == 1:
+        return versions[0]
+    return "mixed::" + "+".join(versions)
 
 
 def _iter_nodes(item: Dict[str, Any]) -> Iterable[Dict[str, Any]]:
@@ -1003,7 +1196,7 @@ def main() -> None:
 
     stats = {
         "task": args.task,
-        "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+        "prompt_template_version": _resolved_prompt_template_version(rows_after_balance),
         "input_path": str(Path(args.input).resolve()),
         "use_reference_templates": bool(args.use_reference_templates),
         "use_template_id_targets": bool(args.use_template_id_targets),

@@ -1,8 +1,9 @@
 """Build T5 train/dev/test datasets from projected book->corpus JSONL.
 
 The exporter selects one note candidate per eligible Sentence/Phrase node,
-renders the current flat note-context prompt, deduplicates exact pairs, caps
-over-repeated targets, and splits data by source document to reduce leakage.
+serializes the same contract-template payload used by runtime controlled notes,
+deduplicates exact pairs, caps over-repeated targets, and splits data by source
+document to reduce leakage.
 """
 
 from __future__ import annotations
@@ -15,9 +16,15 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 
-from ela_pipeline.annotate.note_context import build_note_context_prompt
+from ela_pipeline.annotate.contract_template_builder import (
+    CONTRACT_PROMPT_TEMPLATE_VERSION,
+    build_contract_template_payload,
+    build_contract_template_training_prompt,
+    normalize_template_text,
+    template_uses_allowed_slots,
+)
+from ela_pipeline.dataset.template_topic_mapping import topic_to_template_id
 from ela_pipeline.dataset.build_dataset import (
-    PROMPT_TEMPLATE_VERSION,
     _count_by,
     _count_level_tam,
     _sanitize_training_target_text,
@@ -87,6 +94,48 @@ def _candidate_target_text(candidate: Dict[str, Any]) -> str:
     if slot_text:
         return slot_text
     return str(candidate.get("note_text") or "").strip()
+
+
+def _candidate_target_template(candidate: Dict[str, Any], payload: Dict[str, Any] | None) -> tuple[str, str]:
+    canonical_template = normalize_template_text((payload or {}).get("template_text"))
+    allowed_slots = list((payload or {}).get("allowed_slots") or [])
+    payload_template_id = str((payload or {}).get("template_id") or "").strip()
+    payload_level = ""
+    if payload_template_id.startswith("SENT"):
+        payload_level = "Sentence"
+    elif payload_template_id.startswith("PHRASE"):
+        payload_level = "Phrase"
+    slot_template = normalize_template_text(candidate.get("slot_template_text"))
+    candidate_topic = str(candidate.get("topic") or "")
+    mapped_template_id = topic_to_template_id(payload_level, candidate_topic)
+    compatible = True
+    if mapped_template_id and payload_template_id:
+        compatible = mapped_template_id == payload_template_id
+        if not compatible and mapped_template_id == "SENT_NEGATION_GENERAL" and payload_template_id.startswith("SENT_NEGATION_"):
+            compatible = True
+        if not compatible and mapped_template_id == "SENT_CONDITIONAL_GENERAL" and payload_template_id.startswith("SENT_CONDITIONAL_"):
+            compatible = True
+        if not compatible and mapped_template_id == "SENT_PASSIVE_GENERAL" and payload_template_id.startswith("SENT_PASSIVE_"):
+            compatible = True
+        if not compatible and mapped_template_id == "SENT_QUESTION_WH" and payload_template_id in {"SENT_QUESTION_WH", "SENT_QUESTION_WH_DO_SUPPORT"}:
+            compatible = True
+        if not compatible and mapped_template_id == "PHRASE_PP_GENERAL" and payload_template_id.startswith("PHRASE_PP_"):
+            compatible = True
+        if not compatible and mapped_template_id == "PHRASE_RELATIVE_CLAUSE" and payload_template_id.startswith("PHRASE_RELATIVE_CLAUSE"):
+            compatible = True
+        if not compatible and mapped_template_id == "PHRASE_VP_GENERAL" and payload_template_id.startswith("PHRASE_VP_"):
+            compatible = True
+
+    if (
+        slot_template
+        and bool(candidate.get("slot_templated"))
+        and compatible
+        and template_uses_allowed_slots(slot_template, allowed_slots)
+    ):
+        return slot_template, "slot_template"
+    if canonical_template:
+        return canonical_template, "contract_template"
+    return "", "missing_template"
 
 
 def _candidate_risk_flags(candidate: Dict[str, Any]) -> List[str]:
@@ -324,33 +373,35 @@ def _choose_candidate(
 
 def _make_sentence_row(row: Dict[str, Any], candidate: Dict[str, Any]) -> Dict[str, Any]:
     sentence_stub = _build_sentence_stub(row)
-    prompt = build_note_context_prompt(
+    payload = build_contract_template_payload(
         node=sentence_stub,
-        parent=None,
         sentence_node=sentence_stub,
+        parent=None,
         path_types=["Sentence"],
         depth=0,
         sibling_index=0,
         sibling_count=1,
-        template_version=PROMPT_TEMPLATE_VERSION,
     )
+    prompt = build_contract_template_training_prompt(payload or {}, node_level="Sentence")
+    target_template, target_variant = _candidate_target_template(candidate, payload)
     source_document = row.get("source_document") or {}
     return {
         "input": prompt,
-        "target": _candidate_target_text(candidate),
+        "target": target_template,
         "level": "Sentence",
         "tam_bucket": "none",
-        "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+        "prompt_template_version": CONTRACT_PROMPT_TEMPLATE_VERSION,
         "source_document_id": source_document.get("id"),
         "source_name": source_document.get("source_name"),
         "sentence_text": row.get("sentence_text"),
         "target_content": row.get("sentence_text"),
+        "template_id": (payload or {}).get("template_id"),
         "note_source_book": candidate.get("source_book"),
         "note_topic": candidate.get("topic"),
         "note_origin_unit": candidate.get("origin_unit"),
         "note_match_level": candidate.get("match_level"),
         "note_selection_mode": "book_preferred",
-        "note_target_variant": "slot_rendered" if candidate.get("slot_rendered_note") else "note_text",
+        "note_target_variant": target_variant,
         "note_source_tier": "internal_fallback"
         if candidate.get("source_book") == "internal_pedagogical_grammar"
         else "book",
@@ -364,7 +415,7 @@ def _make_phrase_row(row: Dict[str, Any], phrase_entry: Dict[str, Any], candidat
         row,
         phrase_entry,
     )
-    prompt = build_note_context_prompt(
+    payload = build_contract_template_payload(
         node=phrase_stub,
         parent=parent_stub,
         sentence_node=sentence_stub,
@@ -372,25 +423,27 @@ def _make_phrase_row(row: Dict[str, Any], phrase_entry: Dict[str, Any], candidat
         depth=depth,
         sibling_index=sibling_index,
         sibling_count=sibling_count,
-        template_version=PROMPT_TEMPLATE_VERSION,
     )
+    prompt = build_contract_template_training_prompt(payload or {}, node_level="Phrase")
+    target_template, target_variant = _candidate_target_template(candidate, payload)
     source_document = row.get("source_document") or {}
     return {
         "input": prompt,
-        "target": _candidate_target_text(candidate),
+        "target": target_template,
         "level": "Phrase",
         "tam_bucket": "none",
-        "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+        "prompt_template_version": CONTRACT_PROMPT_TEMPLATE_VERSION,
         "source_document_id": source_document.get("id"),
         "source_name": source_document.get("source_name"),
         "sentence_text": row.get("sentence_text"),
         "target_content": phrase_entry.get("content"),
+        "template_id": (payload or {}).get("template_id"),
         "note_source_book": candidate.get("source_book"),
         "note_topic": candidate.get("topic"),
         "note_origin_unit": candidate.get("origin_unit"),
         "note_match_level": candidate.get("match_level"),
         "note_selection_mode": "book_preferred",
-        "note_target_variant": "slot_rendered" if candidate.get("slot_rendered_note") else "note_text",
+        "note_target_variant": target_variant,
         "note_source_tier": "internal_fallback"
         if candidate.get("source_book") == "internal_pedagogical_grammar"
         else "book",
@@ -580,7 +633,7 @@ def main() -> None:
         "task": "linguistic_note",
         "builder": "build_t5_dataset_from_projected_corpus.py",
         "mode": args.mode,
-        "prompt_template_version": PROMPT_TEMPLATE_VERSION,
+        "prompt_template_version": CONTRACT_PROMPT_TEMPLATE_VERSION,
         "input_path": str(projected_path.resolve()),
         "total_before_dedup": len(rows_before_dedup),
         "total_after_dedup": len(rows_after_dedup),

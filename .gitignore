@@ -67,8 +67,15 @@ data/open_book_sources_*/
 data/phase1_a1_a2_b1_training_dataset_only_v6.zip
 data/phase1_a1_a2_b1_validation_dataset_part01_v2.zip
 
-# Your large dataset file
+# Large local dataset / lexicon files
 linguistic_hierarchical_3000_v3.json
+linguistic_hierarchical_3000_v5*.json
+
+# WordNet extracted definitions (large, regenerable)
+data/wordnet/
+
+# Local inference result snapshots
+result_v*.json
 
 # -------------------------
 # Cache
