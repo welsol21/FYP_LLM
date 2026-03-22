@@ -2,6 +2,7 @@ transformers>=4.57.3
 datasets
 evaluate
 sentencepiece
+protobuf
 rouge-score
 pandas
 numpy
