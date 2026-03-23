@@ -15,16 +15,12 @@
 
 * { box-sizing: border-box; }
 
-html, body {
-  height: 100%;
-  overflow: hidden;
-}
-
 body {
   margin: 0;
   font-family: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
   background: radial-gradient(circle at top right, #182132 0%, #0d1017 55%, #090b10 100%);
   color: var(--text);
+  min-height: 100dvh;
 }
 
 .app-shell {
@@ -108,6 +104,7 @@ button {
   padding: 0;
   overflow: auto;
   min-height: 0;
+  padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
 }
 
 .screen-block {
