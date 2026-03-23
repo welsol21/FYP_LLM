@@ -108,7 +108,6 @@ button {
   padding: 0;
   overflow: auto;
   min-height: 0;
-  padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
 }
 
 .screen-block {
