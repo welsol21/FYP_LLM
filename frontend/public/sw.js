@@ -37,7 +37,7 @@ self.addEventListener('fetch', (event) => {
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-store' })
         .then((response) => response)
         .catch(async () => {
           return (await caches.match('/offline.html')) || Response.error()
