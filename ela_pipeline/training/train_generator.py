@@ -58,8 +58,7 @@ def _validate_processed_freshness(train_path: str, dev_path: str) -> Dict:
         raise ValueError(f"Missing processed stats file: {stats_path}")
     with open(stats_path, "r", encoding="utf-8") as f:
         stats = json.load(f)
-    prompt_template_version = str(stats.get("prompt_template_version") or "").strip()
-    if prompt_template_version not in {"v1", "v2", "contract_template_v1", "contract_template_v2"} and not prompt_template_version.startswith("mixed::"):
+    if stats.get("prompt_template_version") != "v1":
         raise ValueError("Incompatible processed stats: unexpected prompt_template_version")
     if int(stats.get("total_after_balance", 0)) <= 0:
         raise ValueError("Processed stats indicate zero training rows")
@@ -134,13 +133,7 @@ def main() -> None:
     def preprocess(batch):
         inputs = tokenizer(batch["input"], truncation=True, padding="max_length", max_length=args.max_input)
         labels = tokenizer(batch["target"], truncation=True, padding="max_length", max_length=args.max_target)
-        label_ids = []
-        for row in labels["input_ids"]:
-            label_ids.append([
-                token_id if token_id != tokenizer.pad_token_id else -100
-                for token_id in row
-            ])
-        inputs["labels"] = label_ids
+        inputs["labels"] = labels["input_ids"]
         return inputs
 
     train_tok = train_ds.map(preprocess, batched=True, remove_columns=train_ds.column_names)
@@ -229,7 +222,7 @@ def main() -> None:
         "train_metrics": {k: float(v) for k, v in train_output.metrics.items() if isinstance(v, (int, float))},
         "eval_metrics": {k: float(v) for k, v in eval_metrics.items() if isinstance(v, (int, float))},
         "best_model_dir": best_model_dir,
-        "prompt_template_version": str(processed_stats.get("prompt_template_version") or "unknown"),
+        "prompt_template_version": "v1",
     }
     save_json(os.path.join(args.output_dir, "evaluation_report.json"), evaluation_report)
     print(f"Saved model to {best_model_dir}")

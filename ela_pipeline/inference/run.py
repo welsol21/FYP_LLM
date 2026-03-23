@@ -9,11 +9,6 @@ import os
 from datetime import datetime
 from typing import Any
 
-from ela_pipeline.annotate.wordnet_lookup import get_wordnet_note
-from ela_pipeline.annotate.contract_template_builder import (
-    build_contract_template_payload,
-    render_contract_template,
-)
 from ela_pipeline.classifier.grammar_blueprints import build_note_blueprints
 from ela_pipeline.classifier.grammar_rules import map_pedagogical_grammar_classes
 from ela_pipeline.contract import deep_copy_contract
@@ -31,7 +26,6 @@ from ela_pipeline.tam.rules import apply_tam
 from ela_pipeline.validation.validator import (
     raise_if_invalid,
     validate_contract,
-    validate_frozen_structure,
 )
 
 STRICT_NULLABLE_TAM_FIELDS = {"tense", "aspect", "mood", "voice", "finiteness"}
@@ -758,27 +752,16 @@ def _attach_note_blueprints(doc: dict) -> None:
                 class_id = str(item.get("class_id") or "").strip()
                 if class_id:
                     class_ids.append(class_id)
-        pos = str(node.get("part_of_speech") or "").strip().lower()
-        blueprints = build_note_blueprints(
+        return build_note_blueprints(
             grammar_classes=class_ids,
             cefr_level=cefr,
             node_type=node_type,
             content=content,
             grammatical_role=role,
             tam_construction=tam,
-            part_of_speech=pos,
+            part_of_speech=str(node.get("part_of_speech") or "").strip().lower(),
             tense=str(node.get("tense") or "").strip().lower(),
         )
-        if not blueprints and node_type == "word":
-            wn_note = get_wordnet_note(
-                lemma=str(node.get("lemma") or content).strip().lower(),
-                part_of_speech=pos,
-                grammatical_role=role,
-                surface=content,
-            )
-            if wn_note:
-                return wn_note
-        return blueprints
 
     def walk(node: dict) -> None:
         generated = build_notes(node)
@@ -945,139 +928,6 @@ def _attach_note_generator_version(doc: dict, version: str) -> None:
     for sentence_node in doc.values():
         if isinstance(sentence_node, dict):
             walk(sentence_node)
-
-
-def _apply_contract_template_notes(doc: dict, renderer: Any | None = None) -> None:
-    key_to_level = {
-        "elementary": "elementary",
-        "intermediate": "intermediate",
-        "advanced": "advanced",
-    }
-
-    def walk(
-        node: dict,
-        sentence_node: dict,
-        parent: dict | None,
-        *,
-        path_types: list[str],
-        depth: int,
-        sibling_index: int,
-        sibling_count: int,
-    ) -> None:
-        payload = build_contract_template_payload(
-            node=node,
-            sentence_node=sentence_node,
-            parent=parent,
-            path_types=path_types,
-            depth=depth,
-            sibling_index=sibling_index,
-            sibling_count=sibling_count,
-        )
-        if isinstance(payload, dict):
-            deterministic_note = str(payload.get("rendered_note_text") or payload.get("fallback_note_text") or "").strip()
-            active_template_text = str(payload.get("template_text") or "").strip()
-            notes = _empty_linguistic_notes()
-            render_status = str(payload.get("render_status") or "template_rendered")
-            render_source = "contract_template"
-            render_model = "deterministic"
-            blueprints = node.get("note_blueprints") or {}
-            for level in key_to_level.values():
-                if level in ("elementary", "advanced"):
-                    blueprint_note = str(blueprints.get(f"{level}_text") or "").strip()
-                    notes[level] = blueprint_note or deterministic_note
-                else:
-                    notes[level] = deterministic_note
-            if renderer is not None:
-                render_source = "contract_template_t5"
-                render_model = type(renderer).__name__
-                t5_used = False
-                t5_fallback = False
-                for level in key_to_level.values():
-                    # elementary and advanced use blueprint notes directly;
-                    # only intermediate goes through T5 contract template rewrite.
-                    if level in ("elementary", "advanced"):
-                        blueprint_note = str(blueprints.get(f"{level}_text") or "").strip()
-                        notes[level] = blueprint_note or deterministic_note
-                        continue
-                    generated_template_text = str(
-                        renderer.render_note(
-                            blueprint_text=str(blueprints.get(f"{level}_text") or ""),
-                            level=level,
-                            node=node,
-                            parent=parent,
-                            sentence_node=sentence_node,
-                            path_types=path_types,
-                            depth=depth,
-                            sibling_index=sibling_index,
-                            sibling_count=sibling_count,
-                            template_payload=payload,
-                            deterministic_note=deterministic_note,
-                        )
-                        or ""
-                    ).strip()
-                    resolved_note, template_status = render_contract_template(
-                        generated_template_text or active_template_text,
-                        slot_values=dict(payload.get("slot_values") or {}),
-                        fallback_note=deterministic_note,
-                    )
-                    notes[level] = resolved_note
-                    if template_status == "template_rendered":
-                        normalized_generated = str(generated_template_text or "").strip()
-                        if normalized_generated and normalized_generated != active_template_text:
-                            active_template_text = normalized_generated
-                            t5_used = True
-                        else:
-                            t5_fallback = True
-                    else:
-                        t5_fallback = True
-                if t5_used:
-                    render_status = "rendered_with_t5"
-                elif t5_fallback:
-                    render_status = f"{render_status}::t5_fallback"
-            node["linguistic_notes"] = _coerce_linguistic_notes(notes)
-            node["note_template_version"] = str(payload.get("note_template_version") or "")
-            node["note_template_id"] = str(payload.get("template_id") or "")
-            node["note_template_text"] = active_template_text
-            node["note_template_slots"] = dict(payload.get("slot_values") or {})
-            node["note_template_input"] = dict(payload.get("note_template_input") or {})
-            node["note_render_source"] = render_source
-            node["note_render_model"] = render_model
-            node["note_render_status"] = render_status
-            node["template_selection"] = dict(payload.get("selection") or {})
-        elif isinstance(node.get("note_blueprints"), dict):
-            node["linguistic_notes"] = _coerce_linguistic_notes(
-                {},
-                note_blueprints=node.get("note_blueprints"),
-            )
-        else:
-            node["linguistic_notes"] = _empty_linguistic_notes()
-
-        children = [c for c in (node.get("linguistic_elements") or []) if isinstance(c, dict)]
-        for idx, child in enumerate(children):
-            child_type = str(child.get("type") or "").strip()
-            walk(
-                child,
-                sentence_node,
-                node,
-                path_types=[*path_types, child_type] if child_type else list(path_types),
-                depth=depth + 1,
-                sibling_index=idx,
-                sibling_count=len(children),
-            )
-
-    for sentence_node in doc.values():
-        if not isinstance(sentence_node, dict):
-            continue
-        sentence_type = str(sentence_node.get("type") or "").strip() or "Sentence"
-        walk(
-            sentence_node,
-            sentence_node,
-            None,
-            path_types=[sentence_type],
-            depth=0,
-            sibling_index=0,
-            sibling_count=1,
-        )
 
 
 def _prune_unused_legacy_fields(doc: dict) -> None:
@@ -1283,15 +1133,13 @@ def run_pipeline(
         raise ValueError("classifier_provider must be one of: rule | deberta | tabular")
 
     if note_mode == "controlled":
-        pre_note_merge = deep_copy_contract(enriched)
-        note_version = "controlled::contract_templates"
+        _apply_controlled_notes(enriched)
+        note_version = "controlled::classifier_blueprints"
         if model_dir:
             renderer = _get_controlled_t5_renderer_cached(model_dir)
-            _apply_contract_template_notes(enriched, renderer=renderer)
-            note_version = "controlled_t5::contract_templates"
-        else:
-            _apply_contract_template_notes(enriched)
-        raise_if_invalid(validate_frozen_structure(pre_note_merge, enriched))
+            _rewrite_controlled_notes_with_t5(enriched, renderer=renderer)
+            _apply_controlled_notes(enriched)
+            note_version = "controlled_t5::blueprint_rewrite"
         _attach_note_generator_version(
             enriched,
             version=note_version,

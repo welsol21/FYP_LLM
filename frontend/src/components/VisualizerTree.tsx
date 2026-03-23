@@ -1,0 +1,140 @@
+import { useMemo, useState } from 'react'
+import type { VisualizerNode } from '../api/runtimeApi'
+import { normalizeLinguisticNotes } from '../lib/linguisticNotes'
+import { resolveNodeTranslation } from '../lib/translationContract'
+
+type Props = {
+  node: VisualizerNode
+  depth?: number
+}
+
+const COLOR_MAP: Record<string, string> = {
+  sentence: '#f0d45a',
+  'modal phrase': '#f7c948',
+  'verb phrase': '#e9b949',
+  'noun phrase': '#f4a259',
+  'prepositional phrase': '#dfaf2b',
+  'adjective phrase': '#f6aa64',
+  'adverbial phrase': '#e6a141',
+  pronoun: '#6dbf4b',
+  verb: '#3d9970',
+  'auxiliary verb': '#4ecdc4',
+  'modal verb': '#2ecc71',
+  noun: '#a8d582',
+  adjective: '#b2e672',
+  adverb: '#ace1af',
+  preposition: '#8faf5a',
+  determiner: '#567d46',
+  article: '#567d46',
+  conjunction: '#228b22',
+}
+
+function resolveLabel(node: VisualizerNode): string {
+  return node.part_of_speech
+}
+
+function toneForLabel(label: string): string {
+  return COLOR_MAP[label.toLowerCase()] ?? '#7a8699'
+}
+
+export function VisualizerTree({ node, depth = 0 }: Props) {
+  const [expanded, setExpanded] = useState(true)
+  const [showDetails, setShowDetails] = useState(depth === 0)
+  const [showElementary, setShowElementary] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const label = resolveLabel(node)
+  const borderColor = useMemo(() => toneForLabel(label), [label])
+  const hasChildren = node.linguistic_elements.length > 0
+  const cefrText = node.cefr_level ?? '-'
+  const tenseText = node.tense == null || node.tense === '' ? '-' : node.tense
+  const notes = normalizeLinguisticNotes(node.linguistic_notes)
+  const fallbackNotes = node.notes?.map((note) => note?.text?.trim()).filter(Boolean).join(' ') || ''
+  const intermediateText = notes.intermediate || fallbackNotes || '-'
+  const translationText = resolveNodeTranslation(node)
+  const phoneticText =
+    node.phonetic?.uk || node.phonetic?.us
+      ? `${node.phonetic?.uk ? `UK /${node.phonetic.uk}/` : ''}${node.phonetic?.uk && node.phonetic?.us ? ' | ' : ''}${node.phonetic?.us ? `US /${node.phonetic.us}/` : ''}`
+      : '-'
+
+  return (
+    <div className="visualizer-node parse-node" style={{ borderLeftColor: borderColor }}>
+      <div className="visualizer-node-head">
+        <div className="visualizer-node-title">
+          <button
+            type="button"
+            className="node-chip"
+            style={{ backgroundColor: borderColor }}
+            onClick={() => setShowDetails((prev) => !prev)}
+            aria-label={`details-${node.node_id}`}
+          >
+            {label}
+          </button>
+          {node.cefr_level ? <span className="pill level">{node.cefr_level}</span> : null}
+          {depth === 0 ? <span className="pill">root</span> : null}
+        </div>
+        {hasChildren ? (
+          <button
+            type="button"
+            className="tree-toggle"
+            onClick={() => setExpanded((prev) => !prev)}
+            aria-label={`toggle-${node.node_id}`}
+          >
+            {expanded ? 'Collapse' : 'Expand'}
+          </button>
+        ) : null}
+      </div>
+      <div className="node-content-strip">
+        {hasChildren ? (
+          node.linguistic_elements.map((child) => {
+            const childLabel = resolveLabel(child)
+            return (
+              <span
+                key={child.node_id}
+                className="child-content"
+                style={{ textDecorationColor: toneForLabel(childLabel) }}
+              >
+                {child.content}
+              </span>
+            )
+          })
+        ) : (
+          <span className="child-content own" style={{ textDecorationColor: borderColor }}>
+            {node.content}
+          </span>
+        )}
+      </div>
+      {showDetails ? (
+        <div className="node-details">
+          <div><strong>CEFR:</strong> {cefrText}</div>
+          <div><strong>Tense:</strong> {tenseText}</div>
+          <div><strong>Linguistic Notes (Intermediate):</strong> {intermediateText}</div>
+          {notes.elementary ? (
+            <div>
+              <button type="button" className="tree-toggle" onClick={() => setShowElementary((prev) => !prev)}>
+                {showElementary ? 'Hide Elementary' : 'Show Elementary'}
+              </button>
+              {showElementary ? <div>{notes.elementary}</div> : null}
+            </div>
+          ) : null}
+          {notes.advanced ? (
+            <div>
+              <button type="button" className="tree-toggle" onClick={() => setShowAdvanced((prev) => !prev)}>
+                {showAdvanced ? 'Hide Advanced' : 'Show Advanced'}
+              </button>
+              {showAdvanced ? <div>{notes.advanced}</div> : null}
+            </div>
+          ) : null}
+          <div><strong>Translation:</strong> {translationText}</div>
+          <div><strong>Phonetic:</strong> {phoneticText}</div>
+        </div>
+      ) : null}
+      {hasChildren && expanded ? (
+        <div className="tree-children">
+          {node.linguistic_elements.map((child) => (
+            <VisualizerTree key={child.node_id} node={child} depth={depth + 1} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}

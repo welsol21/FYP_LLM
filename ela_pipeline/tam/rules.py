@@ -27,9 +27,6 @@ class TamResult:
     @property
     def short_tense(self) -> str:
         if self.tense == "none":
-            # Modal constructions have no traditional tense; surface the mood instead.
-            if self.mood == "modal":
-                return "modal"
             return "null"
         if self.aspect == "simple":
             return self.tense

@@ -633,26 +633,29 @@ class PipelineTests(unittest.TestCase):
         sentence = out[next(iter(out))]
         blueprints = sentence.get("note_blueprints")
         self.assertIsInstance(blueprints, dict)
-        notes = sentence.get("linguistic_notes")
-        self.assertIsInstance(notes, dict)
-        self.assertTrue(str(notes.get("intermediate") or notes.get("elementary") or notes.get("advanced") or "").strip())
-        self.assertEqual(sentence.get("note_generator_version"), "controlled::contract_templates")
-        self.assertTrue(sentence.get("note_template_version"))
-        self.assertTrue(sentence.get("note_template_id"))
-        self.assertTrue(sentence.get("note_template_text"))
-        self.assertIsInstance(sentence.get("note_template_input"), dict)
-        self.assertIsInstance(sentence.get("note_template_slots"), dict)
-        self.assertEqual(sentence.get("note_render_source"), "contract_template")
+        self.assertEqual(
+            sentence.get("linguistic_notes"),
+            {
+                "elementary": blueprints.get("elementary_text"),
+                "intermediate": blueprints.get("intermediate_text"),
+                "advanced": blueprints.get("advanced_text"),
+            },
+        )
+        self.assertEqual(sentence.get("note_generator_version"), "controlled::classifier_blueprints")
 
     def test_pipeline_default_note_mode_is_controlled(self):
         out = run_pipeline("She trusted him.", model_dir=None)
         sentence = out[next(iter(out))]
         blueprints = sentence.get("note_blueprints")
         self.assertIsInstance(blueprints, dict)
-        notes = sentence.get("linguistic_notes")
-        self.assertIsInstance(notes, dict)
-        self.assertTrue(str(notes.get("intermediate") or notes.get("elementary") or notes.get("advanced") or "").strip())
-        self.assertEqual(sentence.get("note_generator_version"), "controlled::contract_templates")
+        self.assertEqual(
+            sentence.get("linguistic_notes"),
+            {
+                "elementary": blueprints.get("elementary_text"),
+                "intermediate": blueprints.get("intermediate_text"),
+                "advanced": blueprints.get("advanced_text"),
+            },
+        )
 
     def test_pipeline_keeps_uncovered_sentence_words_when_phrase_nodes_exist(self):
         out = run_pipeline("She came to him towards morning.", model_dir=None)
@@ -715,7 +718,7 @@ class PipelineTests(unittest.TestCase):
     @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.__init__", side_effect=AssertionError("must not be called"))
     def test_pipeline_controlled_mode_skips_legacy_t5_annotator(self, _mock_init, mock_renderer_cls):
         mock_renderer = MagicMock()
-        mock_renderer.render_note.side_effect = lambda **kwargs: kwargs["deterministic_note"]
+        mock_renderer.render_note.side_effect = lambda **kwargs: kwargs["blueprint_text"]
         mock_renderer_cls.return_value = mock_renderer
         out = run_pipeline(
             "She trusted him.",
@@ -723,15 +726,14 @@ class PipelineTests(unittest.TestCase):
             note_mode="controlled",
         )
         sentence = out[next(iter(out))]
-        self.assertEqual(sentence.get("note_generator_version"), "controlled_t5::contract_templates")
-        self.assertEqual(sentence.get("note_render_source"), "contract_template_t5")
+        self.assertEqual(sentence.get("note_generator_version"), "controlled_t5::blueprint_rewrite")
 
     @patch("ela_pipeline.annotate.controlled_renderer.ControlledT5NoteRenderer")
     def test_pipeline_controlled_mode_rewrites_blueprints_with_t5(self, mock_renderer_cls):
         mock_renderer = MagicMock()
 
         def _render(**kwargs):
-            return f"rendered::{kwargs['level']}::{kwargs['deterministic_note']}"
+            return f"rendered::{kwargs['level']}::{kwargs['blueprint_text']}"
 
         mock_renderer.render_note.side_effect = _render
         mock_renderer_cls.return_value = mock_renderer
@@ -743,14 +745,14 @@ class PipelineTests(unittest.TestCase):
         )
         sentence = out[next(iter(out))]
         blueprints = sentence.get("note_blueprints", {})
-        self.assertFalse(str(blueprints.get("elementary_text")).startswith("rendered::elementary::"))
-        self.assertFalse(str(blueprints.get("intermediate_text")).startswith("rendered::intermediate::"))
-        self.assertFalse(str(blueprints.get("advanced_text")).startswith("rendered::advanced::"))
-        notes = sentence.get("linguistic_notes") or {}
-        self.assertTrue(str(notes.get("elementary") or "").startswith("rendered::elementary::"))
-        self.assertTrue(str(notes.get("intermediate") or "").startswith("rendered::intermediate::"))
-        self.assertTrue(str(notes.get("advanced") or "").startswith("rendered::advanced::"))
-        self.assertEqual(sentence.get("note_render_status"), "rendered_with_t5")
+        self.assertTrue(str(blueprints.get("elementary_text")).startswith("rendered::elementary::"))
+        self.assertTrue(str(blueprints.get("intermediate_text")).startswith("rendered::intermediate::"))
+        self.assertTrue(str(blueprints.get("advanced_text")).startswith("rendered::advanced::"))
+        self.assertEqual(sentence.get("linguistic_notes"), {
+            "elementary": blueprints.get("elementary_text"),
+            "intermediate": blueprints.get("intermediate_text"),
+            "advanced": blueprints.get("advanced_text"),
+        })
 
     @patch("ela_pipeline.classifier.deberta.DebertaProfileClassifier")
     def test_pipeline_uses_deberta_classifier_provider(self, mock_classifier_cls):
@@ -773,7 +775,11 @@ class PipelineTests(unittest.TestCase):
         self.assertIsInstance(sentence.get("grammar_classes"), list)
         self.assertGreater(len(sentence.get("grammar_classes")), 0)
         self.assertTrue(sentence.get("note_blueprints", {}).get("intermediate_text"))
-        self.assertTrue(str((sentence.get("linguistic_notes") or {}).get("intermediate") or "").strip())
+        self.assertEqual(sentence.get("linguistic_notes"), {
+            "elementary": sentence.get("note_blueprints", {}).get("elementary_text"),
+            "intermediate": sentence.get("note_blueprints", {}).get("intermediate_text"),
+            "advanced": sentence.get("note_blueprints", {}).get("advanced_text"),
+        })
         self.assertGreaterEqual(fake_classifier.classify_node.call_count, 1)
 
     @patch("ela_pipeline.classifier.tabular_cefr_predictor.TabularProfileClassifier")
@@ -797,7 +803,11 @@ class PipelineTests(unittest.TestCase):
         self.assertIsInstance(sentence.get("grammar_classes"), list)
         self.assertGreater(len(sentence.get("grammar_classes")), 0)
         self.assertTrue(sentence.get("note_blueprints", {}).get("intermediate_text"))
-        self.assertTrue(str((sentence.get("linguistic_notes") or {}).get("intermediate") or "").strip())
+        self.assertEqual(sentence.get("linguistic_notes"), {
+            "elementary": sentence.get("note_blueprints", {}).get("elementary_text"),
+            "intermediate": sentence.get("note_blueprints", {}).get("intermediate_text"),
+            "advanced": sentence.get("note_blueprints", {}).get("advanced_text"),
+        })
         self.assertGreaterEqual(fake_classifier.classify_node.call_count, 1)
 
     @patch("ela_pipeline.annotate.local_generator.LocalT5Annotator.annotate")

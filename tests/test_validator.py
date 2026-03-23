@@ -412,14 +412,6 @@ class ValidatorTests(unittest.TestCase):
         sentence["quality_flags"] = ["note_generated", "model_used"]
         sentence["rejected_candidates"] = ["Bad template output"]
         sentence["reason_codes"] = ["MODEL_NOTE_ACCEPTED"]
-        sentence["note_template_version"] = "v1"
-        sentence["note_template_id"] = "PHRASE_PP_LOCATION"
-        sentence["note_template_text"] = "This {{PART_OF_SPEECH}} works as a {{GRAMMATICAL_ROLE}}."
-        sentence["note_template_input"] = {"node_id": "n1", "node_type": "Sentence"}
-        sentence["note_template_slots"] = {"PART_OF_SPEECH": "sentence", "GRAMMATICAL_ROLE": "clause"}
-        sentence["note_render_source"] = "contract_template"
-        sentence["note_render_model"] = "deterministic"
-        sentence["note_render_status"] = "template_rendered"
 
         result = validate_contract(data, validation_mode="v1")
         self.assertTrue(result.ok, msg=str(result.errors))
@@ -615,24 +607,11 @@ class ValidatorTests(unittest.TestCase):
         sentence["quality_flags"] = "model_used"
         sentence["rejected_candidates"] = [123]
         sentence["reason_codes"] = [None]
-        sentence["note_template_version"] = ""
-        sentence["note_template_input"] = []
-        sentence["note_template_slots"] = {"PART_OF_SPEECH": 7}
-        sentence["note_render_status"] = 5
 
         result = validate_contract(data, validation_mode="v1")
         self.assertFalse(result.ok)
         self.assertTrue(
-            any(
-                ".quality_flags" in err.path
-                or ".rejected_candidates" in err.path
-                or ".reason_codes" in err.path
-                or ".note_template_version" in err.path
-                or ".note_template_input" in err.path
-                or ".note_template_slots" in err.path
-                or ".note_render_status" in err.path
-                for err in result.errors
-            ),
+            any(".quality_flags" in err.path or ".rejected_candidates" in err.path or ".reason_codes" in err.path for err in result.errors),
             msg=str(result.errors),
         )
 

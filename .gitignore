@@ -24,7 +24,7 @@ env/
 # -------------------------
 .vscode/
 .history/
-.claude/
+
 # -------------------------
 # HuggingFace / Transformers
 # -------------------------
@@ -61,21 +61,11 @@ results_*/
 *.parquet
 data/external_datasets/
 data/processed_classifier/
-data/processed_*/
-data/reports/
-data/open_book_sources_*/
 data/phase1_a1_a2_b1_training_dataset_only_v6.zip
 data/phase1_a1_a2_b1_validation_dataset_part01_v2.zip
 
-# Large local dataset / lexicon files
+# Your large dataset file
 linguistic_hierarchical_3000_v3.json
-linguistic_hierarchical_3000_v5*.json
-
-# WordNet extracted definitions (large, regenerable)
-data/wordnet/
-
-# Local inference result snapshots
-result_v*.json
 
 # -------------------------
 # Cache
@@ -116,24 +106,10 @@ artifacts/
 
 temp/
 
-# Frontend (lives only in tauri_app and android_pwa_release_v2 branches)
-frontend/
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/coverage/
+frontend/*.tsbuildinfo
 tmp_media_check/
-
-# Internal working docs (not for repo)
-docs/contract_field_ownership_2026-03-04.md
-docs/curator_progress_report.md
-docs/dataset_ingestion_plan_2026-02-13.md
-docs/grammar_curriculum_classifier_spec_2026-02-24.md
-docs/grammar_reference_sources_2026-02-13.md
-docs/implementation_proposal.md
-docs/legacy_feature_source_map_2026-02-17.md
-docs/license_compliance_checklists.md
-docs/media_processing_feature_spec_2026-02-18.md
-docs/next_stage_product_spec_2026-02-17.md
-docs/template_id_experiment_report_2026-02-13.md
-docs/TODO.md
-docs/ui_migration_map_2026-02-17.md
-docs/123.json
-docs/example_sentences_razbor.json
-docs/reports/

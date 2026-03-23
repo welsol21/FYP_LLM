@@ -7,10 +7,6 @@ import os
 import torch
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
-from ela_pipeline.annotate.contract_template_builder import (
-    build_contract_template_training_prompt,
-    resolve_generated_template_text,
-)
 from ela_pipeline.annotate.note_context import build_note_context_prompt
 from ela_pipeline.validation.notes_quality import sanitize_note
 
@@ -50,8 +46,6 @@ class ControlledT5NoteRenderer:
     def _build_prompt(
         self,
         *,
-        template_payload: dict | None,
-        deterministic_note: str,
         blueprint_text: str,
         level: str,
         node: dict,
@@ -62,12 +56,6 @@ class ControlledT5NoteRenderer:
         sibling_index: int,
         sibling_count: int,
     ) -> str:
-        if isinstance(template_payload, dict):
-            return build_contract_template_training_prompt(
-                template_payload,
-                node_level=str(node.get("type") or "").strip() or "Unknown",
-                audience_level=level,
-            )
         context = build_note_context_prompt(
             node=node,
             parent=parent,
@@ -90,7 +78,7 @@ class ControlledT5NoteRenderer:
     def render_note(
         self,
         *,
-        blueprint_text: str = "",
+        blueprint_text: str,
         level: str,
         node: dict,
         parent: dict | None,
@@ -99,12 +87,8 @@ class ControlledT5NoteRenderer:
         depth: int,
         sibling_index: int,
         sibling_count: int,
-        template_payload: dict | None = None,
-        deterministic_note: str = "",
     ) -> str:
         prompt = self._build_prompt(
-            template_payload=template_payload,
-            deterministic_note=deterministic_note,
             blueprint_text=blueprint_text,
             level=level,
             node=node,
@@ -129,16 +113,7 @@ class ControlledT5NoteRenderer:
                 num_beams=4,
                 do_sample=False,
             )
-        generated = sanitize_note(self.tokenizer.decode(out[0], skip_special_tokens=True))
-        if isinstance(template_payload, dict):
-            resolved, _ = resolve_generated_template_text(
-                generated,
-                default_template_text=str(template_payload.get("template_text") or ""),
-                allowed_slots=template_payload.get("allowed_slots") or [],
-            )
-            return resolved
-        if not generated:
-            if deterministic_note:
-                return str(deterministic_note or "").strip()
+        note = sanitize_note(self.tokenizer.decode(out[0], skip_special_tokens=True))
+        if not note:
             return str(blueprint_text or "").strip()
-        return generated
+        return note

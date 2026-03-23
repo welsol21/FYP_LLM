@@ -16,8 +16,6 @@ from typing import Any, Dict, Iterable, List, Tuple
 
 from ela_pipeline.annotate.note_context import build_note_context_prompt
 from ela_pipeline.dataset.build_dataset import (
-    _note_prompt_for_contract_node,
-    _resolved_prompt_template_version,
     PROMPT_TEMPLATE_VERSION,
     _build_template_target,
     _count_by,
@@ -148,7 +146,7 @@ def _make_rows(nodes_dir: Path) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
                     "source_span": src.get("source_span"),
                     "linguistic_elements": [],
                 }
-                prompt, prompt_template_version = _note_prompt_for_contract_node(
+                prompt = build_note_context_prompt(
                     node=sentence_node,
                     parent=None,
                     sentence_node=sentence_node,
@@ -156,7 +154,7 @@ def _make_rows(nodes_dir: Path) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
                     depth=0,
                     sibling_index=0,
                     sibling_count=1,
-                    level="Sentence",
+                    template_version=PROMPT_TEMPLATE_VERSION,
                 )
             elif level == "Phrase":
                 phrase_node = {
@@ -191,7 +189,7 @@ def _make_rows(nodes_dir: Path) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
                     "source_span": None,
                     "linguistic_elements": [],
                 }
-                prompt, prompt_template_version = _note_prompt_for_contract_node(
+                prompt = build_note_context_prompt(
                     node=phrase_node,
                     parent=sentence_stub,
                     sentence_node=sentence_stub,
@@ -199,7 +197,7 @@ def _make_rows(nodes_dir: Path) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
                     depth=1,
                     sibling_index=0,
                     sibling_count=1,
-                    level="Phrase",
+                    template_version=PROMPT_TEMPLATE_VERSION,
                 )
             else:
                 word_node = {
@@ -262,7 +260,6 @@ def _make_rows(nodes_dir: Path) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
                     sibling_count=1,
                     template_version=PROMPT_TEMPLATE_VERSION,
                 )
-                prompt_template_version = PROMPT_TEMPLATE_VERSION
 
             rows.append(
                 {
@@ -270,7 +267,7 @@ def _make_rows(nodes_dir: Path) -> Tuple[List[Dict[str, str]], Dict[str, int]]:
                     "target": target,
                     "level": level,
                     "tam_bucket": tam,
-                    "prompt_template_version": prompt_template_version,
+                    "prompt_template_version": PROMPT_TEMPLATE_VERSION,
                 }
             )
             counters["rows_emitted"] += 1
@@ -343,7 +340,7 @@ def main() -> None:
     write_jsonl(test, str(out_dir / "test.jsonl"))
 
     stats = {
-        "prompt_template_version": _resolved_prompt_template_version(rows_after_balance),
+        "prompt_template_version": PROMPT_TEMPLATE_VERSION,
         "input_nodes_dir": str(args.nodes_dir),
         "total_before_dedup": len(rows_before_dedup),
         "total_after_dedup": len(rows_after_dedup),
