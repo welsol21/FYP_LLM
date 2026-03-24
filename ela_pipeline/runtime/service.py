@@ -2142,6 +2142,31 @@ class RuntimeMediaService:
             voice_name = _voice_name_for_choice(voice_choice)
             with tempfile.TemporaryDirectory(prefix="ela_tts_") as tmpdir:
                 tmp = Path(tmpdir)
+
+                # Pre-generate all TTS segments in parallel (one asyncio.gather instead of N sequential asyncio.run calls).
+                if include_target:
+                    async def _batch_tts() -> None:
+                        async def _one(idx_: int, text_: str) -> None:
+                            path_ = tmp / f"tgt_{idx_:04d}.mp3"
+                            await edge_tts.Communicate(text_, voice_name).save(str(path_))
+
+                        tts_coros = []
+                        for _idx, _row in enumerate(media_sentences, start=1):
+                            _text_en = str(_row.get("sentence_text") or _row.get("text_eng") or "").strip()
+                            _text_ru = str(_row.get("text_ru") or "").strip()
+                            _text_for_tts = _text_ru or _text_en
+                            if _text_for_tts:
+                                tts_coros.append(_one(_idx, _text_for_tts))
+                        await asyncio.gather(*tts_coros, return_exceptions=True)
+
+                    if stage_callback is not None:
+                        stage_callback(
+                            "exporting_files",
+                            0.11,
+                            f"Synthesizing {len(media_sentences)} TTS segments",
+                        )
+                    asyncio.run(_batch_tts())
+
                 for idx, row in enumerate(media_sentences, start=1):
                     total_segments = max(1, len(media_sentences))
                     if stage_callback is not None:
@@ -2220,10 +2245,6 @@ class RuntimeMediaService:
                                 segment_audio_files.append(pause_2)
                                 current_ms += source_target_pause_ms
 
-                        async def _save_segment(path: Path = target_seg_mp3, text: str = text_for_tts) -> None:
-                            await edge_tts.Communicate(text, voice_name).save(str(path))
-
-                        asyncio.run(_save_segment())
                         if not target_seg_mp3.exists() or target_seg_mp3.stat().st_size <= 1024:
                             raise RuntimeError(f"edge-tts synthesis failed for sentence {idx}.")
                         if not _normalize_audio_to_wav(source=target_seg_mp3, out_path=target_seg):

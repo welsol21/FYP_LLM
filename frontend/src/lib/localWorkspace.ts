@@ -40,8 +40,7 @@ type WorkspaceState = {
 const DEFAULT_TRANSLATION_CONFIG: TranslationConfig = {
   default_provider: 'm2m100',
   providers: [
-    { id: 'm2m100', label: 'Our Translator (M2M100)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} },
-    { id: 'hf', label: 'HuggingFace', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} },
+    { id: 'm2m100', label: 'M2M100', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} },
     { id: 'gpt', label: 'OpenAI GPT', kind: 'builtin', enabled: false, credential_fields: ['api_key'], credentials: { api_key: '' } },
     { id: 'deepl', label: 'DeepL', kind: 'builtin', enabled: false, credential_fields: ['auth_key'], credentials: { auth_key: '' } },
     {
