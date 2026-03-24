@@ -362,10 +362,11 @@ export class MockRuntimeApi implements RuntimeApi {
   }
 
   async getTranslationConfig(): Promise<TranslationConfig> {
-    const cfg = JSON.parse(JSON.stringify(this.translationConfig)) as TranslationConfig
-    cfg.providers = cfg.providers.filter((p) => p.id !== 'hf')
-    if (cfg.default_provider === 'hf') cfg.default_provider = 'm2m100'
-    return cfg
+    if (this.translationConfig.providers.some((p) => p.id === 'hf')) {
+      this.translationConfig.providers = this.translationConfig.providers.filter((p) => p.id !== 'hf')
+      if (this.translationConfig.default_provider === 'hf') this.translationConfig.default_provider = 'm2m100'
+    }
+    return JSON.parse(JSON.stringify(this.translationConfig)) as TranslationConfig
   }
 
   async saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig> {
