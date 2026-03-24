@@ -1220,20 +1220,17 @@ class RuntimeMediaService:
                             stage_callback("transcribing_audio", 1.0, "Cache hit: skipped transcription.")
                         stage_callback("translating_text", 0.02, "Cache hit: reused sentence contracts.")
         # --- Try to reuse an immutable checkpoint from a previous (possibly failed) run ---
+        # Path is derived from immutable_signature — no SQLite needed to locate the file.
         extraction: MediaExtractionResult | None = None
-        if not force_full_reprocess and pipeline is None and isinstance(manifest_state, dict):
-            pending_doc_id = str(manifest_state.get("last_document_id") or "").strip()
-            pending_sig = str(manifest_state.get("immutable_signature") or "").strip()
-            if pending_doc_id and pending_sig == immutable_signature:
-                checkpoint = self._load_immutable_checkpoint(document_id=pending_doc_id)
-                if checkpoint is not None:
-                    extraction = checkpoint
-                    document_id = document_id or pending_doc_id
-                    if stage_callback is not None:
-                        stage_callback("loading_file", 1.0, "Checkpoint: reused previous extraction.")
-                        if checkpoint.source_type in {"audio", "video"}:
-                            stage_callback("transcribing_audio", 1.0, "Checkpoint: skipped Whisper.")
-                        stage_callback("translating_text", 0.02, "Checkpoint: rebuilding sentence contracts.")
+        if not force_full_reprocess and pipeline is None:
+            checkpoint = self._load_immutable_checkpoint(immutable_signature=immutable_signature)
+            if checkpoint is not None:
+                extraction = checkpoint
+                if stage_callback is not None:
+                    stage_callback("loading_file", 1.0, "Checkpoint: reused previous extraction.")
+                    if checkpoint.source_type in {"audio", "video"}:
+                        stage_callback("transcribing_audio", 1.0, "Checkpoint: skipped Whisper.")
+                    stage_callback("translating_text", 0.02, "Checkpoint: rebuilding sentence contracts.")
 
         # --- Full extraction (Whisper / text / PDF parse) ---
         if pipeline is None and extraction is None:
@@ -1256,7 +1253,10 @@ class RuntimeMediaService:
             # Checkpoint saved immediately — retries skip Whisper even if contract-build fails.
             document_id = document_id or f"doc-{uuid.uuid4().hex[:12]}"
             try:
-                self._save_immutable_checkpoint(document_id=document_id, extraction=extraction)
+                self._save_immutable_checkpoint(immutable_signature=immutable_signature, extraction=extraction)
+            except Exception:
+                pass  # checkpoint is best-effort; must not block pipeline
+            try:
                 self.repo.set_workspace_state(
                     manifest_key,
                     {
@@ -1267,7 +1267,7 @@ class RuntimeMediaService:
                     },
                 )
             except Exception:
-                pass  # checkpoint is best-effort; must not block pipeline
+                pass
 
         # --- Contract building (variant stage — may fail and be retried) ---
         if pipeline is None:
@@ -1519,32 +1519,37 @@ class RuntimeMediaService:
             pass
 
     @staticmethod
-    def _immutable_checkpoint_path(*, document_id: str) -> Path:
-        return RuntimeMediaService._doc_artifacts_dir(document_id=document_id) / "immutable_checkpoint.json"
+    def _pending_extraction_dir() -> Path:
+        base = Path(os.getenv("MEDIA_CONTRACT_ARTIFACTS_DIR", "artifacts/media_contracts"))
+        return base / "_pending_extraction"
 
     @staticmethod
-    def _save_immutable_checkpoint(*, document_id: str, extraction: MediaExtractionResult) -> None:
+    def _immutable_checkpoint_path(*, immutable_signature: str) -> Path:
+        """Deterministic path based on signature — no SQLite lookup needed."""
+        return RuntimeMediaService._pending_extraction_dir() / immutable_signature[:24] / "immutable_checkpoint.json"
+
+    @staticmethod
+    def _save_immutable_checkpoint(*, immutable_signature: str, extraction: MediaExtractionResult) -> None:
         """Persist the immutable (Whisper/extract) stage result immediately.
 
-        Saved right after extraction succeeds so that a subsequent contract-build
-        failure can be retried without repeating the expensive Whisper run.
+        Path is derived from immutable_signature, so the loader can find it
+        without relying on the SQLite manifest (which may not be flushed yet
+        when running from a background thread).
         """
-        doc_dir = RuntimeMediaService._doc_artifacts_dir(document_id=document_id)
-        doc_dir.mkdir(parents=True, exist_ok=True)
+        checkpoint_path = RuntimeMediaService._immutable_checkpoint_path(immutable_signature=immutable_signature)
+        checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "source_type": extraction.source_type,
             "full_text": extraction.full_text,
             "sentence_stream": extraction.sentence_stream,
             "sentence_timeline": extraction.sentence_timeline,
         }
-        RuntimeMediaService._immutable_checkpoint_path(document_id=document_id).write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        checkpoint_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
     @staticmethod
-    def _load_immutable_checkpoint(*, document_id: str) -> MediaExtractionResult | None:
-        """Load a previously saved immutable checkpoint, if it exists."""
-        path = RuntimeMediaService._immutable_checkpoint_path(document_id=document_id)
+    def _load_immutable_checkpoint(*, immutable_signature: str) -> MediaExtractionResult | None:
+        """Load a previously saved immutable checkpoint by signature, if it exists."""
+        path = RuntimeMediaService._immutable_checkpoint_path(immutable_signature=immutable_signature)
         if not path.exists():
             return None
         try:
