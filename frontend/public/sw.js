@@ -1,5 +1,5 @@
-const APP_SHELL_CACHE = 'ela-app-shell-v4'
-const RUNTIME_CACHE = 'ela-runtime-v4'
+const APP_SHELL_CACHE = 'ela-app-shell-v5'
+const RUNTIME_CACHE = 'ela-runtime-v5'
 const APP_SHELL_FILES = [
   '/manifest.webmanifest',
   '/offline.html',

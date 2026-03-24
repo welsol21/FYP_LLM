@@ -163,16 +163,22 @@ export function MediaSubmitForm({
       <div className="analyze-grid">
         <label className="analyze-label">Translator:</label>
         <div className="touch-options-grid">
-          {enabledProviders.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={`touch-option-btn${translator === p.id ? ' active' : ''}`}
-              onClick={() => setTranslator(p.id)}
-            >
-              {p.label}
-            </button>
-          ))}
+          {translatorOptions.length === 0 ? (
+            <span className="muted">Loading…</span>
+          ) : enabledProviders.length === 0 ? (
+            <span className="muted">No providers enabled — check Config.</span>
+          ) : (
+            enabledProviders.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`touch-option-btn${translator === p.id ? ' active' : ''}`}
+                onClick={() => setTranslator(p.id)}
+              >
+                {p.label}
+              </button>
+            ))
+          )}
         </div>
 
         <label className="analyze-label">Subtitles:</label>
