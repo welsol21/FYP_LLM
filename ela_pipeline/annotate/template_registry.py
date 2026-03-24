@@ -353,6 +353,111 @@ TEMPLATE_VARIANTS: Dict[str, List[str]] = {
         "As a word, '{content}' is an adverb with modifying function.",
         "'{content}' serves as an adverbial modifier in the sentence.",
     ],
+    "PHRASE_RELATIVE_CLAUSE": [
+        "This relative clause gives more information about the noun it refers to.",
+        "A relative clause adds identifying or descriptive information about a noun.",
+        "This relative clause extends the reference of the noun it modifies.",
+        "The relative clause here provides additional detail about a noun in context.",
+        "This clause functions as a relative clause modifying a noun antecedent.",
+    ],
+    "PHRASE_RELATIVE_CLAUSE_RESTRICTIVE": [
+        "This restrictive relative clause helps identify which noun is meant.",
+        "A restrictive relative clause limits the possible referents of the noun it modifies.",
+        "This relative clause is restrictive: it narrows down the reference of the noun.",
+        "The restrictive relative clause here defines which specific noun is being referred to.",
+        "This clause restricts the noun's reference by specifying identifying information.",
+    ],
+    "PHRASE_RELATIVE_CLAUSE_NONRESTRICTIVE": [
+        "This non-restrictive relative clause adds extra information about a known noun.",
+        "A non-restrictive relative clause gives optional extra detail about a noun.",
+        "This relative clause adds parenthetical information about the noun it follows.",
+        "The non-restrictive relative clause provides additional context without limiting the noun.",
+        "This clause adds supplementary information and could be removed without changing core meaning.",
+    ],
+    "PHRASE_RELATIVE_CLAUSE_STRANDED_PREP": [
+        "This relative clause places the preposition at the end rather than before the relative marker.",
+        "The preposition is stranded at the end of this relative clause, which is common in informal style.",
+        "In this relative clause, the preposition follows rather than precedes the relative pronoun.",
+        "Preposition stranding here is the informal pattern where the preposition stays at clause end.",
+        "This relative clause uses end-placement of the preposition, a natural spoken-English pattern.",
+    ],
+    "PHRASE_RELATIVE_CLAUSE_FRONTED_PREP": [
+        "This relative clause fronts the preposition before the relative marker, a formal pattern.",
+        "A fronted preposition before the relative marker marks formal written register.",
+        "This relative clause uses a formal preposition-fronting pattern.",
+        "The preposition appears before the relative pronoun here, which is the formal written style.",
+        "Preposition fronting in this relative clause signals a more formal or literary register.",
+    ],
+    "SENT_DECLARATIVE": [
+        "This is a declarative sentence that makes a statement.",
+        "The sentence states a proposition in declarative form.",
+        "This sentence uses a declarative structure to express a fact or idea.",
+        "A declarative sentence like this one presents a claim or piece of information.",
+        "This declarative sentence asserts something without asking a question or giving a command.",
+    ],
+    "SENT_PASSIVE_GENERAL": [
+        "This sentence uses the passive voice, where the subject receives the action.",
+        "The passive construction shifts focus from the agent to the recipient of the action.",
+        "This sentence is in passive voice: the grammatical subject is affected by the verb action.",
+        "In the passive voice, the entity that undergoes the action is foregrounded as the subject.",
+        "This passive sentence omits or demotes the agent and highlights the affected participant.",
+    ],
+    "SENT_NEGATION_GENERAL": [
+        "This sentence contains a negation that reverses the truth value of the clause.",
+        "The sentence uses negation to deny or contradict the predicate.",
+        "Negation in this sentence reverses the meaning of the verb phrase.",
+        "This negated sentence expresses that the predicate does not hold.",
+        "A negation marker makes the clause negative, asserting the opposite of the affirmative form.",
+    ],
+    "SENT_MODAL_GENERAL": [
+        "This sentence uses a modal auxiliary to express possibility, obligation, or stance.",
+        "A modal verb in this sentence marks the speaker's attitude toward the event.",
+        "The modal auxiliary adds meaning related to possibility, necessity, or permission.",
+        "Modal verbs like this one encode epistemic or deontic meaning in the clause.",
+        "This sentence uses a modal to express degree of certainty or social obligation.",
+    ],
+    "SENT_MODAL_PERFECT": [
+        "This sentence uses a modal perfect form to evaluate or comment on a past unrealized event.",
+        "The modal perfect expresses hindsight judgment about what should or could have happened.",
+        "This modal perfect construction evaluates a past action against current expectations.",
+        "Modal perfects like this often express regret, criticism, or retrospective assessment.",
+        "This sentence combines a modal with perfect aspect to comment on an unfulfilled past possibility.",
+    ],
+    "SENT_PERFECT_GENERAL": [
+        "This sentence uses perfect aspect to relate a past situation to a current reference point.",
+        "The perfect construction links a completed event to a relevant present context.",
+        "Perfect aspect in this sentence connects a prior event to the current moment.",
+        "The perfect here signals that a past event has current relevance or consequence.",
+        "This perfect-aspect sentence presents an event as complete relative to a reference time.",
+    ],
+    "SENT_PROGRESSIVE_GENERAL": [
+        "This sentence uses progressive aspect to present an event as ongoing or in progress.",
+        "The progressive form presents the event as unfolding at the reference time.",
+        "Progressive aspect here marks the event as continuous rather than completed.",
+        "The progressive construction focuses on the activity as an ongoing process.",
+        "This sentence uses the progressive to express an event in progress at a given time.",
+    ],
+    "SENT_QUESTION_YES_NO_AUX": [
+        "This is a yes/no question formed with an auxiliary verb.",
+        "The sentence inverts subject and auxiliary to form a yes/no question.",
+        "This yes/no question uses auxiliary inversion to seek confirmation.",
+        "Yes/no questions like this one expect a confirmation or denial as a response.",
+        "Subject-auxiliary inversion here creates a question that can be answered with yes or no.",
+    ],
+    "SENT_QUESTION_WH": [
+        "This is a wh-question seeking specific information.",
+        "The wh-word at the beginning signals a request for specific information.",
+        "This wh-question uses a wh-word to ask about a specific element.",
+        "Wh-questions request information about a particular participant, time, place, or reason.",
+        "This sentence uses a wh-word to form an open question about a specific fact.",
+    ],
+    "SENT_CONDITIONAL_GENERAL": [
+        "This sentence introduces a conditional clause with 'if', stating a condition.",
+        "The 'if' clause here sets up a condition that affects the result clause.",
+        "This conditional sentence links a hypothetical condition to a possible outcome.",
+        "Conditional sentences with 'if' express dependency between a condition and a consequence.",
+        "This sentence uses 'if' to mark the conditional relationship between two clauses.",
+    ],
 }
 
 SENTENCE_MODAL_PERFECT_VARIANTS: List[str] = [
@@ -497,7 +602,67 @@ def is_template_semantically_compatible(node: Dict[str, object], template_id: st
             return first in {"because", "since", "as"}
         if template_id == "CLAUSE_SUBORDINATE_TIME":
             return first in {"before", "after", "when", "while"}
-        return template_id == "SENTENCE_FINITE_CLAUSE"
+        if template_id == "SENTENCE_FINITE_CLAUSE":
+            return True
+        # Semantic checks for SENT_* priority templates
+        mood_val = _norm(node.get("mood"))
+        aspect_val = _norm(node.get("aspect"))
+        voice_val = _norm(node.get("voice"))
+        has_neg_val = " not " in f" {content} " or "n't" in content
+        is_q = content.endswith("?")
+        wh_starters = {"who", "what", "which", "when", "where", "why", "how"}
+        _time_subordinators = {"before", "after", "when", "while", "as", "since", "although", "though", "because"}
+        if template_id == "SENT_QUESTION_TAG":
+            return bool(re.search(r",\s*\w+(?:n't)?\s+\w+\?\s*$", content, re.IGNORECASE))
+        if template_id in {"SENT_QUESTION_WH_DO_SUPPORT", "SENT_QUESTION_WH"}:
+            return first in wh_starters and is_q
+        if template_id in {"SENT_QUESTION_YES_NO_DO_SUPPORT", "SENT_QUESTION_YES_NO_AUX"}:
+            return is_q and first not in wh_starters and not bool(re.search(r",\s*\w+(?:n't)?\s+\w+\?\s*$", content, re.IGNORECASE))
+        if template_id in {"SENT_EXISTENTIAL_THERE_QUESTION", "SENT_EXISTENTIAL_THERE_AGREEMENT", "SENT_EXISTENTIAL_THERE"}:
+            return first == "there"
+        if template_id in {"SENT_EXTRAPOSITION_IT_THAT", "SENT_CLEFT_IT"}:
+            return first == "it"
+        if template_id in {
+            "SENT_PASSIVE_PERFECT", "SENT_PASSIVE_PROGRESSIVE",
+            "SENT_PASSIVE_REPORTING_IT", "SENT_PASSIVE_AGENTLESS", "SENT_PASSIVE_GENERAL",
+        }:
+            return voice_val == "passive"
+        if template_id in {
+            "SENT_CONDITIONAL_THIRD", "SENT_CONDITIONAL_SECOND", "SENT_CONDITIONAL_FIRST",
+            "SENT_CONDITIONAL_ZERO", "SENT_CONDITIONAL_CONCESSIVE", "SENT_CONDITIONAL_FORMAL_SHOULD",
+            "SENT_CONDITIONAL_IMPERATIVE_RESULT", "SENT_CONDITIONAL_PRESENT_MODAL",
+            "SENT_CONDITIONAL_COUNTERFACTUAL_PAST", "SENT_CONDITIONAL_COUNTERFACTUAL",
+            "SENT_CONDITIONAL_FACTUAL", "SENT_CONDITIONAL_NECESSARY_CONDITION",
+            "SENT_CONDITIONAL_PREDICTIVE", "SENT_CONDITIONAL_GENERAL",
+        }:
+            return first == "if"
+        if template_id == "SENT_TIME_CLAUSE_FUTURE_REFERENCE":
+            return first in {"when", "while", "once", "until", "after", "before", "as"} and (
+                " will " in content or " shall " in content
+            )
+        if template_id in {"SENT_NEGATION_DO_SUPPORT", "SENT_NEGATION_AUXILIARY", "SENT_NEGATION_GENERAL"}:
+            return has_neg_val and not is_q
+        if template_id == "SENT_MODAL_PERFECT":
+            return mood_val == "modal" and aspect_val == "perfect"
+        if template_id == "SENT_MODAL_GENERAL":
+            return mood_val == "modal"
+        if template_id == "SENT_PERFECT_GENERAL":
+            return aspect_val in {"perfect", "perfect_progressive"}
+        if template_id == "SENT_PROGRESSIVE_GENERAL":
+            return aspect_val in {"progressive", "perfect_progressive"}
+        if template_id == "SENT_EXCLAMATIVE":
+            return "!" in content
+        if template_id in {"SENT_DECLARATIVE", "SENT_ACTIVE_VOICE"}:
+            # Catch-all: declarative non-question, non-negation, non-passive,
+            # not a subordinate clause that the registry handles via lex_class
+            return (
+                not is_q
+                and not has_neg_val
+                and first != "if"
+                and voice_val != "passive"
+                and first not in _time_subordinators
+            )
+        return False
 
     if level == "phrase":
         verbal_phrase_like = {"verb phrase", "phrasal verb", "idiom", "collocation", "clause chunk"}
@@ -569,5 +734,10 @@ def render_template_note(template_id: str, node: Dict[str, object], matched_key:
 
 def all_template_ids() -> List[str]:
     ids = set(TEMPLATE_VARIANTS.keys())
-    ids.update({"CLAUSE_SUBORDINATE_TIME", "CLAUSE_SUBORDINATE_REASON", "CLAUSE_SUBORDINATE_CONCESSION"})
+    ids.update({
+        "CLAUSE_SUBORDINATE_TIME",
+        "CLAUSE_SUBORDINATE_REASON",
+        "CLAUSE_SUBORDINATE_CONCESSION",
+        "SENTENCE_FINITE_CLAUSE",
+    })
     return sorted(ids)

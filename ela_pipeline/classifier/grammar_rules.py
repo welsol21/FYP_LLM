@@ -82,6 +82,8 @@ def map_pedagogical_grammar_classes(
             add_class("present_simple_negative" if negative else "present_simple_affirmative")
         elif construction == "past_simple" or tense_value == "past":
             add_class("past_simple_negative" if negative else "past_simple_affirmative")
+        elif "past" in tense_value and ("progressive" in tense_value or aspect_value in {"progressive", "continuous"}):
+            add_class("past_continuous")
         elif construction == "present_continuous" or "progressive" in tense_value or aspect_value in {"progressive", "continuous"}:
             add_class("present_continuous")
         elif construction == "be_copula" or (node_kind == "phrase" and pos_value == "noun phrase" and "cop" in dep_signature):

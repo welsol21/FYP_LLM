@@ -25,9 +25,9 @@ class TamResult:
         return f"{self.tense} {self.aspect} {self.voice}{modal_part} {self.polarity}".strip()
 
     @property
-    def short_tense(self) -> str:
+    def short_tense(self) -> str | None:
         if self.tense == "none":
-            return "null"
+            return None
         if self.aspect == "simple":
             return self.tense
         return f"{self.tense} {self.aspect}".strip()
@@ -54,7 +54,7 @@ def detect_tam(tokens: Iterable) -> TamResult:
     has_be = any(l in BE_FORMS for l in lowered)
     has_have = any(l in HAVE_FORMS for l in lowered)
 
-    passive = any(t.dep_ == "auxpass" for t in seq) or (has_be and has_vbn)
+    passive = any(t.dep_ in {"auxpass", "aux:pass"} for t in seq) or (has_be and has_vbn)
     voice = "passive" if passive else "active"
 
     perfect = has_have and has_vbn

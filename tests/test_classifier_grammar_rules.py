@@ -32,6 +32,37 @@ class GrammarRulesTests(unittest.TestCase):
         )
         self.assertIn("passive_voice", classes)
 
+    def test_maps_past_continuous_not_present_continuous(self):
+        # "past progressive" short_tense must produce past_continuous, not present_continuous
+        classes = map_pedagogical_grammar_classes(
+            tense="past progressive",
+            aspect="progressive",
+            content="She was brushing the mantel.",
+        )
+        self.assertIn("past_continuous", classes)
+        self.assertNotIn("present_continuous", classes)
+
+    def test_maps_present_continuous(self):
+        # pure progressive aspect without "past" must still produce present_continuous
+        classes = map_pedagogical_grammar_classes(
+            tense="progressive",
+            aspect="progressive",
+            content="She is reading.",
+        )
+        self.assertIn("present_continuous", classes)
+        self.assertNotIn("past_continuous", classes)
+
+    def test_past_simple_not_confused_with_progressive(self):
+        # plain past tense must still produce past_simple_affirmative
+        classes = map_pedagogical_grammar_classes(
+            tense="past",
+            aspect="simple",
+            content="She left.",
+        )
+        self.assertIn("past_simple_affirmative", classes)
+        self.assertNotIn("past_continuous", classes)
+        self.assertNotIn("present_continuous", classes)
+
 
 if __name__ == "__main__":
     unittest.main()
