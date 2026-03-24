@@ -287,15 +287,25 @@ def _extract_text_and_sentence_chunks(
         media_duration_sec = _probe_media_duration_seconds(source_path)
 
         # Validate that the file actually contains audio before handing it to Whisper.
-        # whisper.load_audio() uses ffmpeg; if it returns an empty array the subsequent
-        # mel-spectrogram reshape will raise an opaque tensor error.
+        # whisper.load_audio() uses ffmpeg internally; if the file contains no decodable
+        # audio the subsequent mel-spectrogram reshape raises an opaque tensor error.
+        # We load once here, validate, then pass the numpy array directly to transcribe
+        # to avoid a second load that could return a different (empty) result.
+        _WHISPER_SAMPLE_RATE = 16_000
+        _MIN_AUDIO_SAMPLES = _WHISPER_SAMPLE_RATE // 10  # 100 ms minimum
         try:
             import whisper as _whisper_mod  # type: ignore[import-not-found]
             _raw = _whisper_mod.load_audio(str(source_path))
-            if _raw is None or (hasattr(_raw, "__len__") and len(_raw) == 0):
+            n_samples = len(_raw) if _raw is not None and hasattr(_raw, "__len__") else 0
+            if n_samples == 0:
                 raise RuntimeError(
                     f"'{source_path.name}' contains no audio samples. "
                     "The file may have no audio track or may be corrupt."
+                )
+            if n_samples < _MIN_AUDIO_SAMPLES:
+                raise RuntimeError(
+                    f"'{source_path.name}' is too short for transcription "
+                    f"({n_samples} samples, minimum {_MIN_AUDIO_SAMPLES})."
                 )
         except RuntimeError:
             raise
@@ -309,8 +319,9 @@ def _extract_text_and_sentence_chunks(
 
         def _run_transcribe() -> None:
             try:
+                # Pass the pre-loaded numpy array to avoid Whisper reloading the file.
                 result_holder["result"] = model.transcribe(
-                    str(source_path),
+                    _raw,
                     language=source_lang,
                     word_timestamps=False,
                     verbose=False,
