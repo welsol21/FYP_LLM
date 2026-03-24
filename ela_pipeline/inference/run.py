@@ -947,11 +947,14 @@ def pre_translate_sentences_batch(
     source_lang: str = "en",
     target_lang: str = "ru",
     device: str = "cpu",
+    chunk_size: int = 16,
 ) -> None:
-    """Pre-populate the process-wide translation cache using a single batched model.generate() call.
+    """Pre-populate the process-wide translation cache in small chunks.
 
-    Call this before processing N sentences to replace N individual M2M100 calls with 1 batch call.
-    When run_pipeline() subsequently runs for each sentence, the cache hit is found and M2M100 is skipped.
+    Processes sentences in groups of `chunk_size` to avoid OOM on low-memory
+    servers (M2M100 418M ~1.7 GB; batching all sentences at once can exhaust RAM).
+    When run_pipeline() subsequently runs for each sentence, cache hits are found
+    and M2M100 is skipped.
     """
     from ela_pipeline.translate import build_translation_cache_from_env, build_translation_cache_key
 
@@ -967,17 +970,19 @@ def pre_translate_sentences_batch(
     if not texts:
         return
 
-    translations = translator.translate_texts(texts, source_lang=source_lang, target_lang=target_lang)
-    for text, translation in zip(texts, translations):
-        if not translation:
-            continue
-        key = build_translation_cache_key(
-            source_text=text,
-            source_lang=source_lang,
-            target_lang=target_lang,
-            model_name=translator.model_name,
-        )
-        cache.set(key, translation.strip() or text, ttl_seconds=ttl)
+    for i in range(0, len(texts), chunk_size):
+        chunk = texts[i : i + chunk_size]
+        translations = translator.translate_texts(chunk, source_lang=source_lang, target_lang=target_lang)
+        for text, translation in zip(chunk, translations):
+            if not translation:
+                continue
+            key = build_translation_cache_key(
+                source_text=text,
+                source_lang=source_lang,
+                target_lang=target_lang,
+                model_name=translator.model_name,
+            )
+            cache.set(key, translation.strip() or text, ttl_seconds=ttl)
 
 
 def run_pipeline(

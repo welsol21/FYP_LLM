@@ -121,5 +121,144 @@ class RuntimeApiServerTests(unittest.TestCase):
             server.server_close()
             thread.join(timeout=2)
 
+class ApiServerHttpSmokeTests(unittest.TestCase):
+    """Start a real ThreadingHTTPServer on a random port, hit all endpoints,
+    verify they respond with 2xx JSON — not 502 / crash / connection-refused."""
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            cls.server = ThreadingHTTPServer(("127.0.0.1", 0), api_server.RuntimeApiHandler)
+        except PermissionError:
+            cls.server = None
+            return
+        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+        host, port = cls.server.server_address
+        cls.base = f"http://{host}:{port}"
+
+    @classmethod
+    def tearDownClass(cls):
+        if cls.server:
+            cls.server.shutdown()
+            cls.server.server_close()
+            cls.thread.join(timeout=2)
+
+    def _get(self, path: str):
+        if not self.server:
+            self.skipTest("Socket bind not permitted.")
+        with urlrequest.urlopen(f"{self.base}{path}", timeout=5) as r:  # nosec B310
+            return r.status, json.loads(r.read().decode())
+
+    def _post(self, path: str, body: dict):
+        if not self.server:
+            self.skipTest("Socket bind not permitted.")
+        req = urlrequest.Request(
+            f"{self.base}{path}",
+            data=json.dumps(body).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlrequest.urlopen(req, timeout=5) as r:  # nosec B310
+            return r.status, json.loads(r.read().decode())
+
+    def test_health_returns_200_ok(self):
+        status, body = self._get("/health")
+        self.assertEqual(status, 200)
+        self.assertEqual(body.get("status"), "ok")
+
+    @patch("ela_pipeline.runtime.api_server.SERVICE.get_ui_state", return_value={"mode": "offline"})
+    def test_ui_state_returns_200(self, _mock):
+        status, body = self._get("/api/ui-state")
+        self.assertEqual(status, 200)
+        self.assertIsInstance(body, dict)
+
+    @patch("ela_pipeline.runtime.api_server.SERVICE.get_visualizer_payload", return_value={})
+    def test_visualizer_payload_missing_document_id_returns_empty(self, _mock):
+        status, body = self._get("/api/visualizer-payload")
+        self.assertEqual(status, 200)
+        self.assertEqual(body, {})
+
+    @patch("ela_pipeline.runtime.api_server.SERVICE.get_visualizer_payload", return_value={"s": "t"})
+    def test_visualizer_payload_with_document_id_returns_200(self, _mock):
+        status, body = self._get("/api/visualizer-payload?document_id=doc-123")
+        self.assertEqual(status, 200)
+        self.assertEqual(body, {"s": "t"})
+
+    @patch("ela_pipeline.runtime.api_server.SERVICE.get_backend_job_status", return_value={"status": "completed"})
+    def test_backend_job_status_returns_200(self, _mock):
+        status, body = self._get("/api/backend-job-status?job_id=local-abc")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["status"], "completed")
+
+    def test_backend_job_status_missing_job_id_returns_400(self):
+        if not self.server:
+            self.skipTest("Socket bind not permitted.")
+        import urllib.error
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urlrequest.urlopen(f"{self.base}/api/backend-job-status", timeout=5)  # nosec B310
+        self.assertEqual(ctx.exception.code, 400)
+
+    @patch("ela_pipeline.runtime.api_server.SERVICE.list_document_artifacts", return_value=[])
+    def test_document_artifacts_missing_id_returns_empty_list(self, _mock):
+        status, body = self._get("/api/document-artifacts")
+        self.assertEqual(status, 200)
+        self.assertEqual(body, [])
+
+    @patch("ela_pipeline.runtime.api_server.SERVICE.submit_media", return_value={"job_id": "local-xyz", "document_id": "doc-1"})
+    def test_submit_media_returns_job_id(self, _mock):
+        status, body = self._post("/api/submit-media", {"mediaPath": "/tmp/file.mp3", "durationSec": 60})
+        self.assertEqual(status, 200)
+        self.assertIn("job_id", body)
+
+    def test_submit_media_missing_path_returns_400(self):
+        if not self.server:
+            self.skipTest("Socket bind not permitted.")
+        import urllib.error
+        req = urlrequest.Request(
+            f"{self.base}/api/submit-media",
+            data=json.dumps({}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urlrequest.urlopen(req, timeout=5)  # nosec B310
+        self.assertEqual(ctx.exception.code, 400)
+
+    @patch("ela_pipeline.runtime.api_server.SERVICE.cancel_backend_job", return_value={"status": "ok"})
+    def test_cancel_job_returns_200(self, _mock):
+        status, body = self._post("/api/cancel-job", {"job_id": "local-xyz"})
+        self.assertEqual(status, 200)
+        self.assertEqual(body["status"], "ok")
+
+    @patch("ela_pipeline.runtime.api_server.SERVICE.delete_analysis", return_value={"status": "ok"})
+    def test_delete_analysis_returns_200(self, _mock):
+        status, body = self._post("/api/delete-analysis", {"document_id": "doc-1"})
+        self.assertEqual(status, 200)
+        self.assertEqual(body["status"], "ok")
+
+    def test_unknown_get_path_returns_404(self):
+        if not self.server:
+            self.skipTest("Socket bind not permitted.")
+        import urllib.error
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urlrequest.urlopen(f"{self.base}/api/nonexistent", timeout=5)  # nosec B310
+        self.assertEqual(ctx.exception.code, 404)
+
+    def test_unknown_post_path_returns_404(self):
+        if not self.server:
+            self.skipTest("Socket bind not permitted.")
+        import urllib.error
+        req = urlrequest.Request(
+            f"{self.base}/api/nonexistent",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urlrequest.urlopen(req, timeout=5)  # nosec B310
+        self.assertEqual(ctx.exception.code, 404)
+
+
 if __name__ == "__main__":
     unittest.main()
