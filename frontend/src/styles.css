@@ -213,8 +213,8 @@ button {
     left: auto;
     bottom: auto;
     transform: none;
-    width: 100%;
-    margin: 0;
+    width: min(100%, var(--layout-max));
+    margin: 0 auto;
     flex-shrink: 0;
   }
 }
