@@ -358,6 +358,13 @@ def _attach_translation(
             else:
                 source_text = _node_source_text(node, sentence_text)
                 source_key = source_text.strip()
+                if not source_key:
+                    # No translatable content — skip writing translations to avoid
+                    # empty-text validator failures; still recurse into children.
+                    for child in node.get("linguistic_elements", []) or []:
+                        if isinstance(child, dict):
+                            translate_node(child)
+                    return
                 if source_key in translated_by_source_key:
                     translated = translated_by_source_key[source_key]
                 else:

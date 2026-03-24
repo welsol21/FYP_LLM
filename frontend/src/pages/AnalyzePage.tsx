@@ -448,7 +448,7 @@ export function AnalyzePage() {
       {submission ? (
         <section className={`card feedback ${submission.ui_feedback.severity}`} aria-label="submission-feedback">
           <p>{submission.ui_feedback.message}</p>
-          <p className="stage-log-title">Elapsed: {elapsedSec}s / Estimated: {estimatedSec}s</p>
+          <p className="stage-log-title">Elapsed: {elapsedSec >= 100 ? `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s` : `${elapsedSec}s`} / Estimated: {estimatedSec >= 100 ? `${Math.floor(estimatedSec / 60)}m ${estimatedSec % 60}s` : `${estimatedSec}s`}</p>
           {typeof submission.result.processing_duration_ms === 'number' ? (
             <p className="stage-log-title">
               Total duration: {Math.max(0, Math.round(submission.result.processing_duration_ms / 1000))}s
