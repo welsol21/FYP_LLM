@@ -1042,6 +1042,25 @@ export const LocalWorkspace = {
     return clone(rows)
   },
 
+  async updateAnalysisTranslations(documentId: string, translations: Record<string, string>): Promise<void> {
+    const docId = String(documentId || '').trim()
+    if (!docId) return
+    const state = await ensureState()
+    const row = state.analyses.find((a) => a.document_id === docId || a.analysis_id === docId)
+    if (!row) return
+    const contract: VisualizerPayload = clone(row.contract || {})
+    for (const [sentenceText, translatedText] of Object.entries(translations)) {
+      const node = contract[sentenceText]
+      if (!node) continue
+      node.translations = { ...(node.translations || {}), client: { text: translatedText } }
+      node.active_translation_provider = 'client'
+    }
+    row.contract = contract
+    row.artifacts = buildContractArtifacts(docId, contract)
+    row.updated_at = nowIso()
+    await saveRawState(state)
+  },
+
   async getVisualizerPayload(documentId?: string): Promise<VisualizerPayload> {
     const docId = String(documentId || '').trim()
     if (!docId) return {}

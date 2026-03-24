@@ -1921,7 +1921,7 @@ class RuntimeMediaService:
                 note_mode="controlled",
                 model_dir=controlled_model_dir or None,
                 validation_mode="v2_strict",
-                enable_translation=True,
+                enable_translation=False,
                 translation_model="artifacts/models/m2m100_418M",
                 translation_source_lang="en",
                 translation_target_lang="ru",

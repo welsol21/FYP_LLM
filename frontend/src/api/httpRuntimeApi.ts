@@ -522,14 +522,14 @@ export class HttpRuntimeApi implements RuntimeApi {
   }): Promise<MediaSubmissionPayload> {
     const startedAt = Date.now()
     const stageLogs: string[] = []
-    const progress: number[] = [0, 0, 0, 0, 0]
-    const stageNames = ['loading_file', 'transcribing_audio', 'linguistic_parsing', 'generating_media', 'exporting_files']
+    const progress: number[] = [0, 0, 0, 0, 0, 0]
+    const stageNames = ['loading_file', 'transcribing_audio', 'linguistic_parsing', 'generating_media', 'exporting_files', 'client_translation']
     const push = (payload: MediaProgressPayload): void => {
       input.onProgress?.(payload)
     }
     const log = (stageName: string, message: string, incoming?: number[]): void => {
       const idx = stageNames.indexOf(stageName)
-      if (Array.isArray(incoming) && incoming.length === 5) {
+      if (Array.isArray(incoming) && incoming.length >= 5) {
         for (let i = 0; i < 5; i += 1) progress[i] = Math.max(progress[i], Number(incoming[i] || 0))
       } else if (idx >= 0) {
         progress[idx] = Math.max(progress[idx], 5)
@@ -616,7 +616,7 @@ export class HttpRuntimeApi implements RuntimeApi {
           if (!documentId) {
             throw new Error('Backend completed without document_id.')
           }
-          await this.finalizeBackendAnalysis(documentId, {
+          const contract = await this.finalizeBackendAnalysis(documentId, {
             projectId: input.projectId,
             mediaFileId: input.mediaFileId,
             mediaPath: input.mediaPath,
@@ -631,6 +631,24 @@ export class HttpRuntimeApi implements RuntimeApi {
             body: JSON.stringify({ document_id: documentId }),
           }).catch(() => ({ status: 'error' }))
           recordRuntimeDiagnostic('api.media.backend', 'submit.success', { jobId, documentId })
+          const totalSentences = Object.keys(contract || {}).length
+          if (totalSentences > 0) {
+            log('client_translation', `Translating sentences (0/${totalSentences})`, [...progress.slice(0, 5), 0])
+            await this.clientTranslateAnalysis(
+              documentId,
+              contract,
+              (done, total) => {
+                const pct = Math.round((done / Math.max(total, 1)) * 100)
+                progress[5] = pct
+                log('client_translation', `Translating sentences (${done}/${total})`, [...progress])
+              },
+              input.signal,
+            ).catch((err: unknown) => {
+              recordRuntimeDiagnostic('api.media.backend', 'translate.error', String(err instanceof Error ? err.message : err), 'error')
+            })
+            progress[5] = 100
+            log('client_translation', 'Translation complete', [...progress])
+          }
           return finish({
             result: {
               route: 'local',
@@ -697,7 +715,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       settings: string
       fileName: string
     },
-  ): Promise<void> {
+  ): Promise<VisualizerPayload> {
     recordRuntimeDiagnostic('api.media.backend', 'finalize.start', { documentId, fileName: context.fileName })
     const contract = await requestJson<VisualizerPayload>(
       `/api/visualizer-payload?document_id=${encodeURIComponent(documentId)}`,
@@ -739,6 +757,52 @@ export class HttpRuntimeApi implements RuntimeApi {
       documentId,
       artifacts: artifactMap.size,
       sentences: Object.keys(contract || {}).length,
+    })
+    return contract
+  }
+
+  private clientTranslateAnalysis(
+    documentId: string,
+    contract: VisualizerPayload,
+    onProgress: (done: number, total: number, text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const sentences = Object.keys(contract)
+      if (!sentences.length) {
+        resolve()
+        return
+      }
+      const worker = new Worker(new URL('../workers/translationWorker.ts', import.meta.url), { type: 'module' })
+      const id = documentId
+      const translations: Record<string, string> = {}
+      const onAbort = (): void => {
+        worker.terminate()
+        reject(new DOMException('Analysis cancelled.', 'AbortError'))
+      }
+      signal?.addEventListener('abort', onAbort)
+      worker.onmessage = (ev: MessageEvent): void => {
+        const msg = ev.data as { type: string; id?: string; index?: number; total?: number; text?: string; message?: string }
+        if (msg.type === 'result' && msg.id === id && typeof msg.index === 'number') {
+          const sentenceText = sentences[msg.index]
+          if (sentenceText) translations[sentenceText] = String(msg.text || '')
+          onProgress(msg.index + 1, msg.total ?? sentences.length, String(msg.text || ''))
+        } else if (msg.type === 'done' && msg.id === id) {
+          signal?.removeEventListener('abort', onAbort)
+          worker.terminate()
+          LocalWorkspace.updateAnalysisTranslations(documentId, translations).then(resolve).catch(reject)
+        } else if (msg.type === 'error') {
+          signal?.removeEventListener('abort', onAbort)
+          worker.terminate()
+          reject(new Error(String(msg.message || 'Translation worker error')))
+        }
+      }
+      worker.onerror = (err): void => {
+        signal?.removeEventListener('abort', onAbort)
+        worker.terminate()
+        reject(new Error(String(err.message || 'Translation worker crashed')))
+      }
+      worker.postMessage({ type: 'translate', id, sentences })
     })
   }
 

@@ -259,10 +259,10 @@ export function AnalyzePage() {
   }
 
   const stageProgress = useMemo(() => {
-    if (Array.isArray(submission?.result.stage_progress) && submission.result.stage_progress.length === 5) {
+    if (Array.isArray(submission?.result.stage_progress) && submission.result.stage_progress.length >= 5) {
       return submission.result.stage_progress
     }
-    return [0, 0, 0, 0, 0]
+    return [0, 0, 0, 0, 0, 0]
   }, [submission])
 
   useEffect(() => {
@@ -279,6 +279,7 @@ export function AnalyzePage() {
     const value = String(submission?.result.stage_name || '').trim().toLowerCase()
     if (!value) return ''
     if (value === 'translating_text') return 'linguistic parsing'
+    if (value === 'client_translation') return 'translating'
     return value.replace(/_/g, ' ')
   }, [submission?.result.stage_name])
   const elapsedSec = useMemo(() => {
@@ -400,7 +401,7 @@ export function AnalyzePage() {
                 stage_name: payload.stage_name || prevResult?.stage_name || '',
                 stage_log: logs.slice(-10).join('\n'),
                 stage_logs: logs,
-                stage_progress: payload.stage_progress || prevResult?.stage_progress || [0, 0, 0, 0, 0],
+                stage_progress: payload.stage_progress || prevResult?.stage_progress || [0, 0, 0, 0, 0, 0],
                 processing_duration_ms: prevResult?.processing_duration_ms,
                 document_id: prevResult?.document_id,
                 job_id: prevResult?.job_id,
@@ -426,7 +427,7 @@ export function AnalyzePage() {
                 stage_name: 'loading_file',
                 stage_log: '',
                 stage_logs: [],
-                stage_progress: [0, 0, 0, 0, 0],
+                stage_progress: [0, 0, 0, 0, 0, 0],
               },
               ui_feedback: {
                 severity: 'info',
