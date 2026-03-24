@@ -62,6 +62,8 @@ export type BackendJobStatus = {
   stage_logs?: string[]
   stage_progress: number[]
   document_id?: string
+  visualizer_payload?: VisualizerPayload
+  document_artifacts?: DocumentArtifact[]
 }
 
 export type MediaFileRow = {

@@ -709,7 +709,13 @@ class RuntimeMediaService:
                 "stage_logs": ["Job not found."],
                 "stage_progress": [0, 0, 0, 0, 0],
             }
-        return dict(row)
+        result = dict(row)
+        if result.get("status") == "completed_local":
+            document_id = str(result.get("document_id") or "").strip()
+            if document_id:
+                result["visualizer_payload"] = self.get_visualizer_payload(document_id=document_id)
+                result["document_artifacts"] = self.list_document_artifacts(document_id=document_id)
+        return result
 
     def cancel_backend_job(self, *, job_id: str) -> dict[str, Any]:
         jid = str(job_id or "").strip()

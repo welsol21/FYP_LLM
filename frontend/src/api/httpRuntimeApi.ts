@@ -624,6 +624,8 @@ export class HttpRuntimeApi implements RuntimeApi {
             durationSec: input.durationSec,
             settings: input.settings,
             fileName: input.fileName,
+            contract: (status.visualizer_payload || {}) as VisualizerPayload,
+            remoteArtifacts: status.document_artifacts || [],
           })
           await requestJson('/api/delete-analysis', {
             method: 'POST',
@@ -714,23 +716,13 @@ export class HttpRuntimeApi implements RuntimeApi {
       durationSec?: number
       settings: string
       fileName: string
+      contract: VisualizerPayload
+      remoteArtifacts: DocumentArtifact[]
     },
   ): Promise<VisualizerPayload> {
     recordRuntimeDiagnostic('api.media.backend', 'finalize.start', { documentId, fileName: context.fileName })
-    const contractRes = await fetchWithRetry(
-      `/api/visualizer-payload?document_id=${encodeURIComponent(documentId)}`,
-      {},
-      { retries: 4, retryDelayMs: 2500 },
-    )
-    if (!contractRes.ok) throw new Error(`HTTP ${contractRes.status}: visualizer-payload`)
-    const contract = (await contractRes.json()) as VisualizerPayload
-    const artifactsRes = await fetchWithRetry(
-      `/api/document-artifacts?document_id=${encodeURIComponent(documentId)}`,
-      {},
-      { retries: 3, retryDelayMs: 2000 },
-    )
-    if (!artifactsRes.ok) throw new Error(`HTTP ${artifactsRes.status}: document-artifacts`)
-    const remoteArtifacts = (await artifactsRes.json()) as DocumentArtifact[]
+    const contract = context.contract
+    const remoteArtifacts = context.remoteArtifacts
     const artifacts = LocalWorkspace.buildDocumentArtifacts(documentId, contract)
     const artifactMap = new Map<string, DocumentArtifact>(artifacts.map((row) => [row.name, row]))
     for (const row of remoteArtifacts) {
