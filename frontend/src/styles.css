@@ -24,12 +24,24 @@ body {
 }
 
 /* On pointer-device (desktop) browsers, lock body scroll so only .screen scrolls.
-   Also un-fix the bottom-nav so the CSS grid handles it — position:fixed conflicts
-   with overflow:hidden on html/body and causes the nav to render off-screen. */
+   Switch app-shell to flex column so the screen gets the exact remaining height
+   (100dvh - top-bar - bottom-nav) with no fixed-position hacks needed. */
 @media (hover: hover) and (pointer: fine) {
   html, body {
     height: 100%;
     overflow: hidden;
+  }
+
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .screen {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 14px;
   }
 
   .bottom-nav {
@@ -39,10 +51,7 @@ body {
     transform: none;
     width: 100%;
     margin: 0;
-  }
-
-  .screen {
-    padding-bottom: 10px;
+    flex-shrink: 0;
   }
 }
 
