@@ -1127,7 +1127,11 @@ export const LocalWorkspace = {
 
   async getTranslationConfig(): Promise<TranslationConfig | null> {
     const state = await ensureState()
-    return state.translation_config ? clone(state.translation_config) : clone(DEFAULT_TRANSLATION_CONFIG)
+    const cfg = state.translation_config ? clone(state.translation_config) : clone(DEFAULT_TRANSLATION_CONFIG)
+    // Strip removed built-in providers (e.g. 'hf' was removed in favour of 'm2m100').
+    cfg.providers = cfg.providers.filter((p) => p.id !== 'hf')
+    if (cfg.default_provider === 'hf') cfg.default_provider = 'm2m100'
+    return cfg
   },
 
   async saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig> {
