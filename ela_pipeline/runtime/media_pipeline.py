@@ -292,7 +292,7 @@ def _extract_text_and_sentence_chunks(
         try:
             import whisper as _whisper_mod  # type: ignore[import-not-found]
             _raw = _whisper_mod.load_audio(str(source_path))
-            if _raw is not None and hasattr(_raw, "__len__") and len(_raw) == 0:
+            if _raw is None or (hasattr(_raw, "__len__") and len(_raw) == 0):
                 raise RuntimeError(
                     f"'{source_path.name}' contains no audio samples. "
                     "The file may have no audio track or may be corrupt."
@@ -314,6 +314,7 @@ def _extract_text_and_sentence_chunks(
                     language=source_lang,
                     word_timestamps=False,
                     verbose=False,
+                    fp16=False,
                 )
             except Exception as exc:  # pragma: no cover
                 error_holder["error"] = exc
