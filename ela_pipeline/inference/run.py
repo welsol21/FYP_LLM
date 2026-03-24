@@ -273,24 +273,23 @@ def _attach_translation(
 
     model_name = str(getattr(translator, "model_name", "unknown"))
 
-    def translate_with_cache(source_text: str) -> str:
-        if translation_cache is None:
-            result = translator.translate_text(source_text, source_lang=source_lang, target_lang=target_lang)
-            return result or source_text
-
-        cache_key = build_translation_cache_key(
-            source_text=source_text,
-            source_lang=source_lang,
-            target_lang=target_lang,
-            model_name=model_name,
-        )
-        cached = translation_cache.get(cache_key)
-        if isinstance(cached, str) and cached:
-            return cached
-        translated = translator.translate_text(source_text, source_lang=source_lang, target_lang=target_lang)
-        # Fall back to source text so downstream validator never sees an empty translation.
-        result = translated or source_text
-        translation_cache.set(cache_key, result, ttl_seconds=translation_cache_ttl_seconds)
+    def translate_sentence(source_text: str) -> str:
+        """Translate sentence text, using cache when available."""
+        cache_key = None
+        if translation_cache is not None:
+            cache_key = build_translation_cache_key(
+                source_text=source_text,
+                source_lang=source_lang,
+                target_lang=target_lang,
+                model_name=model_name,
+            )
+            cached = translation_cache.get(cache_key)
+            if isinstance(cached, str) and cached:
+                return cached
+        result = translator.translate_text(source_text, source_lang=source_lang, target_lang=target_lang)
+        result = (result or "").strip() or source_text
+        if translation_cache is not None and cache_key is not None:
+            translation_cache.set(cache_key, result, ttl_seconds=translation_cache_ttl_seconds)
         return result
 
     def set_translation_map(
@@ -314,7 +313,8 @@ def _attach_translation(
             continue
 
         sentence_text = str(sentence_node.get("content") or "")
-        sentence_translation = translate_with_cache(sentence_text)
+        sentence_translation = translate_sentence(sentence_text)
+
         if dual_channels:
             literary, idiomatic = build_dual_translation_channels(
                 literary_text=sentence_translation,
@@ -331,82 +331,28 @@ def _attach_translation(
                 "target_lang": target_lang,
                 "text": idiomatic,
             }
-            set_translation_map(
-                sentence_node,
-                text=literary,
-                include_model=True,
-            )
+            set_translation_map(sentence_node, text=literary, include_model=True)
         else:
-            set_translation_map(
-                sentence_node,
-                text=sentence_translation,
-                include_model=True,
-            )
+            set_translation_map(sentence_node, text=sentence_translation, include_model=True)
 
         if not include_node_translations:
             continue
 
-        translated_by_node_id: dict[str, str] = {}
-        translated_by_source_key: dict[str, str] = {}
+        # Propagate the sentence translation to all child nodes.
+        # Nodes display sentence translation as context — no separate per-node M2M100 call.
+        node_text = literary if dual_channels else sentence_translation
 
-        def translate_node(node: dict) -> None:
-            node_id = node.get("node_id")
-            ref_node_id = node.get("ref_node_id")
-
-            if isinstance(ref_node_id, str) and ref_node_id in translated_by_node_id:
-                translated = translated_by_node_id[ref_node_id]
-            else:
-                source_text = _node_source_text(node, sentence_text)
-                source_key = source_text.strip()
-                if not source_key:
-                    # No translatable content — skip writing translations to avoid
-                    # empty-text validator failures; still recurse into children.
-                    for child in node.get("linguistic_elements", []) or []:
-                        if isinstance(child, dict):
-                            translate_node(child)
-                    return
-                if source_key in translated_by_source_key:
-                    translated = translated_by_source_key[source_key]
-                else:
-                    translated = translate_with_cache(source_text)
-                    translated_by_source_key[source_key] = translated
-
-            if dual_channels:
-                literary, idiomatic = build_dual_translation_channels(
-                    literary_text=translated,
-                    target_lang=target_lang,
-                )
-                node["translation_literary"] = {
-                    "source_lang": source_lang,
-                    "target_lang": target_lang,
-                    "text": literary,
-                }
-                node["translation_idiomatic"] = {
-                    "source_lang": source_lang,
-                    "target_lang": target_lang,
-                    "text": idiomatic,
-                }
-                set_translation_map(
-                    node,
-                    text=literary,
-                    include_model=False,
-                )
-            else:
-                set_translation_map(
-                    node,
-                    text=translated,
-                    include_model=False,
-                )
-            if isinstance(node_id, str):
-                translated_by_node_id[node_id] = translated
-
+        def propagate_to_node(node: dict) -> None:
+            source_key = _node_source_text(node, sentence_text).strip()
+            if source_key:
+                set_translation_map(node, text=node_text, include_model=False)
             for child in node.get("linguistic_elements", []) or []:
                 if isinstance(child, dict):
-                    translate_node(child)
+                    propagate_to_node(child)
 
         for child in sentence_node.get("linguistic_elements", []) or []:
             if isinstance(child, dict):
-                translate_node(child)
+                propagate_to_node(child)
 
 
 def _attach_phonetic(
@@ -992,6 +938,46 @@ def _resolve_translation_cache_ttl_seconds(default_seconds: int = 86400) -> int:
     if ttl <= 0:
         raise ValueError("ELA_TRANSLATION_CACHE_TTL_SECONDS must be > 0")
     return ttl
+
+
+def pre_translate_sentences_batch(
+    sentences: list[str],
+    *,
+    translation_model: str = "facebook/m2m100_418M",
+    source_lang: str = "en",
+    target_lang: str = "ru",
+    device: str = "cpu",
+) -> None:
+    """Pre-populate the process-wide translation cache using a single batched model.generate() call.
+
+    Call this before processing N sentences to replace N individual M2M100 calls with 1 batch call.
+    When run_pipeline() subsequently runs for each sentence, the cache hit is found and M2M100 is skipped.
+    """
+    from ela_pipeline.translate import build_translation_cache_from_env, build_translation_cache_key
+
+    resolved_model = _resolve_translation_model_name(translation_model)
+    translator = _get_m2m100_translator_cached(resolved_model, device)
+
+    cache = build_translation_cache_from_env()
+    if cache is None:
+        cache = _get_in_memory_translation_cache()
+
+    ttl = _resolve_translation_cache_ttl_seconds()
+    texts = [str(t).strip() for t in sentences if str(t).strip()]
+    if not texts:
+        return
+
+    translations = translator.translate_texts(texts, source_lang=source_lang, target_lang=target_lang)
+    for text, translation in zip(texts, translations):
+        if not translation:
+            continue
+        key = build_translation_cache_key(
+            source_text=text,
+            source_lang=source_lang,
+            target_lang=target_lang,
+            model_name=translator.model_name,
+        )
+        cache.set(key, translation.strip() or text, ttl_seconds=ttl)
 
 
 def run_pipeline(

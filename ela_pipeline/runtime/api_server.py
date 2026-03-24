@@ -341,12 +341,22 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    import threading
+
     host = os.getenv("ELA_RUNTIME_HTTP_HOST", "0.0.0.0")
     port = _env_int("ELA_RUNTIME_HTTP_PORT", 8000)
-    _run_sentence_contract_warmup()
-    _run_media_pipeline_warmup()
     server = ThreadingHTTPServer((host, port), RuntimeApiHandler)
     print(f"[runtime-api] serving on http://{host}:{port}", flush=True)
+
+    # Run warmup in a background thread so the server starts accepting connections
+    # immediately.  Without this, the 2-3 minute warmup window leaves the port
+    # closed and Cloudflare / nginx return 502 "Bad Gateway" for any request that
+    # arrives during that window.
+    def _warmup():
+        _run_sentence_contract_warmup()
+        _run_media_pipeline_warmup()
+
+    threading.Thread(target=_warmup, daemon=True).start()
     server.serve_forever()
 
 

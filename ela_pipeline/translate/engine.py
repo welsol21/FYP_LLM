@@ -41,22 +41,26 @@ class M2M100Translator:
             return dev
         raise ValueError("translation_device must be one of: auto | cpu | cuda")
 
-    def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
-        raw = (text or "").strip()
-        if not raw:
-            return ""
-
+    def translate_texts(
+        self, texts: list[str], source_lang: str, target_lang: str
+    ) -> list[str]:
+        """Translate a list of texts in a single model.generate() call (batched)."""
         src = (source_lang or "").strip()
         tgt = (target_lang or "").strip()
         if not src or not tgt:
             raise ValueError("source_lang and target_lang must be non-empty")
 
+        non_empty = [(i, t.strip()) for i, t in enumerate(texts) if t.strip()]
+        if not non_empty:
+            return [""] * len(texts)
+
         self.tokenizer.src_lang = src
         encoded = self.tokenizer(
-            raw,
+            [t for _, t in non_empty],
             return_tensors="pt",
             truncation=True,
             max_length=512,
+            padding=True,
         ).to(self.device)
 
         forced_bos_token_id = self.tokenizer.get_lang_id(tgt)
@@ -66,4 +70,12 @@ class M2M100Translator:
                 forced_bos_token_id=forced_bos_token_id,
                 max_length=self.max_target_length,
             )
-        return self.tokenizer.batch_decode(generated, skip_special_tokens=True)[0].strip()
+        decoded = self.tokenizer.batch_decode(generated, skip_special_tokens=True)
+
+        results = [""] * len(texts)
+        for (orig_idx, _), translation in zip(non_empty, decoded):
+            results[orig_idx] = translation.strip()
+        return results
+
+    def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
+        return self.translate_texts([text], source_lang, target_lang)[0]
