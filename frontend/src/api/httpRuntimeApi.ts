@@ -717,12 +717,20 @@ export class HttpRuntimeApi implements RuntimeApi {
     },
   ): Promise<VisualizerPayload> {
     recordRuntimeDiagnostic('api.media.backend', 'finalize.start', { documentId, fileName: context.fileName })
-    const contract = await requestJson<VisualizerPayload>(
+    const contractRes = await fetchWithRetry(
       `/api/visualizer-payload?document_id=${encodeURIComponent(documentId)}`,
+      {},
+      { retries: 4, retryDelayMs: 2500 },
     )
-    const remoteArtifacts = await requestJson<DocumentArtifact[]>(
+    if (!contractRes.ok) throw new Error(`HTTP ${contractRes.status}: visualizer-payload`)
+    const contract = (await contractRes.json()) as VisualizerPayload
+    const artifactsRes = await fetchWithRetry(
       `/api/document-artifacts?document_id=${encodeURIComponent(documentId)}`,
+      {},
+      { retries: 3, retryDelayMs: 2000 },
     )
+    if (!artifactsRes.ok) throw new Error(`HTTP ${artifactsRes.status}: document-artifacts`)
+    const remoteArtifacts = (await artifactsRes.json()) as DocumentArtifact[]
     const artifacts = LocalWorkspace.buildDocumentArtifacts(documentId, contract)
     const artifactMap = new Map<string, DocumentArtifact>(artifacts.map((row) => [row.name, row]))
     for (const row of remoteArtifacts) {
