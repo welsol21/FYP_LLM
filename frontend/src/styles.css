@@ -113,7 +113,9 @@ button {
   overflow: auto;
   min-height: 0;
   padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+  scrollbar-width: none;
 }
+.screen::-webkit-scrollbar { display: none; }
 
 .screen-block {
   padding: 10px 2px 0;
@@ -392,6 +394,112 @@ textarea {
   margin: 8px 0 4px;
   font-weight: 600;
 }
+
+/* Connection status card variants */
+.runtime-status-card h2 { margin: 0 0 8px; }
+.runtime-status-msg { margin: 0; font-size: 15px; }
+.runtime-status-loading { border-color: rgba(140, 160, 200, 0.35); color: var(--muted); }
+.runtime-status-offline { border-color: rgba(255, 180, 60, 0.4); background: rgba(255, 160, 30, 0.06); }
+.runtime-status-offline .runtime-status-msg { color: #f0a840; }
+.runtime-status-online  { border-color: rgba(80, 200, 120, 0.35); background: rgba(60, 180, 100, 0.05); }
+
+/* Collapsible config sections */
+.config-group {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.config-group > summary {
+  cursor: pointer;
+  padding: 14px 16px;
+  font-weight: 600;
+  font-size: 15px;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+}
+.config-group > summary::before {
+  content: '▶';
+  font-size: 11px;
+  transition: transform 0.15s;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.config-group[open] > summary::before { transform: rotate(90deg); }
+.config-group-body { padding: 0 16px 16px; }
+
+.config-subgroup {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.config-subgroup > summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  font-size: 14px;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+}
+.config-subgroup > summary::before {
+  content: '▶';
+  font-size: 10px;
+  transition: transform 0.15s;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.config-subgroup[open] > summary::before { transform: rotate(90deg); }
+.config-subgroup-body { padding: 0 14px 14px; display: grid; gap: 10px; }
+
+/* Log preview inside diagnostics */
+.config-log-preview { margin-top: 12px; }
+.log-preview {
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: hidden;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 6px 0 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* Toast notifications */
+.log-toasts {
+  position: fixed;
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+  pointer-events: none;
+  width: min(90vw, 400px);
+}
+.log-toast {
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  animation: toast-in 0.2s ease;
+}
+.log-toast-ok  { background: #1a3a2a; color: #5fca8a; border: 1px solid #2a5a3a; }
+.log-toast-err { background: #3a1a1a; color: #ff8a8a; border: 1px solid #5a2a2a; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
 .stage-list {
   display: grid;

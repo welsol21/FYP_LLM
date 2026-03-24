@@ -6,6 +6,7 @@ describe('RuntimeStatusCard', () => {
   it('renders disabled reason when feature is blocked', () => {
     renderWithProviders(
       <RuntimeStatusCard
+        status="ok"
         uiState={{
           runtime_mode: 'offline',
           deployment_mode: 'distributed',
