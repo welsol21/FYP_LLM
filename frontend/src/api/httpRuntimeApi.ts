@@ -607,7 +607,10 @@ export class HttpRuntimeApi implements RuntimeApi {
           stage: status.stage_name,
           message: status.message,
         })
-        log(String(status.stage_name || ''), String(status.message || ''), status.stage_progress)
+        if (status.stage_logs?.length) {
+          stageLogs.splice(0, stageLogs.length, ...status.stage_logs.slice(-30))
+        }
+        log(String(status.stage_name || ''), String(status.stage_log || status.message || ''), status.stage_progress)
         if (status.status === 'completed_local') {
           const documentId = String(status.document_id || '').trim()
           if (!documentId) {
