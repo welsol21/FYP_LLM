@@ -275,7 +275,8 @@ def _attach_translation(
 
     def translate_with_cache(source_text: str) -> str:
         if translation_cache is None:
-            return translator.translate_text(source_text, source_lang=source_lang, target_lang=target_lang)
+            result = translator.translate_text(source_text, source_lang=source_lang, target_lang=target_lang)
+            return result or source_text
 
         cache_key = build_translation_cache_key(
             source_text=source_text,
@@ -287,8 +288,10 @@ def _attach_translation(
         if isinstance(cached, str) and cached:
             return cached
         translated = translator.translate_text(source_text, source_lang=source_lang, target_lang=target_lang)
-        translation_cache.set(cache_key, translated, ttl_seconds=translation_cache_ttl_seconds)
-        return translated
+        # Fall back to source text so downstream validator never sees an empty translation.
+        result = translated or source_text
+        translation_cache.set(cache_key, result, ttl_seconds=translation_cache_ttl_seconds)
+        return result
 
     def set_translation_map(
         node: dict[str, Any],

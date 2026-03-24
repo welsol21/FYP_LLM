@@ -90,6 +90,20 @@ class MediaPipelineResult:
     contract_sentences: list[dict[str, Any]]
 
 
+@dataclass(frozen=True)
+class MediaExtractionResult:
+    """Result of the immutable (Whisper/text-extract) stage only.
+
+    Stored as a checkpoint so that a failed contract-build step can be retried
+    without repeating the expensive Whisper transcription.
+    """
+
+    source_type: str
+    full_text: str
+    sentence_stream: list[str]
+    sentence_timeline: list[dict[str, float] | None]
+
+
 def _detect_source_type(path: Path) -> str:
     suffix = path.suffix.lower()
     if suffix in {".txt", ".md", ".rtf"}:
@@ -590,7 +604,7 @@ def _attach_translation_runtime(
                 "m2m100": {
                     "source_lang": source_lang,
                     "target_lang": target_lang,
-                    "text": translated,
+                    "text": translated or source_text,
                 }
             }
             node["active_translation_provider"] = "m2m100"
@@ -676,13 +690,17 @@ def translate_text_with_provider(
     ).strip()
 
 
-def run_media_pipeline(
+def extract_media_text_and_sentences(
     *,
     source_path: str,
     spacy_model: str = "en_core_web_sm",
-    sentence_contract_builder: Callable[..., dict[str, Any]] | None = None,
     progress_callback: Callable[[str, float | None, str | None], None] | None = None,
-) -> MediaPipelineResult:
+) -> MediaExtractionResult:
+    """Immutable stage: run Whisper (or text/PDF extract) and split into sentences.
+
+    This is the expensive step.  Its result is checkpointed by the service layer
+    so that a subsequent contract-build failure does not require repeating it.
+    """
     path = Path(source_path)
     if not path.exists():
         raise FileNotFoundError(f"Media source not found: {source_path}")
@@ -696,11 +714,6 @@ def run_media_pipeline(
     full_text = full_text.strip()
     if not full_text:
         raise RuntimeError("Extracted text is empty.")
-
-    if sentence_contract_builder is None:
-        raise RuntimeError(
-            "sentence_contract_builder is required. Local sentence-contract fallback is disabled."
-        )
 
     if progress_callback is not None:
         progress_callback("translating_text", 0.02, "Preparing linguistic parsing")
@@ -748,6 +761,26 @@ def run_media_pipeline(
 
     if progress_callback is not None:
         progress_callback("translating_text", 0.08, f"Prepared {len(sentence_stream)} sentences")
+
+    return MediaExtractionResult(
+        source_type=source_type,
+        full_text=full_text,
+        sentence_stream=sentence_stream,
+        sentence_timeline=sentence_timeline,
+    )
+
+
+def build_media_contracts(
+    *,
+    extraction: MediaExtractionResult,
+    sentence_contract_builder: Callable[..., dict[str, Any]],
+    progress_callback: Callable[[str, float | None, str | None], None] | None = None,
+) -> MediaPipelineResult:
+    """Variant stage: call sentence_contract_builder for every extracted sentence."""
+    source_type = extraction.source_type
+    full_text = extraction.full_text
+    sentence_stream = extraction.sentence_stream
+    sentence_timeline = extraction.sentence_timeline
 
     media_sentences: list[dict[str, Any]] = []
     contract_sentences: list[dict[str, Any]] = []
@@ -828,4 +861,28 @@ def run_media_pipeline(
         text_hash=text_hash,
         media_sentences=media_sentences,
         contract_sentences=contract_sentences,
+    )
+
+
+def run_media_pipeline(
+    *,
+    source_path: str,
+    spacy_model: str = "en_core_web_sm",
+    sentence_contract_builder: Callable[..., dict[str, Any]] | None = None,
+    progress_callback: Callable[[str, float | None, str | None], None] | None = None,
+) -> MediaPipelineResult:
+    """Convenience wrapper: extract + build contracts in one call (no checkpoint)."""
+    if sentence_contract_builder is None:
+        raise RuntimeError(
+            "sentence_contract_builder is required. Local sentence-contract fallback is disabled."
+        )
+    extraction = extract_media_text_and_sentences(
+        source_path=source_path,
+        spacy_model=spacy_model,
+        progress_callback=progress_callback,
+    )
+    return build_media_contracts(
+        extraction=extraction,
+        sentence_contract_builder=sentence_contract_builder,
+        progress_callback=progress_callback,
     )

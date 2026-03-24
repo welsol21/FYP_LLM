@@ -26,7 +26,14 @@ from ela_pipeline.validation.validator import raise_if_invalid, validate_contrac
 
 from .capabilities import build_runtime_capabilities, resolve_deployment_mode, resolve_runtime_mode
 from .media_policy import MediaPolicyLimits, load_media_policy_limits_from_env
-from .media_pipeline import MediaPipelineResult, run_media_pipeline, translate_text_with_provider
+from .media_pipeline import (
+    MediaExtractionResult,
+    MediaPipelineResult,
+    build_media_contracts,
+    extract_media_text_and_sentences,
+    run_media_pipeline,
+    translate_text_with_provider,
+)
 from .media_submission import submit_media_for_processing
 from .ui_state import build_runtime_ui_state, build_submission_ui_feedback
 
@@ -1212,15 +1219,63 @@ class RuntimeMediaService:
                         if cached.source_type in {"audio", "video"}:
                             stage_callback("transcribing_audio", 1.0, "Cache hit: skipped transcription.")
                         stage_callback("translating_text", 0.02, "Cache hit: reused sentence contracts.")
-        if stage_callback is not None and not reused_immutable:
-            stage_callback("loading_file", 0.25, "Loading source file")
-        source_type = pipeline.source_type if pipeline is not None else self._detect_source_type(media_path)
-        if source_type in {"audio", "video"} and stage_callback is not None and not reused_immutable:
-            stage_callback("transcribing_audio", 0.05, "Preparing ASR")
-        if pipeline is None:
+        # --- Try to reuse an immutable checkpoint from a previous (possibly failed) run ---
+        extraction: MediaExtractionResult | None = None
+        if not force_full_reprocess and pipeline is None and isinstance(manifest_state, dict):
+            pending_doc_id = str(manifest_state.get("last_document_id") or "").strip()
+            pending_sig = str(manifest_state.get("immutable_signature") or "").strip()
+            if pending_doc_id and pending_sig == immutable_signature:
+                checkpoint = self._load_immutable_checkpoint(document_id=pending_doc_id)
+                if checkpoint is not None:
+                    extraction = checkpoint
+                    document_id = document_id or pending_doc_id
+                    if stage_callback is not None:
+                        stage_callback("loading_file", 1.0, "Checkpoint: reused previous extraction.")
+                        if checkpoint.source_type in {"audio", "video"}:
+                            stage_callback("transcribing_audio", 1.0, "Checkpoint: skipped Whisper.")
+                        stage_callback("translating_text", 0.02, "Checkpoint: rebuilding sentence contracts.")
+
+        # --- Full extraction (Whisper / text / PDF parse) ---
+        if pipeline is None and extraction is None:
+            if stage_callback is not None and not reused_immutable:
+                stage_callback("loading_file", 0.25, "Loading source file")
+            source_type_probe = self._detect_source_type(media_path)
+            if source_type_probe in {"audio", "video"} and stage_callback is not None and not reused_immutable:
+                stage_callback("transcribing_audio", 0.05, "Preparing ASR")
             try:
-                pipeline = run_media_pipeline(
+                extraction = extract_media_text_and_sentences(
                     source_path=media_path,
+                    progress_callback=stage_callback,
+                )
+            except Exception as exc:
+                return {
+                    "job_id": None,
+                    "status": "error",
+                    "message": str(exc),
+                }
+            # Checkpoint saved immediately — retries skip Whisper even if contract-build fails.
+            document_id = document_id or f"doc-{uuid.uuid4().hex[:12]}"
+            try:
+                self._save_immutable_checkpoint(document_id=document_id, extraction=extraction)
+                self.repo.set_workspace_state(
+                    manifest_key,
+                    {
+                        "schema_version": 1,
+                        "status": "extraction_done",
+                        "immutable_signature": immutable_signature,
+                        "last_document_id": document_id,
+                    },
+                )
+            except Exception:
+                pass  # checkpoint is best-effort; must not block pipeline
+
+        # --- Contract building (variant stage — may fail and be retried) ---
+        if pipeline is None:
+            assert extraction is not None
+            document_id = document_id or f"doc-{uuid.uuid4().hex[:12]}"
+            try:
+                pipeline = build_media_contracts(
+                    extraction=extraction,
                     sentence_contract_builder=lambda *, sentence_text, sentence_idx: self._build_sentence_contract_from_backend_and_local_translation(
                         sentence_text=sentence_text,
                         sentence_idx=sentence_idx,
@@ -1233,6 +1288,18 @@ class RuntimeMediaService:
                     "status": "error",
                     "message": str(exc),
                 }
+            # Contracts built — checkpoint immediately so next run skips Whisper + contracts.
+            try:
+                self._save_contracts_checkpoint(
+                    document_id=document_id,
+                    manifest_key=manifest_key,
+                    immutable_signature=immutable_signature,
+                    media_signature=media_signature,
+                    pipeline=pipeline,
+                    media_path=media_path,
+                )
+            except Exception:
+                pass
 
         if stage_callback is not None:
             stage_callback("translating_text", 1.0, "Sentence contract build completed")
@@ -1393,6 +1460,109 @@ class RuntimeMediaService:
             "linked_sentences_count": len(pipeline.media_sentences),
             "message": "Local media processed and synced.",
         }
+
+    def _save_contracts_checkpoint(
+        self,
+        *,
+        document_id: str,
+        manifest_key: str,
+        immutable_signature: str,
+        media_signature: str,
+        pipeline: "MediaPipelineResult",
+        media_path: str,
+    ) -> None:
+        """Persist contract-build results immediately after build_media_contracts.
+
+        Writes the same three files that _load_cached_pipeline expects, plus an
+        intermediate manifest record with the immutable signature.  On the next
+        run, the existing full-reuse path will find these files and skip both
+        Whisper AND contract-building, jumping straight to DB writes + artifacts.
+        """
+        doc_dir = self._doc_artifacts_dir(document_id=document_id)
+        doc_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            (doc_dir / "full_text.txt").write_text(pipeline.full_text, encoding="utf-8")
+            media_contract = {
+                "document_id": document_id,
+                "source_type": pipeline.source_type,
+                "source_path": media_path,
+                "text_hash": pipeline.text_hash,
+                "media_sentences": pipeline.media_sentences,
+            }
+            (doc_dir / "media_contract.json").write_text(
+                json.dumps(media_contract, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            (doc_dir / "contract_sentences.json").write_text(
+                json.dumps(pipeline.contract_sentences, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+        except Exception:
+            return  # best-effort; don't block pipeline on write failure
+        # Update workspace state so the next run's full-reuse path can pick this up.
+        try:
+            self.repo.set_workspace_state(
+                manifest_key,
+                {
+                    "schema_version": 1,
+                    "status": "contracts_done",
+                    "media_signature": media_signature,
+                    "last_document_id": document_id,
+                    "immutable": {
+                        "signature": immutable_signature,
+                        "source_type": pipeline.source_type,
+                        "text_hash": pipeline.text_hash,
+                        "media_sentences_count": len(pipeline.media_sentences),
+                        "contract_sentences_count": len(pipeline.contract_sentences),
+                    },
+                },
+            )
+        except Exception:
+            pass
+
+    @staticmethod
+    def _immutable_checkpoint_path(*, document_id: str) -> Path:
+        return RuntimeMediaService._doc_artifacts_dir(document_id=document_id) / "immutable_checkpoint.json"
+
+    @staticmethod
+    def _save_immutable_checkpoint(*, document_id: str, extraction: MediaExtractionResult) -> None:
+        """Persist the immutable (Whisper/extract) stage result immediately.
+
+        Saved right after extraction succeeds so that a subsequent contract-build
+        failure can be retried without repeating the expensive Whisper run.
+        """
+        doc_dir = RuntimeMediaService._doc_artifacts_dir(document_id=document_id)
+        doc_dir.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "source_type": extraction.source_type,
+            "full_text": extraction.full_text,
+            "sentence_stream": extraction.sentence_stream,
+            "sentence_timeline": extraction.sentence_timeline,
+        }
+        RuntimeMediaService._immutable_checkpoint_path(document_id=document_id).write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+
+    @staticmethod
+    def _load_immutable_checkpoint(*, document_id: str) -> MediaExtractionResult | None:
+        """Load a previously saved immutable checkpoint, if it exists."""
+        path = RuntimeMediaService._immutable_checkpoint_path(document_id=document_id)
+        if not path.exists():
+            return None
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+        source_type = str(data.get("source_type") or "").strip()
+        full_text = str(data.get("full_text") or "").strip()
+        sentence_stream = data.get("sentence_stream")
+        sentence_timeline = data.get("sentence_timeline")
+        if not source_type or not full_text or not isinstance(sentence_stream, list):
+            return None
+        return MediaExtractionResult(
+            source_type=source_type,
+            full_text=full_text,
+            sentence_stream=sentence_stream,
+            sentence_timeline=sentence_timeline if isinstance(sentence_timeline, list) else [],
+        )
 
     def _persist_stage_manifest_artifact(self, *, document_id: str, manifest: dict[str, Any]) -> None:
         doc_dir = self._doc_artifacts_dir(document_id=document_id)
@@ -1917,6 +2087,15 @@ class RuntimeMediaService:
             return
 
         tts_mp3 = doc_dir / "translated_audio_ru.mp3"
+        out_video_check = doc_dir / "translated_video_ru.mp4"
+        # Skip the entire (slow) TTS + mux stage if both expected outputs already exist.
+        tts_done = tts_mp3.exists() and tts_mp3.stat().st_size > 0
+        video_done = source_type != "video" or (out_video_check.exists() and out_video_check.stat().st_size > 0)
+        if tts_done and video_done:
+            if stage_callback is not None:
+                stage_callback("exporting_files", 1.0, "Checkpoint: reused existing media artifacts.")
+            return
+
         source = Path(source_path)
         try:
             import edge_tts  # type: ignore

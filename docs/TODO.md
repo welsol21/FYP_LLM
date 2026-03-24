@@ -708,3 +708,60 @@
   - [x] `docs/ela_pipeline_full_documentation.md`
   - [x] `docs/next_stage_product_spec_2026-02-17.md`
   - [x] `docs/deploy_docker.md`
+
+## Runtime Bug Fixes (2026-03-24)
+
+- [x] Fix M2M100 translator not appearing in Analyze file window (`MediaSubmitForm.tsx`: show loading/empty state while `translatorOptions` is being fetched).
+- [x] Fix bottom navigation bar rendered under screen content on desktop browsers (move `@media (hover:hover) and (pointer:fine)` block after `.bottom-nav` base rule in `styles.css` to win CSS cascade; apply flex column layout on `app-shell`).
+- [x] Fix abnormal nav bar width on desktop (override `width: min(100%, var(--layout-max)); margin: 0 auto` instead of `width: 100%`).
+- [x] Fix `intermediate must be non-empty` validator error when `build_note_blueprints` returns no grammar classes — generate content-based fallback note (`"<snippet>" is a <node_type> in this passage.`) in `run.py`.
+- [x] Fix `translations.m2m100.text: '' should be non-empty` — fall back to source content when M2M100 returns empty string in `service.py`.
+- [x] Fix Whisper `cannot reshape tensor of 0 elements` on files with no audio track — validate `whisper.load_audio()` result before `model.transcribe()` in `media_pipeline.py`.
+
+## Translation Quality Pipeline: GPT Batch Reference Translator (Planned)
+
+Goal: detect low-quality M2M100 translations automatically, accumulate them, send batches to ChatGPT API as the reference translator, store corrected pairs, and use them to fine-tune M2M100 via LoRA.
+
+### A) Quality Gate (detect bad M2M100 output)
+
+- [ ] Add round-trip ChrF scorer: translate `en → ru` with M2M100, back-translate `ru → en` with M2M100, compute ChrF against original English; flag sentence if score < threshold.
+- [ ] Add length-ratio guard: flag if `len(translation) / len(source)` is outside `[0.5, 2.5]`.
+- [ ] Add repetition penalty: flag if any 4-gram appears more than N times in the translation.
+- [ ] Expose quality-gate thresholds as env/config (`TRANSLATION_QG_CHRF_MIN`, `TRANSLATION_QG_LEN_MIN/MAX`, `TRANSLATION_QG_REPEAT_MAX`).
+- [ ] Wire quality gate into `service.py` translation stage; attach `translation_quality_flags` list to each provider result.
+- [ ] Add unit tests for each gate criterion (ChrF threshold, length ratio, repetition detector).
+
+### B) Review Queue (accumulate flagged pairs)
+
+- [ ] Add `translation_review_queue` table to PostgreSQL schema:
+  - `id`, `sentence_key`, `source_text`, `m2m100_text`, `quality_flags` (JSONB), `status` (`pending|sent|accepted|rejected`), `gpt_text`, `created_at`, `processed_at`.
+- [ ] Add DB migration for the new table.
+- [ ] Wire quality-gate result into service layer: insert `pending` row on each flagged translation (idempotent by `sentence_key`).
+- [ ] Add repository methods: `enqueue_review`, `list_pending`, `mark_sent`, `store_gpt_result`.
+- [ ] Add integration tests for queue CRUD.
+
+### C) GPT Batch Translator Job
+
+- [ ] Add `BatchGptTranslator` service (`ela_pipeline/translate/gpt_batch.py`):
+  - Pull up to N `pending` rows from `translation_review_queue`.
+  - Build single ChatGPT prompt with JSON array of source sentences (batch of ≤50).
+  - Parse JSON array response → map GPT translations back to `sentence_key`.
+  - Store result in `translation_review_queue.gpt_text`, set `status = accepted`.
+  - Handle partial failures gracefully (mark individual rows `rejected` on parse error).
+- [ ] Add CLI entrypoint: `python -m ela_pipeline.translate.run_gpt_batch [--batch-size 50] [--dry-run]`.
+- [ ] Add env config: `OPENAI_API_KEY`, `GPT_BATCH_MODEL` (default `gpt-4o`), `GPT_BATCH_SIZE`.
+- [ ] Add unit tests for prompt builder, response parser, partial-failure handling.
+
+### D) Config UI Integration
+
+- [ ] Add "Translation review queue" info block in Config screen: show count of `pending` rows.
+- [ ] Add "Process queue (N pending)" button that calls `POST /api/translation-review/process`.
+- [ ] Add backend endpoint `POST /api/translation-review/process` that triggers `BatchGptTranslator.run()`.
+- [ ] Show last-run result (rows processed, errors) in Config UI after job completes.
+
+### E) Dataset Export for Fine-Tuning
+
+- [ ] Add export CLI: `python -m ela_pipeline.translate.export_finetune_dataset --output data/m2m100_finetune/` — exports `accepted` GPT pairs as `{source, reference}` JSONL.
+- [ ] Add provenance fields to export (`sentence_key`, `gpt_model`, `processed_at`, `quality_flags`).
+- [ ] Add dataset quality gates before export (min pair count, dedup by source text, no empty translations).
+- [ ] Document LoRA fine-tune recipe for `facebook/m2m100_418M` using exported reference pairs in `docs/m2m100_finetune.md`.
