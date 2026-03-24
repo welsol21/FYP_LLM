@@ -25,7 +25,9 @@ body {
 
 /* On pointer-device (desktop) browsers, lock body scroll so only .screen scrolls.
    Switch app-shell to flex column so the screen gets the exact remaining height
-   (100dvh - top-bar - bottom-nav) with no fixed-position hacks needed. */
+   (100dvh - top-bar - bottom-nav) with no fixed-position hacks needed.
+   overflow:hidden strictly caps the flex container to its height so min-height
+   cannot push it beyond 100dvh. */
 @media (hover: hover) and (pointer: fine) {
   html, body {
     height: 100%;
@@ -35,6 +37,7 @@ body {
   .app-shell {
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
   .screen {
@@ -229,7 +232,9 @@ button {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
+  scrollbar-width: none;
 }
+.pwa-diagnostics-box::-webkit-scrollbar { display: none; }
 
 .compact-card {
   padding-top: 10px;
@@ -498,7 +503,9 @@ textarea {
   margin: 6px 0 0;
   max-height: 220px;
   overflow-y: auto;
+  scrollbar-width: none;
 }
+.log-preview::-webkit-scrollbar { display: none; }
 
 /* Toast notifications */
 .log-toasts {
