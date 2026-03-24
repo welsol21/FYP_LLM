@@ -1273,23 +1273,6 @@ class RuntimeMediaService:
         if pipeline is None:
             assert extraction is not None
             document_id = document_id or f"doc-{uuid.uuid4().hex[:12]}"
-            # Batch pre-translate all sentences in ONE model.generate() call before the
-            # contract loop.  Each subsequent run_pipeline() call finds the cache hit and
-            # skips M2M100, turning N sequential calls into 1 batched call.
-            if extraction.sentence_stream and effective_translation_provider in {
-                "m2m100", "our", "backend", "default", "",
-            }:
-                try:
-                    from ela_pipeline.inference.run import pre_translate_sentences_batch
-                    pre_translate_sentences_batch(
-                        extraction.sentence_stream,
-                        translation_model="artifacts/models/m2m100_418M",
-                        source_lang="en",
-                        target_lang="ru",
-                        device="cpu",
-                    )
-                except Exception:
-                    pass  # Cache warm-up is best-effort; individual calls remain as fallback
             try:
                 pipeline = build_media_contracts(
                     extraction=extraction,
