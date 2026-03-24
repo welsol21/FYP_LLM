@@ -271,6 +271,25 @@ def _extract_text_and_sentence_chunks(
             progress_callback("transcribing_audio", 0.05, f"Loading ASR model: {model_name}")
         model = _get_whisper_model_cached(model_name, str(asr_cache_dir))
         media_duration_sec = _probe_media_duration_seconds(source_path)
+
+        # Validate that the file actually contains audio before handing it to Whisper.
+        # whisper.load_audio() uses ffmpeg; if it returns an empty array the subsequent
+        # mel-spectrogram reshape will raise an opaque tensor error.
+        try:
+            import whisper as _whisper_mod  # type: ignore[import-not-found]
+            _raw = _whisper_mod.load_audio(str(source_path))
+            if _raw is not None and hasattr(_raw, "__len__") and len(_raw) == 0:
+                raise RuntimeError(
+                    f"'{source_path.name}' contains no audio samples. "
+                    "The file may have no audio track or may be corrupt."
+                )
+        except RuntimeError:
+            raise
+        except Exception as _audio_exc:
+            raise RuntimeError(
+                f"Could not load audio from '{source_path.name}': {_audio_exc}"
+            ) from _audio_exc
+
         result_holder: dict[str, Any] = {}
         error_holder: dict[str, Exception] = {}
 
