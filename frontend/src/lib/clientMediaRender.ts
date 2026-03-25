@@ -243,13 +243,12 @@ async function ensureFfmpeg(onProgress?: ProgressCb): Promise<{ ffmpeg: FfmpegIn
         ]))
 
         const ffmpeg = new FFmpeg()
-        const baseUrl = String(import.meta.env?.VITE_CLIENT_FFMPEG_CORE_BASE_URL || 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm').trim()
+        const baseUrl = String(import.meta.env?.VITE_CLIENT_FFMPEG_CORE_BASE_URL || '/ffmpeg').trim()
         const coreURL = await util.toBlobURL(`${baseUrl}/ffmpeg-core.js`, 'text/javascript')
         const wasmURL = await util.toBlobURL(`${baseUrl}/ffmpeg-core.wasm`, 'application/wasm')
-        const workerURL = await util.toBlobURL(`${baseUrl}/ffmpeg-core.worker.js`, 'text/javascript')
 
         await yieldToBrowser()
-        await ffmpeg.load({ coreURL, wasmURL, workerURL })
+        await ffmpeg.load({ coreURL, wasmURL })
         progress(onProgress, 'Local media renderer loaded', 12)
         await yieldToBrowser()
         return { ffmpeg, util }
