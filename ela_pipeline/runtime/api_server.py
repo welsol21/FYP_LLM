@@ -99,6 +99,36 @@ SERVICE = RuntimeMediaService(
     deployment_mode=os.getenv("ELA_DEPLOYMENT_MODE", "auto"),
 )
 
+# In-memory TTS job registry — no DB, no persistence, just status tracking.
+import threading as _threading
+_tts_jobs: dict[str, dict] = {}
+_tts_jobs_lock = _threading.Lock()
+
+
+def _run_tts_job(job_id: str, *, sentences: list, doc_dir: "Path", source_type: str, source_path: str, voice_choice: str, subtitles_mode: str) -> None:
+    try:
+        artifacts = SERVICE.generate_tts_batch(
+            sentences=sentences,
+            doc_dir=doc_dir,
+            source_type=source_type,
+            source_path=source_path,
+            voice_choice=voice_choice,
+            subtitles_mode=subtitles_mode,
+        )
+        artifact_list = [
+            {
+                "name": a["name"],
+                "size_bytes": a["size_bytes"],
+                "download_url": f"/api/document-artifact-download?document_id={job_id}&name={a['name']}",
+            }
+            for a in artifacts
+        ]
+        with _tts_jobs_lock:
+            _tts_jobs[job_id] = {"status": "done", "artifacts": artifact_list}
+    except Exception as exc:
+        with _tts_jobs_lock:
+            _tts_jobs[job_id] = {"status": "error", "error": str(exc)}
+
 
 def _build_sentence_contract_payload(sentence_text: str, sentence_idx: int) -> dict:
     controlled_model_dir = _env_str("ELA_CONTROLLED_T5_MODEL_DIR", "")
@@ -218,6 +248,18 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": "job_id is required"}, status=400)
                 return
             self._send_json(SERVICE.get_backend_job_status(job_id=job_id))
+            return
+        if path == "/api/tts-job-status":
+            job_id = (query.get("job_id") or [""])[0]
+            if not job_id:
+                self._send_json({"error": "job_id is required"}, status=400)
+                return
+            with _tts_jobs_lock:
+                job = _tts_jobs.get(job_id)
+            if job is None:
+                self._send_json({"status": "not_found", "job_id": job_id}, status=404)
+                return
+            self._send_json({"job_id": job_id, **job})
             return
         if path == "/api/document-artifacts":
             document_id = (query.get("document_id") or [""])[0]
@@ -362,26 +404,24 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
             base = Path(os.getenv("MEDIA_CONTRACT_ARTIFACTS_DIR", "artifacts/media_contracts")).resolve()
             doc_dir = base / document_id
             doc_dir.mkdir(parents=True, exist_ok=True)
-            try:
-                artifacts = SERVICE.generate_tts_batch(
+            # Register job as running before spawning thread so /api/tts-job-status
+            # never returns not_found for a valid job_id.
+            with _tts_jobs_lock:
+                _tts_jobs[document_id] = {"status": "running"}
+            _threading.Thread(
+                target=_run_tts_job,
+                kwargs=dict(
+                    job_id=document_id,
                     sentences=sentences,
                     doc_dir=doc_dir,
                     source_type=source_type,
                     source_path=source_path,
                     voice_choice=voice_choice,
                     subtitles_mode=subtitles_mode,
-                )
-                artifact_list = [
-                    {
-                        "name": a["name"],
-                        "size_bytes": a["size_bytes"],
-                        "download_url": f"/api/document-artifact-download?document_id={document_id}&name={a['name']}",
-                    }
-                    for a in artifacts
-                ]
-                self._send_json({"document_id": document_id, "artifacts": artifact_list})
-            except Exception as exc:
-                self._send_json({"error": str(exc)}, status=500)
+                ),
+                daemon=True,
+            ).start()
+            self._send_json({"job_id": document_id, "status": "running"})
             return
 
         if path == "/api/sentence-contract":

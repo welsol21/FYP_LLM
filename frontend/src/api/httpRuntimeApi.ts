@@ -685,10 +685,8 @@ export class HttpRuntimeApi implements RuntimeApi {
         }))
         const voiceChoice = String(input.voiceChoice || '').trim().toLowerCase() === 'backend_svetlana' ? 'female' : 'male'
         try {
-          const ttsResult = await requestJson<{
-            document_id: string
-            artifacts: Array<{ name: string; size_bytes: number; download_url: string }>
-          }>('/api/tts-batch', {
+          // Start async TTS job — returns immediately with job_id
+          const ttsStarted = await requestJson<{ job_id: string; status: string }>('/api/tts-batch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -701,11 +699,33 @@ export class HttpRuntimeApi implements RuntimeApi {
             }),
             signal: input.signal,
           })
-          log('exporting_files', 'Downloading audio artifacts...', [100, 100, 100, 100, 100, 50])
+          const ttsJobId = String(ttsStarted.job_id || documentId)
+          // Poll until TTS job completes
+          let ttsArtifacts: Array<{ name: string; size_bytes: number; download_url: string }> = []
+          for (;;) {
+            ensureNotAborted()
+            await sleepMs(2000)
+            ensureNotAborted()
+            const ttsStatus = await requestJson<{
+              job_id: string
+              status: string
+              artifacts?: Array<{ name: string; size_bytes: number; download_url: string }>
+              error?: string
+            }>(`/api/tts-job-status?job_id=${encodeURIComponent(ttsJobId)}`)
+            if (ttsStatus.status === 'done') {
+              ttsArtifacts = ttsStatus.artifacts || []
+              break
+            }
+            if (ttsStatus.status === 'error') {
+              throw new Error(`TTS generation failed: ${ttsStatus.error || 'unknown error'}`)
+            }
+            log('exporting_files', 'Generating translated audio...', [100, 100, 100, 100, 100, 30])
+          }
+          log('exporting_files', 'Downloading audio artifacts...', [100, 100, 100, 100, 100, 60])
           const artifactMap = new Map<string, DocumentArtifact>(
             LocalWorkspace.buildDocumentArtifacts(documentId, contract).map((row) => [row.name, row]),
           )
-          for (const row of ttsResult.artifacts || []) {
+          for (const row of ttsArtifacts) {
             const name = String(row.name || '').trim()
             const downloadUrl = String(row.download_url || '').trim()
             if (!name || !downloadUrl) continue
@@ -736,6 +756,7 @@ export class HttpRuntimeApi implements RuntimeApi {
           }).catch(() => {})
           log('exporting_files', 'Audio artifacts saved', [100, 100, 100, 100, 100, 100])
         } catch (ttsErr) {
+          if (ttsErr instanceof DOMException && ttsErr.name === 'AbortError') throw ttsErr
           recordRuntimeDiagnostic('api.media.backend', 'tts-batch.error', String(ttsErr instanceof Error ? ttsErr.message : ttsErr), 'error')
           log('exporting_files', 'TTS failed — analysis saved without audio', [100, 100, 100, 100, 100, 100])
         }
