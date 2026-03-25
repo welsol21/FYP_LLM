@@ -878,17 +878,17 @@ export class HttpRuntimeApi implements RuntimeApi {
             subtitlesMode: input.subtitlesMode || 'bilingual',
             voiceChoice: voiceForCache,
             sentences: timedSentences,
-            onProgress: (msg, pct) => log('exporting_files', msg, [100, 100, 100, 100, 100, Math.max(5, Math.round(pct))]),
+            onProgress: (msg, pct) => log('exporting_files', msg, [100, 100, 100, 100, 100, Math.max(5, Math.min(95, Math.round(pct)))]),
             ttsProvider,
           })
 
           if (!rendered) throw new Error('Media render returned null')
           ensureNotAborted()
 
+          log('exporting_files', 'Saving audio…', [100, 100, 100, 100, 100, 96])
           await LocalWorkspace.cacheAnalysisArtifactBlob(documentId, 'translated_audio_ru.mp3', rendered.translatedAudio)
-          if (sourceType === 'video') {
-            await LocalWorkspace.cacheAnalysisArtifactBlob(documentId, 'translated_video_ru.mp4', rendered.translatedVideo)
-          }
+          log('exporting_files', 'Saving video…', [100, 100, 100, 100, 100, 97])
+          await LocalWorkspace.cacheAnalysisArtifactBlob(documentId, 'translated_video_ru.mp4', rendered.translatedVideo)
 
           const artifactMap = new Map<string, DocumentArtifact>(
             LocalWorkspace.buildDocumentArtifacts(documentId, contract).map((row) => [row.name, row]),
@@ -897,6 +897,7 @@ export class HttpRuntimeApi implements RuntimeApi {
           artifactMap.set('subtitles_bilingual.srt', { name: 'subtitles_bilingual.srt', size_bytes: rendered.subtitlesBilingual.length, download_url: encodeTextArtifact('text/plain', rendered.subtitlesBilingual) })
           artifactMap.set('subtitles_target.srt', { name: 'subtitles_target.srt', size_bytes: rendered.subtitlesTarget.length, download_url: encodeTextArtifact('text/plain', rendered.subtitlesTarget) })
 
+          log('exporting_files', 'Saving analysis…', [100, 100, 100, 100, 100, 98])
           // Final save: contractCurrent: true → file.analyzed = true
           await LocalWorkspace.upsertAnalysis({
             documentId,
