@@ -527,20 +527,17 @@ export class HttpRuntimeApi implements RuntimeApi {
   }): Promise<MediaSubmissionPayload> {
     const startedAt = Date.now()
     const stageLogs: string[] = []
-    // loading_file | transcribing_audio | linguistic_parsing | generating_media | client_translation | exporting_files
-    const progress: number[] = [0, 0, 0, 0, 0, 0]
-    const stageNames = ['loading_file', 'transcribing_audio', 'linguistic_parsing', 'generating_media', 'client_translation', 'exporting_files']
-    const log = (stageName: string, message: string, incoming?: number[]): void => {
-      const idx = stageNames.indexOf(stageName)
-      if (Array.isArray(incoming)) {
-        for (let i = 0; i < incoming.length && i < progress.length; i += 1) {
-          progress[i] = Math.max(progress[i], Number(incoming[i] || 0))
-        }
-      } else if (idx >= 0) {
-        progress[idx] = Math.max(progress[idx], 5)
+    const progress: number[] = [0, 0, 0, 0, 0]
+    const stageNames = ['loading_file', 'transcribing_audio', 'linguistic_parsing', 'generating_media', 'exporting_files']
+    let mediaStageClosed = false
+    const log = (stage: number, text: string, pct: number): void => {
+      if (stage >= 4 && !mediaStageClosed) {
+        progress[3] = 100
+        mediaStageClosed = true
       }
-      if (!stageLogs.length || stageLogs[stageLogs.length - 1] !== message) stageLogs.push(message)
-      input.onProgress?.({ stage_name: stageName, message, stage_logs: stageLogs.slice(-30), stage_progress: [...progress] })
+      progress[stage] = Math.max(progress[stage], Math.max(0, Math.min(100, Math.round(pct))))
+      if (!stageLogs.length || stageLogs[stageLogs.length - 1] !== text) stageLogs.push(text)
+      input.onProgress?.({ stage_name: stageNames[stage] || '', message: text, stage_logs: stageLogs.slice(-30), stage_progress: [...progress] })
     }
     const finish = (payload: MediaSubmissionPayload): MediaSubmissionPayload => ({
       ...payload,
@@ -656,7 +653,8 @@ export class HttpRuntimeApi implements RuntimeApi {
       }
 
       if (resumePoint === 'done') {
-        log('loading_file', 'Already analyzed — returning existing result', [100, 100, 100, 100, 100, 100])
+        progress.fill(100)
+        log(0, 'Already analyzed — returning existing result', 100)
         return finish({
           result: { route: 'local', status: 'completed_local', document_id: documentId, message: 'Analysis already completed.', stage_name: 'completed' },
           ui_feedback: { severity: 'info', title: 'Already analyzed', message: 'This file has already been analyzed.' },
@@ -669,7 +667,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       const needsUpload = resumePoint === 'full' && !isRemoteDeployment()
       let uploadedMediaPath = ''
       if (needsUpload) {
-        log('loading_file', 'Uploading media to backend...', [20, 0, 0, 0, 0, 0])
+        log(0, 'Uploading media to backend...', 20)
         const form = new FormData()
         form.append('file', input.mediaBlob, input.fileName)
         const uploadRes = await fetchWithRetry('/api/upload', { method: 'POST', body: form, signal: input.signal }, { retries: 2, retryDelayMs: 1500 })
@@ -683,10 +681,10 @@ export class HttpRuntimeApi implements RuntimeApi {
         }
         const uploaded = (await uploadRes.json()) as { mediaPath: string; sizeBytes: number; fileName: string }
         uploadedMediaPath = uploaded.mediaPath
-        log('loading_file', 'Media uploaded', [100, 0, 0, 0, 0, 0])
+        log(0, 'Media uploaded', 100)
         ensureNotAborted()
       } else {
-        log('loading_file', 'Ready', [100, 0, 0, 0, 0, 0])
+        log(0, 'Ready', 100)
       }
 
       // ── Stage 1: Transcribe ──────────────────────────────────────
@@ -697,12 +695,12 @@ export class HttpRuntimeApi implements RuntimeApi {
       if (resumePoint === 'full') {
         const durationMin = Math.round((input.durationSec ?? 0) / 60)
         const timeHint = durationMin > 2 ? ` (~${durationMin * 2}–${durationMin * 4} min on CPU)` : ''
-        log('transcribing_audio', `Loading Whisper model…${timeHint}`, [100, 3, 0, 0, 0, 0])
+        log(1, `Loading Whisper model…${timeHint}`, 3)
         const transcribeResult = isRemoteDeployment()
           ? await this.clientTranscribeAudio(
               input.mediaBlob,
               input.fileName,
-              (msg, pct = 50) => log('transcribing_audio', msg, [100, pct, 0, 0, 0, 0]),
+              (msg, pct = 50) => log(1, msg, pct),
               input.signal,
             ).then((r) => ({ ...r, full_text: r.sentences.map((s) => s.text).join(' ') }))
           : await new Promise<{ source_type: string; full_text: string; sentences: StoredSentence[] }>(
@@ -751,7 +749,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         )
         sentences = transcribeResult.sentences || []
         sourceType = String(transcribeResult.source_type || 'audio').trim()
-        log('transcribing_audio', `Transcribed ${sentences.length} sentences`, [100, 100, 0, 0, 0, 0])
+        log(1, `Transcribed ${sentences.length} sentences`, 100)
         ensureNotAborted()
 
         // Persist sentences for future resume (pipeline_settings saved only on full success)
@@ -763,7 +761,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       } else {
         sentences = resumeSentences!
         sourceType = resumeSourceType ?? 'audio'
-        log('transcribing_audio', 'Reusing existing transcription', [100, 100, 0, 0, 0, 0])
+        log(1, 'Reusing existing transcription', 100)
       }
 
       // ── Stage 2: Sentence contracts ──────────────────────────────
@@ -771,7 +769,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         contract = {}
         const total = sentences.length
         let contractsDone = 0
-        log('linguistic_parsing', `Building sentence contracts (0/${total})...`, [100, 100, 5, 0, 0, 0])
+        log(2, `Building sentence contracts (0/${total})...`, 5)
         await runConcurrent(
           sentences.map((sent, i) => async () => {
             ensureNotAborted()
@@ -787,11 +785,11 @@ export class HttpRuntimeApi implements RuntimeApi {
               recordRuntimeDiagnostic('api.media.backend', 'sentence-contract.error', String(err instanceof Error ? err.message : err), 'error')
             }
             contractsDone++
-            log('linguistic_parsing', `Processing sentences (${contractsDone}/${total})`, [100, 100, Math.round((contractsDone / Math.max(total, 1)) * 100), 0, 0, 0])
+            log(2, `Processing sentences (${contractsDone}/${total})`, Math.round((contractsDone / Math.max(total, 1)) * 100))
           }),
           3,
         )
-        log('linguistic_parsing', `Contracts built (${Object.keys(contract).length}/${total})`, [100, 100, 100, 100, 0, 0])
+        log(2, `Contracts built (${Object.keys(contract).length}/${total})`, 100)
         ensureNotAborted()
 
         // Intermediate save — contractCurrent: false keeps file.analyzed = false until pipeline completes
@@ -810,42 +808,35 @@ export class HttpRuntimeApi implements RuntimeApi {
         })
       } else {
         contract = resumeContract!
-        progress[2] = 100
-        progress[3] = 100
-        log('linguistic_parsing', 'Reusing existing contracts', [100, 100, 100, 100, 0, 0])
+        log(2, 'Reusing existing contracts', 100)
       }
 
       // ── Stage 3: Translation ─────────────────────────────────────
       let translations: Record<string, string> = {}
       if (resumePoint === 'tts' && resumeTranslations) {
         translations = resumeTranslations
-        progress[4] = 100
-        log('client_translation', 'Reusing existing translations', [100, 100, 100, 100, 100, 0])
+        log(2, 'Reusing existing translations', 100)
       } else {
         const sentenceKeys = Object.keys(contract)
         if (sentenceKeys.length > 0) {
-          log('client_translation', `Translating sentences (0/${sentenceKeys.length})...`, [100, 100, 100, 100, 5, 0])
+          log(2, `Translating sentences (0/${sentenceKeys.length})...`, 5)
           translations = await this.clientTranslateAnalysis(
             documentId,
             contract,
-            (done, ttl) => {
-              progress[4] = Math.round((done / Math.max(ttl, 1)) * 100)
-              log('client_translation', `Translating sentences (${done}/${ttl})`, [...progress])
-            },
+            (done, ttl) => log(2, `Translating sentences (${done}/${ttl})`, Math.round((done / Math.max(ttl, 1)) * 100)),
             input.signal,
           ).catch((err: unknown) => {
             recordRuntimeDiagnostic('api.media.backend', 'translate.error', String(err instanceof Error ? err.message : err), 'error')
             return {}
           })
         }
-        progress[4] = 100
-        log('client_translation', 'Translation complete', [...progress])
+        log(2, 'Translation complete', 100)
       }
       ensureNotAborted()
 
       // ── Stage 4: Per-sentence TTS + client render ─────────────────
       if (sourceType === 'audio' || sourceType === 'video') {
-        log('generating_media', 'Generating TTS audio…', [100, 100, 100, 5, 100, 0])
+        log(3, 'Generating TTS audio…', 5)
         const voiceForCache = String(input.voiceChoice || '').trim().toLowerCase() === 'backend_svetlana' ? 'female' : 'male'
         const timedSentences = sentences.map((sent) => ({
           text_eng: sent.text,
@@ -871,16 +862,10 @@ export class HttpRuntimeApi implements RuntimeApi {
           return blob
         }
 
-        // pct 0-73 from renderTranslatedMediaArtifacts = TTS + audio assembly → generating_media
-        // pct 74-100 = canvas video record + H.264 encode → exporting_files
         const onRenderProgress = (msg: string, pct: number): void => {
-          if (pct < 74) {
-            const gmPct = 5 + Math.round((pct / 73) * 95)
-            log('generating_media', msg, [100, 100, 100, Math.min(100, gmPct), 100, 0])
-          } else {
-            const efPct = Math.max(5, Math.round(((pct - 74) / 26) * 90))
-            log('exporting_files', msg, [100, 100, 100, 100, 100, efPct])
-          }
+          const normalized = String(msg || '').trim()
+          const isExportStage = normalized === 'Finalizing media artifacts' || normalized === 'Media artifacts exported'
+          log(isExportStage ? 4 : 3, normalized, pct)
         }
 
         try {
@@ -897,9 +882,9 @@ export class HttpRuntimeApi implements RuntimeApi {
           if (!rendered) throw new Error('Media render returned null')
           ensureNotAborted()
 
-          log('exporting_files', 'Saving audio…', [100, 100, 100, 100, 100, 96])
+          log(4, 'Saving audio…', 96)
           await LocalWorkspace.cacheAnalysisArtifactBlob(documentId, 'translated_audio_ru.mp3', rendered.translatedAudio)
-          log('exporting_files', 'Saving video…', [100, 100, 100, 100, 100, 97])
+          log(4, 'Saving video…', 97)
           await LocalWorkspace.cacheAnalysisArtifactBlob(documentId, 'translated_video_ru.mp4', rendered.translatedVideo)
 
           const artifactMap = new Map<string, DocumentArtifact>(
@@ -909,7 +894,7 @@ export class HttpRuntimeApi implements RuntimeApi {
           artifactMap.set('subtitles_bilingual.srt', { name: 'subtitles_bilingual.srt', size_bytes: rendered.subtitlesBilingual.length, download_url: encodeTextArtifact('text/plain', rendered.subtitlesBilingual) })
           artifactMap.set('subtitles_target.srt', { name: 'subtitles_target.srt', size_bytes: rendered.subtitlesTarget.length, download_url: encodeTextArtifact('text/plain', rendered.subtitlesTarget) })
 
-          log('exporting_files', 'Saving analysis…', [100, 100, 100, 100, 100, 98])
+          log(4, 'Saving analysis…', 98)
           // Final save: contractCurrent: true → file.analyzed = true
           await LocalWorkspace.upsertAnalysis({
             documentId,
@@ -937,15 +922,14 @@ export class HttpRuntimeApi implements RuntimeApi {
             } satisfies PipelineSettings)], { type: 'application/json' }),
           )
 
-          log('exporting_files', 'Artifacts saved', [100, 100, 100, 100, 100, 100])
+          log(4, 'Artifacts saved', 100)
         } catch (renderErr) {
           if (renderErr instanceof DOMException && renderErr.name === 'AbortError') throw renderErr
           recordRuntimeDiagnostic('api.media.backend', 'render.error', String(renderErr instanceof Error ? renderErr.message : renderErr), 'error')
-          log('exporting_files', 'Media render failed — analysis saved without audio', [100, 100, 100, 100, 100, 100])
+          log(4, 'Media render failed — analysis saved without audio', 100)
         }
       } else {
-        progress[5] = 100
-        log('exporting_files', 'Text analysis complete', [100, 100, 100, 100, 100, 100])
+        log(4, 'Text analysis complete', 100)
       }
 
       recordRuntimeDiagnostic('api.media.backend', 'submit.success', { documentId, sentences: Object.keys(contract).length })

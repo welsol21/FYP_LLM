@@ -249,6 +249,11 @@ async function ensureFfmpeg(onProgress?: ProgressCb): Promise<{ ffmpeg: FfmpegIn
 
         await yieldToBrowser()
         await ffmpeg.load({ coreURL, wasmURL })
+        // Load DejaVuSans font into WASM VFS for drawtext subtitle rendering (Cyrillic support)
+        try {
+          const fontBytes = await util.fetchFile('/desktop-runtime/fonts/DejaVuSans.ttf')
+          await ffmpeg.writeFile('/DejaVuSans.ttf', fontBytes)
+        } catch { /* font unavailable — drawtext will use default font */ }
         progress(onProgress, 'Local media renderer loaded', 12)
         await yieldToBrowser()
         return { ffmpeg, util }
@@ -479,243 +484,6 @@ async function probeBlobDurationMs(blob: Blob): Promise<number> {
   }
 }
 
-function subtitleLinesForMode(row: SubtitleRow | null, mode: ReturnType<typeof toSubtitleMode>): string[] {
-  if (!row) return []
-  const textEn = String(row.text_eng || '').trim()
-  const textRu = String(row.text_ru || '').trim()
-  if (mode === 'source') return textEn ? [textEn] : []
-  if (mode === 'target') return textRu ? [textRu] : []
-  return [textEn, textRu].filter(Boolean)
-}
-
-function findActiveSubtitleRow(rows: SubtitleRow[], timeMs: number): SubtitleRow | null {
-  for (const row of rows) {
-    if (timeMs >= row.start_ms && timeMs <= row.end_ms) return row
-  }
-  return null
-}
-
-function drawSubtitleOverlay(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  lines: string[],
-  mode: ReturnType<typeof toSubtitleMode>,
-): void {
-  if (!lines.length) return
-  const baseFont = Math.max(24, Math.round(width * 0.024))
-  const lineHeight = Math.round(baseFont * 1.3)
-  const bottomPadding = Math.round(height * 0.08)
-  const topPadding = Math.round(height * 0.08)
-  const isSimultaneous = mode === 'bilingual_simultaneous' && lines.length >= 2
-
-  const wrapText = (text: string): string[] => {
-    const normalized = String(text || '').replace(/\s+/g, ' ').trim()
-    if (!normalized) return []
-    const words = normalized.split(' ')
-    const maxWidth = width * 0.84
-    const wrapped: string[] = []
-    ctx.font = `700 ${baseFont}px Arial`
-    let current = ''
-    for (const word of words) {
-      const candidate = current ? `${current} ${word}` : word
-      if (ctx.measureText(candidate).width <= maxWidth) {
-        current = candidate
-        continue
-      }
-      if (current) wrapped.push(current)
-      current = word
-    }
-    if (current) wrapped.push(current)
-    return wrapped.slice(0, 4)
-  }
-
-  const drawBlock = (text: string, centerY: number): void => {
-    const wrapped = wrapText(text)
-    if (!wrapped.length) return
-    ctx.font = `700 ${baseFont}px Arial`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    const maxLineWidth = Math.max(...wrapped.map((line) => ctx.measureText(line).width))
-    const boxWidth = Math.min(width * 0.9, maxLineWidth + 56)
-    const boxHeight = wrapped.length * lineHeight + 24
-    const boxX = (width - boxWidth) / 2
-    const boxY = centerY - boxHeight / 2
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.68)'
-    ctx.fillRect(boxX, boxY, boxWidth, boxHeight)
-    ctx.fillStyle = '#ffffff'
-    let lineY = centerY - ((wrapped.length - 1) * lineHeight) / 2
-    for (const line of wrapped) {
-      ctx.fillText(line, width / 2, lineY)
-      lineY += lineHeight
-    }
-  }
-
-  if (isSimultaneous) {
-    drawBlock(lines[0], topPadding + lineHeight * 1.6)
-    drawBlock(lines[1], height - bottomPadding - lineHeight * 1.6)
-    return
-  }
-
-  const totalHeight = lines.length * lineHeight
-  let startY = height - bottomPadding - totalHeight + lineHeight / 2
-  for (const line of lines) {
-    drawBlock(line, startY)
-    startY += lineHeight
-  }
-}
-
-async function waitForMediaEnded(media: HTMLMediaElement): Promise<void> {
-  if (media.ended) return
-  await new Promise<void>((resolve, reject) => {
-    const onEnded = (): void => { cleanup(); resolve() }
-    const onError = (): void => { cleanup(); reject(new Error('Media playback failed during canvas render.')) }
-    const cleanup = (): void => {
-      media.removeEventListener('ended', onEnded)
-      media.removeEventListener('error', onError)
-      clearTimeout(timer)
-    }
-    // Safety timeout: if ended never fires (autoplay blocked, browser policy),
-    // resolve after duration + 5s to avoid hanging forever.
-    const safetyMs = (isFinite(media.duration) && media.duration > 0 ? media.duration * 1000 : 60_000) + 5_000
-    const timer = window.setTimeout(() => { cleanup(); resolve() }, safetyMs)
-    media.addEventListener('ended', onEnded)
-    media.addEventListener('error', onError)
-  })
-}
-
-async function renderVideoWithCanvas(input: {
-  sourceBlob: Blob
-  sourceKind: SourceKind
-  translatedAudio: Blob
-  subtitleRows: SubtitleRow[]
-  mode: ReturnType<typeof toSubtitleMode>
-  onProgress?: ProgressCb
-}): Promise<Blob> {
-  const canvas = document.createElement('canvas')
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Canvas 2D context is unavailable.')
-
-  const audioUrl = URL.createObjectURL(input.translatedAudio)
-  const audioEl = document.createElement('audio')
-  audioEl.src = audioUrl
-  audioEl.preload = 'auto'
-  audioEl.crossOrigin = 'anonymous'
-
-  let videoEl: HTMLVideoElement | null = null
-  let sourceUrl: string | null = null
-  if (input.sourceKind === 'video') {
-    sourceUrl = URL.createObjectURL(input.sourceBlob)
-    videoEl = document.createElement('video')
-    videoEl.src = sourceUrl
-    videoEl.preload = 'auto'
-    videoEl.muted = true
-    videoEl.playsInline = true
-    await new Promise<void>((resolve, reject) => {
-      const onLoaded = (): void => {
-        cleanup()
-        resolve()
-      }
-      const onError = (): void => {
-        cleanup()
-        reject(new Error('Source video could not be loaded for canvas render.'))
-      }
-      const cleanup = (): void => {
-        videoEl?.removeEventListener('loadedmetadata', onLoaded)
-        videoEl?.removeEventListener('error', onError)
-      }
-      videoEl?.addEventListener('loadedmetadata', onLoaded)
-      videoEl?.addEventListener('error', onError)
-    })
-    canvas.width = Math.max(640, videoEl.videoWidth || 1280)
-    canvas.height = Math.max(360, videoEl.videoHeight || 720)
-  } else {
-    canvas.width = 1280
-    canvas.height = 720
-  }
-
-  const AudioCtx = (globalThis as typeof globalThis & { webkitAudioContext?: typeof AudioContext }).AudioContext
-    || (globalThis as typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-  if (!AudioCtx) throw new Error('WebAudio is unavailable for video render.')
-  const audioCtx = new AudioCtx()
-  const destination = audioCtx.createMediaStreamDestination()
-  const audioSource = audioCtx.createMediaElementSource(audioEl)
-  audioSource.connect(destination)
-
-  const canvasStream = canvas.captureStream(25)
-  const mixedStream = new MediaStream([
-    ...canvasStream.getVideoTracks(),
-    ...destination.stream.getAudioTracks(),
-  ])
-
-  const mimeCandidates = [
-    'video/webm;codecs=vp9,opus',
-    'video/webm;codecs=vp8,opus',
-    'video/webm',
-  ]
-  const mimeType = mimeCandidates.find((value) => {
-    try {
-      return typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(value)
-    } catch {
-      return false
-    }
-  })
-  if (!mimeType) throw new Error('MediaRecorder WebM is unavailable in this browser.')
-
-  const chunks: BlobPart[] = []
-  const recorder = new MediaRecorder(mixedStream, { mimeType })
-  recorder.ondataavailable = (event) => {
-    if (event.data && event.data.size > 0) chunks.push(event.data)
-  }
-
-  let rafId = 0
-  let lastRenderPct = -1
-  const drawFrame = (): void => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    if (videoEl && videoEl.readyState >= 2) {
-      ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height)
-    } else {
-      ctx.fillStyle = '#000000'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-    }
-    const activeRow = findActiveSubtitleRow(input.subtitleRows, Math.round(audioEl.currentTime * 1000))
-    const lines = subtitleLinesForMode(activeRow, input.mode)
-    drawSubtitleOverlay(ctx, canvas.width, canvas.height, lines, input.mode)
-    const duration = Math.max(0.001, audioEl.duration || 0)
-    const renderPct = 76 + Math.min(14, Math.max(0, (audioEl.currentTime / duration) * 14))
-    const roundedPct = Math.round(renderPct)
-    if (roundedPct !== lastRenderPct) {
-      lastRenderPct = roundedPct
-      progress(input.onProgress, 'Rendering translated video track', roundedPct)
-    }
-    rafId = window.requestAnimationFrame(drawFrame)
-  }
-
-  recorder.start(250)
-  drawFrame()
-  progress(input.onProgress, 'Rendering translated video track', 76)
-  await yieldToBrowser()
-  await audioCtx.resume()
-  if (videoEl) {
-    void videoEl.play().catch(() => undefined)
-  }
-  void audioEl.play().catch(() => undefined)
-  await waitForMediaEnded(audioEl)
-  window.cancelAnimationFrame(rafId)
-  recorder.stop()
-  await new Promise<void>((resolve) => {
-    recorder.onstop = () => resolve()
-  })
-
-  audioSource.disconnect()
-  destination.disconnect()
-  mixedStream.getTracks().forEach((track) => track.stop())
-  await audioCtx.close().catch(() => undefined)
-  URL.revokeObjectURL(audioUrl)
-  if (sourceUrl) URL.revokeObjectURL(sourceUrl)
-
-  return new Blob(chunks, { type: mimeType })
-}
 
 function buildSimultaneousBilingualTimeline(windows: SentenceWindow[]): TimelineSegment[] {
   const out: TimelineSegment[] = []
@@ -789,6 +557,72 @@ export async function muxVideoWithAudio(
     progress(onProgress, 'Video mux complete', 100)
     return new Blob([copy], { type: 'video/mp4' })
   })
+}
+
+// ── FFmpeg drawtext subtitle filter ──────────────────────────────────────────
+
+const DT_MARGIN_BOTTOM = 70
+const DT_LINE_HEIGHT = 38
+const DT_BLOCK_GAP = 12
+const DT_MAX_CHARS = 48
+
+function escapeDtText(text: string): string {
+  return String(text || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/:/g, '\\:')
+    .replace(/\[/g, '\\[')
+    .replace(/\]/g, '\\]')
+    .replace(/%/g, '%%')
+}
+
+function wrapDtText(text: string): string[] {
+  const normalized = String(text || '').replace(/\s+/g, ' ').trim()
+  if (!normalized) return []
+  const words = normalized.split(' ')
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word
+    if (candidate.length <= DT_MAX_CHARS) {
+      current = candidate
+    } else {
+      if (current) lines.push(current)
+      current = word.length > DT_MAX_CHARS ? word.slice(0, DT_MAX_CHARS) : word
+    }
+  }
+  if (current) lines.push(current)
+  return lines.slice(0, 3)
+}
+
+function buildDrawtextFilter(rows: SubtitleRow[], fontFile: string): string {
+  const base = `fontfile=${fontFile}:fontsize=28:fontcolor=white:box=1:boxcolor=black@0.7:borderw=2:bordercolor=black@0.5`
+  const filters: string[] = []
+
+  const pushLines = (lines: string[], enable: string, bottomOffset: number): void => {
+    for (let i = 0; i < lines.length; i += 1) {
+      const distFromBottom = bottomOffset + (lines.length - 1 - i) * DT_LINE_HEIGHT
+      filters.push(`drawtext=${base}:text='${escapeDtText(lines[i])}':enable='${enable}':x=(w-text_w)/2:y=h-${distFromBottom}`)
+    }
+  }
+
+  for (const row of rows.slice(0, 120)) {
+    const t0 = (Math.max(0, row.start_ms) / 1000).toFixed(3)
+    const t1 = (Math.max(0, row.end_ms) / 1000).toFixed(3)
+    const enable = `between(t,${t0},${t1})`
+    const engLines = String(row.text_eng || '').trim() ? wrapDtText(row.text_eng) : []
+    const ruLines = String(row.text_ru || '').trim() ? wrapDtText(row.text_ru) : []
+
+    if (engLines.length > 0 && ruLines.length > 0) {
+      pushLines(ruLines, enable, DT_MARGIN_BOTTOM)
+      pushLines(engLines, enable, DT_MARGIN_BOTTOM + ruLines.length * DT_LINE_HEIGHT + DT_BLOCK_GAP)
+    } else if (ruLines.length > 0) {
+      pushLines(ruLines, enable, DT_MARGIN_BOTTOM)
+    } else if (engLines.length > 0) {
+      pushLines(engLines, enable, DT_MARGIN_BOTTOM)
+    }
+  }
+  return filters.join(',')
 }
 
 export async function renderTranslatedMediaArtifacts(input: RenderInput): Promise<RenderOutput | null> {
@@ -1029,45 +863,53 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
       }
       await ffmpeg.writeFile(subtitleFile, new TextEncoder().encode(selectedSubtitle))
 
-      progress(input.onProgress, 'Preparing translated video track', 74)
+      progress(input.onProgress, 'Composing video track', 74)
       await yieldToBrowser()
-      const audioBlob = await readFsBlob(ffmpeg, audioFile, 'audio/mpeg')
-      const renderedVideo = await renderVideoWithCanvas({
-        sourceBlob: input.sourceBlob,
-        sourceKind: input.sourceKind,
-        translatedAudio: audioBlob,
-        subtitleRows: selectedSubtitleRows,
-        mode,
-        onProgress: input.onProgress,
-      })
-      const renderedVideoInput = 'translated_video_input.webm'
-      await ffmpeg.writeFile(renderedVideoInput, await util.fetchFile(renderedVideo))
-      progress(input.onProgress, 'Encoding mp4 container', 92)
-      await yieldToBrowser()
-      await runWithProgressPulse(
-        runCommand(
-          ffmpeg,
-          [
+      const subsFilter = buildDrawtextFilter(selectedSubtitleRows, '/DejaVuSans.ttf')
+      const vfArgs = subsFilter ? ['-vf', subsFilter] : []
+      const videoArgs = input.sourceKind === 'video'
+        ? [
             '-y',
-            '-i', renderedVideoInput,
+            '-i', sourceFile,
+            '-i', audioFile,
+            ...vfArgs,
+            '-map', '0:v',
+            '-map', '1:a',
             '-c:v', 'libx264',
             '-pix_fmt', 'yuv420p',
             '-preset', 'ultrafast',
-            '-crf', '24',
+            '-crf', '23',
+            '-c:a', 'aac',
+            '-b:a', '192k',
+            '-shortest',
+            '-movflags', '+faststart',
+            videoFile,
+          ]
+        : [
+            '-y',
+            '-f', 'lavfi',
+            '-i', 'color=c=black:size=1280x720:rate=25',
+            '-i', audioFile,
+            ...vfArgs,
+            '-shortest',
+            '-c:v', 'libx264',
+            '-pix_fmt', 'yuv420p',
+            '-preset', 'ultrafast',
+            '-tune', 'stillimage',
+            '-crf', '28',
             '-c:a', 'aac',
             '-b:a', '192k',
             '-movflags', '+faststart',
             videoFile,
-          ],
-          'Video remuxing',
-        ),
+          ]
+      await runWithProgressPulse(
+        runCommand(ffmpeg, videoArgs, 'Video composition'),
         input.onProgress,
-        'Encoding mp4 container',
-        92,
+        'Composing video track',
+        74,
         95,
         1200,
       )
-      await safeDelete(ffmpeg, renderedVideoInput)
       progress(input.onProgress, 'Finalizing media artifacts', 96)
       await yieldToBrowser()
 
