@@ -845,7 +845,7 @@ export class HttpRuntimeApi implements RuntimeApi {
 
       // ── Stage 4: Per-sentence TTS + client render ─────────────────
       if (sourceType === 'audio' || sourceType === 'video') {
-        log('exporting_files', 'Generating translated audio...', [100, 100, 100, 100, 100, 5])
+        log('generating_media', 'Generating TTS audio…', [100, 100, 100, 5, 100, 0])
         const voiceForCache = String(input.voiceChoice || '').trim().toLowerCase() === 'backend_svetlana' ? 'female' : 'male'
         const timedSentences = sentences.map((sent) => ({
           text_eng: sent.text,
@@ -871,6 +871,18 @@ export class HttpRuntimeApi implements RuntimeApi {
           return blob
         }
 
+        // pct 0-73 from renderTranslatedMediaArtifacts = TTS + audio assembly → generating_media
+        // pct 74-100 = canvas video record + H.264 encode → exporting_files
+        const onRenderProgress = (msg: string, pct: number): void => {
+          if (pct < 74) {
+            const gmPct = 5 + Math.round((pct / 73) * 95)
+            log('generating_media', msg, [100, 100, 100, Math.min(100, gmPct), 100, 0])
+          } else {
+            const efPct = Math.max(5, Math.round(((pct - 74) / 26) * 90))
+            log('exporting_files', msg, [100, 100, 100, 100, 100, efPct])
+          }
+        }
+
         try {
           const rendered = await renderTranslatedMediaArtifacts({
             sourceBlob: input.mediaBlob,
@@ -878,7 +890,7 @@ export class HttpRuntimeApi implements RuntimeApi {
             subtitlesMode: input.subtitlesMode || 'bilingual',
             voiceChoice: voiceForCache,
             sentences: timedSentences,
-            onProgress: (msg, pct) => log('exporting_files', msg, [100, 100, 100, 100, 100, Math.max(5, Math.min(95, Math.round(pct)))]),
+            onProgress: onRenderProgress,
             ttsProvider,
           })
 
