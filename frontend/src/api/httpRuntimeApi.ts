@@ -961,6 +961,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     // AudioContext is unavailable in Web Workers — decode here in the main thread
     // and pass a Float32Array to the worker instead of a URL.
     onProgress('Decoding audio…')
+    console.log('[clientTranscribeAudio] decoding', fileName, mediaBlob.type, mediaBlob.size, 'bytes')
     const AudioCtx = (window as typeof window & { webkitAudioContext?: typeof AudioContext }).AudioContext
       ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
     if (!AudioCtx) throw new Error('AudioContext is unavailable in this browser.')
@@ -979,6 +980,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         })()
       : new Float32Array(audioBuffer.getChannelData(0))
     const sampling_rate = audioBuffer.sampleRate
+    console.log('[clientTranscribeAudio] decoded:', audioBuffer.duration.toFixed(1), 's,', audio.length, 'samples, sr:', sampling_rate, 'channels:', audioBuffer.numberOfChannels)
 
     if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
 

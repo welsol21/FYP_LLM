@@ -66,19 +66,29 @@ self.addEventListener('message', async (event: MessageEvent) => {
     sampling_rate: number
   }
   if (type !== 'transcribe') return
+  console.log('[Whisper] received transcribe, audio length:', audio?.length, 'sr:', sampling_rate)
   try {
     const t = await getTranscriber((msg) => self.postMessage({ type: 'progress', id, message: msg }))
+    console.log('[Whisper] model ready, starting inference')
     self.postMessage({ type: 'progress', id, message: 'Transcribing audio…' })
+    let chunksProcessed = 0
     const result: any = await t({ array: audio, sampling_rate }, {
       return_timestamps: true,
       chunk_length_s: 30,
       stride_length_s: 5,
       language: 'english',
       task: 'transcribe',
+      chunk_callback: (_chunk: any) => {
+        chunksProcessed++
+        console.log('[Whisper] chunk', chunksProcessed, 'done')
+        self.postMessage({ type: 'progress', id, message: `Transcribing… (chunk ${chunksProcessed})` })
+      },
     })
+    console.log('[Whisper] inference done, chunks:', result.chunks?.length)
     const sentences = groupChunksToSentences(result.chunks ?? [])
     self.postMessage({ type: 'done', id, fullText: String(result.text || ''), sentences })
   } catch (err) {
+    console.error('[Whisper] error:', err)
     self.postMessage({ type: 'error', id, message: err instanceof Error ? err.message : String(err) })
   }
 })
