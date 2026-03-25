@@ -23,9 +23,6 @@ async function getTranscriber(onProgress: (msg: string) => void): Promise<any> {
   if (transcriber) return transcriber
 
   const hasWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator
-  const device = hasWebGPU ? 'webgpu' : 'wasm'
-  const dtype = hasWebGPU ? 'fp16' : 'q8'
-  console.log('[Whisper] device:', device, 'dtype:', dtype)
 
   const progressCb = (info: any) => {
     if (typeof info?.progress === 'number' && info.status === 'progress') {
@@ -33,23 +30,29 @@ async function getTranscriber(onProgress: (msg: string) => void): Promise<any> {
     }
   }
 
-  try {
-    transcriber = await (pipeline as any)('automatic-speech-recognition', MODEL, {
+  const tryLoad = async (device: string, dtype: string) => {
+    console.log('[Whisper] trying device:', device, 'dtype:', dtype)
+    return await (pipeline as any)('automatic-speech-recognition', MODEL, {
       device,
       dtype,
       progress_callback: progressCb,
     })
-  } catch (err) {
-    if (hasWebGPU) {
-      console.warn('[Whisper] WebGPU failed, falling back to WASM q8:', err)
-      transcriber = await (pipeline as any)('automatic-speech-recognition', MODEL, {
-        device: 'wasm',
-        dtype: 'q8',
-        progress_callback: progressCb,
-      })
-    } else {
-      throw err
+  }
+
+  if (hasWebGPU) {
+    try {
+      transcriber = await tryLoad('webgpu', 'fp32')
+    } catch (e1) {
+      console.warn('[Whisper] WebGPU fp32 failed:', e1)
+      try {
+        transcriber = await tryLoad('webgpu', 'fp16')
+      } catch (e2) {
+        console.warn('[Whisper] WebGPU fp16 failed, falling back to WASM q8:', e2)
+        transcriber = await tryLoad('wasm', 'q8')
+      }
     }
+  } else {
+    transcriber = await tryLoad('wasm', 'q8')
   }
 
   return transcriber
@@ -98,12 +101,11 @@ self.addEventListener('message', async (event: MessageEvent) => {
     // Pass a plain Float32Array (already 16 kHz from main thread).
     // Transformers.js prepareAudios() only handles string|URL|Float32Array|Float64Array —
     // passing { array, sampling_rate } causes Ze.subarray errors in _call_whisper chunking.
+    // whisper-small.en is English-only: do NOT pass language/task (causes error)
     const result: any = await t(audio, {
       return_timestamps: true,
       chunk_length_s: 30,
       stride_length_s: 5,
-      language: 'english',
-      task: 'transcribe',
       chunk_callback: (_chunk: any) => {
         chunksProcessed++
         console.log('[Whisper] chunk', chunksProcessed, 'done')
