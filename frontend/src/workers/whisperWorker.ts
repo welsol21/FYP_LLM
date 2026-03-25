@@ -102,22 +102,12 @@ self.addEventListener('message', async (event: MessageEvent) => {
     const CHUNK_S = 30, STRIDE_S = 5
     const jump = (CHUNK_S - 2 * STRIDE_S) * sampling_rate
     const totalChunks = Math.max(1, Math.ceil(audio.length / jump))
-    self.postMessage({ type: 'progress', id, message: 'Transcribing…', pct: 0 })
+    self.postMessage({ type: 'progress', id, message: 'Transcribing… 0%', pct: 0 })
     let chunksProcessed = 0
-    let currentPct = 0
-    let tokenCount = 0
-    // TextStreamer.token_callback_function fires on every generated token —
-    // gives live feedback while a single 30-second chunk is being processed.
+    let lastMilestone = 0
     const streamer = new TextStreamer(t.tokenizer, {
       skip_prompt: true,
       skip_special_tokens: true,
-      token_callback_function: () => {
-        tokenCount++
-        if (tokenCount % 8 === 0) {
-          const dots = '.'.repeat((Math.floor(tokenCount / 8) % 3) + 1)
-          self.postMessage({ type: 'progress', id, message: `Transcribing${dots} ${currentPct}%`, pct: currentPct })
-        }
-      },
     })
     const result: any = await t(audio, {
       return_timestamps: true,
@@ -126,10 +116,13 @@ self.addEventListener('message', async (event: MessageEvent) => {
       streamer,
       chunk_callback: (_chunk: any) => {
         chunksProcessed++
-        tokenCount = 0
-        currentPct = Math.min(99, Math.round((chunksProcessed / totalChunks) * 100))
-        console.log('[Whisper] chunk', chunksProcessed, '/', totalChunks, `(${currentPct}%)`)
-        self.postMessage({ type: 'progress', id, message: `Transcribing… ${currentPct}%`, pct: currentPct })
+        const pct = Math.min(99, Math.round((chunksProcessed / totalChunks) * 100))
+        const milestone = Math.floor(pct / 25) * 25
+        if (milestone > lastMilestone) {
+          lastMilestone = milestone
+          console.log('[Whisper] chunk', chunksProcessed, '/', totalChunks, `(${pct}%)`)
+          self.postMessage({ type: 'progress', id, message: `Transcribing… ${milestone}%`, pct: milestone })
+        }
       },
     })
     console.log('[Whisper] inference done, chunks:', result.chunks?.length)
