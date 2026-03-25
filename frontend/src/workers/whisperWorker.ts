@@ -24,10 +24,21 @@ async function getTranscriber(onProgress: (msg: string) => void): Promise<any> {
 
   const hasWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator
 
+  // Aggregate per-file progress into one smooth overall percentage
+  const fileProgress: Record<string, number> = {}
   const progressCb = (info: any) => {
-    if (typeof info?.progress === 'number' && info.status === 'progress') {
-      onProgress(`Loading Whisper model (${Math.round(info.progress as number)}%)…`)
+    if (!info?.file) return
+    if (info.status === 'progress' && typeof info.progress === 'number') {
+      fileProgress[info.file] = info.progress
+    } else if (info.status === 'done') {
+      fileProgress[info.file] = 100
+    } else if (info.status === 'initiate') {
+      fileProgress[info.file] = 0
     }
+    const files = Object.values(fileProgress)
+    if (files.length === 0) return
+    const avg = Math.round(files.reduce((s, v) => s + v, 0) / files.length)
+    onProgress(`Loading Whisper model (${avg}%)…`)
   }
 
   const tryLoad = async (device: string, dtype: string) => {
