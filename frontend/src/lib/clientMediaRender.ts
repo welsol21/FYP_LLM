@@ -252,10 +252,16 @@ async function ensureFfmpeg(onProgress?: ProgressCb): Promise<{ ffmpeg: FfmpegIn
         await ffmpeg.load({ coreURL, wasmURL })
         // Load DejaVuSans font into WASM VFS for drawtext subtitle rendering (Cyrillic support)
         try {
-          const fontBytes = await util.fetchFile('/desktop-runtime/fonts/DejaVuSans.ttf')
-          await ffmpeg.writeFile('/DejaVuSans.ttf', fontBytes)
-          ffmpegFontLoaded = true
-          recordRuntimeDiagnostic('client.ffmpeg', 'font.loaded', { size: fontBytes.byteLength })
+          const fontRes = await fetch('/desktop-runtime/fonts/DejaVuSans.ttf')
+          const fontBytes = new Uint8Array(await fontRes.arrayBuffer())
+          if (fontRes.ok && fontBytes.byteLength > 0) {
+            await ffmpeg.writeFile('/DejaVuSans.ttf', fontBytes)
+            ffmpegFontLoaded = true
+            recordRuntimeDiagnostic('client.ffmpeg', 'font.loaded', { size: fontBytes.byteLength })
+          } else {
+            ffmpegFontLoaded = false
+            recordRuntimeDiagnostic('client.ffmpeg', 'font.error', `HTTP ${fontRes.status}, size=${fontBytes.byteLength}`, 'warning')
+          }
         } catch (err) {
           ffmpegFontLoaded = false
           recordRuntimeDiagnostic('client.ffmpeg', 'font.error', String(err instanceof Error ? err.message : err), 'warning')
