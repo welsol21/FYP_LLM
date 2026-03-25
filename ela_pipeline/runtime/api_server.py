@@ -99,36 +99,6 @@ SERVICE = RuntimeMediaService(
     deployment_mode=os.getenv("ELA_DEPLOYMENT_MODE", "auto"),
 )
 
-# In-memory TTS job registry — no DB, no persistence, just status tracking.
-import threading as _threading
-_tts_jobs: dict[str, dict] = {}
-_tts_jobs_lock = _threading.Lock()
-
-
-def _run_tts_job(job_id: str, *, sentences: list, doc_dir: "Path", source_type: str, source_path: str, voice_choice: str, subtitles_mode: str) -> None:
-    try:
-        artifacts = SERVICE.generate_tts_batch(
-            sentences=sentences,
-            doc_dir=doc_dir,
-            source_type=source_type,
-            source_path=source_path,
-            voice_choice=voice_choice,
-            subtitles_mode=subtitles_mode,
-        )
-        artifact_list = [
-            {
-                "name": a["name"],
-                "size_bytes": a["size_bytes"],
-                "download_url": f"/api/document-artifact-download?document_id={job_id}&name={a['name']}",
-            }
-            for a in artifacts
-        ]
-        with _tts_jobs_lock:
-            _tts_jobs[job_id] = {"status": "done", "artifacts": artifact_list}
-    except Exception as exc:
-        with _tts_jobs_lock:
-            _tts_jobs[job_id] = {"status": "error", "error": str(exc)}
-
 
 def _build_sentence_contract_payload(sentence_text: str, sentence_idx: int) -> dict:
     controlled_model_dir = _env_str("ELA_CONTROLLED_T5_MODEL_DIR", "")
@@ -205,6 +175,24 @@ def _run_media_pipeline_warmup() -> None:
 class RuntimeApiHandler(BaseHTTPRequestHandler):
     server_version = "ELARuntimeHTTP/1.0"
 
+    def _send_sse_start(self) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.end_headers()
+
+    def _send_sse_event(self, data: dict) -> bool:
+        """Write one SSE event. Returns False if the client disconnected."""
+        encoded = json.dumps(data, ensure_ascii=False)
+        event_bytes = f"data: {encoded}\n\n".encode("utf-8")
+        try:
+            self.wfile.write(event_bytes)
+            self.wfile.flush()
+            return True
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            return False
+
     def _send_json(self, payload: dict | list, status: int = 200) -> None:
         encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
@@ -248,18 +236,6 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": "job_id is required"}, status=400)
                 return
             self._send_json(SERVICE.get_backend_job_status(job_id=job_id))
-            return
-        if path == "/api/tts-job-status":
-            job_id = (query.get("job_id") or [""])[0]
-            if not job_id:
-                self._send_json({"error": "job_id is required"}, status=400)
-                return
-            with _tts_jobs_lock:
-                job = _tts_jobs.get(job_id)
-            if job is None:
-                self._send_json({"status": "not_found", "job_id": job_id}, status=404)
-                return
-            self._send_json({"job_id": job_id, **job})
             return
         if path == "/api/document-artifacts":
             document_id = (query.get("document_id") or [""])[0]
@@ -404,24 +380,31 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
             base = Path(os.getenv("MEDIA_CONTRACT_ARTIFACTS_DIR", "artifacts/media_contracts")).resolve()
             doc_dir = base / document_id
             doc_dir.mkdir(parents=True, exist_ok=True)
-            # Register job as running before spawning thread so /api/tts-job-status
-            # never returns not_found for a valid job_id.
-            with _tts_jobs_lock:
-                _tts_jobs[document_id] = {"status": "running"}
-            _threading.Thread(
-                target=_run_tts_job,
-                kwargs=dict(
-                    job_id=document_id,
+            # Stream progress via SSE — one request, no polling, Cloudflare-safe.
+            self._send_sse_start()
+            def _progress(stage: str, ratio: "float | None", msg: "str | None") -> None:
+                self._send_sse_event({"status": "progress", "stage": stage, "ratio": ratio or 0, "message": msg or ""})
+            try:
+                artifacts = SERVICE.generate_tts_batch(
                     sentences=sentences,
                     doc_dir=doc_dir,
                     source_type=source_type,
                     source_path=source_path,
                     voice_choice=voice_choice,
                     subtitles_mode=subtitles_mode,
-                ),
-                daemon=True,
-            ).start()
-            self._send_json({"job_id": document_id, "status": "running"})
+                    stage_callback=_progress,
+                )
+                artifact_list = [
+                    {
+                        "name": a["name"],
+                        "size_bytes": a["size_bytes"],
+                        "download_url": f"/api/document-artifact-download?document_id={document_id}&name={a['name']}",
+                    }
+                    for a in artifacts
+                ]
+                self._send_sse_event({"status": "done", "document_id": document_id, "artifacts": artifact_list})
+            except Exception as exc:
+                self._send_sse_event({"status": "error", "error": str(exc)})
             return
 
         if path == "/api/sentence-contract":

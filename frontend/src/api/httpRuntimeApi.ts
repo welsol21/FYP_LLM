@@ -685,42 +685,65 @@ export class HttpRuntimeApi implements RuntimeApi {
         }))
         const voiceChoice = String(input.voiceChoice || '').trim().toLowerCase() === 'backend_svetlana' ? 'female' : 'male'
         try {
-          // Start async TTS job — returns immediately with job_id
-          const ttsStarted = await requestJson<{ job_id: string; status: string }>('/api/tts-batch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              documentId,
-              mediaPath: uploaded.mediaPath,
-              sentences: timedSentences,
-              voiceChoice,
-              subtitlesMode: input.subtitlesMode || 'bilingual',
-              sourceType,
-            }),
-            signal: input.signal,
-          })
-          const ttsJobId = String(ttsStarted.job_id || documentId)
-          // Poll until TTS job completes
-          let ttsArtifacts: Array<{ name: string; size_bytes: number; download_url: string }> = []
-          for (;;) {
-            ensureNotAborted()
-            await sleepMs(2000)
-            ensureNotAborted()
-            const ttsStatus = await requestJson<{
-              job_id: string
-              status: string
-              artifacts?: Array<{ name: string; size_bytes: number; download_url: string }>
-              error?: string
-            }>(`/api/tts-job-status?job_id=${encodeURIComponent(ttsJobId)}`)
-            if (ttsStatus.status === 'done') {
-              ttsArtifacts = ttsStatus.artifacts || []
-              break
-            }
-            if (ttsStatus.status === 'error') {
-              throw new Error(`TTS generation failed: ${ttsStatus.error || 'unknown error'}`)
-            }
-            log('exporting_files', 'Generating translated audio...', [100, 100, 100, 100, 100, 30])
-          }
+          // Stream TTS progress via SSE — one request, no polling
+          const ttsArtifacts = await new Promise<Array<{ name: string; size_bytes: number; download_url: string }>>(
+            (resolve, reject) => {
+              const onAbort = (): void => reject(new DOMException('Analysis cancelled.', 'AbortError'))
+              input.signal?.addEventListener('abort', onAbort)
+              fetch(apiUrl('/api/tts-batch'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  documentId,
+                  mediaPath: uploaded.mediaPath,
+                  sentences: timedSentences,
+                  voiceChoice,
+                  subtitlesMode: input.subtitlesMode || 'bilingual',
+                  sourceType,
+                }),
+                signal: input.signal,
+              }).then((res) => {
+                if (!res.ok || !res.body) {
+                  reject(new Error(`TTS batch request failed: HTTP ${res.status}`))
+                  return
+                }
+                const reader = res.body.getReader()
+                const decoder = new TextDecoder()
+                let buf = ''
+                const pump = (): void => {
+                  reader.read().then(({ done, value }) => {
+                    if (done) { reject(new Error('TTS stream ended without done event')); return }
+                    buf += decoder.decode(value, { stream: true })
+                    const parts = buf.split('\n\n')
+                    buf = parts.pop() ?? ''
+                    for (const part of parts) {
+                      const dataLine = part.split('\n').find((l) => l.startsWith('data: '))
+                      if (!dataLine) continue
+                      try {
+                        const evt = JSON.parse(dataLine.slice(6)) as { status: string; ratio?: number; message?: string; artifacts?: typeof ttsArtifacts; error?: string }
+                        if (evt.status === 'done') {
+                          input.signal?.removeEventListener('abort', onAbort)
+                          resolve(evt.artifacts || [])
+                          return
+                        }
+                        if (evt.status === 'error') {
+                          input.signal?.removeEventListener('abort', onAbort)
+                          reject(new Error(`TTS generation failed: ${evt.error || 'unknown'}`))
+                          return
+                        }
+                        if (evt.status === 'progress') {
+                          const pct = Math.round((evt.ratio ?? 0) * 100)
+                          log('exporting_files', evt.message || 'Generating translated audio...', [100, 100, 100, 100, 100, Math.max(5, pct)])
+                        }
+                      } catch { /* malformed event line, skip */ }
+                    }
+                    pump()
+                  }).catch(reject)
+                }
+                pump()
+              }).catch(reject)
+            },
+          )
           log('exporting_files', 'Downloading audio artifacts...', [100, 100, 100, 100, 100, 60])
           const artifactMap = new Map<string, DocumentArtifact>(
             LocalWorkspace.buildDocumentArtifacts(documentId, contract).map((row) => [row.name, row]),

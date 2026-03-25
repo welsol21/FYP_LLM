@@ -2423,6 +2423,7 @@ class RuntimeMediaService:
         source_path: str = "",
         voice_choice: str = "male",
         subtitles_mode: str = "bilingual",
+        stage_callback: Callable[[str, float | None, str | None], None] | None = None,
     ) -> list[dict[str, Any]]:
         """Generate TTS audio and subtitle artifacts from translated sentences.
 
@@ -2456,6 +2457,7 @@ class RuntimeMediaService:
             media_sentences=media_sentences,
             subtitles_mode=subtitles_mode,
             voice_choice=voice_choice,
+            stage_callback=stage_callback,
         )
         artifact_names = [
             "translated_audio_ru.mp3",
