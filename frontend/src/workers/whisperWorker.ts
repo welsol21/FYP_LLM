@@ -117,6 +117,8 @@ self.addEventListener('message', async (event: MessageEvent) => {
     const totalChunks = Math.max(1, Math.ceil(audio.length / jump))
     self.postMessage({ type: 'progress', id, message: 'Transcribing…', pct: 0 })
     let chunksProcessed = 0
+    let currentPct = 0
+    let tokensSinceChunk = 0
     // Pass a plain Float32Array (already 16 kHz from main thread).
     // Transformers.js prepareAudios() only handles string|URL|Float32Array|Float64Array —
     // passing { array, sampling_rate } causes Ze.subarray errors in _call_whisper chunking.
@@ -125,11 +127,21 @@ self.addEventListener('message', async (event: MessageEvent) => {
       return_timestamps: true,
       chunk_length_s: CHUNK_S,
       stride_length_s: STRIDE_S,
+      // Fires after each generated token — keeps UI alive during long single-chunk inference
+      callback_function: (_: any) => {
+        tokensSinceChunk++
+        // Throttle to every 8 tokens to avoid flooding postMessage
+        if (tokensSinceChunk % 8 === 0) {
+          const dots = '.'.repeat((Math.floor(tokensSinceChunk / 8) % 3) + 1)
+          self.postMessage({ type: 'progress', id, message: `Transcribing${dots} ${currentPct}%`, pct: currentPct })
+        }
+      },
       chunk_callback: (_chunk: any) => {
         chunksProcessed++
-        const pct = Math.min(99, Math.round((chunksProcessed / totalChunks) * 100))
-        console.log('[Whisper] chunk', chunksProcessed, '/', totalChunks, `(${pct}%)`)
-        self.postMessage({ type: 'progress', id, message: `Transcribing… ${pct}%`, pct })
+        tokensSinceChunk = 0
+        currentPct = Math.min(99, Math.round((chunksProcessed / totalChunks) * 100))
+        console.log('[Whisper] chunk', chunksProcessed, '/', totalChunks, `(${currentPct}%)`)
+        self.postMessage({ type: 'progress', id, message: `Transcribing… ${currentPct}%`, pct: currentPct })
       },
     })
     console.log('[Whisper] inference done, chunks:', result.chunks?.length)
