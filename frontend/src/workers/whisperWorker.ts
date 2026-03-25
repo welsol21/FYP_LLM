@@ -11,7 +11,7 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { pipeline, env } from '@huggingface/transformers'
+import { pipeline, env, TextStreamer } from '@huggingface/transformers'
 
 ;(env as any).allowLocalModels = false
 
@@ -118,27 +118,28 @@ self.addEventListener('message', async (event: MessageEvent) => {
     self.postMessage({ type: 'progress', id, message: 'Transcribing…', pct: 0 })
     let chunksProcessed = 0
     let currentPct = 0
-    let tokensSinceChunk = 0
-    // Pass a plain Float32Array (already 16 kHz from main thread).
-    // Transformers.js prepareAudios() only handles string|URL|Float32Array|Float64Array —
-    // passing { array, sampling_rate } causes Ze.subarray errors in _call_whisper chunking.
-    // whisper-small.en is English-only: do NOT pass language/task (causes error)
+    let tokenCount = 0
+    // TextStreamer.token_callback_function fires on every generated token —
+    // gives live feedback while a single 30-second chunk is being processed.
+    const streamer = new TextStreamer(t.tokenizer, {
+      skip_prompt: true,
+      skip_special_tokens: true,
+      token_callback_function: () => {
+        tokenCount++
+        if (tokenCount % 8 === 0) {
+          const dots = '.'.repeat((Math.floor(tokenCount / 8) % 3) + 1)
+          self.postMessage({ type: 'progress', id, message: `Transcribing${dots} ${currentPct}%`, pct: currentPct })
+        }
+      },
+    })
     const result: any = await t(audio, {
       return_timestamps: true,
       chunk_length_s: CHUNK_S,
       stride_length_s: STRIDE_S,
-      // Fires after each generated token — keeps UI alive during long single-chunk inference
-      callback_function: (_: any) => {
-        tokensSinceChunk++
-        // Throttle to every 8 tokens to avoid flooding postMessage
-        if (tokensSinceChunk % 8 === 0) {
-          const dots = '.'.repeat((Math.floor(tokensSinceChunk / 8) % 3) + 1)
-          self.postMessage({ type: 'progress', id, message: `Transcribing${dots} ${currentPct}%`, pct: currentPct })
-        }
-      },
+      streamer,
       chunk_callback: (_chunk: any) => {
         chunksProcessed++
-        tokensSinceChunk = 0
+        tokenCount = 0
         currentPct = Math.min(99, Math.round((chunksProcessed / totalChunks) * 100))
         console.log('[Whisper] chunk', chunksProcessed, '/', totalChunks, `(${currentPct}%)`)
         self.postMessage({ type: 'progress', id, message: `Transcribing… ${currentPct}%`, pct: currentPct })
