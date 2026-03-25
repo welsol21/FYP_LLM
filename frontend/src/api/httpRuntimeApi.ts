@@ -43,14 +43,8 @@ type TimedSentenceRow = {
 }
 
 function isRemoteDeployment(): boolean {
-  const base = normalizedApiBaseUrl()
-  if (!base) return false
-  try {
-    const host = new URL(base).hostname
-    return host !== 'localhost' && host !== '127.0.0.1' && !host.startsWith('192.168.')
-  } catch {
-    return false
-  }
+  const host = typeof window !== 'undefined' ? window.location.hostname : ''
+  return host !== 'localhost' && host !== '127.0.0.1' && !host.startsWith('192.168.')
 }
 
 function normalizedApiBaseUrl(): string {

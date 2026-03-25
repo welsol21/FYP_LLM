@@ -54,6 +54,13 @@ export function MediaSubmitForm({
   const [processingMode, setProcessingMode] = useState<'incremental' | 'force'>('incremental')
   const [submitting, setSubmitting] = useState(false)
   const currentControllerRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    return () => {
+      currentControllerRef.current?.abort()
+      currentControllerRef.current = null
+    }
+  }, [])
   const enabledProviders = translatorOptions.filter((p) => p.enabled && hasRequiredCredentials(p))
   const subtitleOptions: Array<{ label: string; value: string }> = [
     { label: 'Bilingual (sequential)', value: 'bilingual_sequential' },
