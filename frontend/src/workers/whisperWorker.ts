@@ -22,8 +22,6 @@ let transcriber: any = null
 async function getTranscriber(onProgress: (msg: string) => void): Promise<any> {
   if (transcriber) return transcriber
 
-  const hasWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator
-
   // Aggregate per-file progress into one smooth overall percentage
   const fileProgress: Record<string, number> = {}
   const progressCb = (info: any) => {
@@ -50,19 +48,24 @@ async function getTranscriber(onProgress: (msg: string) => void): Promise<any> {
     })
   }
 
-  if (hasWebGPU) {
+  // Check WebGPU adapter availability BEFORE trying to load — failed WebGPU
+  // attempts corrupt ONNX Runtime state, causing even the WASM fallback to fail.
+  let gpuAdapter: any = null
+  if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
+    try {
+      gpuAdapter = await (navigator as any).gpu.requestAdapter()
+    } catch { /* WebGPU not available */ }
+  }
+
+  if (gpuAdapter) {
     try {
       transcriber = await tryLoad('webgpu', 'fp32')
-    } catch (e1) {
-      console.warn('[Whisper] WebGPU fp32 failed:', e1)
-      try {
-        transcriber = await tryLoad('webgpu', 'fp16')
-      } catch (e2) {
-        console.warn('[Whisper] WebGPU fp16 failed, falling back to WASM q8:', e2)
-        transcriber = await tryLoad('wasm', 'q8')
-      }
+    } catch (e) {
+      console.warn('[Whisper] WebGPU failed, falling back to WASM q8:', e)
+      transcriber = await tryLoad('wasm', 'q8')
     }
   } else {
+    console.log('[Whisper] No WebGPU adapter, using WASM q8')
     transcriber = await tryLoad('wasm', 'q8')
   }
 
