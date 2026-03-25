@@ -769,7 +769,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         contract = {}
         const total = sentences.length
         let contractsDone = 0
-        log(2, `Building sentence contracts (0/${total})...`, 5)
+        log(2, `Building sentence contracts (0/${total})...`, 0)
         await runConcurrent(
           sentences.map((sent, i) => async () => {
             ensureNotAborted()
@@ -785,11 +785,11 @@ export class HttpRuntimeApi implements RuntimeApi {
               recordRuntimeDiagnostic('api.media.backend', 'sentence-contract.error', String(err instanceof Error ? err.message : err), 'error')
             }
             contractsDone++
-            log(2, `Processing sentences (${contractsDone}/${total})`, Math.round((contractsDone / Math.max(total, 1)) * 100))
+            log(2, `Processing sentences (${contractsDone}/${total})`, Math.round((contractsDone / Math.max(total, 1)) * 45))
           }),
           3,
         )
-        log(2, `Contracts built (${Object.keys(contract).length}/${total})`, 100)
+        log(2, `Contracts built (${Object.keys(contract).length}/${total})`, 45)
         ensureNotAborted()
 
         // Intermediate save — contractCurrent: false keeps file.analyzed = false until pipeline completes
@@ -808,7 +808,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         })
       } else {
         contract = resumeContract!
-        log(2, 'Reusing existing contracts', 100)
+        log(2, 'Reusing existing contracts', 45)
       }
 
       // ── Stage 3: Translation ─────────────────────────────────────
@@ -819,11 +819,11 @@ export class HttpRuntimeApi implements RuntimeApi {
       } else {
         const sentenceKeys = Object.keys(contract)
         if (sentenceKeys.length > 0) {
-          log(2, `Translating sentences (0/${sentenceKeys.length})...`, 5)
+          log(2, `Translating sentences (0/${sentenceKeys.length})...`, 50)
           translations = await this.clientTranslateAnalysis(
             documentId,
             contract,
-            (done, ttl) => log(2, `Translating sentences (${done}/${ttl})`, Math.round((done / Math.max(ttl, 1)) * 100)),
+            (done, ttl) => log(2, `Translating sentences (${done}/${ttl})`, 50 + Math.round((done / Math.max(ttl, 1)) * 48)),
             input.signal,
           ).catch((err: unknown) => {
             recordRuntimeDiagnostic('api.media.backend', 'translate.error', String(err instanceof Error ? err.message : err), 'error')
