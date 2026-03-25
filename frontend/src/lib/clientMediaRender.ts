@@ -566,19 +566,19 @@ function drawSubtitleOverlay(
 }
 
 async function waitForMediaEnded(media: HTMLMediaElement): Promise<void> {
+  if (media.ended) return
   await new Promise<void>((resolve, reject) => {
-    const onEnded = (): void => {
-      cleanup()
-      resolve()
-    }
-    const onError = (): void => {
-      cleanup()
-      reject(new Error('Media playback failed during canvas render.'))
-    }
+    const onEnded = (): void => { cleanup(); resolve() }
+    const onError = (): void => { cleanup(); reject(new Error('Media playback failed during canvas render.')) }
     const cleanup = (): void => {
       media.removeEventListener('ended', onEnded)
       media.removeEventListener('error', onError)
+      clearTimeout(timer)
     }
+    // Safety timeout: if ended never fires (autoplay blocked, browser policy),
+    // resolve after duration + 5s to avoid hanging forever.
+    const safetyMs = (isFinite(media.duration) && media.duration > 0 ? media.duration * 1000 : 60_000) + 5_000
+    const timer = window.setTimeout(() => { cleanup(); resolve() }, safetyMs)
     media.addEventListener('ended', onEnded)
     media.addEventListener('error', onError)
   })
@@ -699,7 +699,7 @@ async function renderVideoWithCanvas(input: {
   if (videoEl) {
     void videoEl.play().catch(() => undefined)
   }
-  await audioEl.play()
+  void audioEl.play().catch(() => undefined)
   await waitForMediaEnded(audioEl)
   window.cancelAnimationFrame(rafId)
   recorder.stop()
