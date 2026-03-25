@@ -900,7 +900,7 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
         : [
             '-y',
             '-f', 'lavfi',
-            '-i', 'color=c=black:size=1280x720:rate=25',
+            '-i', 'color=c=black:size=640x360:rate=5',
             '-i', audioFile,
             ...vfArgs,
             '-shortest',
@@ -910,8 +910,7 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
             '-tune', 'stillimage',
             '-crf', '28',
             '-c:a', 'aac',
-            '-b:a', '192k',
-            '-movflags', '+faststart',
+            '-b:a', '128k',
             videoFile,
           ]
       await runWithProgressPulse(
