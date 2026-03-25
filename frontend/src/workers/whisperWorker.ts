@@ -21,14 +21,37 @@ let transcriber: any = null
 
 async function getTranscriber(onProgress: (msg: string) => void): Promise<any> {
   if (transcriber) return transcriber
-  transcriber = await (pipeline as any)('automatic-speech-recognition', MODEL, {
-    dtype: 'q8',
-    progress_callback: (info: any) => {
-      if (typeof info?.progress === 'number' && info.status === 'progress') {
-        onProgress(`Loading Whisper model (${Math.round(info.progress as number)}%)…`)
-      }
-    },
-  })
+
+  const hasWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator
+  const device = hasWebGPU ? 'webgpu' : 'wasm'
+  const dtype = hasWebGPU ? 'fp16' : 'q8'
+  console.log('[Whisper] device:', device, 'dtype:', dtype)
+
+  const progressCb = (info: any) => {
+    if (typeof info?.progress === 'number' && info.status === 'progress') {
+      onProgress(`Loading Whisper model (${Math.round(info.progress as number)}%)…`)
+    }
+  }
+
+  try {
+    transcriber = await (pipeline as any)('automatic-speech-recognition', MODEL, {
+      device,
+      dtype,
+      progress_callback: progressCb,
+    })
+  } catch (err) {
+    if (hasWebGPU) {
+      console.warn('[Whisper] WebGPU failed, falling back to WASM q8:', err)
+      transcriber = await (pipeline as any)('automatic-speech-recognition', MODEL, {
+        device: 'wasm',
+        dtype: 'q8',
+        progress_callback: progressCb,
+      })
+    } else {
+      throw err
+    }
+  }
+
   return transcriber
 }
 
