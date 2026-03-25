@@ -72,7 +72,10 @@ self.addEventListener('message', async (event: MessageEvent) => {
     console.log('[Whisper] model ready, starting inference')
     self.postMessage({ type: 'progress', id, message: 'Transcribing audio…' })
     let chunksProcessed = 0
-    const result: any = await t({ array: audio, sampling_rate }, {
+    // Pass a plain Float32Array (already 16 kHz from main thread).
+    // Transformers.js prepareAudios() only handles string|URL|Float32Array|Float64Array —
+    // passing { array, sampling_rate } causes Ze.subarray errors in _call_whisper chunking.
+    const result: any = await t(audio, {
       return_timestamps: true,
       chunk_length_s: 30,
       stride_length_s: 5,
