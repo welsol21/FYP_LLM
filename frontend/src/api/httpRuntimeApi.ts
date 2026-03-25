@@ -958,8 +958,10 @@ export class HttpRuntimeApi implements RuntimeApi {
     const isVideo = mediaBlob.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm)$/i.test(fileName)
     const source_type = isVideo ? 'video' : 'audio'
 
-    // AudioContext is unavailable in Web Workers — decode here in the main thread
-    // and pass a Float32Array to the worker instead of a URL.
+    // AudioContext is unavailable in Web Workers — decode and resample here in the
+    // main thread, then pass a plain Float32Array at 16 kHz to the worker.
+    // Passing a non-16kHz { array, sampling_rate } object to Transformers.js
+    // causes Ze.subarray errors inside _call_whisper chunking logic.
     onProgress('Decoding audio…')
     console.log('[clientTranscribeAudio] decoding', fileName, mediaBlob.type, mediaBlob.size, 'bytes')
     const AudioCtx = (window as typeof window & { webkitAudioContext?: typeof AudioContext }).AudioContext
@@ -967,20 +969,21 @@ export class HttpRuntimeApi implements RuntimeApi {
     if (!AudioCtx) throw new Error('AudioContext is unavailable in this browser.')
     const audioCtx = new AudioCtx()
     const arrayBuffer = await mediaBlob.arrayBuffer()
-    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer)
+    const decoded = await audioCtx.decodeAudioData(arrayBuffer)
     await audioCtx.close().catch(() => undefined)
-    // Mix down to mono
-    const audio = audioBuffer.numberOfChannels > 1
-      ? (() => {
-          const ch0 = audioBuffer.getChannelData(0)
-          const ch1 = audioBuffer.getChannelData(1)
-          const mono = new Float32Array(ch0.length)
-          for (let i = 0; i < ch0.length; i++) mono[i] = (ch0[i] + ch1[i]) / 2
-          return mono
-        })()
-      : new Float32Array(audioBuffer.getChannelData(0))
-    const sampling_rate = audioBuffer.sampleRate
-    console.log('[clientTranscribeAudio] decoded:', audioBuffer.duration.toFixed(1), 's,', audio.length, 'samples, sr:', sampling_rate, 'channels:', audioBuffer.numberOfChannels)
+
+    // Resample to 16 kHz mono using OfflineAudioContext
+    const TARGET_SR = 16_000
+    const numFrames = Math.ceil(decoded.duration * TARGET_SR)
+    const offlineCtx = new OfflineAudioContext(1, numFrames, TARGET_SR)
+    const src = offlineCtx.createBufferSource()
+    src.buffer = decoded
+    src.connect(offlineCtx.destination)
+    src.start(0)
+    const resampled = await offlineCtx.startRendering()
+    const audio = new Float32Array(resampled.getChannelData(0))
+    const sampling_rate = TARGET_SR
+    console.log('[clientTranscribeAudio] decoded+resampled:', decoded.duration.toFixed(1), 's →', audio.length, 'samples @16kHz')
 
     if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
 
