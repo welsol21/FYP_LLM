@@ -20,14 +20,45 @@ let translator: any = null
 
 async function getTranslator(): Promise<any> {
   if (translator) return translator
-  translator = await (pipeline as any)('translation', 'Xenova/opus-mt-en-ru', {
-    dtype: 'q8',
-    progress_callback: (info: any) => {
-      if (typeof info?.progress === 'number') {
-        self.postMessage({ type: 'progress', loaded: Math.round(info.progress as number), total: 100 })
-      }
-    },
-  })
+
+  const progressCb = (info: any) => {
+    if (info?.status === 'initiate') {
+      self.postMessage({ type: 'progress', loaded: 0, total: 100 })
+    } else if (typeof info?.progress === 'number') {
+      self.postMessage({ type: 'progress', loaded: Math.round(info.progress as number), total: 100 })
+    }
+  }
+
+  const tryLoad = async (device: string, dtype: string) => {
+    console.log('[Translation] trying device:', device, 'dtype:', dtype)
+    return await (pipeline as any)('translation', 'Xenova/opus-mt-en-ru', {
+      device,
+      dtype,
+      progress_callback: progressCb,
+    })
+  }
+
+  // Check WebGPU adapter availability BEFORE trying to load — failed WebGPU
+  // attempts corrupt ONNX Runtime state, causing even the WASM fallback to fail.
+  let gpuAdapter: any = null
+  if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
+    try {
+      gpuAdapter = await (navigator as any).gpu.requestAdapter()
+    } catch { /* WebGPU not available */ }
+  }
+
+  if (gpuAdapter) {
+    try {
+      translator = await tryLoad('webgpu', 'fp32')
+    } catch (e) {
+      console.warn('[Translation] WebGPU failed, falling back to WASM q8:', e)
+      translator = await tryLoad('wasm', 'q8')
+    }
+  } else {
+    console.log('[Translation] No WebGPU adapter, using WASM q8')
+    translator = await tryLoad('wasm', 'q8')
+  }
+
   return translator
 }
 
@@ -39,7 +70,7 @@ self.addEventListener('message', async (event: MessageEvent) => {
     const total = sentences.length
     for (let index = 0; index < total; index += 1) {
       const sentence = sentences[index]
-      const output: any = await t(sentence, { src_lang: 'en', tgt_lang: 'ru' })
+      const output: any = await t(sentence)
       const text = String(
         (Array.isArray(output) ? (output[0] as any)?.translation_text : '') || '',
       ).trim()
