@@ -977,7 +977,7 @@ export class HttpRuntimeApi implements RuntimeApi {
           for (let i = 0; i < ch0.length; i++) mono[i] = (ch0[i] + ch1[i]) / 2
           return mono
         })()
-      : audioBuffer.getChannelData(0)
+      : new Float32Array(audioBuffer.getChannelData(0))
     const sampling_rate = audioBuffer.sampleRate
 
     if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
