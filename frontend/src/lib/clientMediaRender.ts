@@ -54,6 +54,7 @@ type TtsPipelineOutput = {
 type TtsPipeline = (text: string, options?: Record<string, unknown>) => Promise<TtsPipelineOutput>
 
 let ffmpegReadyPromise: Promise<{ ffmpeg: FfmpegInstance; util: FfmpegUtilModule }> | null = null
+let ffmpegFontLoaded = false
 let ffmpegRunQueue: Promise<void> = Promise.resolve()
 let ttsPipelinePromise: Promise<TtsPipeline> | null = null
 
@@ -253,7 +254,12 @@ async function ensureFfmpeg(onProgress?: ProgressCb): Promise<{ ffmpeg: FfmpegIn
         try {
           const fontBytes = await util.fetchFile('/desktop-runtime/fonts/DejaVuSans.ttf')
           await ffmpeg.writeFile('/DejaVuSans.ttf', fontBytes)
-        } catch { /* font unavailable — drawtext will use default font */ }
+          ffmpegFontLoaded = true
+          recordRuntimeDiagnostic('client.ffmpeg', 'font.loaded', { size: fontBytes.byteLength })
+        } catch (err) {
+          ffmpegFontLoaded = false
+          recordRuntimeDiagnostic('client.ffmpeg', 'font.error', String(err instanceof Error ? err.message : err), 'warning')
+        }
         progress(onProgress, 'Local media renderer loaded', 12)
         await yieldToBrowser()
         return { ffmpeg, util }
@@ -865,7 +871,7 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
 
       progress(input.onProgress, 'Composing video track', 74)
       await yieldToBrowser()
-      const subsFilter = buildDrawtextFilter(selectedSubtitleRows, '/DejaVuSans.ttf')
+      const subsFilter = ffmpegFontLoaded ? buildDrawtextFilter(selectedSubtitleRows, '/DejaVuSans.ttf') : ''
       const vfArgs = subsFilter ? ['-vf', subsFilter] : []
       const videoArgs = input.sourceKind === 'video'
         ? [
@@ -939,3 +945,4 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
   })
 }
 import { configureTransformersEnv } from './transformersEnv'
+import { recordRuntimeDiagnostic } from './runtimeDiagnostics'
