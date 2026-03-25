@@ -9,7 +9,7 @@ from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from .media_pipeline import warmup_media_models
+from .media_pipeline import extract_media_text_and_sentences, warmup_media_models
 from .service import RuntimeMediaService
 
 
@@ -109,7 +109,7 @@ def _build_sentence_contract_payload(sentence_text: str, sentence_idx: int) -> d
         note_mode="controlled",
         model_dir=controlled_model_dir or None,
         validation_mode="v2_strict",
-        enable_translation=True,
+        enable_translation=False,
         translation_model="artifacts/models/m2m100_418M",
         translation_source_lang="en",
         translation_target_lang="ru",
@@ -318,6 +318,72 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
             payload = SERVICE.delete_analysis(document_id=document_id)
             self._send_json(payload, status=200 if payload.get("status") == "ok" else 404)
             return
+        if path == "/api/transcribe":
+            media_path = str(body.get("mediaPath") or body.get("media_path") or "").strip()
+            if not media_path:
+                self._send_json({"error": "mediaPath is required"}, status=400)
+                return
+            try:
+                result = extract_media_text_and_sentences(source_path=media_path)
+                sentences = [
+                    {
+                        "text": text,
+                        "start_sec": timing["start_sec"] if timing else None,
+                        "end_sec": timing["end_sec"] if timing else None,
+                    }
+                    for text, timing in zip(result.sentence_stream, result.sentence_timeline)
+                ]
+                self._send_json(
+                    {
+                        "source_type": result.source_type,
+                        "full_text": result.full_text,
+                        "sentences": sentences,
+                    }
+                )
+            except FileNotFoundError as exc:
+                self._send_json({"error": str(exc)}, status=400)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=500)
+            return
+
+        if path == "/api/tts-batch":
+            import uuid as _uuid
+            sentences = body.get("sentences") or []
+            if not isinstance(sentences, list):
+                self._send_json({"error": "sentences must be an array"}, status=400)
+                return
+            document_id = str(body.get("documentId") or body.get("document_id") or "").strip()
+            if not document_id:
+                document_id = str(_uuid.uuid4())
+            source_type = str(body.get("sourceType") or body.get("source_type") or "audio").strip().lower()
+            source_path = str(body.get("mediaPath") or body.get("media_path") or "").strip()
+            voice_choice = str(body.get("voiceChoice") or body.get("voice_choice") or "male").strip()
+            subtitles_mode = str(body.get("subtitlesMode") or body.get("subtitles_mode") or "bilingual").strip()
+            base = Path(os.getenv("MEDIA_CONTRACT_ARTIFACTS_DIR", "artifacts/media_contracts")).resolve()
+            doc_dir = base / document_id
+            doc_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                artifacts = SERVICE.generate_tts_batch(
+                    sentences=sentences,
+                    doc_dir=doc_dir,
+                    source_type=source_type,
+                    source_path=source_path,
+                    voice_choice=voice_choice,
+                    subtitles_mode=subtitles_mode,
+                )
+                artifact_list = [
+                    {
+                        "name": a["name"],
+                        "size_bytes": a["size_bytes"],
+                        "download_url": f"/api/document-artifact-download?document_id={document_id}&name={a['name']}",
+                    }
+                    for a in artifacts
+                ]
+                self._send_json({"document_id": document_id, "artifacts": artifact_list})
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=500)
+            return
+
         if path == "/api/sentence-contract":
             sentence_text = str(body.get("sentenceText") or body.get("sentence_text") or "").strip()
             if not sentence_text:

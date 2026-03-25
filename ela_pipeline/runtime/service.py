@@ -2414,6 +2414,63 @@ class RuntimeMediaService:
             # Keep pipeline successful even if media rendering fails on one environment.
             (doc_dir / "media_export_error.txt").write_text(str(exc), encoding="utf-8")
 
+    def generate_tts_batch(
+        self,
+        *,
+        sentences: list[dict[str, Any]],
+        doc_dir: Path,
+        source_type: str = "audio",
+        source_path: str = "",
+        voice_choice: str = "male",
+        subtitles_mode: str = "bilingual",
+    ) -> list[dict[str, Any]]:
+        """Generate TTS audio and subtitle artifacts from translated sentences.
+
+        Writes output files to *doc_dir* and returns a list of artifact dicts
+        with 'name' and 'size_bytes' keys.
+        """
+        doc_dir = Path(doc_dir)
+        doc_dir.mkdir(parents=True, exist_ok=True)
+        media_sentences: list[dict[str, Any]] = []
+        for row in sentences:
+            if not isinstance(row, dict):
+                continue
+            text_en = str(row.get("text_en") or row.get("sentence_text") or row.get("text_eng") or "").strip()
+            text_ru = str(row.get("text_ru") or "").strip()
+            start_ms = int(row.get("start_ms") or 0)
+            end_ms = int(row.get("end_ms") or 0)
+            if not text_en and not text_ru:
+                continue
+            media_sentences.append(
+                {
+                    "sentence_text": text_en,
+                    "text_ru": text_ru,
+                    "start_ms": start_ms,
+                    "end_ms": end_ms,
+                }
+            )
+        self._export_final_media_artifacts(
+            source_type=source_type,
+            source_path=source_path,
+            doc_dir=doc_dir,
+            media_sentences=media_sentences,
+            subtitles_mode=subtitles_mode,
+            voice_choice=voice_choice,
+        )
+        artifact_names = [
+            "translated_audio_ru.mp3",
+            "translated_video_ru.mp4",
+            "subtitles_bilingual.srt",
+            "subtitles_en.srt",
+            "subtitles_target.srt",
+        ]
+        artifacts: list[dict[str, Any]] = []
+        for name in artifact_names:
+            path = doc_dir / name
+            if path.exists() and path.stat().st_size > 0:
+                artifacts.append({"name": name, "size_bytes": path.stat().st_size})
+        return artifacts
+
     def _request_sentence_contract(
         self,
         *,

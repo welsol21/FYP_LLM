@@ -1,7 +1,6 @@
 import type {
   AnalysisHistoryRow,
   AnalyzeTextPayload,
-  BackendJobStatus,
   DocumentArtifact,
   MediaFileRow,
   MediaProgressPayload,
@@ -522,22 +521,20 @@ export class HttpRuntimeApi implements RuntimeApi {
   }): Promise<MediaSubmissionPayload> {
     const startedAt = Date.now()
     const stageLogs: string[] = []
+    // loading_file | transcribing_audio | linguistic_parsing | generating_media | client_translation | exporting_files
     const progress: number[] = [0, 0, 0, 0, 0, 0]
-    const stageNames = ['loading_file', 'transcribing_audio', 'linguistic_parsing', 'generating_media', 'exporting_files', 'client_translation']
-    const push = (payload: MediaProgressPayload): void => {
-      input.onProgress?.(payload)
-    }
+    const stageNames = ['loading_file', 'transcribing_audio', 'linguistic_parsing', 'generating_media', 'client_translation', 'exporting_files']
     const log = (stageName: string, message: string, incoming?: number[]): void => {
       const idx = stageNames.indexOf(stageName)
-      if (Array.isArray(incoming) && incoming.length >= 5) {
-        for (let i = 0; i < 5; i += 1) progress[i] = Math.max(progress[i], Number(incoming[i] || 0))
+      if (Array.isArray(incoming)) {
+        for (let i = 0; i < incoming.length && i < progress.length; i += 1) {
+          progress[i] = Math.max(progress[i], Number(incoming[i] || 0))
+        }
       } else if (idx >= 0) {
         progress[idx] = Math.max(progress[idx], 5)
       }
-      if (!stageLogs.length || stageLogs[stageLogs.length - 1] !== message) {
-        stageLogs.push(message)
-      }
-      push({ stage_name: stageName, message, stage_logs: stageLogs.slice(-30), stage_progress: [...progress] })
+      if (!stageLogs.length || stageLogs[stageLogs.length - 1] !== message) stageLogs.push(message)
+      input.onProgress?.({ stage_name: stageName, message, stage_logs: stageLogs.slice(-30), stage_progress: [...progress] })
     }
     const finish = (payload: MediaSubmissionPayload): MediaSubmissionPayload => ({
       ...payload,
@@ -552,213 +549,225 @@ export class HttpRuntimeApi implements RuntimeApi {
     const ensureNotAborted = (): void => {
       if (input.signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
     }
+
     try {
-      recordRuntimeDiagnostic('api.media.backend', 'submit.start', {
-        mediaPath: input.mediaPath,
-        fileName: input.fileName,
-        voiceChoice: input.voiceChoice,
-        translationProvider: input.translationProvider,
-      })
-      log('loading_file', 'Uploading media to backend for remote processing', [20, 0, 0, 0, 0])
+      recordRuntimeDiagnostic('api.media.backend', 'submit.start', { mediaPath: input.mediaPath, fileName: input.fileName })
+
+      // ── Stage 0: Upload ──────────────────────────────────────────
+      log('loading_file', 'Uploading media to backend...', [20, 0, 0, 0, 0, 0])
       const form = new FormData()
       form.append('file', input.mediaBlob, input.fileName)
       const uploadRes = await fetchWithRetry('/api/upload', { method: 'POST', body: form, signal: input.signal }, { retries: 2, retryDelayMs: 1500 })
       if (!uploadRes.ok) {
         const text = await uploadRes.text()
-        const message = shouldRetryBackendRequest(uploadRes.status)
-          ? `Backend upload failed: service is temporarily unavailable (HTTP ${uploadRes.status}). Please retry in a few seconds.`
-          : `Backend upload failed: HTTP ${uploadRes.status}: ${text}`
-        throw new Error(message)
+        throw new Error(
+          shouldRetryBackendRequest(uploadRes.status)
+            ? `Backend upload failed: service temporarily unavailable (HTTP ${uploadRes.status}). Retry in a few seconds.`
+            : `Backend upload failed: HTTP ${uploadRes.status}: ${text}`,
+        )
       }
       const uploaded = (await uploadRes.json()) as { mediaPath: string; sizeBytes: number; fileName: string }
-      recordRuntimeDiagnostic('api.media.backend', 'upload.success', uploaded)
-      log('loading_file', 'Media uploaded to backend', [100, 0, 0, 0, 0])
+      log('loading_file', 'Media uploaded', [100, 0, 0, 0, 0, 0])
       ensureNotAborted()
 
-      const remoteVoice = String(input.voiceChoice || '').trim().toLowerCase() === 'backend_svetlana' ? 'female' : 'male'
-      const submit = await requestJson<MediaSubmissionPayload>('/api/submit-media', {
+      // ── Stage 1: Transcribe ──────────────────────────────────────
+      log('transcribing_audio', 'Transcribing audio (this may take a minute)...', [100, 5, 0, 0, 0, 0])
+      const transcribeResult = await requestJson<{
+        source_type: string
+        full_text: string
+        sentences: Array<{ text: string; start_sec: number | null; end_sec: number | null }>
+      }>('/api/transcribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mediaPath: uploaded.mediaPath,
-          durationSec: input.durationSec,
-          sizeBytes: input.sizeBytes,
-          projectId: input.projectId,
-          mediaFileId: null,
-          translationProvider: input.translationProvider,
-          subtitlesMode: input.subtitlesMode,
-          voiceChoice: remoteVoice,
-          forceFullReprocess: input.forceFullReprocess,
-        }),
+        body: JSON.stringify({ mediaPath: uploaded.mediaPath }),
         signal: input.signal,
       })
-      const jobId = String(submit?.result?.job_id || '').trim()
-      recordRuntimeDiagnostic('api.media.backend', 'job.submitted', { jobId })
-      if (!jobId) {
-        return finish(submit)
+      const sentences = transcribeResult.sentences || []
+      const sourceType = String(transcribeResult.source_type || 'audio').trim()
+      log('transcribing_audio', `Transcribed ${sentences.length} sentences`, [100, 100, 0, 0, 0, 0])
+      ensureNotAborted()
+
+      // ── Stage 2: Sentence contracts (parallel, concurrency = 3) ─
+      const documentId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+      const contract: VisualizerPayload = {}
+      const total = sentences.length
+      let contractsDone = 0
+
+      const runConcurrent = (tasks: Array<() => Promise<void>>, concurrency: number): Promise<void> => {
+        let idx = 0
+        let active = 0
+        return new Promise<void>((resolve, reject) => {
+          const next = (): void => {
+            if (idx === tasks.length && active === 0) { resolve(); return }
+            while (active < concurrency && idx < tasks.length) {
+              active++
+              const task = tasks[idx++]
+              task().then(() => { active--; next() }).catch(reject)
+            }
+          }
+          next()
+        })
       }
 
-      while (true) {
-        ensureNotAborted()
-        const status = await requestJson<BackendJobStatus>(`/api/backend-job-status?job_id=${encodeURIComponent(jobId)}`)
-        recordRuntimeDiagnostic('api.media.backend', 'job.poll', {
-          jobId,
-          status: status.status,
-          stage: status.stage_name,
-          message: status.message,
-        })
-        if (status.stage_logs?.length) {
-          stageLogs.splice(0, stageLogs.length, ...status.stage_logs.slice(-30))
-        }
-        log(String(status.stage_name || ''), String(status.stage_log || status.message || ''), status.stage_progress)
-        if (status.status === 'completed_local') {
-          const documentId = String(status.document_id || '').trim()
-          if (!documentId) {
-            throw new Error('Backend completed without document_id.')
+      log('linguistic_parsing', `Building sentence contracts (0/${total})...`, [100, 100, 5, 0, 0, 0])
+      await runConcurrent(
+        sentences.map((sent, i) => async () => {
+          ensureNotAborted()
+          try {
+            const result = await requestJson<SentenceContractPayload>('/api/sentence-contract', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sentenceText: sent.text, sentenceIdx: i }),
+              signal: input.signal,
+            })
+            if (result.sentence_node && sent.text) contract[sent.text] = result.sentence_node
+          } catch (err) {
+            recordRuntimeDiagnostic('api.media.backend', 'sentence-contract.error', String(err instanceof Error ? err.message : err), 'error')
           }
-          const contract = await this.finalizeBackendAnalysis(documentId, {
+          contractsDone++
+          const pct = Math.round((contractsDone / Math.max(total, 1)) * 100)
+          log('linguistic_parsing', `Processing sentences (${contractsDone}/${total})`, [100, 100, pct, 0, 0, 0])
+        }),
+        3,
+      )
+      progress[3] = 100 // generating_media — skip, mark complete
+      log('linguistic_parsing', `Contracts built (${Object.keys(contract).length}/${total})`, [100, 100, 100, 100, 0, 0])
+      ensureNotAborted()
+
+      // Save initial analysis (without translations or TTS artifacts)
+      await LocalWorkspace.upsertAnalysis({
+        documentId,
+        projectId: input.projectId,
+        mediaFileId: input.mediaFileId,
+        fileName: input.fileName,
+        filePath: input.mediaPath,
+        sizeBytes: input.sizeBytes,
+        durationSeconds: input.durationSec,
+        settings: input.settings,
+        contract,
+        artifacts: LocalWorkspace.buildDocumentArtifacts(documentId, contract),
+      })
+
+      // ── Stage 3: Client translation ──────────────────────────────
+      let translations: Record<string, string> = {}
+      const sentenceKeys = Object.keys(contract)
+      if (sentenceKeys.length > 0) {
+        log('client_translation', `Translating sentences (0/${sentenceKeys.length})...`, [100, 100, 100, 100, 5, 0])
+        translations = await this.clientTranslateAnalysis(
+          documentId,
+          contract,
+          (done, ttl) => {
+            const pct = Math.round((done / Math.max(ttl, 1)) * 100)
+            progress[4] = pct
+            log('client_translation', `Translating sentences (${done}/${ttl})`, [...progress])
+          },
+          input.signal,
+        ).catch((err: unknown) => {
+          recordRuntimeDiagnostic('api.media.backend', 'translate.error', String(err instanceof Error ? err.message : err), 'error')
+          return {}
+        })
+      }
+      progress[4] = 100
+      log('client_translation', 'Translation complete', [...progress])
+      ensureNotAborted()
+
+      // ── Stage 4: TTS batch ───────────────────────────────────────
+      if (sourceType === 'audio' || sourceType === 'video') {
+        log('exporting_files', 'Generating translated audio...', [100, 100, 100, 100, 100, 5])
+        const timedSentences = sentences.map((sent) => ({
+          text_en: sent.text,
+          text_ru: String(translations[sent.text] || ''),
+          start_ms: typeof sent.start_sec === 'number' ? Math.round(sent.start_sec * 1000) : 0,
+          end_ms: typeof sent.end_sec === 'number' ? Math.round(sent.end_sec * 1000) : 0,
+        }))
+        const voiceChoice = String(input.voiceChoice || '').trim().toLowerCase() === 'backend_svetlana' ? 'female' : 'male'
+        try {
+          const ttsResult = await requestJson<{
+            document_id: string
+            artifacts: Array<{ name: string; size_bytes: number; download_url: string }>
+          }>('/api/tts-batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              documentId,
+              mediaPath: uploaded.mediaPath,
+              sentences: timedSentences,
+              voiceChoice,
+              subtitlesMode: input.subtitlesMode || 'bilingual',
+              sourceType,
+            }),
+            signal: input.signal,
+          })
+          log('exporting_files', 'Downloading audio artifacts...', [100, 100, 100, 100, 100, 50])
+          const artifactMap = new Map<string, DocumentArtifact>(
+            LocalWorkspace.buildDocumentArtifacts(documentId, contract).map((row) => [row.name, row]),
+          )
+          for (const row of ttsResult.artifacts || []) {
+            const name = String(row.name || '').trim()
+            const downloadUrl = String(row.download_url || '').trim()
+            if (!name || !downloadUrl) continue
+            const blob = await requestBlob(downloadUrl)
+            if (name === 'translated_audio_ru.mp3' || name === 'translated_video_ru.mp4') {
+              await LocalWorkspace.cacheAnalysisArtifactBlob(documentId, name, blob)
+            } else {
+              artifactMap.set(name, { name, size_bytes: row.size_bytes || blob.size, download_url: await blobToDataUrl(blob) })
+            }
+          }
+          await LocalWorkspace.upsertAnalysis({
+            documentId,
             projectId: input.projectId,
             mediaFileId: input.mediaFileId,
-            mediaPath: input.mediaPath,
-            sizeBytes: input.sizeBytes,
-            durationSec: input.durationSec,
-            settings: input.settings,
             fileName: input.fileName,
-            contract: (status.visualizer_payload || {}) as VisualizerPayload,
-            remoteArtifacts: status.document_artifacts || [],
+            filePath: input.mediaPath,
+            sizeBytes: input.sizeBytes,
+            durationSeconds: input.durationSec,
+            settings: input.settings,
+            contract,
+            artifacts: Array.from(artifactMap.values()),
           })
-          await requestJson('/api/delete-analysis', {
+          // Cleanup server-side temp files (fire-and-forget)
+          requestJson('/api/delete-analysis', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ document_id: documentId }),
-          }).catch(() => ({ status: 'error' }))
-          recordRuntimeDiagnostic('api.media.backend', 'submit.success', { jobId, documentId })
-          const totalSentences = Object.keys(contract || {}).length
-          if (totalSentences > 0) {
-            log('client_translation', `Translating sentences (0/${totalSentences})`, [...progress.slice(0, 5), 0])
-            await this.clientTranslateAnalysis(
-              documentId,
-              contract,
-              (done, total) => {
-                const pct = Math.round((done / Math.max(total, 1)) * 100)
-                progress[5] = pct
-                log('client_translation', `Translating sentences (${done}/${total})`, [...progress])
-              },
-              input.signal,
-            ).catch((err: unknown) => {
-              recordRuntimeDiagnostic('api.media.backend', 'translate.error', String(err instanceof Error ? err.message : err), 'error')
-            })
-            progress[5] = 100
-            log('client_translation', 'Translation complete', [...progress])
-          }
-          return finish({
-            result: {
-              route: 'local',
-              status: 'completed_local',
-              document_id: documentId,
-              message: 'Backend media processing completed.',
-              stage_name: 'completed',
-            },
-            ui_feedback: {
-              severity: 'info',
-              title: 'Remote processing completed',
-              message: 'Backend media processing completed and saved locally.',
-            },
-          })
+          }).catch(() => {})
+          log('exporting_files', 'Audio artifacts saved', [100, 100, 100, 100, 100, 100])
+        } catch (ttsErr) {
+          recordRuntimeDiagnostic('api.media.backend', 'tts-batch.error', String(ttsErr instanceof Error ? ttsErr.message : ttsErr), 'error')
+          log('exporting_files', 'TTS failed — analysis saved without audio', [100, 100, 100, 100, 100, 100])
         }
-        if (status.status === 'rejected' || status.status === 'error' || status.status === 'canceled' || status.status === 'not_found') {
-          return finish({
-            result: {
-              route: 'reject',
-              status: status.status,
-              message: String(status.message || 'Backend processing failed.'),
-              stage_name: String(status.stage_name || 'error'),
-            },
-            ui_feedback: {
-              severity: status.status === 'canceled' ? 'warning' : 'error',
-              title: status.status === 'canceled' ? 'Processing cancelled' : 'Processing failed',
-              message: String(status.message || 'Backend processing failed.'),
-            },
-          })
-        }
-        await new Promise<void>((resolve) => window.setTimeout(resolve, 1000))
+      } else {
+        progress[5] = 100
+        log('exporting_files', 'Text analysis complete', [100, 100, 100, 100, 100, 100])
       }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') {
-        throw err
-      }
-      const message = err instanceof Error ? err.message : String(err)
-      recordRuntimeDiagnostic('api.media.backend', 'submit.error', message, 'error')
-      log('loading_file', message, [100, 0, 0, 0, 0])
+
+      recordRuntimeDiagnostic('api.media.backend', 'submit.success', { documentId, sentences: Object.keys(contract).length })
       return finish({
         result: {
-          route: 'reject',
-          status: 'rejected',
-          message,
-          stage_name: 'loading_file',
+          route: 'local',
+          status: 'completed_local',
+          document_id: documentId,
+          message: 'Analysis completed.',
+          stage_name: 'completed',
         },
         ui_feedback: {
-          severity: 'error',
-          title: 'Processing failed',
-          message,
+          severity: 'info',
+          title: 'Analysis completed',
+          message: 'Media analysis completed and saved locally.',
         },
       })
-    }
-  }
-
-  private async finalizeBackendAnalysis(
-    documentId: string,
-    context: {
-      projectId: string
-      mediaFileId?: string
-      mediaPath: string
-      sizeBytes?: number
-      durationSec?: number
-      settings: string
-      fileName: string
-      contract: VisualizerPayload
-      remoteArtifacts: DocumentArtifact[]
-    },
-  ): Promise<VisualizerPayload> {
-    recordRuntimeDiagnostic('api.media.backend', 'finalize.start', { documentId, fileName: context.fileName })
-    const contract = context.contract
-    const remoteArtifacts = context.remoteArtifacts
-    const artifacts = LocalWorkspace.buildDocumentArtifacts(documentId, contract)
-    const artifactMap = new Map<string, DocumentArtifact>(artifacts.map((row) => [row.name, row]))
-    for (const row of remoteArtifacts) {
-      const name = String(row.name || '').trim()
-      const downloadUrl = String(row.download_url || '').trim()
-      if (!name || !downloadUrl) continue
-      const blob = await requestBlob(downloadUrl)
-      if (name === 'translated_audio_ru.mp3' || name === 'translated_video_ru.mp4') {
-        await LocalWorkspace.cacheAnalysisArtifactBlob(documentId, name, blob)
-        continue
-      }
-      const encoded = await blobToDataUrl(blob)
-      artifactMap.set(name, {
-        name,
-        size_bytes: row.size_bytes || blob.size,
-        download_url: encoded,
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') throw err
+      const message = err instanceof Error ? err.message : String(err)
+      recordRuntimeDiagnostic('api.media.backend', 'submit.error', message, 'error')
+      return finish({
+        result: { route: 'reject', status: 'rejected', message, stage_name: 'loading_file' },
+        ui_feedback: { severity: 'error', title: 'Processing failed', message },
       })
     }
-    await LocalWorkspace.upsertAnalysis({
-      documentId,
-      projectId: context.projectId,
-      mediaFileId: context.mediaFileId,
-      fileName: context.fileName,
-      filePath: context.mediaPath,
-      sizeBytes: context.sizeBytes,
-      durationSeconds: context.durationSec,
-      settings: context.settings,
-      contract,
-      artifacts: Array.from(artifactMap.values()),
-    })
-    recordRuntimeDiagnostic('api.media.backend', 'finalize.success', {
-      documentId,
-      artifacts: artifactMap.size,
-      sentences: Object.keys(contract || {}).length,
-    })
-    return contract
   }
 
   private clientTranslateAnalysis(
@@ -766,11 +775,11 @@ export class HttpRuntimeApi implements RuntimeApi {
     contract: VisualizerPayload,
     onProgress: (done: number, total: number, text: string) => void,
     signal?: AbortSignal,
-  ): Promise<void> {
+  ): Promise<Record<string, string>> {
     return new Promise((resolve, reject) => {
       const sentences = Object.keys(contract)
       if (!sentences.length) {
-        resolve()
+        resolve({})
         return
       }
       const worker = new Worker(new URL('../workers/translationWorker.ts', import.meta.url), { type: 'module' })
@@ -790,7 +799,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         } else if (msg.type === 'done' && msg.id === id) {
           signal?.removeEventListener('abort', onAbort)
           worker.terminate()
-          LocalWorkspace.updateAnalysisTranslations(documentId, translations).then(resolve).catch(reject)
+          LocalWorkspace.updateAnalysisTranslations(documentId, translations).then(() => resolve(translations)).catch(reject)
         } else if (msg.type === 'error') {
           signal?.removeEventListener('abort', onAbort)
           worker.terminate()
