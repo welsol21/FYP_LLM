@@ -652,6 +652,12 @@ export class HttpRuntimeApi implements RuntimeApi {
         }
       }
 
+      recordRuntimeDiagnostic('api.media.resume', 'detection', {
+        resumePoint,
+        mediaFileId: input.mediaFileId || null,
+        forceFullReprocess: input.forceFullReprocess || false,
+      })
+
       if (resumePoint === 'done') {
         progress.fill(100)
         log(0, 'Already analyzed — returning existing result', 100)
@@ -927,6 +933,26 @@ export class HttpRuntimeApi implements RuntimeApi {
           if (renderErr instanceof DOMException && renderErr.name === 'AbortError') throw renderErr
           recordRuntimeDiagnostic('api.media.backend', 'render.error', String(renderErr instanceof Error ? renderErr.message : renderErr), 'error')
           log(4, 'Media render failed — analysis saved without audio', 100)
+          // Save pipeline_settings + mark contract complete so future runs skip to 'done'
+          // (rather than re-transcribing). User can force re-render via force mode.
+          try {
+            await LocalWorkspace.upsertAnalysis({
+              documentId, projectId: input.projectId, mediaFileId: input.mediaFileId,
+              fileName: input.fileName, filePath: input.mediaPath, sizeBytes: input.sizeBytes,
+              durationSeconds: input.durationSec, settings: input.settings, contract,
+              artifacts: LocalWorkspace.buildDocumentArtifacts(documentId, contract),
+              contractCurrent: true,
+            })
+            await LocalWorkspace.cacheAnalysisArtifactBlob(
+              documentId, 'pipeline_settings.json',
+              new Blob([JSON.stringify({
+                translationProvider: input.translationProvider || 'm2m100',
+                voiceChoice: String(input.voiceChoice || 'backend_dmitry').trim().toLowerCase(),
+                subtitlesMode: input.subtitlesMode || 'bilingual',
+                sourceType,
+              } satisfies PipelineSettings)], { type: 'application/json' }),
+            )
+          } catch { /* ignore secondary save failure */ }
         }
       } else {
         log(4, 'Text analysis complete', 100)
