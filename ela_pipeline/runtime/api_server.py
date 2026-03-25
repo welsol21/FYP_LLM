@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 import cgi
+import queue as _queue
+import threading as _threading
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -381,30 +383,53 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
             doc_dir = base / document_id
             doc_dir.mkdir(parents=True, exist_ok=True)
             # Stream progress via SSE — one request, no polling, Cloudflare-safe.
+            # TTS runs in a background thread; main thread drains the event queue
+            # and sends ": keepalive" comments every 20 s so Cloudflare never sees
+            # an idle connection (needed during long ffmpeg video-mux steps).
+            evt_queue: "_queue.Queue[dict]" = _queue.Queue()
+
+            def _worker() -> None:
+                def _progress(stage: str, ratio: "float | None", msg: "str | None") -> None:
+                    evt_queue.put({"status": "progress", "stage": stage, "ratio": ratio or 0, "message": msg or ""})
+                try:
+                    artifacts = SERVICE.generate_tts_batch(
+                        sentences=sentences,
+                        doc_dir=doc_dir,
+                        source_type=source_type,
+                        source_path=source_path,
+                        voice_choice=voice_choice,
+                        subtitles_mode=subtitles_mode,
+                        stage_callback=_progress,
+                    )
+                    artifact_list = [
+                        {
+                            "name": a["name"],
+                            "size_bytes": a["size_bytes"],
+                            "download_url": f"/api/document-artifact-download?document_id={document_id}&name={a['name']}",
+                        }
+                        for a in artifacts
+                    ]
+                    evt_queue.put({"status": "done", "document_id": document_id, "artifacts": artifact_list})
+                except Exception as exc:
+                    evt_queue.put({"status": "error", "error": str(exc)})
+
+            _threading.Thread(target=_worker, daemon=True).start()
             self._send_sse_start()
-            def _progress(stage: str, ratio: "float | None", msg: "str | None") -> None:
-                self._send_sse_event({"status": "progress", "stage": stage, "ratio": ratio or 0, "message": msg or ""})
-            try:
-                artifacts = SERVICE.generate_tts_batch(
-                    sentences=sentences,
-                    doc_dir=doc_dir,
-                    source_type=source_type,
-                    source_path=source_path,
-                    voice_choice=voice_choice,
-                    subtitles_mode=subtitles_mode,
-                    stage_callback=_progress,
-                )
-                artifact_list = [
-                    {
-                        "name": a["name"],
-                        "size_bytes": a["size_bytes"],
-                        "download_url": f"/api/document-artifact-download?document_id={document_id}&name={a['name']}",
-                    }
-                    for a in artifacts
-                ]
-                self._send_sse_event({"status": "done", "document_id": document_id, "artifacts": artifact_list})
-            except Exception as exc:
-                self._send_sse_event({"status": "error", "error": str(exc)})
+            while True:
+                try:
+                    event = evt_queue.get(timeout=20)
+                    if not self._send_sse_event(event):
+                        break  # client disconnected
+                    if event.get("status") in ("done", "error"):
+                        break
+                except _queue.Empty:
+                    # No progress for 20 s (e.g. ffmpeg muxing) — send SSE comment
+                    # to keep the Cloudflare connection alive.
+                    try:
+                        self.wfile.write(b": keepalive\n\n")
+                        self.wfile.flush()
+                    except OSError:
+                        break
             return
 
         if path == "/api/sentence-contract":
