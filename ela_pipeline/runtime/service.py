@@ -2098,11 +2098,9 @@ class RuntimeMediaService:
             return
 
         tts_mp3 = doc_dir / "translated_audio_ru.mp3"
-        out_video_check = doc_dir / "translated_video_ru.mp4"
-        # Skip the entire (slow) TTS + mux stage if both expected outputs already exist.
+        # Skip TTS + subtitle generation if MP3 already exists.
         tts_done = tts_mp3.exists() and tts_mp3.stat().st_size > 0
-        video_done = source_type != "video" or (out_video_check.exists() and out_video_check.stat().st_size > 0)
-        if tts_done and video_done:
+        if tts_done:
             if stage_callback is not None:
                 stage_callback("exporting_files", 1.0, "Checkpoint: reused existing media artifacts.")
             return
@@ -2346,69 +2344,6 @@ class RuntimeMediaService:
             )
 
             if stage_callback is not None:
-                stage_callback("exporting_files", 0.84, "Rendering final video")
-            out_video = doc_dir / "translated_video_ru.mp4"
-            subtitle_path = _subtitle_path_for_mode(doc_dir=doc_dir, subtitles_mode=subtitles_mode)
-            escaped_subs = _ffmpeg_escape_filter_path(subtitle_path)
-            if source_type == "video" and source.exists():
-                subprocess.run(
-                    [
-                        "ffmpeg",
-                        "-y",
-                        "-i",
-                        str(source),
-                        "-i",
-                        str(tts_mp3),
-                        "-vf",
-                        f"subtitles='{escaped_subs}'",
-                        "-map",
-                        "0:v:0",
-                        "-map",
-                        "1:a:0",
-                        "-c:v",
-                        "libx264",
-                        "-preset",
-                        "veryfast",
-                        "-crf",
-                        "23",
-                        "-c:a",
-                        "aac",
-                        "-shortest",
-                        str(out_video),
-                    ],
-                    check=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-            else:
-                subprocess.run(
-                    [
-                        "ffmpeg",
-                        "-y",
-                        "-f",
-                        "lavfi",
-                        "-i",
-                        "color=c=black:s=1280x720:r=25",
-                        "-i",
-                        str(tts_mp3),
-                        "-vf",
-                        f"subtitles='{escaped_subs}'",
-                        "-c:v",
-                        "libx264",
-                        "-preset",
-                        "veryfast",
-                        "-tune",
-                        "stillimage",
-                        "-c:a",
-                        "aac",
-                        "-shortest",
-                        str(out_video),
-                    ],
-                    check=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-            if stage_callback is not None:
                 stage_callback("exporting_files", 1.0, "Media artifacts exported")
         except Exception as exc:
             # Keep pipeline successful even if media rendering fails on one environment.
@@ -2461,7 +2396,6 @@ class RuntimeMediaService:
         )
         artifact_names = [
             "translated_audio_ru.mp3",
-            "translated_video_ru.mp4",
             "subtitles_bilingual.srt",
             "subtitles_en.srt",
             "subtitles_target.srt",

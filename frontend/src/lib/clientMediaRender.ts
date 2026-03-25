@@ -16,6 +16,8 @@ type RenderInput = {
   voiceChoice?: string
   sentences: TimedSentence[]
   onProgress?: ProgressCb
+  /** If provided, called instead of local TTS model. Returns audio blob (any format ffmpeg can decode). */
+  ttsProvider?: (idx: number, text: string) => Promise<Blob>
 }
 
 type RenderOutput = {
@@ -736,6 +738,60 @@ function buildSimultaneousBilingualTimeline(windows: SentenceWindow[]): Timeline
   return out
 }
 
+export async function muxVideoWithAudio(
+  sourceVideoBlob: Blob,
+  audioBlob: Blob,
+  onProgress?: ProgressCb,
+): Promise<Blob> {
+  return await runQueued(async () => {
+    const { ffmpeg, util } = await ensureFfmpeg(onProgress)
+    const videoExt = extensionForBlob(sourceVideoBlob, 'mp4')
+    const audioExt = extensionForBlob(audioBlob, 'mp3')
+    const inVideo = `mux_src.${videoExt}`
+    const inAudio = `mux_audio.${audioExt}`
+    const outFile = 'mux_out.mp4'
+
+    progress(onProgress, 'Muxing video with translated audio', 5)
+    await ffmpeg.writeFile(inVideo, await util.fetchFile(sourceVideoBlob))
+    await ffmpeg.writeFile(inAudio, await util.fetchFile(audioBlob))
+
+    progress(onProgress, 'Muxing video with translated audio', 15)
+    await runWithProgressPulse(
+      runCommand(
+        ffmpeg,
+        [
+          '-y',
+          '-i', inVideo,
+          '-i', inAudio,
+          '-map', '0:v:0',
+          '-map', '1:a:0',
+          '-c:v', 'copy',
+          '-c:a', 'aac',
+          '-b:a', '192k',
+          '-shortest',
+          '-movflags', '+faststart',
+          outFile,
+        ],
+        'Video mux',
+      ),
+      onProgress,
+      'Muxing video with translated audio',
+      15,
+      90,
+      1000,
+    )
+
+    const bytes = await ffmpeg.readFile(outFile)
+    const copy = new Uint8Array(bytes.byteLength)
+    copy.set(bytes)
+    await safeDelete(ffmpeg, inVideo)
+    await safeDelete(ffmpeg, inAudio)
+    await safeDelete(ffmpeg, outFile)
+    progress(onProgress, 'Video mux complete', 100)
+    return new Blob([copy], { type: 'video/mp4' })
+  })
+}
+
 export async function renderTranslatedMediaArtifacts(input: RenderInput): Promise<RenderOutput | null> {
   if (!isMediaKind(input.sourceKind)) return null
 
@@ -852,7 +908,13 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
               currentMs += 10
             }
             await yieldToBrowser()
-            const target = await synthesizeTargetSegment(textForTts, i, input.sentences.length, input.onProgress)
+            let target: { wav: Blob; durationMs: number; text: string }
+            if (input.ttsProvider) {
+              const wav = await input.ttsProvider(i, textForTts)
+              target = { wav, durationMs: 0, text: textForTts }
+            } else {
+              target = await synthesizeTargetSegment(textForTts, i, input.sentences.length, input.onProgress)
+            }
             const targetInputWavName = `tgt_in_${String(i + 1).padStart(4, '0')}.wav`
             const targetWavName = `tgt_${String(i + 1).padStart(4, '0')}.wav`
             await ffmpeg.writeFile(targetInputWavName, await util.fetchFile(target.wav))

@@ -1097,6 +1097,14 @@ export const LocalWorkspace = {
     return { status: 'ok', message: 'Edit applied.' }
   },
 
+  async getRawAnalysis(documentId: string): Promise<WorkspaceAnalysis | null> {
+    const docId = String(documentId || '').trim()
+    if (!docId) return null
+    const state = await ensureState()
+    const row = state.analyses.find((a) => a.document_id === docId || a.analysis_id === docId)
+    return row ? clone(row) : null
+  },
+
   async deleteAnalysis(documentId: string): Promise<{ status: 'ok' | 'error'; message: string; document_id?: string }> {
     const state = await ensureState()
     const docId = String(documentId || '').trim()

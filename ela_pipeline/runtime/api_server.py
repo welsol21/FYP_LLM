@@ -343,27 +343,42 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
             if not media_path:
                 self._send_json({"error": "mediaPath is required"}, status=400)
                 return
-            try:
-                result = extract_media_text_and_sentences(source_path=media_path)
-                sentences = [
-                    {
-                        "text": text,
-                        "start_sec": timing["start_sec"] if timing else None,
-                        "end_sec": timing["end_sec"] if timing else None,
-                    }
-                    for text, timing in zip(result.sentence_stream, result.sentence_timeline)
-                ]
-                self._send_json(
-                    {
+            evt_queue: "_queue.Queue[dict]" = _queue.Queue()
+
+            def _transcribe_worker() -> None:
+                try:
+                    result = extract_media_text_and_sentences(source_path=media_path)
+                    sentences = [
+                        {
+                            "text": text,
+                            "start_sec": timing["start_sec"] if timing else None,
+                            "end_sec": timing["end_sec"] if timing else None,
+                        }
+                        for text, timing in zip(result.sentence_stream, result.sentence_timeline)
+                    ]
+                    evt_queue.put({
+                        "status": "done",
                         "source_type": result.source_type,
                         "full_text": result.full_text,
                         "sentences": sentences,
-                    }
-                )
-            except FileNotFoundError as exc:
-                self._send_json({"error": str(exc)}, status=400)
-            except Exception as exc:
-                self._send_json({"error": str(exc)}, status=500)
+                    })
+                except FileNotFoundError as exc:
+                    evt_queue.put({"status": "error", "error": str(exc)})
+                except Exception as exc:
+                    evt_queue.put({"status": "error", "error": str(exc)})
+
+            _threading.Thread(target=_transcribe_worker, daemon=True).start()
+            self._send_sse_start()
+            while True:
+                try:
+                    event = evt_queue.get(timeout=20)
+                    if not self._send_sse_event(event):
+                        break
+                    if event.get("status") in ("done", "error"):
+                        break
+                except _queue.Empty:
+                    self.wfile.write(b": keepalive\n\n")
+                    self.wfile.flush()
             return
 
         if path == "/api/tts-batch":
@@ -430,6 +445,34 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                         self.wfile.flush()
                     except OSError:
                         break
+            return
+
+        if path == "/api/tts-sentence":
+            import asyncio as _asyncio
+            import tempfile as _tempfile
+            text = str(body.get("text") or "").strip()
+            voice_choice = str(body.get("voiceChoice") or body.get("voice_choice") or "male").strip().lower()
+            if not text:
+                self._send_json({"error": "text is required"}, status=400)
+                return
+            voice_name = "ru-RU-SvetlanaNeural" if voice_choice.startswith("f") else "ru-RU-DmitryNeural"
+            try:
+                import edge_tts as _edge_tts  # type: ignore
+                with _tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as _f:
+                    _tmp_path = _f.name
+                _asyncio.run(_edge_tts.Communicate(text, voice_name).save(_tmp_path))
+                _data = Path(_tmp_path).read_bytes()
+                try:
+                    Path(_tmp_path).unlink()
+                except OSError:
+                    pass
+                self.send_response(200)
+                self.send_header("Content-Type", "audio/mpeg")
+                self.send_header("Content-Length", str(len(_data)))
+                self.end_headers()
+                self.wfile.write(_data)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=500)
             return
 
         if path == "/api/sentence-contract":
