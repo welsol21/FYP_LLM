@@ -110,7 +110,12 @@ self.addEventListener('message', async (event: MessageEvent) => {
   try {
     const t = await getTranscriber((msg) => self.postMessage({ type: 'progress', id, message: msg }))
     console.log('[Whisper] model ready, starting inference')
-    self.postMessage({ type: 'progress', id, message: 'Transcribing audio…' })
+    // Pre-calculate total chunks so we can show a real percentage.
+    // window=30s stride=5s → jump=20s → totalChunks ≈ ceil(duration / 20)
+    const CHUNK_S = 30, STRIDE_S = 5
+    const jump = (CHUNK_S - 2 * STRIDE_S) * sampling_rate
+    const totalChunks = Math.max(1, Math.ceil(audio.length / jump))
+    self.postMessage({ type: 'progress', id, message: 'Transcribing…', pct: 0 })
     let chunksProcessed = 0
     // Pass a plain Float32Array (already 16 kHz from main thread).
     // Transformers.js prepareAudios() only handles string|URL|Float32Array|Float64Array —
@@ -118,12 +123,13 @@ self.addEventListener('message', async (event: MessageEvent) => {
     // whisper-small.en is English-only: do NOT pass language/task (causes error)
     const result: any = await t(audio, {
       return_timestamps: true,
-      chunk_length_s: 30,
-      stride_length_s: 5,
+      chunk_length_s: CHUNK_S,
+      stride_length_s: STRIDE_S,
       chunk_callback: (_chunk: any) => {
         chunksProcessed++
-        console.log('[Whisper] chunk', chunksProcessed, 'done')
-        self.postMessage({ type: 'progress', id, message: `Transcribing… (chunk ${chunksProcessed})` })
+        const pct = Math.min(99, Math.round((chunksProcessed / totalChunks) * 100))
+        console.log('[Whisper] chunk', chunksProcessed, '/', totalChunks, `(${pct}%)`)
+        self.postMessage({ type: 'progress', id, message: `Transcribing… ${pct}%`, pct })
       },
     })
     console.log('[Whisper] inference done, chunks:', result.chunks?.length)

@@ -695,12 +695,14 @@ export class HttpRuntimeApi implements RuntimeApi {
       let contract: VisualizerPayload
 
       if (resumePoint === 'full') {
-        log('transcribing_audio', 'Transcribing audio (this may take a minute)...', [100, 5, 0, 0, 0, 0])
+        const durationMin = Math.round((input.durationSec ?? 0) / 60)
+        const timeHint = durationMin > 2 ? ` (~${durationMin * 2}–${durationMin * 4} min on CPU)` : ''
+        log('transcribing_audio', `Loading Whisper model…${timeHint}`, [100, 3, 0, 0, 0, 0])
         const transcribeResult = isRemoteDeployment()
           ? await this.clientTranscribeAudio(
               input.mediaBlob,
               input.fileName,
-              (msg) => log('transcribing_audio', msg, [100, 50, 0, 0, 0, 0]),
+              (msg, pct = 50) => log('transcribing_audio', msg, [100, pct, 0, 0, 0, 0]),
               input.signal,
             ).then((r) => ({ ...r, full_text: r.sentences.map((s) => s.text).join(' ') }))
           : await new Promise<{ source_type: string; full_text: string; sentences: StoredSentence[] }>(
@@ -952,7 +954,7 @@ export class HttpRuntimeApi implements RuntimeApi {
   private async clientTranscribeAudio(
     mediaBlob: Blob,
     fileName: string,
-    onProgress: (msg: string) => void,
+    onProgress: (msg: string, pct?: number) => void,
     signal?: AbortSignal,
   ): Promise<{ source_type: string; sentences: Array<{ text: string; start_sec: number | null; end_sec: number | null }> }> {
     const isVideo = mediaBlob.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm)$/i.test(fileName)
@@ -993,10 +995,11 @@ export class HttpRuntimeApi implements RuntimeApi {
       const onAbort = (): void => { worker.terminate(); reject(new DOMException('Analysis cancelled.', 'AbortError')) }
       signal?.addEventListener('abort', onAbort)
       worker.onmessage = (ev: MessageEvent): void => {
-        const msg = ev.data as { type: string; id: string; message?: string; fullText?: string; sentences?: Array<{ text: string; start_sec: number; end_sec: number }> }
+        const msg = ev.data as { type: string; id: string; message?: string; pct?: number; fullText?: string; sentences?: Array<{ text: string; start_sec: number; end_sec: number }> }
         if (msg.id !== id) return
         if (msg.type === 'progress') {
-          onProgress(msg.message ?? 'Transcribing…')
+          const pct = typeof msg.pct === 'number' ? Math.max(5, msg.pct) : 50
+          onProgress(msg.message ?? 'Transcribing…', pct)
         } else if (msg.type === 'done') {
           signal?.removeEventListener('abort', onAbort)
           worker.terminate()
