@@ -22,21 +22,8 @@ let transcriber: any = null
 async function getTranscriber(onProgress: (msg: string) => void): Promise<any> {
   if (transcriber) return transcriber
 
-  // Aggregate per-file progress into one smooth overall percentage
-  const fileProgress: Record<string, number> = {}
   const progressCb = (info: any) => {
-    if (!info?.file) return
-    if (info.status === 'progress' && typeof info.progress === 'number') {
-      fileProgress[info.file] = info.progress
-    } else if (info.status === 'done') {
-      fileProgress[info.file] = 100
-    } else if (info.status === 'initiate') {
-      fileProgress[info.file] = 0
-    }
-    const files = Object.values(fileProgress)
-    if (files.length === 0) return
-    const avg = Math.round(files.reduce((s, v) => s + v, 0) / files.length)
-    onProgress(`Loading Whisper model (${avg}%)…`)
+    if (info?.status === 'initiate') onProgress('Loading Whisper model…')
   }
 
   const tryLoad = async (device: string, dtype: string) => {
