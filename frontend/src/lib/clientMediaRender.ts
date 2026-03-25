@@ -252,7 +252,7 @@ async function ensureFfmpeg(onProgress?: ProgressCb): Promise<{ ffmpeg: FfmpegIn
         await ffmpeg.load({ coreURL, wasmURL })
         // Load DejaVuSans font into WASM VFS for drawtext subtitle rendering (Cyrillic support)
         try {
-          const fontRes = await fetch('/desktop-runtime/fonts/DejaVuSans.ttf')
+          const fontRes = await fetch(dejaVuSansUrl)
           const fontBytes = new Uint8Array(await fontRes.arrayBuffer())
           if (fontRes.ok && fontBytes.byteLength > 0) {
             await ffmpeg.writeFile('/DejaVuSans.ttf', fontBytes)
@@ -952,3 +952,4 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
 }
 import { configureTransformersEnv } from './transformersEnv'
 import { recordRuntimeDiagnostic } from './runtimeDiagnostics'
+import dejaVuSansUrl from '../assets/DejaVuSans.ttf?url'
