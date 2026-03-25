@@ -949,7 +949,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     }
   }
 
-  private clientTranscribeAudio(
+  private async clientTranscribeAudio(
     mediaBlob: Blob,
     fileName: string,
     onProgress: (msg: string) => void,
@@ -957,11 +957,35 @@ export class HttpRuntimeApi implements RuntimeApi {
   ): Promise<{ source_type: string; sentences: Array<{ text: string; start_sec: number | null; end_sec: number | null }> }> {
     const isVideo = mediaBlob.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm)$/i.test(fileName)
     const source_type = isVideo ? 'video' : 'audio'
-    const audioUrl = URL.createObjectURL(mediaBlob)
+
+    // AudioContext is unavailable in Web Workers — decode here in the main thread
+    // and pass a Float32Array to the worker instead of a URL.
+    onProgress('Decoding audio…')
+    const AudioCtx = (window as typeof window & { webkitAudioContext?: typeof AudioContext }).AudioContext
+      ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioCtx) throw new Error('AudioContext is unavailable in this browser.')
+    const audioCtx = new AudioCtx()
+    const arrayBuffer = await mediaBlob.arrayBuffer()
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer)
+    await audioCtx.close().catch(() => undefined)
+    // Mix down to mono
+    const audio = audioBuffer.numberOfChannels > 1
+      ? (() => {
+          const ch0 = audioBuffer.getChannelData(0)
+          const ch1 = audioBuffer.getChannelData(1)
+          const mono = new Float32Array(ch0.length)
+          for (let i = 0; i < ch0.length; i++) mono[i] = (ch0[i] + ch1[i]) / 2
+          return mono
+        })()
+      : audioBuffer.getChannelData(0)
+    const sampling_rate = audioBuffer.sampleRate
+
+    if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
+
     return new Promise((resolve, reject) => {
       const worker = new Worker(new URL('../workers/whisperWorker.ts', import.meta.url), { type: 'module' })
       const id = Math.random().toString(36).slice(2)
-      const onAbort = (): void => { worker.terminate(); URL.revokeObjectURL(audioUrl); reject(new DOMException('Analysis cancelled.', 'AbortError')) }
+      const onAbort = (): void => { worker.terminate(); reject(new DOMException('Analysis cancelled.', 'AbortError')) }
       signal?.addEventListener('abort', onAbort)
       worker.onmessage = (ev: MessageEvent): void => {
         const msg = ev.data as { type: string; id: string; message?: string; fullText?: string; sentences?: Array<{ text: string; start_sec: number; end_sec: number }> }
@@ -971,22 +995,20 @@ export class HttpRuntimeApi implements RuntimeApi {
         } else if (msg.type === 'done') {
           signal?.removeEventListener('abort', onAbort)
           worker.terminate()
-          URL.revokeObjectURL(audioUrl)
           resolve({ source_type, sentences: msg.sentences ?? [] })
         } else if (msg.type === 'error') {
           signal?.removeEventListener('abort', onAbort)
           worker.terminate()
-          URL.revokeObjectURL(audioUrl)
           reject(new Error(msg.message ?? 'Whisper worker error'))
         }
       }
       worker.onerror = (err): void => {
         signal?.removeEventListener('abort', onAbort)
         worker.terminate()
-        URL.revokeObjectURL(audioUrl)
         reject(new Error(String(err.message || 'Whisper worker crashed')))
       }
-      worker.postMessage({ type: 'transcribe', id, audioUrl })
+      // Transfer the buffer to avoid copying (worker takes ownership)
+      worker.postMessage({ type: 'transcribe', id, audio, sampling_rate }, [audio.buffer])
     })
   }
 

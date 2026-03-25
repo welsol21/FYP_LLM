@@ -2,7 +2,7 @@
  * Whisper WebWorker — runs Xenova/whisper-small.en in a background thread.
  *
  * Message protocol (main → worker):
- *   { type: 'transcribe', id: string, audioUrl: string }
+ *   { type: 'transcribe', id: string, audio: Float32Array, sampling_rate: number }
  *
  * Message protocol (worker → main):
  *   { type: 'progress', id: string, message: string }
@@ -59,12 +59,17 @@ function groupChunksToSentences(
 }
 
 self.addEventListener('message', async (event: MessageEvent) => {
-  const { type, id, audioUrl } = event.data as { type: string; id: string; audioUrl: string }
+  const { type, id, audio, sampling_rate } = event.data as {
+    type: string
+    id: string
+    audio: Float32Array
+    sampling_rate: number
+  }
   if (type !== 'transcribe') return
   try {
     const t = await getTranscriber((msg) => self.postMessage({ type: 'progress', id, message: msg }))
     self.postMessage({ type: 'progress', id, message: 'Transcribing audio…' })
-    const result: any = await t(audioUrl, {
+    const result: any = await t({ array: audio, sampling_rate }, {
       return_timestamps: true,
       chunk_length_s: 30,
       stride_length_s: 5,
