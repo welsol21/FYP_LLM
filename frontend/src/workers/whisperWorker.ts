@@ -15,7 +15,7 @@ import { pipeline, env } from '@huggingface/transformers'
 
 ;(env as any).allowLocalModels = false
 
-const MODEL = (import.meta as any).env?.VITE_WHISPER_MODEL || 'Xenova/whisper-small.en'
+const MODEL = (import.meta as any).env?.VITE_WHISPER_MODEL || 'Xenova/whisper-base.en'
 
 let transcriber: any = null
 
