@@ -656,7 +656,7 @@ export async function muxVideoWithAudio(
 const DT_MARGIN_BOTTOM = 70
 const DT_LINE_HEIGHT = 38
 const DT_BLOCK_GAP = 12
-const DT_MAX_CHARS = 48
+const DT_MAX_CHARS = 38
 
 function escapeDtText(text: string): string {
   return String(text || '')
@@ -869,24 +869,30 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
         pcmOffset += chunk.length
       }
 
-      // Single FFmpeg call to encode assembled PCM → MP3
+      // Encode assembled PCM → MP3. Split into ≤40MB WAV chunks to avoid WASM heap OOM
+      // on long files. MP3 frames are self-contained so chunks can be concatenated directly.
       progress(input.onProgress, 'Encoding audio track', 60)
       await yieldToBrowser()
-      const assembledWav = rawAudioToWavBlob(outputPcm, TARGET_RATE)
-      await ffmpeg.writeFile('assembled.wav', await util.fetchFile(assembledWav))
-      await runWithProgressPulse(
-        runCommand(
-          ffmpeg,
-          ['-y', '-i', 'assembled.wav', '-ac', '1', '-ar', String(TARGET_RATE), '-c:a', 'libmp3lame', '-q:a', '2', audioFile],
-          'Audio encoding',
-        ),
-        input.onProgress,
-        'Encoding audio track',
-        60,
-        70,
-        900,
-      )
-      await safeDelete(ffmpeg, 'assembled.wav')
+      const MAX_CHUNK_SAMPLES = Math.floor(40 * 1024 * 1024 / 2) // 40MB WAV = 20M s16 samples
+      const mp3Parts: Uint8Array[] = []
+      for (let ci = 0, off = 0; off < outputPcm.length; ci++, off += MAX_CHUNK_SAMPLES) {
+        const slice = outputPcm.subarray(off, Math.min(off + MAX_CHUNK_SAMPLES, outputPcm.length))
+        const chunkWav = rawAudioToWavBlob(slice, TARGET_RATE)
+        const chunkIn = `ac_${ci}.wav`
+        const chunkOut = `ac_${ci}.mp3`
+        await ffmpeg.writeFile(chunkIn, await util.fetchFile(chunkWav))
+        await runCommand(ffmpeg, ['-y', '-i', chunkIn, '-ac', '1', '-ar', String(TARGET_RATE), '-c:a', 'libmp3lame', '-q:a', '2', chunkOut], 'Audio encoding')
+        await safeDelete(ffmpeg, chunkIn)
+        const raw = await ffmpeg.readFile(chunkOut) as Uint8Array
+        mp3Parts.push(new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength))
+        await safeDelete(ffmpeg, chunkOut)
+      }
+      // Concatenate MP3 parts and write final file
+      const totalMp3 = mp3Parts.reduce((s, p) => s + p.byteLength, 0)
+      const mp3Combined = new Uint8Array(totalMp3)
+      let mp3Off = 0
+      for (const part of mp3Parts) { mp3Combined.set(part, mp3Off); mp3Off += part.byteLength }
+      await ffmpeg.writeFile(audioFile, mp3Combined)
 
       const subtitlesEnRows = sourceSubtitleSegments.length > 0 ? sourceSubtitleSegments : bilingualSequentialSegments
       const simultaneousRows = flags.bilingualSimultaneous ? buildSimultaneousBilingualTimeline(sentenceWindows) : []
