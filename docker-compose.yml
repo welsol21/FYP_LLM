@@ -54,6 +54,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        DOWNLOAD_MODELS: ${DOWNLOAD_MODELS:-1}
     restart: unless-stopped
     depends_on:
       - app

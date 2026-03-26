@@ -13,7 +13,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { pipeline, env, TextStreamer } from '@huggingface/transformers'
 
-;(env as any).allowLocalModels = false
+// Models are served locally — no CDN downloads allowed.
+// If local files are missing, the user must install the PWA.
+;(env as any).allowLocalModels = true
+;(env as any).allowRemoteModels = false
+;(env as any).localModelPath = '/models/'
+
+// ONNX Runtime WASM files served locally from /onnx/ — enables multi-threaded
+// CPU inference (SharedArrayBuffer) without CDN dependency.
+;(env as any).backends.onnx.wasm.wasmPaths = '/onnx/'
 
 const MODEL = (import.meta as any).env?.VITE_WHISPER_MODEL || 'Xenova/whisper-base.en'
 
@@ -35,26 +43,7 @@ async function getTranscriber(onProgress: (msg: string) => void): Promise<any> {
     })
   }
 
-  // Check WebGPU adapter availability BEFORE trying to load — failed WebGPU
-  // attempts corrupt ONNX Runtime state, causing even the WASM fallback to fail.
-  let gpuAdapter: any = null
-  if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
-    try {
-      gpuAdapter = await (navigator as any).gpu.requestAdapter()
-    } catch { /* WebGPU not available */ }
-  }
-
-  if (gpuAdapter) {
-    try {
-      transcriber = await tryLoad('webgpu', 'fp32')
-    } catch (e) {
-      console.warn('[Whisper] WebGPU failed, falling back to WASM q8:', e)
-      transcriber = await tryLoad('wasm', 'q8')
-    }
-  } else {
-    console.log('[Whisper] No WebGPU adapter, using WASM q8')
-    transcriber = await tryLoad('wasm', 'q8')
-  }
+  transcriber = await tryLoad('wasm', 'q8')
 
   return transcriber
 }

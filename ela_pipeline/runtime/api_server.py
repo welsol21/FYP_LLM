@@ -102,6 +102,158 @@ SERVICE = RuntimeMediaService(
 )
 
 
+def _format_srt_time(ms: int) -> str:
+    ms = max(0, int(ms))
+    h, rem = divmod(ms, 3600000)
+    m, rem = divmod(rem, 60000)
+    s, ms = divmod(rem, 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def _build_srt(sentences: list[dict], mode: str) -> str:
+    blocks: list[str] = []
+    cue = 1
+    for sent in sentences:
+        start_ms = max(0, int(sent.get("start_ms") or 0))
+        end_ms = max(start_ms + 300, int(sent.get("end_ms") or 0))
+        en = str(sent.get("text_eng") or "").strip()
+        ru = str(sent.get("text_ru") or "").strip()
+        ts = f"{_format_srt_time(start_ms)} --> {_format_srt_time(end_ms)}"
+        if mode == "source":
+            if en:
+                blocks.append(f"{cue}\n{ts}\n{en}\n"); cue += 1
+        elif mode == "target":
+            if ru:
+                blocks.append(f"{cue}\n{ts}\n{ru}\n"); cue += 1
+        else:  # bilingual
+            if en and ru:
+                blocks.append(f"{cue}\n{ts}\n{en}\n{ru}\n"); cue += 1
+            elif en:
+                blocks.append(f"{cue}\n{ts}\n{en}\n"); cue += 1
+            elif ru:
+                blocks.append(f"{cue}\n{ts}\n{ru}\n"); cue += 1
+    return "\n".join(blocks)
+
+
+def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: str, need_audio: bool = True, need_video: bool = True) -> bytes:
+    """Generate TTS → assemble audio → compose video → return ZIP bytes."""
+    import asyncio
+    import io
+    import shutil
+    import subprocess
+    import tempfile
+    import zipfile
+
+    import numpy as np
+
+    TARGET_RATE = 24000
+    voice_name = "ru-RU-SvetlanaNeural" if voice.startswith("f") else "ru-RU-DmitryNeural"
+
+    # ── 1. Generate TTS + assemble PCM (only if audio or video needed) ────────
+    output_pcm: "np.ndarray | None" = None
+    if need_audio or need_video:
+        async def _tts(text: str, sem: asyncio.Semaphore) -> bytes:
+            import edge_tts as _edge_tts
+            async with sem:
+                with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+                    tmp = Path(f.name)
+                try:
+                    await _edge_tts.Communicate(text, voice_name).save(str(tmp))
+                    return tmp.read_bytes()
+                finally:
+                    tmp.unlink(missing_ok=True)
+
+        async def _generate_all() -> list[bytes]:
+            sem = asyncio.Semaphore(8)
+            async def _empty() -> bytes:
+                return b""
+            tasks = [
+                _tts(str(s.get("text_ru") or ""), sem) if str(s.get("text_ru") or "").strip() else _empty()
+                for s in sentences
+            ]
+            return list(await asyncio.gather(*tasks, return_exceptions=False))
+
+        tts_blobs: list[bytes] = asyncio.run(_generate_all())
+
+        # ── 2. Decode each TTS blob to float32 PCM and assemble with timing ───
+        def _decode_mp3(mp3_bytes: bytes) -> np.ndarray:
+            proc = subprocess.run(
+                ["ffmpeg", "-i", "pipe:0", "-f", "f32le", "-ar", str(TARGET_RATE), "-ac", "1", "pipe:1"],
+                input=mp3_bytes, capture_output=True,
+            )
+            return np.frombuffer(proc.stdout, dtype=np.float32).copy()
+
+        output_pcm = np.zeros(TARGET_RATE, dtype=np.float32)  # start with 1s of silence
+
+        for sent, blob in zip(sentences, tts_blobs):
+            if not blob:
+                continue
+            pcm = _decode_mp3(blob)
+            start_sample = int(max(0, int(sent.get("start_ms") or 0)) / 1000 * TARGET_RATE)
+            end_sample = start_sample + len(pcm)
+            if end_sample > len(output_pcm):
+                output_pcm = np.concatenate([output_pcm, np.zeros(end_sample - len(output_pcm), dtype=np.float32)])
+            output_pcm[start_sample:end_sample] = pcm
+
+    # ── 3. Encode assembled PCM → MP3 (needed for audio or video) ────────────
+    mp3_bytes = b""
+    if (need_audio or need_video) and output_pcm is not None:
+        proc = subprocess.run(
+            ["ffmpeg", "-f", "f32le", "-ar", str(TARGET_RATE), "-ac", "1", "-i", "pipe:0",
+             "-c:a", "libmp3lame", "-q:a", "2", "-f", "mp3", "pipe:1"],
+            input=output_pcm.tobytes(), capture_output=True, check=True,
+        )
+        mp3_bytes = proc.stdout
+
+    # ── 4. Build SRT files ─────────────────────────────────────────────────────
+    srt_en = _build_srt(sentences, "source")
+    srt_bilingual = _build_srt(sentences, "bilingual")
+    srt_target = _build_srt(sentences, "target")
+    selected_srt = {"source": srt_en, "target": srt_target}.get(subtitles_mode, srt_bilingual)
+
+    # ── 5. Compose video: black background + audio + subtitles ────────────────
+    mp4_bytes = b""
+    if need_video:
+        tmpdir = Path(tempfile.mkdtemp())
+        try:
+            audio_path = tmpdir / "audio.mp3"
+            srt_path = tmpdir / "subs.srt"
+            video_path = tmpdir / "output.mp4"
+            audio_path.write_bytes(mp3_bytes)
+            srt_path.write_text(selected_srt, encoding="utf-8")
+
+            vf = f"subtitles={srt_path}"
+            subprocess.run(
+                [
+                    "ffmpeg", "-y",
+                    "-f", "lavfi", "-i", "color=c=black:size=640x360:rate=5",
+                    "-i", str(audio_path),
+                    "-vf", vf,
+                    "-shortest",
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                    "-preset", "ultrafast", "-tune", "stillimage", "-crf", "28",
+                    "-c:a", "aac", "-b:a", "128k",
+                    str(video_path),
+                ],
+                capture_output=True, check=True,
+            )
+            mp4_bytes = video_path.read_bytes()
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+    # ── 6. Pack into ZIP (STORED — files already compressed) ──────────────────
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_STORED) as zf:
+        if need_audio:
+            zf.writestr("translated_audio_ru.mp3", mp3_bytes)
+        if need_video:
+            zf.writestr("translated_video_ru.mp4", mp4_bytes)
+        zf.writestr("subtitles_en.srt", srt_en.encode("utf-8"))
+        zf.writestr("subtitles_bilingual.srt", srt_bilingual.encode("utf-8"))
+        zf.writestr("subtitles_target.srt", srt_target.encode("utf-8"))
+    return buf.getvalue()
+
+
 def _build_sentence_contract_payload(sentence_text: str, sentence_idx: int) -> dict:
     controlled_model_dir = _env_str("ELA_CONTROLLED_T5_MODEL_DIR", "")
     classifier_provider, classifier_model_path = _resolve_classifier_settings()
@@ -492,6 +644,27 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(exc)}, status=400)
                 return
             self._send_json(payload)
+            return
+
+        if path == "/api/render-media":
+            sentences = body.get("sentences") or []
+            voice = str(body.get("voice") or "male").strip().lower()
+            subtitles_mode = str(body.get("subtitlesMode") or "bilingual").strip()
+            need_audio = bool(body.get("need_audio", True))
+            need_video = bool(body.get("need_video", True))
+            if not sentences:
+                self._send_json({"error": "sentences is required"}, status=400)
+                return
+            try:
+                zip_bytes = _render_media_artifacts(sentences, voice, subtitles_mode, need_audio=need_audio, need_video=need_video)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/zip")
+                self.send_header("Content-Length", str(len(zip_bytes)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(zip_bytes)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=500)
             return
 
         self._send_json({"error": "Not found"}, status=404)

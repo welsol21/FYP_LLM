@@ -148,6 +148,7 @@ describe('VisualizerPage', () => {
         providers: [{ id: 'm2m100', label: 'Our Translator (M2M100)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} }],
       }),
       saveTranslationConfig: async (config) => config,
+      getSourceFileBlob: async () => null,
     }
 
     render(
@@ -258,6 +259,7 @@ describe('VisualizerPage', () => {
         providers: [{ id: 'm2m100', label: 'Our Translator (M2M100)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} }],
       }),
       saveTranslationConfig: async (config) => config,
+      getSourceFileBlob: async () => null,
     }
 
     render(
@@ -350,6 +352,7 @@ describe('VisualizerPage', () => {
         providers: [{ id: 'm2m100', label: 'Our Translator (M2M100)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} }],
       }),
       saveTranslationConfig: async (config) => config,
+      getSourceFileBlob: async () => null,
     }
 
     render(
@@ -434,6 +437,7 @@ describe('VisualizerPage', () => {
         providers: [{ id: 'm2m100', label: 'Our Translator (M2M100)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} }],
       }),
       saveTranslationConfig: async (config) => config,
+      getSourceFileBlob: async () => null,
     }
 
     render(

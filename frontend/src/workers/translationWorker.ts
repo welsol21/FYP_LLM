@@ -14,7 +14,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { pipeline, env } from '@huggingface/transformers'
 
-;(env as any).allowLocalModels = false
+// Models are served locally — no CDN downloads allowed.
+;(env as any).allowLocalModels = true
+;(env as any).allowRemoteModels = false
+;(env as any).localModelPath = '/models/'
+
+// ONNX Runtime WASM files served locally from /onnx/ — enables multi-threaded
+// CPU inference (SharedArrayBuffer) without CDN dependency.
+;(env as any).backends.onnx.wasm.wasmPaths = '/onnx/'
 
 let translator: any = null
 

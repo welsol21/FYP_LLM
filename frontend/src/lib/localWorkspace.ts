@@ -1149,10 +1149,6 @@ export const LocalWorkspace = {
         download_url: await encodeBlobArtifact(translatedVideo),
       })
     }
-    const stem = String(row.file_name || '').replace(/\.[^.]+$/, '').trim()
-    if (stem) {
-      return out.map((a) => ({ ...a, name: `${stem}_${a.name}` }))
-    }
     return out
   },
 

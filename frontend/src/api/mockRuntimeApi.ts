@@ -442,6 +442,10 @@ export class MockRuntimeApi implements RuntimeApi {
       : { status: 'error', message: 'analysis not found', document_id: docId }
   }
 
+  async getSourceFileBlob(_mediaPath: string): Promise<Blob | null> {
+    return null
+  }
+
   async listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]> {
     if (!documentId || !this.payloadByDocument[documentId]) return []
     const payload = this.payloadByDocument[documentId] || {}

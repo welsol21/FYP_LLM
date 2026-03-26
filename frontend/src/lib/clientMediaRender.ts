@@ -868,6 +868,8 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
         outputPcm.set(chunk, pcmOffset)
         pcmOffset += chunk.length
       }
+      // Release per-sentence PCM buffers — no longer needed after assembly
+      outputChunks.length = 0
 
       // Encode assembled PCM → MP3. Split into ≤40MB WAV chunks to avoid WASM heap OOM
       // on long files. MP3 frames are self-contained so chunks can be concatenated directly.
@@ -892,7 +894,11 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
       const mp3Combined = new Uint8Array(totalMp3)
       let mp3Off = 0
       for (const part of mp3Parts) { mp3Combined.set(part, mp3Off); mp3Off += part.byteLength }
+      mp3Parts.length = 0 // release encoded chunk buffers
       await ffmpeg.writeFile(audioFile, mp3Combined)
+      // Yield after audio encoding to allow GC of large PCM/MP3 buffers before video composition
+      await yieldToBrowser()
+      await yieldToBrowser()
 
       const subtitlesEnRows = sourceSubtitleSegments.length > 0 ? sourceSubtitleSegments : bilingualSequentialSegments
       const simultaneousRows = flags.bilingualSimultaneous ? buildSimultaneousBilingualTimeline(sentenceWindows) : []
@@ -931,9 +937,12 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
 
       progress(input.onProgress, 'Composing video track', 74)
       await yieldToBrowser()
-      const subsFilter = ffmpegFontLoaded ? buildDrawtextFilter(selectedSubtitleRows, '/DejaVuSans.ttf') : ''
-      console.log('[Render] subsFilter length:', subsFilter.length, 'rows:', selectedSubtitleRows.length)
-      const vfArgs = subsFilter ? ['-vf', subsFilter] : []
+      // subtitles filter (libass) uses a single filter instance reading the SRT file — avoids
+      // the ~360MB heap cost of 700+ drawtext instances each loading the font independently.
+      const vfArgs = ffmpegFontLoaded
+        ? ['-vf', `subtitles=${subtitleFile}:fontsdir=/:force_style='FontName=DejaVu Sans,FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=2,Shadow=0,MarginV=30'`]
+        : []
+      console.log('[Render] subtitle filter:', vfArgs.length ? 'enabled (libass)' : 'disabled (no font)')
       const videoArgs = input.sourceKind === 'video'
         ? [
             '-y',

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
-import { buildAnalysisFeatureBadges } from '../lib/analysisSettings'
+import { buildAnalysisFeatureBadges, buildExportFileName } from '../lib/analysisSettings'
 import type {
   DocumentArtifact,
   MediaFileRow,
@@ -462,6 +462,33 @@ export function AnalyzePage() {
           ) : null}
         </section>
       ) : null}
+      {activeMedia?.mediaPath && activeMedia?.fileName ? (
+        <section className="card compact-card" aria-label="source-file-download">
+          <p className="stage-log-title">Source file</p>
+          <div className="artifact-actions">
+            <a
+              className="top-link"
+              href="#"
+              download={activeMedia.fileName}
+              onClick={async (e) => {
+                e.preventDefault()
+                const blob = await api.getSourceFileBlob(activeMedia.mediaPath!)
+                if (!blob) return
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = activeMedia.fileName!
+                document.body.appendChild(a)
+                a.click()
+                document.body.removeChild(a)
+                setTimeout(() => URL.revokeObjectURL(url), 10000)
+              }}
+            >
+              Download {activeMedia.fileName}
+            </a>
+          </div>
+        </section>
+      ) : null}
       <section className="card compact-card" aria-label="analyze-history">
         <p className="stage-log-title">Analysis history</p>
         {historyLoading ? (
@@ -533,12 +560,12 @@ export function AnalyzePage() {
                             key={`${item.file_id}-${artifact.name}`}
                             className="top-link"
                             href={artifact.download_url}
-                            download={artifact.name}
+                            download={buildExportFileName(item.file_name, item.settings, artifact.name)}
                             onClick={(e) => {
                               e.preventDefault()
                               const a = document.createElement('a')
                               a.href = artifact.download_url
-                              a.download = artifact.name
+                              a.download = buildExportFileName(item.file_name, item.settings, artifact.name)
                               document.body.appendChild(a)
                               a.click()
                               document.body.removeChild(a)

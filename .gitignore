@@ -118,3 +118,7 @@ frontend/*.tsbuildinfo
 frontend/src-tauri/
 frontend/public/desktop-runtime/
 tmp_media_check/
+frontend/public/models/
+.env.local
+frontend/public/ffmpeg/
+frontend/public/onnx/

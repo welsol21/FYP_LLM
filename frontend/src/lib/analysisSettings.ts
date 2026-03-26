@@ -71,6 +71,15 @@ export function getTranslationProviderFromSettings(settings: string, fallback = 
   return parsed.translator || fallback
 }
 
+/** Build the user-facing download filename: {file_stem}_{voice}_{subs}_{artifact_name} */
+export function buildExportFileName(fileName: string, settings: string, artifactName: string): string {
+  const stem = String(fileName || '').replace(/\.[^.]+$/, '').trim()
+  const parsed = parseAnalysisSettings(settings)
+  const tags = [parsed.voice, parsed.subtitles].filter(Boolean)
+  const prefix = [stem, ...tags].filter(Boolean).join('_')
+  return prefix ? `${prefix}_${artifactName}` : artifactName
+}
+
 export function buildAnalysisFeatureBadges(settings: string): AnalysisFeatureBadge[] {
   const parsed = parseAnalysisSettings(settings)
   const out: AnalysisFeatureBadge[] = []

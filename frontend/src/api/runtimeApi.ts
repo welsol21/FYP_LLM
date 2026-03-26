@@ -196,6 +196,7 @@ export interface RuntimeApi {
   deleteFile(fileId: string): Promise<{ status: 'ok' | 'error'; message: string; file_id?: string }>
   listAnalysisHistory(projectId?: string): Promise<AnalysisHistoryRow[]>
   deleteAnalysis(documentId: string): Promise<{ status: 'ok' | 'error'; message: string; document_id?: string }>
+  getSourceFileBlob(mediaPath: string): Promise<Blob | null>
   listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]>
   getVisualizerPayload(documentId?: string): Promise<VisualizerPayload>
   analyzeText(input: { rawText: string; sentences?: string[] }): Promise<AnalyzeTextPayload>

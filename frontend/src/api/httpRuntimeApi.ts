@@ -14,7 +14,36 @@ import type {
 } from './runtimeApi'
 import { LocalWorkspace } from '../lib/localWorkspace'
 import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics'
-import { renderTranslatedMediaArtifacts } from '../lib/clientMediaRender'
+
+/** Parse a ZIP file (STORED entries only) into a filename→Uint8Array map. */
+function parseStoredZip(buf: ArrayBuffer): Map<string, Uint8Array> {
+  const view = new DataView(buf)
+  const bytes = new Uint8Array(buf)
+  const result = new Map<string, Uint8Array>()
+  // Find End of Central Directory signature (0x06054b50)
+  let eocd = buf.byteLength - 22
+  while (eocd >= 0 && view.getUint32(eocd, true) !== 0x06054b50) eocd--
+  if (eocd < 0) throw new Error('Invalid ZIP: EOCD not found')
+  const cdOffset = view.getUint32(eocd + 16, true)
+  const cdCount = view.getUint16(eocd + 8, true)
+  let pos = cdOffset
+  for (let i = 0; i < cdCount; i++) {
+    if (view.getUint32(pos, true) !== 0x02014b50) break
+    const nameLen = view.getUint16(pos + 28, true)
+    const extraLen = view.getUint16(pos + 30, true)
+    const commentLen = view.getUint16(pos + 32, true)
+    const localOffset = view.getUint32(pos + 42, true)
+    const name = new TextDecoder().decode(bytes.subarray(pos + 46, pos + 46 + nameLen))
+    pos += 46 + nameLen + extraLen + commentLen
+    // Read local file header to get data offset
+    const lnLen = view.getUint16(localOffset + 26, true)
+    const leLen = view.getUint16(localOffset + 28, true)
+    const compSize = view.getUint32(localOffset + 18, true)
+    const dataStart = localOffset + 30 + lnLen + leLen
+    result.set(name, bytes.slice(dataStart, dataStart + compSize))
+  }
+  return result
+}
 
 type SentenceContractPayload = {
   sentence_text?: string
@@ -42,10 +71,6 @@ type TimedSentenceRow = {
   end_ms: number
 }
 
-function isRemoteDeployment(): boolean {
-  const host = typeof window !== 'undefined' ? window.location.hostname : ''
-  return host !== 'localhost' && host !== '127.0.0.1' && !host.startsWith('192.168.')
-}
 
 function normalizedApiBaseUrl(): string {
   const raw = String(import.meta.env?.VITE_API_BASE_URL || '').trim()
@@ -166,6 +191,19 @@ function splitIntoSentences(rawText: string): string[] {
     .filter(Boolean)
 }
 
+const PWA_INSTALL_MESSAGE =
+  'AI models are not installed. Please install the ELA app: open the browser menu and choose "Install app" / "Add to Home Screen", then reopen it.'
+
+function isPwaModelMissingError(err: unknown): boolean {
+  const msg = String(err instanceof Error ? err.message : err || '').toLowerCase()
+  return (
+    msg.includes('could not locate file') ||
+    msg.includes('allowremotemodels') ||
+    msg.includes('localmodelpath') ||
+    (msg.includes('404') && (msg.includes('onnx') || msg.includes('config.json') || msg.includes('tokenizer')))
+  )
+}
+
 function normalizeContractError(errorMessage: string): string {
   const text = String(errorMessage || '').trim().toLowerCase()
   if (!text) return 'Project service is unavailable. Check internet access and service URL.'
@@ -173,6 +211,15 @@ function normalizeContractError(errorMessage: string): string {
     return 'Project service is unavailable. Check internet access and service URL.'
   }
   return 'Project service is unavailable. Check internet access and service URL.'
+}
+
+async function computeDocumentId(
+  fileName: string,
+  settings: { translationProvider: string; voiceChoice: string; subtitlesMode: string },
+): Promise<string> {
+  const input = `${fileName}|${settings.translationProvider}|${settings.voiceChoice}|${settings.subtitlesMode}`
+  const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+  return Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 function formatVoiceSetting(voiceChoice: string | undefined): string {
@@ -576,76 +623,55 @@ export class HttpRuntimeApi implements RuntimeApi {
       recordRuntimeDiagnostic('api.media.backend', 'submit.start', { mediaPath: input.mediaPath, fileName: input.fileName })
 
       // ── Resume detection ──────────────────────────────────────────
+      // documentId = SHA-256(fileContent | translationProvider | voiceChoice | subtitlesMode)
+      // Same file + same settings always produces the same documentId, so cached artifacts
+      // are reused across sessions/projects/browser restarts without any history scan.
       // resumePoint: 'full' = run everything; 'translation' = reuse transcription+contracts;
       //              'tts' = reuse transcription+contracts+translations; 'done' = early exit
+      const docIdSettings = {
+        translationProvider: input.translationProvider || 'm2m100',
+        voiceChoice: String(input.voiceChoice || 'backend_dmitry').trim().toLowerCase(),
+        subtitlesMode: input.subtitlesMode || 'bilingual',
+      }
+      const documentId = await computeDocumentId(input.fileName, docIdSettings)
       let resumePoint: 'full' | 'translation' | 'tts' | 'done' = 'full'
-      let documentId =
-        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
       let resumeSentences: StoredSentence[] | null = null
       let resumeContract: VisualizerPayload | null = null
       let resumeTranslations: Record<string, string> | null = null
       let resumeSourceType: string | null = null
 
-      if (!input.forceFullReprocess && input.mediaFileId) {
-        const history = await LocalWorkspace.listAnalysisHistory(input.projectId)
-        const existing = history
-          .filter((r) => r.media_file_id === input.mediaFileId)
-          .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))[0]
+      if (!input.forceFullReprocess) {
+        const [sentBlob, settBlob] = await Promise.all([
+          LocalWorkspace.getAnalysisArtifactBlob(documentId, 'sentences.json'),
+          LocalWorkspace.getAnalysisArtifactBlob(documentId, 'pipeline_settings.json'),
+        ])
 
-        if (existing) {
-          const [sentBlob, settBlob] = await Promise.all([
-            LocalWorkspace.getAnalysisArtifactBlob(existing.document_id, 'sentences.json'),
-            LocalWorkspace.getAnalysisArtifactBlob(existing.document_id, 'pipeline_settings.json'),
-          ])
+        if (settBlob) {
+          // pipeline_settings.json only exists after a fully successful run
+          resumePoint = 'done'
+        } else if (sentBlob) {
+          const prevSentences = JSON.parse(await sentBlob.text()) as StoredSentence[]
+          if (prevSentences.length > 0) {
+            const rawAnalysis = await LocalWorkspace.getRawAnalysis(documentId)
+            if (rawAnalysis && Object.keys(rawAnalysis.contract).length > 0) {
+              resumeSentences = prevSentences
+              resumeContract = rawAnalysis.contract
+              resumeSourceType = (rawAnalysis as any).sourceType ?? null
 
-          if (sentBlob) {
-            const prevSentences = JSON.parse(await sentBlob.text()) as StoredSentence[]
-
-            // pipeline_settings.json only exists after a fully successful run
-            const prevSettings: PipelineSettings | null = settBlob
-              ? JSON.parse(await settBlob.text()) as PipelineSettings
-              : null
-
-            const currentProvider = input.translationProvider || 'm2m100'
-            const currentVoice = String(input.voiceChoice || 'backend_dmitry').trim().toLowerCase()
-            const currentSubs = input.subtitlesMode || 'bilingual'
-
-            const sameProvider = prevSettings?.translationProvider === currentProvider
-            const sameVoice = prevSettings?.voiceChoice === currentVoice
-            const sameSubs = prevSettings?.subtitlesMode === currentSubs
-
-            if (prevSettings && sameProvider && sameVoice && sameSubs && existing.contract_current !== false) {
-              resumePoint = 'done'
-              documentId = existing.document_id
-            } else if (prevSentences.length > 0) {
-              const rawAnalysis = await LocalWorkspace.getRawAnalysis(existing.document_id)
-              if (rawAnalysis && Object.keys(rawAnalysis.contract).length > 0) {
-                documentId = existing.document_id
-                resumeSentences = prevSentences
-                resumeContract = rawAnalysis.contract
-                resumeSourceType = prevSettings?.sourceType ?? null
-
-                if (prevSettings && sameProvider) {
-                  // Extract stored translations from contract nodes
-                  const translations: Record<string, string> = {}
-                  for (const [key, node] of Object.entries(rawAnalysis.contract)) {
-                    const active = String(node.active_translation_provider || '')
-                    const t = active
-                      ? (node.translations as Record<string, { text?: string }> | undefined)?.[active]?.text
-                      : undefined
-                    if (t) translations[key] = t
-                  }
-                  if (Object.keys(translations).length > 0) {
-                    resumeTranslations = translations
-                    resumePoint = 'tts'
-                  } else {
-                    resumePoint = 'translation'
-                  }
-                } else {
-                  resumePoint = 'translation'
-                }
+              // Extract stored translations from contract nodes
+              const translations: Record<string, string> = {}
+              for (const [key, node] of Object.entries(rawAnalysis.contract)) {
+                const active = String(node.active_translation_provider || '')
+                const t = active
+                  ? (node.translations as Record<string, { text?: string }> | undefined)?.[active]?.text
+                  : undefined
+                if (t) translations[key] = t
+              }
+              if (Object.keys(translations).length > 0) {
+                resumeTranslations = translations
+                resumePoint = 'tts'
+              } else {
+                resumePoint = 'translation'
               }
             }
           }
@@ -667,31 +693,8 @@ export class HttpRuntimeApi implements RuntimeApi {
         })
       }
 
-      // ── Stage 0: Upload ──────────────────────────────────────────
-      // Only needed for desktop (local) transcription path. Remote deployments
-      // use client-side Whisper and per-sentence TTS — no server media path required.
-      const needsUpload = resumePoint === 'full' && !isRemoteDeployment()
-      let uploadedMediaPath = ''
-      if (needsUpload) {
-        log(0, 'Uploading media to backend...', 20)
-        const form = new FormData()
-        form.append('file', input.mediaBlob, input.fileName)
-        const uploadRes = await fetchWithRetry('/api/upload', { method: 'POST', body: form, signal: input.signal }, { retries: 2, retryDelayMs: 1500 })
-        if (!uploadRes.ok) {
-          const text = await uploadRes.text()
-          throw new Error(
-            shouldRetryBackendRequest(uploadRes.status)
-              ? `Backend upload failed: service temporarily unavailable (HTTP ${uploadRes.status}). Retry in a few seconds.`
-              : `Backend upload failed: HTTP ${uploadRes.status}: ${text}`,
-          )
-        }
-        const uploaded = (await uploadRes.json()) as { mediaPath: string; sizeBytes: number; fileName: string }
-        uploadedMediaPath = uploaded.mediaPath
-        log(0, 'Media uploaded', 100)
-        ensureNotAborted()
-      } else {
-        log(0, 'Ready', 100)
-      }
+      // ── Stage 0: Ready ───────────────────────────────────────────
+      log(0, 'Ready', 100)
 
       // ── Stage 1: Transcribe ──────────────────────────────────────
       let sentences: StoredSentence[]
@@ -702,57 +705,12 @@ export class HttpRuntimeApi implements RuntimeApi {
         const durationMin = Math.round((input.durationSec ?? 0) / 60)
         const timeHint = durationMin > 2 ? ` (~${durationMin * 2}–${durationMin * 4} min on CPU)` : ''
         log(1, `Loading Whisper model…${timeHint}`, 3)
-        const transcribeResult = isRemoteDeployment()
-          ? await this.clientTranscribeAudio(
-              input.mediaBlob,
-              input.fileName,
-              (msg, pct = 50) => log(1, msg, pct),
-              input.signal,
-            ).then((r) => ({ ...r, full_text: r.sentences.map((s) => s.text).join(' ') }))
-          : await new Promise<{ source_type: string; full_text: string; sentences: StoredSentence[] }>(
-          (resolve, reject) => {
-            const onAbort = (): void => reject(new DOMException('Analysis cancelled.', 'AbortError'))
-            input.signal?.addEventListener('abort', onAbort)
-            fetch(apiUrl('/api/transcribe'), {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ mediaPath: uploadedMediaPath }),
-              signal: input.signal,
-            }).then((res) => {
-              if (!res.ok || !res.body) { reject(new Error(`Transcribe request failed: HTTP ${res.status}`)); return }
-              const reader = res.body.getReader()
-              const decoder = new TextDecoder()
-              let buf = ''
-              const pump = (): void => {
-                reader.read().then(({ done, value }) => {
-                  if (done) { reject(new Error('Transcribe stream ended without done event')); return }
-                  buf += decoder.decode(value, { stream: true })
-                  const parts = buf.split('\n\n')
-                  buf = parts.pop() ?? ''
-                  for (const part of parts) {
-                    const dataLine = part.split('\n').find((l) => l.startsWith('data: '))
-                    if (!dataLine) continue
-                    try {
-                      const evt = JSON.parse(dataLine.slice(6)) as { status: string; source_type?: string; full_text?: string; sentences?: StoredSentence[]; error?: string }
-                      if (evt.status === 'done') {
-                        input.signal?.removeEventListener('abort', onAbort)
-                        resolve({ source_type: evt.source_type ?? 'audio', full_text: evt.full_text ?? '', sentences: evt.sentences ?? [] })
-                        return
-                      }
-                      if (evt.status === 'error') {
-                        input.signal?.removeEventListener('abort', onAbort)
-                        reject(new Error(`Transcription failed: ${evt.error || 'unknown'}`))
-                        return
-                      }
-                    } catch { /* malformed SSE line */ }
-                  }
-                  pump()
-                }).catch(reject)
-              }
-              pump()
-            }).catch(reject)
-          },
-        )
+        const transcribeResult = await this.clientTranscribeAudio(
+          input.mediaBlob,
+          input.fileName,
+          (msg, pct = 50) => log(1, msg, pct),
+          input.signal,
+        ).then((r) => ({ ...r, full_text: r.sentences.map((s) => s.text).join(' ') }))
         sentences = transcribeResult.sentences || []
         sourceType = String(transcribeResult.source_type || 'audio').trim()
         log(1, `Transcribed ${sentences.length} sentences`, 100)
@@ -840,9 +798,8 @@ export class HttpRuntimeApi implements RuntimeApi {
       }
       ensureNotAborted()
 
-      // ── Stage 4: Per-sentence TTS + client render ─────────────────
+      // ── Stage 4: Backend render (TTS + audio assembly + video) ───────────────
       if (sourceType === 'audio' || sourceType === 'video') {
-        log(3, 'Generating TTS audio…', 5)
         const voiceForCache = String(input.voiceChoice || '').trim().toLowerCase() === 'backend_svetlana' ? 'female' : 'male'
         const timedSentences = sentences.map((sent) => ({
           text_eng: sent.text,
@@ -851,57 +808,65 @@ export class HttpRuntimeApi implements RuntimeApi {
           end_ms: typeof sent.end_sec === 'number' ? Math.round(sent.end_sec * 1000) : 0,
         }))
 
-        const ttsProvider = async (idx: number, text: string): Promise<Blob> => {
-          const cacheKey = `tts_seg_${idx}_${voiceForCache}.mp3`
-          const cached = await LocalWorkspace.getAnalysisArtifactBlob(documentId, cacheKey)
-          if (cached) return cached
-          ensureNotAborted()
-          const res = await fetch(apiUrl('/api/tts-sentence'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, voiceChoice: voiceForCache }),
-            signal: input.signal,
-          })
-          if (!res.ok) throw new Error(`TTS sentence failed: HTTP ${res.status}`)
-          const blob = await normalizeBlobLike(await res.blob())
-          await LocalWorkspace.cacheAnalysisArtifactBlob(documentId, cacheKey, blob)
-          return blob
-        }
-
-        const onRenderProgress = (msg: string, pct: number): void => {
-          const normalized = String(msg || '').trim()
-          const isExportStage = normalized === 'Finalizing media artifacts' || normalized === 'Media artifacts exported'
-          log(isExportStage ? 4 : 3, normalized, pct)
-        }
+        const [existingAudio, existingVideo] = await Promise.all([
+          LocalWorkspace.getAnalysisArtifactBlob(documentId, 'translated_audio_ru.mp3'),
+          LocalWorkspace.getAnalysisArtifactBlob(documentId, 'translated_video_ru.mp4'),
+        ])
+        const needAudio = !existingAudio
+        const needVideo = !existingVideo
 
         try {
-          const rendered = await renderTranslatedMediaArtifacts({
-            sourceBlob: input.mediaBlob,
-            sourceKind: sourceType as 'audio' | 'video',
-            subtitlesMode: input.subtitlesMode || 'bilingual',
-            voiceChoice: voiceForCache,
-            sentences: timedSentences,
-            onProgress: onRenderProgress,
-            ttsProvider,
-          })
+          let audioBlob: Blob = existingAudio ?? new Blob([], { type: 'audio/mpeg' })
+          let videoBlob: Blob = existingVideo ?? new Blob([], { type: 'video/mp4' })
+          const artifactMapSrt = new Map<string, DocumentArtifact>()
 
-          if (!rendered) throw new Error('Media render returned null')
+          if (needAudio || needVideo) {
+            log(3, 'Sending to server for rendering…', 5)
+            const renderRes = await fetchWithRetry(
+              apiUrl('/api/render-media'),
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sentences: timedSentences, voice: voiceForCache, subtitlesMode: input.subtitlesMode || 'bilingual', need_audio: needAudio, need_video: needVideo }),
+                signal: input.signal,
+              },
+              { retries: 0 },
+            )
+            if (!renderRes.ok) {
+              const txt = await renderRes.text().catch(() => '')
+              throw new Error(`Backend render failed: HTTP ${renderRes.status}: ${txt}`)
+            }
+
+            log(3, 'Downloading rendered artifacts…', 50)
+            const zipBuf = await renderRes.arrayBuffer()
+            const files = parseStoredZip(zipBuf)
+
+            const getFileBytes = (name: string): ArrayBuffer => (files.get(name) ?? new Uint8Array(0)).buffer as ArrayBuffer
+            if (needAudio) audioBlob = new Blob([getFileBytes('translated_audio_ru.mp3')], { type: 'audio/mpeg' })
+            if (needVideo) videoBlob = new Blob([getFileBytes('translated_video_ru.mp4')], { type: 'video/mp4' })
+            const srtEn = new TextDecoder().decode(files.get('subtitles_en.srt') ?? new Uint8Array())
+            const srtBilingual = new TextDecoder().decode(files.get('subtitles_bilingual.srt') ?? new Uint8Array())
+            const srtTarget = new TextDecoder().decode(files.get('subtitles_target.srt') ?? new Uint8Array())
+            ensureNotAborted()
+
+            artifactMapSrt.set('subtitles_en.srt', { name: 'subtitles_en.srt', size_bytes: srtEn.length, download_url: encodeTextArtifact('text/plain', srtEn) })
+            artifactMapSrt.set('subtitles_bilingual.srt', { name: 'subtitles_bilingual.srt', size_bytes: srtBilingual.length, download_url: encodeTextArtifact('text/plain', srtBilingual) })
+            artifactMapSrt.set('subtitles_target.srt', { name: 'subtitles_target.srt', size_bytes: srtTarget.length, download_url: encodeTextArtifact('text/plain', srtTarget) })
+          }
+
           ensureNotAborted()
 
-          log(4, 'Saving audio…', 96)
-          await LocalWorkspace.cacheAnalysisArtifactBlob(documentId, 'translated_audio_ru.mp3', rendered.translatedAudio)
-          log(4, 'Saving video…', 97)
-          await LocalWorkspace.cacheAnalysisArtifactBlob(documentId, 'translated_video_ru.mp4', rendered.translatedVideo)
+          log(4, 'Saving audio…', 92)
+          if (needAudio) await LocalWorkspace.cacheAnalysisArtifactBlob(documentId, 'translated_audio_ru.mp3', audioBlob)
+          log(4, 'Saving video…', 95)
+          if (needVideo) await LocalWorkspace.cacheAnalysisArtifactBlob(documentId, 'translated_video_ru.mp4', videoBlob)
 
           const artifactMap = new Map<string, DocumentArtifact>(
             LocalWorkspace.buildDocumentArtifacts(documentId, contract).map((row) => [row.name, row]),
           )
-          artifactMap.set('subtitles_en.srt', { name: 'subtitles_en.srt', size_bytes: rendered.subtitlesEn.length, download_url: encodeTextArtifact('text/plain', rendered.subtitlesEn) })
-          artifactMap.set('subtitles_bilingual.srt', { name: 'subtitles_bilingual.srt', size_bytes: rendered.subtitlesBilingual.length, download_url: encodeTextArtifact('text/plain', rendered.subtitlesBilingual) })
-          artifactMap.set('subtitles_target.srt', { name: 'subtitles_target.srt', size_bytes: rendered.subtitlesTarget.length, download_url: encodeTextArtifact('text/plain', rendered.subtitlesTarget) })
+          for (const [k, v] of artifactMapSrt) artifactMap.set(k, v)
 
           log(4, 'Saving analysis…', 98)
-          // Final save: contractCurrent: true → file.analyzed = true
           await LocalWorkspace.upsertAnalysis({
             documentId,
             projectId: input.projectId,
@@ -915,8 +880,6 @@ export class HttpRuntimeApi implements RuntimeApi {
             artifacts: Array.from(artifactMap.values()),
             contractCurrent: true,
           })
-
-          // Persist completed settings — used by future resume detection
           await LocalWorkspace.cacheAnalysisArtifactBlob(
             documentId,
             'pipeline_settings.json',
@@ -927,14 +890,12 @@ export class HttpRuntimeApi implements RuntimeApi {
               sourceType,
             } satisfies PipelineSettings)], { type: 'application/json' }),
           )
-
           log(4, 'Artifacts saved', 100)
         } catch (renderErr) {
           if (renderErr instanceof DOMException && renderErr.name === 'AbortError') throw renderErr
+          console.error('[Render] FAILED:', renderErr instanceof Error ? renderErr.stack || renderErr.message : renderErr)
           recordRuntimeDiagnostic('api.media.backend', 'render.error', String(renderErr instanceof Error ? renderErr.message : renderErr), 'error')
           log(4, 'Media render failed — analysis saved without audio', 100)
-          // Save pipeline_settings + mark contract complete so future runs skip to 'done'
-          // (rather than re-transcribing). User can force re-render via force mode.
           try {
             await LocalWorkspace.upsertAnalysis({
               documentId, projectId: input.projectId, mediaFileId: input.mediaFileId,
@@ -943,15 +904,6 @@ export class HttpRuntimeApi implements RuntimeApi {
               artifacts: LocalWorkspace.buildDocumentArtifacts(documentId, contract),
               contractCurrent: true,
             })
-            await LocalWorkspace.cacheAnalysisArtifactBlob(
-              documentId, 'pipeline_settings.json',
-              new Blob([JSON.stringify({
-                translationProvider: input.translationProvider || 'm2m100',
-                voiceChoice: String(input.voiceChoice || 'backend_dmitry').trim().toLowerCase(),
-                subtitlesMode: input.subtitlesMode || 'bilingual',
-                sourceType,
-              } satisfies PipelineSettings)], { type: 'application/json' }),
-            )
           } catch { /* ignore secondary save failure */ }
         }
       } else {
@@ -965,11 +917,12 @@ export class HttpRuntimeApi implements RuntimeApi {
       })
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') throw err
-      const message = err instanceof Error ? err.message : String(err)
-      recordRuntimeDiagnostic('api.media.backend', 'submit.error', message, 'error')
+      const rawMessage = err instanceof Error ? err.message : String(err)
+      const message = isPwaModelMissingError(err) ? PWA_INSTALL_MESSAGE : rawMessage
+      recordRuntimeDiagnostic('api.media.backend', 'submit.error', rawMessage, 'error')
       return finish({
         result: { route: 'reject', status: 'rejected', message, stage_name: 'loading_file' },
-        ui_feedback: { severity: 'error', title: 'Processing failed', message },
+        ui_feedback: { severity: 'error', title: 'AI models not installed', message },
       })
     }
   }
@@ -1106,6 +1059,10 @@ export class HttpRuntimeApi implements RuntimeApi {
 
   async listAnalysisHistory(projectId?: string): Promise<AnalysisHistoryRow[]> {
     return await LocalWorkspace.listAnalysisHistory(projectId)
+  }
+
+  async getSourceFileBlob(mediaPath: string): Promise<Blob | null> {
+    return await LocalWorkspace.getCachedUploadedMedia(String(mediaPath || '').trim())
   }
 
   async listDocumentArtifacts(documentId: string): Promise<DocumentArtifact[]> {
