@@ -222,11 +222,20 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
             audio_path.write_bytes(mp3_bytes)
             srt_path.write_text(selected_srt, encoding="utf-8")
 
-            vf = f"subtitles={srt_path}"
+            force_style = (
+                "FontName=DejaVu Sans,FontSize=36,"
+                "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
+                "Outline=2,Shadow=0,MarginV=40,Bold=0"
+            )
+            vf = (
+                f"subtitles={srt_path}"
+                f":fontsdir=/usr/share/fonts/truetype/dejavu"
+                f":force_style='{force_style}'"
+            )
             subprocess.run(
                 [
                     "ffmpeg", "-y",
-                    "-f", "lavfi", "-i", "color=c=black:size=640x360:rate=5",
+                    "-f", "lavfi", "-i", "color=c=black:size=1280x720:rate=5",
                     "-i", str(audio_path),
                     "-vf", vf,
                     "-shortest",

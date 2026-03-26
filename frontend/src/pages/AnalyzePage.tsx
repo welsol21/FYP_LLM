@@ -571,7 +571,7 @@ export function AnalyzePage() {
                               document.body.removeChild(a)
                             }}
                           >
-                            Download {artifact.name}
+                            Download {buildExportFileName(item.file_name, item.settings, artifact.name)}
                           </a>
                         ))
                       ) : (
