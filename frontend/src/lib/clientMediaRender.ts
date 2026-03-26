@@ -248,8 +248,14 @@ async function ensureFfmpeg(onProgress?: ProgressCb): Promise<{ ffmpeg: FfmpegIn
         const coreURL = await util.toBlobURL(`${baseUrl}/ffmpeg-core.js`, 'text/javascript')
         const wasmURL = await util.toBlobURL(`${baseUrl}/ffmpeg-core.wasm`, 'application/wasm')
 
+        // classWorkerURL must point to the bundled worker served from public/ffmpeg/.
+        // Without this, Vite dev mode resolves new URL("./worker.js", import.meta.url)
+        // to /node_modules/.vite/deps/worker.js (404) — ffmpeg.load() hangs forever.
+        const workerURL = `${baseUrl}/ffmpeg-worker.js`
         await yieldToBrowser()
-        await ffmpeg.load({ coreURL, wasmURL })
+        await ffmpeg.load({ coreURL, wasmURL, classWorkerURL: workerURL })
+        ;(ffmpeg as unknown as { on: (e: string, cb: (x: { message: string }) => void) => void })
+          .on('log', ({ message }) => { if (message?.trim()) console.log('[FFmpeg-log]', message) })
         // Load DejaVuSans font into WASM VFS for drawtext subtitle rendering (Cyrillic support)
         try {
           const fontRes = await fetch(dejaVuSansUrl)
@@ -344,10 +350,10 @@ async function createSilentWavSegment(ffmpeg: FfmpegInstance, durationMs: number
     [
       '-y',
       '-f', 'lavfi',
-      '-i', 'anullsrc=r=24000:cl=mono',
+      '-i', 'anullsrc=r=16000:cl=mono',
       '-t', secondsFromMs(safeMs),
       '-ac', '1',
-      '-ar', '24000',
+      '-ar', '16000',
       '-c:a', 'pcm_s16le',
       outPath,
     ],
@@ -448,6 +454,35 @@ async function synthesizeTargetSegment(textForTts: string, sentenceIdx: number, 
   }
 }
 
+async function synthesizeTargetSegmentPcm(
+  textForTts: string,
+  sentenceIdx: number,
+  sentenceTotal: number,
+  targetRate: number,
+  onProgress?: ProgressCb,
+): Promise<{ pcm: Float32Array; text: string }> {
+  const tts = await ensureTtsPipeline(onProgress)
+  const text = String(textForTts || '').trim()
+  if (!text) {
+    throw new Error(`Translated sentence ${sentenceIdx + 1} is empty, TTS cannot continue.`)
+  }
+  const preparedText = prepareRussianTtsText(text)
+  progress(
+    onProgress,
+    `Synthesizing speech ${sentenceIdx + 1}/${sentenceTotal}`,
+    30 + Math.round(((sentenceIdx + 1) / Math.max(1, sentenceTotal)) * 24),
+  )
+  await yieldToBrowser()
+  const raw = await tts(preparedText)
+  const sampleRate = Number(raw?.sampling_rate || 16000)
+  const audio = raw?.audio instanceof Float32Array ? raw.audio : new Float32Array(0)
+  if (!audio.length) {
+    throw new Error(`TTS returned empty audio for sentence ${sentenceIdx + 1}.`)
+  }
+  const pcm = await resampleFloat32(audio, sampleRate, targetRate)
+  return { pcm, text }
+}
+
 type TimelineSegment = {
   start_ms: number
   end_ms: number
@@ -496,6 +531,51 @@ async function probeBlobDurationMs(blob: Blob): Promise<number> {
   }
 }
 
+async function resampleFloat32(pcm: Float32Array, fromRate: number, toRate: number): Promise<Float32Array> {
+  if (pcm.length === 0) return new Float32Array(0)
+  if (Math.abs(fromRate - toRate) < 1) return pcm.slice()
+  const frameCount = Math.ceil(pcm.length / fromRate * toRate)
+  if (frameCount <= 0) return new Float32Array(0)
+  const offlineCtx = new OfflineAudioContext(1, frameCount, toRate)
+  const buf = offlineCtx.createBuffer(1, pcm.length, fromRate)
+  buf.copyToChannel(pcm as Float32Array<ArrayBuffer>, 0)
+  const src = offlineCtx.createBufferSource()
+  src.buffer = buf
+  src.connect(offlineCtx.destination)
+  src.start(0)
+  const rendered = await offlineCtx.startRendering()
+  return rendered.getChannelData(0).slice()
+}
+
+async function decodeAudioBlobToBuffer(blob: Blob): Promise<AudioBuffer> {
+  const ctx = new AudioContext()
+  try {
+    const ab = await blob.arrayBuffer()
+    return await ctx.decodeAudioData(ab)
+  } finally {
+    await ctx.close().catch(() => {})
+  }
+}
+
+async function decodeBlobToPcm(blob: Blob, targetRate: number): Promise<Float32Array> {
+  const ctx = new AudioContext()
+  try {
+    const ab = await blob.arrayBuffer()
+    const decoded = await ctx.decodeAudioData(ab)
+    const mono = decoded.numberOfChannels > 1
+      ? (() => {
+          const ch0 = decoded.getChannelData(0)
+          const ch1 = decoded.getChannelData(1)
+          const mixed = new Float32Array(ch0.length)
+          for (let i = 0; i < ch0.length; i += 1) mixed[i] = (ch0[i] + ch1[i]) * 0.5
+          return mixed
+        })()
+      : decoded.getChannelData(0)
+    return await resampleFloat32(mono, decoded.sampleRate, targetRate)
+  } finally {
+    await ctx.close().catch(() => {})
+  }
+}
 
 function buildSimultaneousBilingualTimeline(windows: SentenceWindow[]): TimelineSegment[] {
   const out: TimelineSegment[] = []
@@ -581,7 +661,7 @@ const DT_MAX_CHARS = 48
 function escapeDtText(text: string): string {
   return String(text || '')
     .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
+    .replace(/'/g, '\u2019')  // right single quotation mark — avoids breaking outer ' quote at level 2
     .replace(/:/g, '\\:')
     .replace(/\[/g, '\\[')
     .replace(/\]/g, '\\]')
@@ -614,14 +694,14 @@ function buildDrawtextFilter(rows: SubtitleRow[], fontFile: string): string {
   const pushLines = (lines: string[], enable: string, bottomOffset: number): void => {
     for (let i = 0; i < lines.length; i += 1) {
       const distFromBottom = bottomOffset + (lines.length - 1 - i) * DT_LINE_HEIGHT
-      filters.push(`drawtext=${base}:text='${escapeDtText(lines[i])}':enable='${enable}':x=(w-text_w)/2:y=h-${distFromBottom}`)
+      filters.push(`drawtext=${base}:text='${escapeDtText(lines[i])}':enable=${enable}:x=(w-text_w)/2:y=h-${distFromBottom}`)
     }
   }
 
   for (const row of rows.slice(0, 120)) {
     const t0 = (Math.max(0, row.start_ms) / 1000).toFixed(3)
     const t1 = (Math.max(0, row.end_ms) / 1000).toFixed(3)
-    const enable = `between(t,${t0},${t1})`
+    const enable = `between(t\\,${t0}\\,${t1})`
     const engLines = String(row.text_eng || '').trim() ? wrapDtText(row.text_eng) : []
     const ruLines = String(row.text_ru || '').trim() ? wrapDtText(row.text_ru) : []
 
@@ -664,13 +744,16 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
     const subtitleFile = 'subs_current.srt'
     const audioFile = 'translated_audio_ru.mp3'
     const videoFile = 'translated_video_ru.mp4'
+    const TARGET_RATE = 24000
 
-    progress(input.onProgress, 'Preparing media timeline', 20)
+    // Decode entire source audio into JS memory once — like Python's AudioSegment.from_file().
+    // All sentence segments are sliced from this buffer; no per-sentence FFmpeg calls needed.
+    progress(input.onProgress, 'Decoding source audio', 20)
     await yieldToBrowser()
-    await ffmpeg.writeFile(sourceFile, await util.fetchFile(input.sourceBlob))
+    const sourceBuffer = await decodeAudioBlobToBuffer(input.sourceBlob)
 
     let currentMs = 0
-    const segmentFiles: string[] = []
+    const outputChunks: Float32Array[] = []
     const sourceSubtitleSegments: TimelineSegment[] = []
     const targetSubtitleSegments: TimelineSegment[] = []
     const sentenceWindows: SentenceWindow[] = []
@@ -693,40 +776,20 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
         if (flags.includeSource) {
           const sourceStartMs = Math.max(0, Number(row.start_ms || 0))
           const sourceEndMs = Math.max(sourceStartMs + 300, Number(row.end_ms || 0))
-          const sourceSegName = `src_${String(i + 1).padStart(4, '0')}.wav`
           progress(
             input.onProgress,
             `Rendering source segment ${i + 1}/${input.sentences.length}`,
             34 + Math.round(((i + 1) / Math.max(1, input.sentences.length)) * 12),
           )
           await yieldToBrowser()
-          await runWithProgressPulse(
-            runCommand(
-              ffmpeg,
-              [
-                '-y',
-                '-ss', secondsFromMs(sourceStartMs),
-                '-to', secondsFromMs(sourceEndMs),
-                '-i', sourceFile,
-                '-vn',
-                '-ac', '1',
-                '-ar', '24000',
-                '-c:a', 'pcm_s16le',
-                sourceSegName,
-              ],
-              `Source segment rendering ${i + 1}`,
-            ),
-            input.onProgress,
-            `Rendering source segment ${i + 1}/${input.sentences.length}`,
-            34 + Math.round((i / Math.max(1, input.sentences.length)) * 12),
-            34 + Math.round(((i + 1) / Math.max(1, input.sentences.length)) * 12),
-            900,
-          )
-          segmentFiles.push(sourceSegName)
-          const sourceBlob = await readFsBlob(ffmpeg, sourceSegName, 'audio/wav')
-          const durationMs = Math.max(300, await probeBlobDurationMs(sourceBlob) || (sourceEndMs - sourceStartMs))
+          const startSample = Math.round(sourceStartMs / 1000 * sourceBuffer.sampleRate)
+          const endSample = Math.min(sourceBuffer.length, Math.round(sourceEndMs / 1000 * sourceBuffer.sampleRate))
+          const rawPcm = sourceBuffer.getChannelData(0).slice(startSample, Math.max(startSample + 1, endSample))
+          const sourcePcm = await resampleFloat32(rawPcm, sourceBuffer.sampleRate, TARGET_RATE)
+          const durationMs = Math.max(300, Math.round(sourcePcm.length / TARGET_RATE * 1000))
           const startMs = currentMs
           const endMs = startMs + durationMs
+          outputChunks.push(sourcePcm)
           sourceSubtitleSegments.push({ start_ms: startMs, end_ms: endMs, text_eng: textEn, text_ru: '' })
           window.source_start_ms = startMs
           window.source_end_ms = endMs
@@ -741,60 +804,40 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
           if (textForTts) {
             const leadSilenceMs = flags.includeSource ? 10 : 0
             if (leadSilenceMs > 0) {
-              const leadSilenceName = `silence_lead_${String(i + 1).padStart(4, '0')}.wav`
-              await createSilentWavSegment(ffmpeg, leadSilenceMs, leadSilenceName)
-              segmentFiles.push(leadSilenceName)
+              outputChunks.push(new Float32Array(Math.round(leadSilenceMs / 1000 * TARGET_RATE)))
               currentMs += leadSilenceMs
             }
             if (flags.bilingualSimultaneous && flags.includeSource) {
-              const simSilenceName = `silence_sim_${String(i + 1).padStart(4, '0')}.wav`
-              await createSilentWavSegment(ffmpeg, 10, simSilenceName)
-              segmentFiles.push(simSilenceName)
+              outputChunks.push(new Float32Array(Math.round(10 / 1000 * TARGET_RATE)))
               currentMs += 10
             }
             await yieldToBrowser()
-            let target: { wav: Blob; durationMs: number; text: string }
+            let ttsPcm: Float32Array
+            let ttsText: string
             if (input.ttsProvider) {
-              const wav = await input.ttsProvider(i, textForTts)
-              target = { wav, durationMs: 0, text: textForTts }
+              progress(
+                input.onProgress,
+                `Normalizing translated segment ${i + 1}/${input.sentences.length}`,
+                46 + Math.round(((i + 1) / Math.max(1, input.sentences.length)) * 10),
+              )
+              const ttsBlob = await input.ttsProvider(i, textForTts)
+              ttsPcm = await decodeBlobToPcm(ttsBlob, TARGET_RATE)
+              ttsText = textForTts
             } else {
-              target = await synthesizeTargetSegment(textForTts, i, input.sentences.length, input.onProgress)
+              const result = await synthesizeTargetSegmentPcm(textForTts, i, input.sentences.length, TARGET_RATE, input.onProgress)
+              ttsPcm = result.pcm
+              ttsText = result.text
             }
-            const targetInputWavName = `tgt_in_${String(i + 1).padStart(4, '0')}.wav`
-            const targetWavName = `tgt_${String(i + 1).padStart(4, '0')}.wav`
-            await ffmpeg.writeFile(targetInputWavName, await util.fetchFile(target.wav))
-            await runWithProgressPulse(
-              runCommand(
-                ffmpeg,
-                [
-                  '-y',
-                  '-i', targetInputWavName,
-                  '-ac', '1',
-                  '-ar', '24000',
-                  '-c:a', 'pcm_s16le',
-                  targetWavName,
-                ],
-                `Target segment normalization ${i + 1}`,
-              ),
-              input.onProgress,
-              `Normalizing translated segment ${i + 1}/${input.sentences.length}`,
-              46 + Math.round((i / Math.max(1, input.sentences.length)) * 10),
-              46 + Math.round(((i + 1) / Math.max(1, input.sentences.length)) * 10),
-              900,
-            )
-            await safeDelete(ffmpeg, targetInputWavName)
-            segmentFiles.push(targetWavName)
-            const targetBlob = await readFsBlob(ffmpeg, targetWavName, 'audio/wav')
-            const targetDurationMs = Math.max(300, await probeBlobDurationMs(targetBlob) || target.durationMs)
-            const startMs = currentMs
-            const endMs = startMs + targetDurationMs
-            targetSubtitleSegments.push({ start_ms: startMs, end_ms: endMs, text_eng: '', text_ru: target.text })
-            window.target_start_ms = startMs
-            window.target_end_ms = endMs
+            const ttsStartMs = currentMs
+            const ttsEndMs = ttsStartMs + Math.max(300, Math.round(ttsPcm.length / TARGET_RATE * 1000))
+            outputChunks.push(ttsPcm)
+            targetSubtitleSegments.push({ start_ms: ttsStartMs, end_ms: ttsEndMs, text_eng: '', text_ru: ttsText })
+            window.target_start_ms = ttsStartMs
+            window.target_end_ms = ttsEndMs
             if (!flags.bilingualSimultaneous) {
-              bilingualSequentialSegments.push({ start_ms: startMs, end_ms: endMs, text_eng: '', text_ru: target.text })
+              bilingualSequentialSegments.push({ start_ms: ttsStartMs, end_ms: ttsEndMs, text_eng: '', text_ru: ttsText })
             }
-            currentMs = endMs
+            currentMs = ttsEndMs
           }
         }
 
@@ -806,45 +849,44 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
             10,
             Math.floor((Math.max(0, Number(nextRow.start_ms || 0)) - Math.max(0, Number(row.end_ms || 0))) / 3),
           )
-          const gapSegName = `silence_gap_${String(i + 1).padStart(4, '0')}.wav`
-          await createSilentWavSegment(ffmpeg, sourceGapMs, gapSegName)
-          segmentFiles.push(gapSegName)
+          outputChunks.push(new Float32Array(Math.round(sourceGapMs / 1000 * TARGET_RATE)))
           currentMs += sourceGapMs
         }
       }
 
-      if (!segmentFiles.length) {
+      if (!outputChunks.length) {
         throw new Error('No media segments were generated.')
       }
 
-      const concatFile = 'tts_concat.txt'
-      await ffmpeg.writeFile(concatFile, new TextEncoder().encode(segmentFiles.map((name) => `file '${name}'`).join('\n')))
-      progress(input.onProgress, 'Concatenating final audio track', 58)
+      // Concatenate all PCM chunks in JS memory — like Python's out.export(mp3_out).
+      progress(input.onProgress, 'Assembling audio track', 57)
       await yieldToBrowser()
+      const totalSamples = outputChunks.reduce((s, c) => s + c.length, 0)
+      const outputPcm = new Float32Array(totalSamples)
+      let pcmOffset = 0
+      for (const chunk of outputChunks) {
+        outputPcm.set(chunk, pcmOffset)
+        pcmOffset += chunk.length
+      }
+
+      // Single FFmpeg call to encode assembled PCM → MP3
+      progress(input.onProgress, 'Encoding audio track', 60)
+      await yieldToBrowser()
+      const assembledWav = rawAudioToWavBlob(outputPcm, TARGET_RATE)
+      await ffmpeg.writeFile('assembled.wav', await util.fetchFile(assembledWav))
       await runWithProgressPulse(
         runCommand(
           ffmpeg,
-          [
-            '-y',
-            '-f', 'concat',
-            '-safe', '0',
-            '-i', concatFile,
-            '-ac', '1',
-            '-ar', '24000',
-            '-c:a', 'libmp3lame',
-            '-q:a', '2',
-            audioFile,
-          ],
-          'Final audio concatenation',
+          ['-y', '-i', 'assembled.wav', '-ac', '1', '-ar', String(TARGET_RATE), '-c:a', 'libmp3lame', '-q:a', '2', audioFile],
+          'Audio encoding',
         ),
         input.onProgress,
-        'Concatenating final audio track',
-        58,
-        68,
+        'Encoding audio track',
+        60,
+        70,
         900,
       )
-      await safeDelete(ffmpeg, concatFile)
-      for (const name of segmentFiles) await safeDelete(ffmpeg, name)
+      await safeDelete(ffmpeg, 'assembled.wav')
 
       const subtitlesEnRows = sourceSubtitleSegments.length > 0 ? sourceSubtitleSegments : bilingualSequentialSegments
       const simultaneousRows = flags.bilingualSimultaneous ? buildSimultaneousBilingualTimeline(sentenceWindows) : []
@@ -875,9 +917,16 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
       }
       await ffmpeg.writeFile(subtitleFile, new TextEncoder().encode(selectedSubtitle))
 
+      // For video sources write the source file to WASM FS now (needed for video track extraction).
+      // For audio sources it is never written — saves ~5MB of WASM heap during the audio loop.
+      if (input.sourceKind === 'video') {
+        await ffmpeg.writeFile(sourceFile, await util.fetchFile(input.sourceBlob))
+      }
+
       progress(input.onProgress, 'Composing video track', 74)
       await yieldToBrowser()
       const subsFilter = ffmpegFontLoaded ? buildDrawtextFilter(selectedSubtitleRows, '/DejaVuSans.ttf') : ''
+      console.log('[Render] subsFilter length:', subsFilter.length, 'rows:', selectedSubtitleRows.length)
       const vfArgs = subsFilter ? ['-vf', subsFilter] : []
       const videoArgs = input.sourceKind === 'video'
         ? [

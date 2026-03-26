@@ -529,7 +529,21 @@ export function AnalyzePage() {
                     <div className="artifact-actions">
                       {item.artifacts.length > 0 ? (
                         item.artifacts.map((artifact) => (
-                          <a key={`${item.file_id}-${artifact.name}`} className="top-link" href={artifact.download_url} download={artifact.name}>
+                          <a
+                            key={`${item.file_id}-${artifact.name}`}
+                            className="top-link"
+                            href={artifact.download_url}
+                            download={artifact.name}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              const a = document.createElement('a')
+                              a.href = artifact.download_url
+                              a.download = artifact.name
+                              document.body.appendChild(a)
+                              a.click()
+                              document.body.removeChild(a)
+                            }}
+                          >
                             Download {artifact.name}
                           </a>
                         ))
