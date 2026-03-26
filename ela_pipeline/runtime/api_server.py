@@ -223,9 +223,9 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
             srt_path.write_text(selected_srt, encoding="utf-8")
 
             force_style = (
-                "FontName=DejaVu Sans,FontSize=36,"
+                "FontName=DejaVu Sans,FontSize=22,"
                 "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
-                "Outline=2,Shadow=0,MarginV=40,Bold=0"
+                "Outline=2,Shadow=0,MarginV=30,Bold=0"
             )
             vf = (
                 f"subtitles={srt_path}"
