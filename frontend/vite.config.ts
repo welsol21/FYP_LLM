@@ -36,6 +36,8 @@ function onnxWasmPlugin() {
   const onnxFiles = [
     'ort-wasm-simd-threaded.wasm',
     'ort-wasm-simd-threaded.mjs',
+    'ort-wasm-simd-threaded.jsep.mjs',
+    'ort-wasm-simd-threaded.jsep.wasm',
   ]
   return {
     name: 'onnx-wasm-copy',
