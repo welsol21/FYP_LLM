@@ -662,10 +662,14 @@ export class HttpRuntimeApi implements RuntimeApi {
       let resumeSourceType: string | null = null
 
       if (!input.forceFullReprocess) {
-        const [sentBlob, settBlob] = await Promise.all([
+        // Also check variantDocId for sentences.json — migration path for data saved
+        // before the stage-scoped key split (old code stored sentences under variantDocId).
+        const [sentBlobNew, sentBlobLegacy, settBlob] = await Promise.all([
           LocalWorkspace.getAnalysisArtifactBlob(immutableDocId, 'sentences.json'),
+          LocalWorkspace.getAnalysisArtifactBlob(documentId, 'sentences.json'),
           LocalWorkspace.getAnalysisArtifactBlob(documentId, 'pipeline_settings.json'),
         ])
+        const sentBlob = sentBlobNew ?? sentBlobLegacy
 
         if (settBlob) {
           // pipeline_settings.json only exists after a fully successful run for this variant
@@ -673,7 +677,9 @@ export class HttpRuntimeApi implements RuntimeApi {
         } else if (sentBlob) {
           const prevSentences = JSON.parse(await sentBlob.text()) as StoredSentence[]
           if (prevSentences.length > 0) {
+            // Fallback: old code stored the contract under variantDocId
             const rawAnalysis = await LocalWorkspace.getRawAnalysis(contractDocId)
+              ?? await LocalWorkspace.getRawAnalysis(documentId)
             if (rawAnalysis && Object.keys(rawAnalysis.contract).length > 0) {
               resumeSentences = prevSentences
               resumeContract = rawAnalysis.contract
