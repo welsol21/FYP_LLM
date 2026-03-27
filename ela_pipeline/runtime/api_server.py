@@ -200,26 +200,21 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
         is_simultaneous = subtitles_mode == "bilingual_simultaneous"
 
         if source_pcm is not None and subtitles_mode not in ("target", "source"):
-            # Bilingual (sequential or simultaneous): source segment → TTS per sentence.
-            # Subtitle timestamps track output sample position — no offset math needed.
+            # Bilingual assembly — matches reference (transcribe_and_translate_windows.py):
+            # • Start directly at first sentence (no pre-sentence gap)
+            # • Between sentences: 1/3-length silence (not source audio)
+            # • No tail after last sentence
             chunks: list[np.ndarray] = []
             src_len = len(source_pcm)
-            cursor = 0
             out_samples = 0  # running output position in samples
 
-            for sent, tts_pcm in zip(sentences, tts_pcms):
+            for idx, (sent, tts_pcm) in enumerate(zip(sentences, tts_pcms)):
                 start_s = int(max(0, int(sent.get("start_ms") or 0)) / 1000 * TARGET_RATE)
                 end_s = min(int(max(0, int(sent.get("end_ms") or 0)) / 1000 * TARGET_RATE), src_len)
                 en = str(sent.get("text_eng") or "").strip()
                 ru = str(sent.get("text_ru") or "").strip()
 
-                # Gap — preserve original audio, advance out_samples
-                if start_s > cursor:
-                    gap = source_pcm[cursor:start_s]
-                    chunks.append(gap)
-                    out_samples += len(gap)
-
-                # Source segment
+                # Source segment (extracted clip, no leading/trailing gaps)
                 seg_start_ms = int(out_samples / TARGET_RATE * 1000)
                 if end_s > start_s:
                     seg = source_pcm[start_s:end_s]
@@ -247,11 +242,13 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                     if ru and tts_end_ms > seg_end_ms:
                         video_srt_entries.append((seg_end_ms, tts_end_ms, ru))
 
-                cursor = end_s
-
-            # Remaining source audio after last sentence
-            if cursor < src_len:
-                chunks.append(source_pcm[cursor:])
+                # Inter-sentence gap → 1/3-length silence (matches reference)
+                if idx < len(sentences) - 1:
+                    next_start_s = int(max(0, int(sentences[idx + 1].get("start_ms") or 0)) / 1000 * TARGET_RATE)
+                    gap_s = max(0, next_start_s - end_s)
+                    silence_s = max(gap_s // 3, int(0.01 * TARGET_RATE))  # min 10 ms
+                    chunks.append(np.zeros(silence_s, dtype=np.float32))
+                    out_samples += silence_s
 
             output_pcm = np.concatenate(chunks) if chunks else source_pcm
 
