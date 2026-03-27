@@ -91,7 +91,7 @@ self.addEventListener('message', async (event: MessageEvent) => {
     const CHUNK_S = 30, STRIDE_S = 5
     const jump = (CHUNK_S - 2 * STRIDE_S) * sampling_rate
     const totalChunks = Math.max(1, Math.ceil(audio.length / jump))
-    self.postMessage({ type: 'progress', id, message: 'Transcribing… 0%', pct: 0 })
+    self.postMessage({ type: 'progress', id, message: 'Transcribing…', pct: 0 })
     let chunksProcessed = 0
     let lastMilestone = 0
     const streamer = new TextStreamer(t.tokenizer, {
