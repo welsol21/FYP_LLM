@@ -197,8 +197,10 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
         # video_srt_entries: (start_ms, end_ms, text) in OUTPUT audio time
         video_srt_entries: "list[tuple[int,int,str]]" = []
 
-        if source_pcm is not None and subtitles_mode != "target":
-            # Bilingual sequential: source segment → TTS per sentence.
+        is_simultaneous = subtitles_mode == "bilingual_simultaneous"
+
+        if source_pcm is not None and subtitles_mode not in ("target", "source"):
+            # Bilingual (sequential or simultaneous): source segment → TTS per sentence.
             # Subtitle timestamps track output sample position — no offset math needed.
             chunks: list[np.ndarray] = []
             src_len = len(source_pcm)
@@ -217,24 +219,33 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                     chunks.append(gap)
                     out_samples += len(gap)
 
-                # Source segment — subtitle: EN text (or EN for bilingual)
+                # Source segment
+                seg_start_ms = int(out_samples / TARGET_RATE * 1000)
                 if end_s > start_s:
                     seg = source_pcm[start_s:end_s]
-                    seg_start_ms = int(out_samples / TARGET_RATE * 1000)
                     chunks.append(seg)
                     out_samples += len(seg)
-                    seg_end_ms = int(out_samples / TARGET_RATE * 1000)
-                    if en:
-                        video_srt_entries.append((seg_start_ms, seg_end_ms, en))
+                seg_end_ms = int(out_samples / TARGET_RATE * 1000)
 
-                # TTS — subtitle: RU text (bilingual mode only)
+                # TTS
+                tts_end_ms = seg_end_ms
                 if tts_pcm is not None and len(tts_pcm) > 0:
-                    tts_start_ms = int(out_samples / TARGET_RATE * 1000)
                     chunks.append(tts_pcm)
                     out_samples += len(tts_pcm)
                     tts_end_ms = int(out_samples / TARGET_RATE * 1000)
-                    if subtitles_mode != "source" and ru:
-                        video_srt_entries.append((tts_start_ms, tts_end_ms, ru))
+
+                # Build subtitle entries
+                if is_simultaneous:
+                    # Both EN (top) and RU (bottom) for the full sentence+TTS span
+                    text = f"{en}\n{ru}" if en and ru else (en or ru)
+                    if text:
+                        video_srt_entries.append((seg_start_ms, tts_end_ms, text))
+                else:
+                    # Sequential: EN during source segment, RU during TTS
+                    if en and seg_end_ms > seg_start_ms:
+                        video_srt_entries.append((seg_start_ms, seg_end_ms, en))
+                    if ru and tts_end_ms > seg_end_ms:
+                        video_srt_entries.append((seg_end_ms, tts_end_ms, ru))
 
                 cursor = end_s
 
