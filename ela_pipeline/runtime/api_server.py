@@ -261,13 +261,15 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
 
                 # ── Subtitle entries at output positions ─────────────────────
                 if is_simultaneous:
-                    # EN top ({\an8}), RU bottom ({\an2}), same time span.
-                    # Two separate ASS events — different screen positions.
+                    # EN upper-middle, RU lower-middle — both in the centre zone of
+                    # the 1280×720 frame (not at the very top/bottom edges).
+                    # \an8 = top-anchor → pos y is the top of the text block.
+                    # \an2 = bottom-anchor → pos y is the bottom of the text block.
                     if en:
-                        video_srt_entries.append((pos_en, end_all_ms, r'{\an8}' + en))
+                        video_srt_entries.append((pos_en, end_all_ms, r'{\an8\pos(640,250)}' + en))
                         en_out_entries.append((pos_en, end_all_ms, en))
                     if ru:
-                        video_srt_entries.append((pos_en, end_all_ms, r'{\an2}' + ru))
+                        video_srt_entries.append((pos_en, end_all_ms, r'{\an2\pos(640,470)}' + ru))
                         ru_out_entries.append((pos_en, end_all_ms, ru))
                 else:
                     # Sequential: EN during source clip (center), RU during TTS (center)
