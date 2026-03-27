@@ -169,17 +169,28 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
     if need_audio or need_video:
         async def _tts(text: str, sem: asyncio.Semaphore) -> bytes:
             import edge_tts as _edge_tts
-            async with sem:
-                with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
-                    tmp = Path(f.name)
-                try:
-                    await _edge_tts.Communicate(text, voice_name).save(str(tmp))
-                    return tmp.read_bytes()
-                finally:
-                    tmp.unlink(missing_ok=True)
+            # Retry up to 3 times (matches reference try_generate_tts).
+            # Returns b"" on permanent failure so one bad sentence doesn't
+            # abort the entire render.
+            for attempt in range(3):
+                async with sem:
+                    with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+                        tmp = Path(f.name)
+                    try:
+                        await _edge_tts.Communicate(text, voice_name).save(str(tmp))
+                        data = tmp.read_bytes()
+                        if data:
+                            return data
+                    except Exception as _tts_err:
+                        print(f"[TTS] attempt {attempt+1}/3 failed: {_tts_err}")
+                    finally:
+                        tmp.unlink(missing_ok=True)
+                if attempt < 2:
+                    await asyncio.sleep(1.5)
+            return b""
 
         async def _generate_all() -> list[bytes]:
-            sem = asyncio.Semaphore(8)
+            sem = asyncio.Semaphore(4)
             async def _empty() -> bytes:
                 return b""
             tasks = [
