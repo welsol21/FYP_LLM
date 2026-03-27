@@ -57,17 +57,45 @@ function groupChunksToSentences(
   let end = 0
 
   for (const chunk of chunks) {
-    const text = String(chunk.text || '').trim()
-    if (!text) continue
-    if (start === null) start = chunk.timestamp[0] ?? 0
-    end = chunk.timestamp[1] ?? end
-    buf += (buf ? ' ' : '') + text
-    if (/[.!?]['"»]?\s*$/.test(buf)) {
-      sentences.push({ text: buf.trim(), start_sec: start ?? 0, end_sec: end })
-      buf = ''
-      start = null
+    const rawText = String(chunk.text || '').trim()
+    if (!rawText) continue
+
+    const chunkStart = chunk.timestamp[0] ?? 0
+    const chunkEnd = chunk.timestamp[1] ?? end
+
+    // Split chunk text at sentence boundaries.
+    // Pass 1: split at ANY .!? followed by space + uppercase.
+    // Pass 2: re-join splits that occurred at known abbreviations (Mr., Mrs., Dr., …).
+    const ABBREVS = new Set(['Mr', 'Mrs', 'Dr', 'Ms', 'Prof', 'Sr', 'Jr', 'St', 'vs', 'No'])
+    const rawParts = rawText.split(/(?<=[.!?]["'»]?)\s+(?=[A-Z])/)
+    const parts: string[] = []
+    let cur = rawParts[0] ?? ''
+    for (let i = 1; i < rawParts.length; i++) {
+      const lastWord = (cur.match(/([A-Za-z]+)[.!?]["'»]?\s*$/) ?? [])[1] ?? ''
+      if (ABBREVS.has(lastWord)) {
+        cur += ' ' + rawParts[i]
+      } else {
+        parts.push(cur)
+        cur = rawParts[i]
+      }
+    }
+    if (cur) parts.push(cur)
+
+    for (const part of parts) {
+      const t = part.trim()
+      if (!t) continue
+      if (start === null) start = chunkStart
+      end = chunkEnd
+      buf += (buf ? ' ' : '') + t
+      // Flush when buffer ends with sentence-terminating punctuation
+      if (/[.!?]["'»]?\s*$/.test(buf)) {
+        sentences.push({ text: buf.trim(), start_sec: start, end_sec: end })
+        buf = ''
+        start = null
+      }
     }
   }
+
   if (buf.trim() && start !== null) {
     sentences.push({ text: buf.trim(), start_sec: start, end_sec: end })
   }
