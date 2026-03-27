@@ -237,7 +237,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                 # Build subtitle entries
                 if is_simultaneous:
                     # Both EN (top) and RU (bottom) for the full sentence+TTS span
-                    text = f"{en}\n{ru}" if en and ru else (en or ru)
+                    text = f"{en}\n\n{ru}" if en and ru else (en or ru)
                     if text:
                         video_srt_entries.append((seg_start_ms, tts_end_ms, text))
                 else:
@@ -339,7 +339,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
             force_style = (
                 "FontName=DejaVu Sans,FontSize=22,"
                 "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
-                "Outline=2,Shadow=0,MarginV=30,Bold=0"
+                "Outline=2,Shadow=0,Alignment=5,Bold=0"
             )
             vf = (
                 f"subtitles={srt_path}"
