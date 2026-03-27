@@ -193,33 +193,48 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
             _decode_audio(b) if b else None for b in tts_blobs
         ]
 
-        # ── 3. Assemble bilingual PCM ──────────────────────────────────────────
-        tts_durations_ms: "list[int]" = []  # per-sentence TTS duration in ms (for SRT shift)
+        # ── 3. Assemble bilingual PCM; track output positions for video SRT ──────
+        # video_srt_entries: (start_ms, end_ms, text) in OUTPUT audio time
+        video_srt_entries: "list[tuple[int,int,str]]" = []
+
         if source_pcm is not None and subtitles_mode != "target":
-            # Bilingual sequential: each source segment followed by its TTS.
-            # Gap audio (silence/music between sentences) is preserved verbatim.
+            # Bilingual sequential: source segment → TTS per sentence.
+            # Subtitle timestamps track output sample position — no offset math needed.
             chunks: list[np.ndarray] = []
             src_len = len(source_pcm)
-            cursor = 0  # sample position in output so far
+            cursor = 0
+            out_samples = 0  # running output position in samples
 
             for sent, tts_pcm in zip(sentences, tts_pcms):
                 start_s = int(max(0, int(sent.get("start_ms") or 0)) / 1000 * TARGET_RATE)
                 end_s = min(int(max(0, int(sent.get("end_ms") or 0)) / 1000 * TARGET_RATE), src_len)
+                en = str(sent.get("text_eng") or "").strip()
+                ru = str(sent.get("text_ru") or "").strip()
 
-                # Gap before this sentence (preserve original audio)
+                # Gap — preserve original audio, advance out_samples
                 if start_s > cursor:
-                    chunks.append(source_pcm[cursor:start_s])
+                    gap = source_pcm[cursor:start_s]
+                    chunks.append(gap)
+                    out_samples += len(gap)
 
-                # Source sentence segment
+                # Source segment — subtitle: EN text (or EN for bilingual)
                 if end_s > start_s:
-                    chunks.append(source_pcm[start_s:end_s])
+                    seg = source_pcm[start_s:end_s]
+                    seg_start_ms = int(out_samples / TARGET_RATE * 1000)
+                    chunks.append(seg)
+                    out_samples += len(seg)
+                    seg_end_ms = int(out_samples / TARGET_RATE * 1000)
+                    if en:
+                        video_srt_entries.append((seg_start_ms, seg_end_ms, en))
 
-                # TTS translation right after
-                tts_dur_ms = 0
+                # TTS — subtitle: RU text (bilingual mode only)
                 if tts_pcm is not None and len(tts_pcm) > 0:
+                    tts_start_ms = int(out_samples / TARGET_RATE * 1000)
                     chunks.append(tts_pcm)
-                    tts_dur_ms = int(len(tts_pcm) / TARGET_RATE * 1000)
-                tts_durations_ms.append(tts_dur_ms)
+                    out_samples += len(tts_pcm)
+                    tts_end_ms = int(out_samples / TARGET_RATE * 1000)
+                    if subtitles_mode != "source" and ru:
+                        video_srt_entries.append((tts_start_ms, tts_end_ms, ru))
 
                 cursor = end_s
 
@@ -231,6 +246,14 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
 
         elif subtitles_mode == "source" and source_pcm is not None:
             output_pcm = source_pcm
+            for sent in sentences:
+                en = str(sent.get("text_eng") or "").strip()
+                if en:
+                    video_srt_entries.append((
+                        max(0, int(sent.get("start_ms") or 0)),
+                        max(300, int(sent.get("end_ms") or 0)),
+                        en,
+                    ))
 
         else:
             # Target-only: TTS at original sentence positions, no source audio
@@ -243,6 +266,13 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                 if end_sample > len(output_pcm):
                     output_pcm = np.concatenate([output_pcm, np.zeros(end_sample - len(output_pcm), dtype=np.float32)])
                 output_pcm[start_sample:end_sample] = tts_pcm
+                ru = str(sent.get("text_ru") or "").strip()
+                if ru:
+                    video_srt_entries.append((
+                        max(0, int(sent.get("start_ms") or 0)),
+                        max(300, int(sent.get("end_ms") or 0)),
+                        ru,
+                    ))
 
     # ── 3. Encode assembled PCM → MP3 (needed for audio or video) ────────────
     mp3_bytes = b""
@@ -259,50 +289,41 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
     srt_bilingual = _build_srt(sentences, "bilingual")
     srt_target = _build_srt(sentences, "target")
 
-    # For bilingual/source modes with interleaved TTS, shift subtitle timestamps
-    # by the accumulated TTS durations so subtitles stay in sync with the audio.
-    def _build_shifted_srt(mode: str) -> str:
-        if not tts_durations_ms:
-            return _build_srt(sentences, mode)
-        blocks: list[str] = []
-        cue = 1
-        accumulated_ms = 0
-        for sent, tts_dur_ms in zip(sentences, tts_durations_ms):
-            start_ms = max(0, int(sent.get("start_ms") or 0)) + accumulated_ms
-            end_ms = max(start_ms + 300, int(sent.get("end_ms") or 0) + accumulated_ms)
-            en = str(sent.get("text_eng") or "").strip()
-            ru = str(sent.get("text_ru") or "").strip()
-            ts = f"{_format_srt_time(start_ms)} --> {_format_srt_time(end_ms)}"
-            if mode == "source":
-                if en:
-                    blocks.append(f"{cue}\n{ts}\n{en}\n"); cue += 1
-            elif mode == "bilingual":
-                if en and ru:
-                    blocks.append(f"{cue}\n{ts}\n{en}\n{ru}\n"); cue += 1
-                elif en:
-                    blocks.append(f"{cue}\n{ts}\n{en}\n"); cue += 1
-                elif ru:
-                    blocks.append(f"{cue}\n{ts}\n{ru}\n"); cue += 1
-            accumulated_ms += tts_dur_ms
+    # Video SRT uses output-time positions tracked during PCM assembly
+    def _entries_to_srt(entries: "list[tuple[int,int,str]]") -> str:
+        blocks = []
+        for cue, (start_ms, end_ms, text) in enumerate(entries, 1):
+            end_ms = max(start_ms + 300, end_ms)
+            blocks.append(f"{cue}\n{_format_srt_time(start_ms)} --> {_format_srt_time(end_ms)}\n{text}\n")
         return "\n".join(blocks)
 
-    if subtitles_mode == "target":
-        selected_srt = srt_target
-    elif subtitles_mode == "source":
-        selected_srt = _build_shifted_srt("source")
-    else:
-        selected_srt = _build_shifted_srt("bilingual")
+    selected_srt = _entries_to_srt(video_srt_entries)
 
-    # ── 5. Compose video: black background + audio + subtitles ────────────────
+    # ── 5. Compose video: static black frame + audio + subtitles ─────────────
+    # Use -loop 1 with a single black image (matches reference), so -shortest
+    # reliably terminates at the audio stream end without libass duration hints.
     mp4_bytes = b""
     if need_video:
         tmpdir = Path(tempfile.mkdtemp())
         try:
             audio_path = tmpdir / "audio.mp3"
             srt_path = tmpdir / "subs.srt"
+            black_path = tmpdir / "black.png"
             video_path = tmpdir / "output.mp4"
             audio_path.write_bytes(mp3_bytes)
             srt_path.write_text(selected_srt, encoding="utf-8")
+
+            # Generate single black 1280×720 frame
+            subprocess.run(
+                ["ffmpeg", "-y", "-f", "lavfi", "-i", "color=c=black:size=1280x720",
+                 "-vframes", "1", str(black_path)],
+                capture_output=True, check=True,
+            )
+
+            # Compute exact audio duration from PCM to cap video precisely.
+            # Neither -shortest nor lavfi duration hints are reliable when the
+            # subtitles filter is in the pipeline — explicit -t is the only fix.
+            audio_duration_s = len(output_pcm) / TARGET_RATE if output_pcm is not None else 0.0
 
             force_style = (
                 "FontName=DejaVu Sans,FontSize=22,"
@@ -317,10 +338,11 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
             subprocess.run(
                 [
                     "ffmpeg", "-y",
-                    "-f", "lavfi", "-i", "color=c=black:size=1280x720:rate=5",
+                    "-loop", "1", "-framerate", "5", "-i", str(black_path),
                     "-i", str(audio_path),
+                    "-t", f"{audio_duration_s:.3f}",
                     "-vf", vf,
-                    "-shortest",
+                    "-map", "0:v", "-map", "1:a",
                     "-c:v", "libx264", "-pix_fmt", "yuv420p",
                     "-preset", "ultrafast", "-tune", "stillimage", "-crf", "28",
                     "-c:a", "aac", "-b:a", "128k",
