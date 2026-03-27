@@ -300,15 +300,38 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
     srt_bilingual = _build_srt(sentences, "bilingual")
     srt_target = _build_srt(sentences, "target")
 
-    # Video SRT uses output-time positions tracked during PCM assembly
-    def _entries_to_srt(entries: "list[tuple[int,int,str]]") -> str:
-        blocks = []
-        for cue, (start_ms, end_ms, text) in enumerate(entries, 1):
-            end_ms = max(start_ms + 300, end_ms)
-            blocks.append(f"{cue}\n{_format_srt_time(start_ms)} --> {_format_srt_time(end_ms)}\n{text}\n")
-        return "\n".join(blocks)
+    # Video subtitles use ASS format: supports Alignment=5 (middle-center) and \N\N (blank line)
+    def _format_ass_time(ms: int) -> str:
+        ms = max(0, int(ms))
+        h, rem = divmod(ms, 3600000)
+        m, rem = divmod(rem, 60000)
+        s, ms_rem = divmod(rem, 1000)
+        cs = ms_rem // 10
+        return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
-    selected_srt = _entries_to_srt(video_srt_entries)
+    def _entries_to_ass(entries: "list[tuple[int,int,str]]") -> str:
+        header = (
+            "[Script Info]\nScriptType: v4.00+\nPlayResX: 1280\nPlayResY: 720\n\n"
+            "[V4+ Styles]\n"
+            "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
+            "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+            "Alignment, MarginL, MarginR, MarginV, Encoding\n"
+            "Style: Default,DejaVu Sans,22,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,"
+            "0,0,0,0,100,100,0,0,1,2,0,5,10,10,10,1\n\n"
+            "[Events]\n"
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        )
+        lines = [header]
+        for start_ms, end_ms, text in entries:
+            end_ms = max(start_ms + 300, end_ms)
+            ass_text = text.replace("\n", "\\N")
+            lines.append(
+                f"Dialogue: 0,{_format_ass_time(start_ms)},{_format_ass_time(end_ms)}"
+                f",Default,,0,0,0,,{ass_text}\n"
+            )
+        return "".join(lines)
+
+    selected_ass = _entries_to_ass(video_srt_entries)
 
     # ── 5. Compose video: static black frame + audio + subtitles ─────────────
     # Use -loop 1 with a single black image (matches reference), so -shortest
@@ -318,11 +341,11 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
         tmpdir = Path(tempfile.mkdtemp())
         try:
             audio_path = tmpdir / "audio.mp3"
-            srt_path = tmpdir / "subs.srt"
+            ass_path = tmpdir / "subs.ass"
             black_path = tmpdir / "black.png"
             video_path = tmpdir / "output.mp4"
             audio_path.write_bytes(mp3_bytes)
-            srt_path.write_text(selected_srt, encoding="utf-8")
+            ass_path.write_text(selected_ass, encoding="utf-8")
 
             # Generate single black 1280×720 frame
             subprocess.run(
@@ -336,16 +359,8 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
             # subtitles filter is in the pipeline — explicit -t is the only fix.
             audio_duration_s = len(output_pcm) / TARGET_RATE if output_pcm is not None else 0.0
 
-            force_style = (
-                "FontName=DejaVu Sans,FontSize=22,"
-                "PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,"
-                "Outline=2,Shadow=0,Alignment=5,Bold=0"
-            )
-            vf = (
-                f"subtitles={srt_path}"
-                f":fontsdir=/usr/share/fonts/truetype/dejavu"
-                f":force_style='{force_style}'"
-            )
+            safe_ass = str(ass_path).replace("\\", "\\\\").replace(":", "\\:")
+            vf = f"ass='{safe_ass}'"
             subprocess.run(
                 [
                     "ffmpeg", "-y",
