@@ -822,12 +822,23 @@ export class HttpRuntimeApi implements RuntimeApi {
 
           if (needAudio || needVideo) {
             log(3, 'Sending to server for rendering…', 5)
+            const form = new FormData()
+            form.append('meta', JSON.stringify({
+              sentences: timedSentences,
+              voice: voiceForCache,
+              subtitlesMode: input.subtitlesMode || 'bilingual',
+              need_audio: needAudio,
+              need_video: needVideo,
+            }))
+            try {
+              const srcBlob = await LocalWorkspace.getCachedUploadedMedia(input.mediaPath)
+              if (srcBlob) form.append('audio', srcBlob, 'source.bin')
+            } catch { /* non-fatal — backend falls back to TTS-only */ }
             const renderRes = await fetchWithRetry(
               apiUrl('/api/render-media'),
               {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sentences: timedSentences, voice: voiceForCache, subtitlesMode: input.subtitlesMode || 'bilingual', need_audio: needAudio, need_video: needVideo }),
+                body: form,
                 signal: input.signal,
               },
               { retries: 0 },

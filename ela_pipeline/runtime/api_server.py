@@ -135,8 +135,8 @@ def _build_srt(sentences: list[dict], mode: str) -> str:
     return "\n".join(blocks)
 
 
-def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: str, need_audio: bool = True, need_video: bool = True) -> bytes:
-    """Generate TTS → assemble audio → compose video → return ZIP bytes."""
+def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: str, need_audio: bool = True, need_video: bool = True, source_audio_bytes: bytes = b"") -> bytes:
+    """Generate TTS → assemble bilingual audio → compose video → return ZIP bytes."""
     import asyncio
     import io
     import shutil
@@ -149,7 +149,22 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
     TARGET_RATE = 24000
     voice_name = "ru-RU-SvetlanaNeural" if voice.startswith("f") else "ru-RU-DmitryNeural"
 
-    # ── 1. Generate TTS + assemble PCM (only if audio or video needed) ────────
+    def _decode_audio(raw_bytes: bytes) -> np.ndarray:
+        proc = subprocess.run(
+            ["ffmpeg", "-i", "pipe:0", "-f", "f32le", "-ar", str(TARGET_RATE), "-ac", "1", "pipe:1"],
+            input=raw_bytes, capture_output=True,
+        )
+        return np.frombuffer(proc.stdout, dtype=np.float32).copy()
+
+    # ── 1. Decode source audio if provided ────────────────────────────────────
+    source_pcm: "np.ndarray | None" = None
+    if source_audio_bytes:
+        try:
+            source_pcm = _decode_audio(source_audio_bytes)
+        except Exception:
+            source_pcm = None
+
+    # ── 2. Generate TTS (only if audio or video needed) ───────────────────────
     output_pcm: "np.ndarray | None" = None
     if need_audio or need_video:
         async def _tts(text: str, sem: asyncio.Semaphore) -> bytes:
@@ -174,26 +189,56 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
             return list(await asyncio.gather(*tasks, return_exceptions=False))
 
         tts_blobs: list[bytes] = asyncio.run(_generate_all())
+        tts_pcms: list["np.ndarray | None"] = [
+            _decode_audio(b) if b else None for b in tts_blobs
+        ]
 
-        # ── 2. Decode each TTS blob to float32 PCM and assemble with timing ───
-        def _decode_mp3(mp3_bytes: bytes) -> np.ndarray:
-            proc = subprocess.run(
-                ["ffmpeg", "-i", "pipe:0", "-f", "f32le", "-ar", str(TARGET_RATE), "-ac", "1", "pipe:1"],
-                input=mp3_bytes, capture_output=True,
-            )
-            return np.frombuffer(proc.stdout, dtype=np.float32).copy()
+        # ── 3. Assemble bilingual PCM ──────────────────────────────────────────
+        if source_pcm is not None and subtitles_mode != "target":
+            # Bilingual sequential: each source segment followed by its TTS.
+            # Gap audio (silence/music between sentences) is preserved verbatim.
+            chunks: list[np.ndarray] = []
+            src_len = len(source_pcm)
+            cursor = 0  # sample position in output so far
 
-        output_pcm = np.zeros(TARGET_RATE, dtype=np.float32)  # start with 1s of silence
+            for sent, tts_pcm in zip(sentences, tts_pcms):
+                start_s = int(max(0, int(sent.get("start_ms") or 0)) / 1000 * TARGET_RATE)
+                end_s = min(int(max(0, int(sent.get("end_ms") or 0)) / 1000 * TARGET_RATE), src_len)
 
-        for sent, blob in zip(sentences, tts_blobs):
-            if not blob:
-                continue
-            pcm = _decode_mp3(blob)
-            start_sample = int(max(0, int(sent.get("start_ms") or 0)) / 1000 * TARGET_RATE)
-            end_sample = start_sample + len(pcm)
-            if end_sample > len(output_pcm):
-                output_pcm = np.concatenate([output_pcm, np.zeros(end_sample - len(output_pcm), dtype=np.float32)])
-            output_pcm[start_sample:end_sample] = pcm
+                # Gap before this sentence (preserve original audio)
+                if start_s > cursor:
+                    chunks.append(source_pcm[cursor:start_s])
+
+                # Source sentence segment
+                if end_s > start_s:
+                    chunks.append(source_pcm[start_s:end_s])
+
+                # TTS translation right after
+                if tts_pcm is not None and len(tts_pcm) > 0:
+                    chunks.append(tts_pcm)
+
+                cursor = end_s
+
+            # Remaining source audio after last sentence
+            if cursor < src_len:
+                chunks.append(source_pcm[cursor:])
+
+            output_pcm = np.concatenate(chunks) if chunks else source_pcm
+
+        elif subtitles_mode == "source" and source_pcm is not None:
+            output_pcm = source_pcm
+
+        else:
+            # Target-only: TTS at original sentence positions, no source audio
+            output_pcm = np.zeros(TARGET_RATE, dtype=np.float32)
+            for sent, tts_pcm in zip(sentences, tts_pcms):
+                if tts_pcm is None:
+                    continue
+                start_sample = int(max(0, int(sent.get("start_ms") or 0)) / 1000 * TARGET_RATE)
+                end_sample = start_sample + len(tts_pcm)
+                if end_sample > len(output_pcm):
+                    output_pcm = np.concatenate([output_pcm, np.zeros(end_sample - len(output_pcm), dtype=np.float32)])
+                output_pcm[start_sample:end_sample] = tts_pcm
 
     # ── 3. Encode assembled PCM → MP3 (needed for audio or video) ────────────
     mp3_bytes = b""
@@ -455,6 +500,46 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
             self._send_json({"fileName": safe_name, "mediaPath": str(save_path), "sizeBytes": len(data)})
             return
 
+        if path == "/api/render-media":
+            source_audio_bytes = b""
+            if "multipart/form-data" in content_type:
+                form = cgi.FieldStorage(
+                    fp=self.rfile,
+                    headers=self.headers,
+                    environ={"REQUEST_METHOD": "POST", "CONTENT_TYPE": content_type},
+                )
+                meta_raw = form["meta"].value if "meta" in form else "{}"
+                try:
+                    body = json.loads(meta_raw)
+                except json.JSONDecodeError:
+                    body = {}
+                if "audio" in form:
+                    try:
+                        source_audio_bytes = form["audio"].file.read()
+                    except Exception:
+                        source_audio_bytes = b""
+            else:
+                body = self._read_json_body()
+            sentences = body.get("sentences") or []
+            voice = str(body.get("voice") or "male").strip().lower()
+            subtitles_mode = str(body.get("subtitlesMode") or "bilingual").strip()
+            need_audio = bool(body.get("need_audio", True))
+            need_video = bool(body.get("need_video", True))
+            if not sentences:
+                self._send_json({"error": "sentences is required"}, status=400)
+                return
+            try:
+                zip_bytes = _render_media_artifacts(sentences, voice, subtitles_mode, need_audio=need_audio, need_video=need_video, source_audio_bytes=source_audio_bytes)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/zip")
+                self.send_header("Content-Length", str(len(zip_bytes)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(zip_bytes)
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=500)
+            return
+
         body = self._read_json_body()
         if path == "/api/submit-media":
             media_path = str(body.get("mediaPath") or body.get("media_path") or "").strip()
@@ -653,27 +738,6 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(exc)}, status=400)
                 return
             self._send_json(payload)
-            return
-
-        if path == "/api/render-media":
-            sentences = body.get("sentences") or []
-            voice = str(body.get("voice") or "male").strip().lower()
-            subtitles_mode = str(body.get("subtitlesMode") or "bilingual").strip()
-            need_audio = bool(body.get("need_audio", True))
-            need_video = bool(body.get("need_video", True))
-            if not sentences:
-                self._send_json({"error": "sentences is required"}, status=400)
-                return
-            try:
-                zip_bytes = _render_media_artifacts(sentences, voice, subtitles_mode, need_audio=need_audio, need_video=need_video)
-                self.send_response(200)
-                self.send_header("Content-Type", "application/zip")
-                self.send_header("Content-Length", str(len(zip_bytes)))
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(zip_bytes)
-            except Exception as exc:
-                self._send_json({"error": str(exc)}, status=500)
             return
 
         self._send_json({"error": "Not found"}, status=404)
