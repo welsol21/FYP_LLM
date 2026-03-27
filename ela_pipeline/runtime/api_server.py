@@ -316,7 +316,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
             "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
             "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
             "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-            "Style: Default,DejaVu Sans,22,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,"
+            "Style: Default,DejaVu Sans,32,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,"
             "0,0,0,0,100,100,0,0,1,2,0,5,10,10,10,1\n\n"
             "[Events]\n"
             "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
@@ -360,7 +360,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
             audio_duration_s = len(output_pcm) / TARGET_RATE if output_pcm is not None else 0.0
 
             safe_ass = str(ass_path).replace("\\", "\\\\").replace(":", "\\:")
-            vf = f"ass='{safe_ass}'"
+            vf = f"ass='{safe_ass}':fontsdir=/usr/share/fonts/truetype/dejavu"
             subprocess.run(
                 [
                     "ffmpeg", "-y",
