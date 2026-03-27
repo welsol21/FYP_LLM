@@ -194,6 +194,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
         ]
 
         # ── 3. Assemble bilingual PCM ──────────────────────────────────────────
+        tts_durations_ms: "list[int]" = []  # per-sentence TTS duration in ms (for SRT shift)
         if source_pcm is not None and subtitles_mode != "target":
             # Bilingual sequential: each source segment followed by its TTS.
             # Gap audio (silence/music between sentences) is preserved verbatim.
@@ -214,8 +215,11 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                     chunks.append(source_pcm[start_s:end_s])
 
                 # TTS translation right after
+                tts_dur_ms = 0
                 if tts_pcm is not None and len(tts_pcm) > 0:
                     chunks.append(tts_pcm)
+                    tts_dur_ms = int(len(tts_pcm) / TARGET_RATE * 1000)
+                tts_durations_ms.append(tts_dur_ms)
 
                 cursor = end_s
 
@@ -254,7 +258,40 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
     srt_en = _build_srt(sentences, "source")
     srt_bilingual = _build_srt(sentences, "bilingual")
     srt_target = _build_srt(sentences, "target")
-    selected_srt = {"source": srt_en, "target": srt_target}.get(subtitles_mode, srt_bilingual)
+
+    # For bilingual/source modes with interleaved TTS, shift subtitle timestamps
+    # by the accumulated TTS durations so subtitles stay in sync with the audio.
+    def _build_shifted_srt(mode: str) -> str:
+        if not tts_durations_ms:
+            return _build_srt(sentences, mode)
+        blocks: list[str] = []
+        cue = 1
+        accumulated_ms = 0
+        for sent, tts_dur_ms in zip(sentences, tts_durations_ms):
+            start_ms = max(0, int(sent.get("start_ms") or 0)) + accumulated_ms
+            end_ms = max(start_ms + 300, int(sent.get("end_ms") or 0) + accumulated_ms)
+            en = str(sent.get("text_eng") or "").strip()
+            ru = str(sent.get("text_ru") or "").strip()
+            ts = f"{_format_srt_time(start_ms)} --> {_format_srt_time(end_ms)}"
+            if mode == "source":
+                if en:
+                    blocks.append(f"{cue}\n{ts}\n{en}\n"); cue += 1
+            elif mode == "bilingual":
+                if en and ru:
+                    blocks.append(f"{cue}\n{ts}\n{en}\n{ru}\n"); cue += 1
+                elif en:
+                    blocks.append(f"{cue}\n{ts}\n{en}\n"); cue += 1
+                elif ru:
+                    blocks.append(f"{cue}\n{ts}\n{ru}\n"); cue += 1
+            accumulated_ms += tts_dur_ms
+        return "\n".join(blocks)
+
+    if subtitles_mode == "target":
+        selected_srt = srt_target
+    elif subtitles_mode == "source":
+        selected_srt = _build_shifted_srt("source")
+    else:
+        selected_srt = _build_shifted_srt("bilingual")
 
     # ── 5. Compose video: black background + audio + subtitles ────────────────
     mp4_bytes = b""
