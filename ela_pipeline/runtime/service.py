@@ -1318,7 +1318,7 @@ class RuntimeMediaService:
             }
 
         selected_provider = effective_translation_provider
-        if selected_provider and selected_provider not in {"m2m100", "our", "backend", "default"}:
+        if selected_provider and selected_provider not in {"our", "backend", "default"}:
             normalized_selected_provider = _normalize_provider_key(selected_provider) or "overlay_provider"
             sentence_total = max(len(pipeline.media_sentences), 1)
             for idx, row in enumerate(pipeline.media_sentences):
@@ -2141,7 +2141,7 @@ class RuntimeMediaService:
                         for _idx, _row in enumerate(media_sentences, start=1):
                             _text_en = str(_row.get("sentence_text") or _row.get("text_eng") or "").strip()
                             _text_ru = str(_row.get("text_ru") or "").strip()
-                            _text_for_tts = _text_ru or _text_en
+                            _text_for_tts = _text_ru  # never fall back to English for Russian TTS
                             if _text_for_tts:
                                 tts_coros.append(_one(_idx, _text_for_tts))
                         await asyncio.gather(*tts_coros, return_exceptions=True)
