@@ -675,6 +675,8 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(zip_bytes)
             except Exception as exc:
+                import traceback as _tb
+                _tb.print_exc()
                 self._send_json({"error": str(exc)}, status=500)
             return
 
