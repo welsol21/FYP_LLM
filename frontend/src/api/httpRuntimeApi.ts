@@ -213,7 +213,24 @@ function normalizeContractError(errorMessage: string): string {
   return 'Project service is unavailable. Check internet access and service URL.'
 }
 
-async function computeDocumentId(
+// Stage-scoped document IDs so that caching at each pipeline stage
+// is invalidated only by the parameters that stage actually depends on.
+//
+//  immutableDocId  = hash(fileName)                          — Whisper output
+//  contractDocId   = hash(fileName | translationProvider)    — contracts + translations
+//  variantDocId    = hash(fileName | provider | voice | subs)— TTS audio + video + done-marker
+async function computeImmutableDocId(fileName: string): Promise<string> {
+  const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(fileName))
+  return Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function computeContractDocId(fileName: string, translationProvider: string): Promise<string> {
+  const input = `${fileName}|${translationProvider}`
+  const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+  return Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function computeVariantDocId(
   fileName: string,
   settings: { translationProvider: string; voiceChoice: string; subtitlesMode: string },
 ): Promise<string> {
@@ -623,17 +640,21 @@ export class HttpRuntimeApi implements RuntimeApi {
       recordRuntimeDiagnostic('api.media.backend', 'submit.start', { mediaPath: input.mediaPath, fileName: input.fileName })
 
       // ── Resume detection ──────────────────────────────────────────
-      // documentId = SHA-256(fileContent | translationProvider | voiceChoice | subtitlesMode)
-      // Same file + same settings always produces the same documentId, so cached artifacts
-      // are reused across sessions/projects/browser restarts without any history scan.
+      // Three stage-scoped IDs so each stage is invalidated only by what it depends on:
+      //   immutableDocId  — Whisper output (sentences.json): only file name
+      //   contractDocId   — contracts + translations: file + provider
+      //   documentId      — TTS audio/video + done-marker: all settings (variant)
       // resumePoint: 'full' = run everything; 'translation' = reuse transcription+contracts;
       //              'tts' = reuse transcription+contracts+translations; 'done' = early exit
+      const provider = input.translationProvider || 'm2m100'
       const docIdSettings = {
-        translationProvider: input.translationProvider || 'm2m100',
+        translationProvider: provider,
         voiceChoice: String(input.voiceChoice || 'backend_dmitry').trim().toLowerCase(),
         subtitlesMode: input.subtitlesMode || 'bilingual',
       }
-      const documentId = await computeDocumentId(input.fileName, docIdSettings)
+      const immutableDocId = await computeImmutableDocId(input.fileName)
+      const contractDocId = await computeContractDocId(input.fileName, provider)
+      const documentId = await computeVariantDocId(input.fileName, docIdSettings)
       let resumePoint: 'full' | 'translation' | 'tts' | 'done' = 'full'
       let resumeSentences: StoredSentence[] | null = null
       let resumeContract: VisualizerPayload | null = null
@@ -642,17 +663,17 @@ export class HttpRuntimeApi implements RuntimeApi {
 
       if (!input.forceFullReprocess) {
         const [sentBlob, settBlob] = await Promise.all([
-          LocalWorkspace.getAnalysisArtifactBlob(documentId, 'sentences.json'),
+          LocalWorkspace.getAnalysisArtifactBlob(immutableDocId, 'sentences.json'),
           LocalWorkspace.getAnalysisArtifactBlob(documentId, 'pipeline_settings.json'),
         ])
 
         if (settBlob) {
-          // pipeline_settings.json only exists after a fully successful run
+          // pipeline_settings.json only exists after a fully successful run for this variant
           resumePoint = 'done'
         } else if (sentBlob) {
           const prevSentences = JSON.parse(await sentBlob.text()) as StoredSentence[]
           if (prevSentences.length > 0) {
-            const rawAnalysis = await LocalWorkspace.getRawAnalysis(documentId)
+            const rawAnalysis = await LocalWorkspace.getRawAnalysis(contractDocId)
             if (rawAnalysis && Object.keys(rawAnalysis.contract).length > 0) {
               resumeSentences = prevSentences
               resumeContract = rawAnalysis.contract
@@ -716,9 +737,9 @@ export class HttpRuntimeApi implements RuntimeApi {
         log(1, `Transcribed ${sentences.length} sentences`, 100)
         ensureNotAborted()
 
-        // Persist sentences for future resume (pipeline_settings saved only on full success)
+        // Persist sentences under immutableDocId — independent of voice/subs/provider
         await LocalWorkspace.cacheAnalysisArtifactBlob(
-          documentId,
+          immutableDocId,
           'sentences.json',
           new Blob([JSON.stringify(sentences)], { type: 'application/json' }),
         )
@@ -756,9 +777,9 @@ export class HttpRuntimeApi implements RuntimeApi {
         log(2, `Contracts built (${Object.keys(contract).length}/${total})`, 45)
         ensureNotAborted()
 
-        // Intermediate save — contractCurrent: false keeps file.analyzed = false until pipeline completes
+        // Intermediate save under contractDocId — shared across voice/subs variants
         await LocalWorkspace.upsertAnalysis({
-          documentId,
+          documentId: contractDocId,
           projectId: input.projectId,
           mediaFileId: input.mediaFileId,
           fileName: input.fileName,
@@ -767,7 +788,7 @@ export class HttpRuntimeApi implements RuntimeApi {
           durationSeconds: input.durationSec,
           settings: input.settings,
           contract,
-          artifacts: LocalWorkspace.buildDocumentArtifacts(documentId, contract),
+          artifacts: LocalWorkspace.buildDocumentArtifacts(contractDocId, contract),
           contractCurrent: false,
         })
       } else {
@@ -785,7 +806,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         if (sentenceKeys.length > 0) {
           log(2, `Translating sentences (0/${sentenceKeys.length})...`, 50)
           translations = await this.clientTranslateAnalysis(
-            documentId,
+            contractDocId,
             contract,
             (done, ttl) => log(2, `Translating sentences (${done}/${ttl})`, 50 + Math.round((done / Math.max(ttl, 1)) * 48)),
             input.signal,
@@ -795,6 +816,23 @@ export class HttpRuntimeApi implements RuntimeApi {
           })
         }
         log(2, 'Translation complete', 100)
+        // Save translated contract at contractDocId so future runs with a different
+        // voice/subtitles can resume from 'tts' without re-translating.
+        if (Object.keys(translations).length > 0) {
+          await LocalWorkspace.upsertAnalysis({
+            documentId: contractDocId,
+            projectId: input.projectId,
+            mediaFileId: input.mediaFileId,
+            fileName: input.fileName,
+            filePath: input.mediaPath,
+            sizeBytes: input.sizeBytes,
+            durationSeconds: input.durationSec,
+            settings: input.settings,
+            contract,
+            artifacts: LocalWorkspace.buildDocumentArtifacts(contractDocId, contract),
+            contractCurrent: false,
+          }).catch(() => { /* best-effort */ })
+        }
       }
       ensureNotAborted()
 
