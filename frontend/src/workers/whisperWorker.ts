@@ -62,7 +62,7 @@ function groupChunksToSentences(
     if (start === null) start = chunk.timestamp[0] ?? 0
     end = chunk.timestamp[1] ?? end
     buf += (buf ? ' ' : '') + text
-    if (/[.!?](\s|$)/.test(buf)) {
+    if (/[.!?]['"»]?\s*$/.test(buf)) {
       sentences.push({ text: buf.trim(), start_sec: start ?? 0, end_sec: end })
       buf = ''
       start = null
