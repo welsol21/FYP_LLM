@@ -196,17 +196,26 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
         # ── 3. Assemble bilingual PCM; track output positions for video SRT ──────
         # video_srt_entries: (start_ms, end_ms, text) in OUTPUT audio time
         video_srt_entries: "list[tuple[int,int,str]]" = []
+        en_out_entries:    "list[tuple[int,int,str]]" = []
+        ru_out_entries:    "list[tuple[int,int,str]]" = []
 
         is_simultaneous = subtitles_mode == "bilingual_simultaneous"
 
         if source_pcm is not None and subtitles_mode not in ("target", "source"):
-            # Bilingual assembly — matches reference (transcribe_and_translate_windows.py):
-            # • Start directly at first sentence (no pre-sentence gap)
-            # • Between sentences: 1/3-length silence (not source audio)
+            # Bilingual assembly — exact match of reference generate_outputs():
+            # • Start at first sentence (no pre-sentence gap)
+            # • eng_audio → 10 ms silence → tts_audio per sentence
+            # • Inter-sentence: 1/3-length silence
             # • No tail after last sentence
+            # • Track EN and RU output positions separately for correct SRT/ASS
             chunks: list[np.ndarray] = []
             src_len = len(source_pcm)
             out_samples = 0  # running output position in samples
+            SILENCE_10MS = int(0.01 * TARGET_RATE)  # 10 ms gap between eng and TTS
+
+            # Per-sentence output-time entries for all three SRT variants
+            en_out_entries:  "list[tuple[int,int,str]]" = []
+            ru_out_entries:  "list[tuple[int,int,str]]" = []
 
             for idx, (sent, tts_pcm) in enumerate(zip(sentences, tts_pcms)):
                 start_s = int(max(0, int(sent.get("start_ms") or 0)) / 1000 * TARGET_RATE)
@@ -214,39 +223,54 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                 en = str(sent.get("text_eng") or "").strip()
                 ru = str(sent.get("text_ru") or "").strip()
 
-                # Source segment (extracted clip, no leading/trailing gaps)
-                seg_start_ms = int(out_samples / TARGET_RATE * 1000)
+                # ── English source clip ──────────────────────────────────────
+                pos_en = int(out_samples / TARGET_RATE * 1000)
+                dur_e = 0
                 if end_s > start_s:
                     seg = source_pcm[start_s:end_s]
                     chunks.append(seg)
                     out_samples += len(seg)
-                seg_end_ms = int(out_samples / TARGET_RATE * 1000)
+                    dur_e = len(seg)
+                end_en_ms = int(out_samples / TARGET_RATE * 1000)
 
-                # TTS
-                tts_end_ms = seg_end_ms
+                # 10 ms silence between eng and TTS (matches reference)
+                chunks.append(np.zeros(SILENCE_10MS, dtype=np.float32))
+                out_samples += SILENCE_10MS
+
+                # ── Russian TTS ──────────────────────────────────────────────
+                pos_ru = int(out_samples / TARGET_RATE * 1000)
+                dur_r = 0
                 if tts_pcm is not None and len(tts_pcm) > 0:
                     chunks.append(tts_pcm)
                     out_samples += len(tts_pcm)
-                    tts_end_ms = int(out_samples / TARGET_RATE * 1000)
+                    dur_r = len(tts_pcm)
+                end_ru_ms = int(out_samples / TARGET_RATE * 1000)
 
-                # Build subtitle entries
+                end_all_ms = end_ru_ms  # span covers eng + 10ms + tts
+
+                # ── Subtitle entries at output positions ─────────────────────
                 if is_simultaneous:
-                    # Both EN (top) and RU (bottom) for the full sentence+TTS span
-                    text = f"{en}\n\n{ru}" if en and ru else (en or ru)
-                    if text:
-                        video_srt_entries.append((seg_start_ms, tts_end_ms, text))
+                    # EN and RU shown together for the full span (pos_en → end_all_ms)
+                    if en:
+                        video_srt_entries.append((pos_en, end_all_ms, en))
+                        en_out_entries.append((pos_en, end_all_ms, en))
+                    if ru:
+                        video_srt_entries.append((pos_en, end_all_ms, ru))
+                        ru_out_entries.append((pos_en, end_all_ms, ru))
                 else:
-                    # Sequential: EN during source segment, RU during TTS
-                    if en and seg_end_ms > seg_start_ms:
-                        video_srt_entries.append((seg_start_ms, seg_end_ms, en))
-                    if ru and tts_end_ms > seg_end_ms:
-                        video_srt_entries.append((seg_end_ms, tts_end_ms, ru))
+                    # Sequential: EN during source clip, RU during TTS
+                    if en and dur_e > 0:
+                        video_srt_entries.append((pos_en, end_en_ms, en))
+                        en_out_entries.append((pos_en, end_en_ms, en))
+                    if ru and dur_r > 0:
+                        video_srt_entries.append((pos_ru, end_ru_ms, ru))
+                        ru_out_entries.append((pos_ru, end_ru_ms, ru))
 
                 # Inter-sentence gap → 1/3-length silence (matches reference)
                 if idx < len(sentences) - 1:
                     next_start_s = int(max(0, int(sentences[idx + 1].get("start_ms") or 0)) / 1000 * TARGET_RATE)
                     gap_s = max(0, next_start_s - end_s)
-                    silence_s = max(gap_s // 3, int(0.01 * TARGET_RATE))  # min 10 ms
+                    silence_s = max(gap_s // 3, SILENCE_10MS)
                     chunks.append(np.zeros(silence_s, dtype=np.float32))
                     out_samples += silence_s
 
@@ -293,9 +317,40 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
         mp3_bytes = proc.stdout
 
     # ── 4. Build SRT files ─────────────────────────────────────────────────────
-    srt_en = _build_srt(sentences, "source")
-    srt_bilingual = _build_srt(sentences, "bilingual")
-    srt_target = _build_srt(sentences, "target")
+    # For bilingual modes the output audio is compressed (no pre/post gaps,
+    # 1/3 inter-sentence silence), so SRT must use output-relative positions.
+    # For source/target modes the output audio preserves original timing.
+    def _entries_to_srt(entries: "list[tuple[int,int,str]]") -> str:
+        blocks = []
+        for cue, (start_ms, end_ms, text) in enumerate(entries, 1):
+            end_ms = max(start_ms + 300, end_ms)
+            blocks.append(f"{cue}\n{_format_srt_time(start_ms)} --> {_format_srt_time(end_ms)}\n{text}\n")
+        return "\n".join(blocks)
+
+    if subtitles_mode not in ("source", "target"):
+        # Build bilingual SRT: EN+RU per sentence at output positions
+        bilingual_out_entries: "list[tuple[int,int,str]]" = []
+        en_idx = ru_idx = 0
+        while en_idx < len(en_out_entries) or ru_idx < len(ru_out_entries):
+            en_e = en_out_entries[en_idx] if en_idx < len(en_out_entries) else None
+            ru_e = ru_out_entries[ru_idx] if ru_idx < len(ru_out_entries) else None
+            if en_e and ru_e and en_e[0] == ru_e[0]:
+                # Simultaneous pair at same start time
+                bilingual_out_entries.append((en_e[0], max(en_e[1], ru_e[1]), f"{en_e[2]}\n{ru_e[2]}"))
+                en_idx += 1; ru_idx += 1
+            elif en_e and (not ru_e or en_e[0] < ru_e[0]):
+                bilingual_out_entries.append(en_e)
+                en_idx += 1
+            else:
+                bilingual_out_entries.append(ru_e)  # type: ignore[arg-type]
+                ru_idx += 1
+        srt_en = _entries_to_srt(en_out_entries)
+        srt_bilingual = _entries_to_srt(bilingual_out_entries)
+        srt_target = _entries_to_srt(ru_out_entries)
+    else:
+        srt_en = _build_srt(sentences, "source")
+        srt_bilingual = _build_srt(sentences, "bilingual")
+        srt_target = _build_srt(sentences, "target")
 
     # Video subtitles use ASS format: supports Alignment=5 (middle-center) and \N\N (blank line)
     def _format_ass_time(ms: int) -> str:
