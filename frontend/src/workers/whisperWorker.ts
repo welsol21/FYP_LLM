@@ -48,6 +48,21 @@ async function getTranscriber(onProgress: (msg: string) => void): Promise<any> {
   return transcriber
 }
 
+// Known title abbreviations that should NOT trigger a sentence flush.
+const ABBREVS = new Set(['Mr', 'Mrs', 'Dr', 'Ms', 'Prof', 'Sr', 'Jr', 'St', 'vs', 'No'])
+
+/**
+ * Groups word-level Whisper chunks into sentences.
+ *
+ * With return_timestamps:"word" each chunk is a single word with its own
+ * precise timestamp — matching the reference transcribe_and_translate_windows.py
+ * algorithm (word_timestamps=True → group_units_by_sentence).
+ *
+ * start_sec = timestamp of the first word in the sentence
+ * end_sec   = timestamp of the last word in the sentence
+ * These per-sentence timestamps are non-overlapping and accurate, so the
+ * backend can extract the correct source-audio slice for each sentence.
+ */
 function groupChunksToSentences(
   chunks: Array<{ text: string; timestamp: [number | null, number | null] }>,
 ): Array<{ text: string; start_sec: number; end_sec: number }> {
@@ -57,38 +72,21 @@ function groupChunksToSentences(
   let end = 0
 
   for (const chunk of chunks) {
-    const rawText = String(chunk.text || '').trim()
-    if (!rawText) continue
+    const word = String(chunk.text || '').trim()
+    if (!word) continue
 
     const chunkStart = chunk.timestamp[0] ?? 0
     const chunkEnd = chunk.timestamp[1] ?? end
 
-    // Split chunk text at sentence boundaries.
-    // Pass 1: split at ANY .!? followed by space + uppercase.
-    // Pass 2: re-join splits that occurred at known abbreviations (Mr., Mrs., Dr., …).
-    const ABBREVS = new Set(['Mr', 'Mrs', 'Dr', 'Ms', 'Prof', 'Sr', 'Jr', 'St', 'vs', 'No'])
-    const rawParts = rawText.split(/(?<=[.!?]["'»]?)\s+(?=[A-Z])/)
-    const parts: string[] = []
-    let cur = rawParts[0] ?? ''
-    for (let i = 1; i < rawParts.length; i++) {
-      const lastWord = (cur.match(/([A-Za-z]+)[.!?]["'»]?\s*$/) ?? [])[1] ?? ''
-      if (ABBREVS.has(lastWord)) {
-        cur += ' ' + rawParts[i]
-      } else {
-        parts.push(cur)
-        cur = rawParts[i]
-      }
-    }
-    if (cur) parts.push(cur)
+    if (start === null) start = chunkStart
+    end = chunkEnd
+    buf += (buf ? ' ' : '') + word
 
-    for (const part of parts) {
-      const t = part.trim()
-      if (!t) continue
-      if (start === null) start = chunkStart
-      end = chunkEnd
-      buf += (buf ? ' ' : '') + t
-      // Flush when buffer ends with sentence-terminating punctuation
-      if (/[.!?]["'»]?\s*$/.test(buf)) {
+    // Flush when buf ends with sentence-terminating punctuation,
+    // but NOT when the last word is a known abbreviation (Mr., Dr., etc.)
+    if (/[.!?]["'»]?\s*$/.test(buf)) {
+      const lastWord = (buf.match(/([A-Za-z]+)[.!?]["'»]?\s*$/) ?? [])[1] ?? ''
+      if (!ABBREVS.has(lastWord)) {
         sentences.push({ text: buf.trim(), start_sec: start, end_sec: end })
         buf = ''
         start = null
@@ -127,7 +125,11 @@ self.addEventListener('message', async (event: MessageEvent) => {
       skip_special_tokens: true,
     })
     const result: any = await t(audio, {
-      return_timestamps: true,
+      // Word-level timestamps — each chunk is one word with its own precise
+      // start/end time.  Matches reference word_timestamps=True behaviour:
+      // non-overlapping per-sentence timestamps so backend extracts each
+      // source-audio slice exactly once.
+      return_timestamps: 'word',
       chunk_length_s: CHUNK_S,
       stride_length_s: STRIDE_S,
       streamer,
