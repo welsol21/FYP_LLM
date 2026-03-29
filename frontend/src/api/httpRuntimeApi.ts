@@ -655,6 +655,13 @@ export class HttpRuntimeApi implements RuntimeApi {
       const immutableDocId = await computeImmutableDocId(input.fileName)
       const contractDocId = await computeContractDocId(input.fileName, provider)
       const documentId = await computeVariantDocId(input.fileName, docIdSettings)
+      recordRuntimeDiagnostic('api.media.resume', 'docids', {
+        fileName: input.fileName,
+        provider,
+        immutableDocId,
+        contractDocId,
+        variantDocId: documentId,
+      })
       let resumePoint: 'full' | 'translation' | 'tts' | 'done' = 'full'
       let resumeSentences: StoredSentence[] | null = null
       let resumeContract: VisualizerPayload | null = null
@@ -666,6 +673,14 @@ export class HttpRuntimeApi implements RuntimeApi {
           LocalWorkspace.getAnalysisArtifactBlob(immutableDocId, 'sentences.json'),
           LocalWorkspace.getAnalysisArtifactBlob(documentId, 'pipeline_settings.json'),
         ])
+
+        recordRuntimeDiagnostic('api.media.resume', 'blobs', {
+          immutableDocId,
+          contractDocId,
+          variantDocId: documentId,
+          hasSentBlob: !!sentBlob,
+          hasSettBlob: !!settBlob,
+        })
 
         if (settBlob) {
           // pipeline_settings.json only exists after a fully successful run for this variant
@@ -694,7 +709,15 @@ export class HttpRuntimeApi implements RuntimeApi {
               } else {
                 resumePoint = 'translation'
               }
+            } else {
+              recordRuntimeDiagnostic('api.media.resume', 'no-contract', {
+                contractDocId,
+                hasRawAnalysis: !!rawAnalysis,
+                contractKeys: rawAnalysis ? Object.keys(rawAnalysis.contract).length : 0,
+              })
             }
+          } else {
+            recordRuntimeDiagnostic('api.media.resume', 'empty-sentences', { immutableDocId, sentBlobSize: sentBlob.size })
           }
         }
       }
@@ -743,6 +766,7 @@ export class HttpRuntimeApi implements RuntimeApi {
           'sentences.json',
           new Blob([JSON.stringify(sentences)], { type: 'application/json' }),
         )
+        recordRuntimeDiagnostic('api.media.resume', 'sentences-saved', { immutableDocId, count: sentences.length })
       } else {
         sentences = resumeSentences!
         sourceType = resumeSourceType ?? 'audio'
