@@ -791,6 +791,7 @@ export class HttpRuntimeApi implements RuntimeApi {
               })
               if (result.sentence_node && sent.text) contract[sent.text] = result.sentence_node
             } catch (err) {
+              if (err instanceof DOMException && err.name === 'AbortError') throw err
               recordRuntimeDiagnostic('api.media.backend', 'sentence-contract.error', String(err instanceof Error ? err.message : err), 'error')
             }
             contractsDone++
@@ -1020,8 +1021,10 @@ export class HttpRuntimeApi implements RuntimeApi {
     if (!AudioCtx) throw new Error('AudioContext is unavailable in this browser.')
     const audioCtx = new AudioCtx()
     const arrayBuffer = await mediaBlob.arrayBuffer()
+    if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
     const decoded = await audioCtx.decodeAudioData(arrayBuffer)
     await audioCtx.close().catch(() => undefined)
+    if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
 
     // Resample to 16 kHz mono using OfflineAudioContext
     const TARGET_SR = 16_000
