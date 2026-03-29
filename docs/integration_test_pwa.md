@@ -182,13 +182,11 @@ omit the file).
 ## After Successful Test → Deploy
 
 ```bash
-# Merge dev → master
-git checkout master && git merge dev && git push
+# Merge dev → master and push
+git checkout master && git merge dev && git push && git checkout dev && git push
 
-# On server:
-ssh ela
-cd /opt/ela
-docker compose down && docker compose up --build -d
+# On server (git pull is required — the server builds from its local repo):
+ssh ela "cd /opt/ela && git pull && docker compose down && docker compose up --build -d"
 ```
 
 The Docker build downloads models automatically (`DOWNLOAD_MODELS=1` default
