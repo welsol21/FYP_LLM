@@ -710,10 +710,15 @@ export class HttpRuntimeApi implements RuntimeApi {
                 resumePoint = 'translation'
               }
             } else {
+              // sentences.json exists but contract was lost (interrupted run after Whisper, before stage 2)
+              // Skip Whisper, keep resumePoint='full' so contracts are rebuilt from scratch
+              resumeSentences = prevSentences
+              resumeSourceType = 'audio'
               recordRuntimeDiagnostic('api.media.resume', 'no-contract', {
                 contractDocId,
                 hasRawAnalysis: !!rawAnalysis,
                 contractKeys: rawAnalysis ? Object.keys(rawAnalysis.contract).length : 0,
+                action: 'skip-whisper-rebuild-contracts',
               })
             }
           } else {
@@ -745,7 +750,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       let sourceType: string
       let contract: VisualizerPayload
 
-      if (resumePoint === 'full') {
+      if (resumePoint === 'full' && resumeSentences === null) {
         const durationMin = Math.round((input.durationSec ?? 0) / 60)
         const timeHint = durationMin > 2 ? ` (~${durationMin * 2}–${durationMin * 4} min on CPU)` : ''
         log(1, `Loading Whisper model…${timeHint}`, 3)

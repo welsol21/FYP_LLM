@@ -1033,7 +1033,7 @@ export const LocalWorkspace = {
       await saveRawState(state)
     }
     const rows = state.analyses
-      .filter((a) => !projectId || a.project_id === projectId)
+      .filter((a) => (!projectId || a.project_id === projectId) && a.contract_current !== false)
       .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))
       .map((row) => {
         const { contract: _contract, artifacts: _artifacts, ...rest } = row
