@@ -841,6 +841,7 @@ export class HttpRuntimeApi implements RuntimeApi {
             (done, ttl) => log(2, `Translating sentences (${done}/${ttl})`, 50 + Math.round((done / Math.max(ttl, 1)) * 48)),
             input.signal,
           ).catch((err: unknown) => {
+            if (err instanceof DOMException && err.name === 'AbortError') throw err
             recordRuntimeDiagnostic('api.media.backend', 'translate.error', String(err instanceof Error ? err.message : err), 'error')
             return {}
           })

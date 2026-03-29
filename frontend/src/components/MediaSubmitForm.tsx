@@ -111,6 +111,7 @@ export function MediaSubmitForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (currentControllerRef.current) return  // already running — block duplicate submission
     const controller = new AbortController()
     currentControllerRef.current = controller
     setSubmitting(true)
