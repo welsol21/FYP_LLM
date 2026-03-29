@@ -633,6 +633,14 @@ button {
   margin-top: 10px;
 }
 
+.artifact-actions > * {
+  word-break: break-all;
+  white-space: normal;
+  height: auto;
+  min-height: var(--touch-min);
+  text-align: center;
+}
+
 .analysis-history {
   display: grid;
   gap: 12px;
