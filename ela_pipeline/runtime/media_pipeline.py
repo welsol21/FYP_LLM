@@ -110,6 +110,8 @@ def _detect_source_type(path: Path) -> str:
         return "text"
     if suffix in {".pdf"}:
         return "pdf"
+    if suffix in {".docx", ".doc"}:
+        return "docx"
     if suffix in {".mp3", ".wav", ".m4a", ".flac", ".ogg"}:
         return "audio"
     if suffix in {".mp4", ".mkv", ".mov", ".avi", ".webm"}:
@@ -265,6 +267,15 @@ def _extract_text_and_sentence_chunks(
             if page_text:
                 chunks.append(page_text)
         return "\n".join(chunks).strip(), []
+
+    if source_type == "docx":
+        try:
+            import docx as _docx  # type: ignore[import-not-found]
+        except Exception as exc:  # pragma: no cover
+            raise RuntimeError("DOCX extraction requires `python-docx` dependency.") from exc
+        doc = _docx.Document(str(source_path))
+        paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+        return "\n".join(paragraphs).strip(), []
 
     if source_type in {"audio", "video"}:
         model_name = os.getenv("ELA_MEDIA_ASR_MODEL", "base").strip() or "base"

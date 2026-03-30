@@ -129,6 +129,7 @@ export function MediaSubmitForm({
         forceFullReprocess: processingMode === 'force',
         onProgress,
         signal: controller.signal,
+        translatorOptions: translatorOptions.map((p) => ({ id: p.id, credentials: (p as any).credentials || {} })),
       })
       if (controller.signal.aborted) {
         // Abort raced with normal completion — still treat as cancelled

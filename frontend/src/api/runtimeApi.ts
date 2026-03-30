@@ -189,6 +189,7 @@ export interface RuntimeApi {
     forceFullReprocess?: boolean
     onProgress?: (payload: MediaProgressPayload) => void
     signal?: AbortSignal
+    translatorOptions?: { id: string; credentials: Record<string, string> }[]
   }): Promise<MediaSubmissionPayload>
   getTranslationConfig(): Promise<TranslationConfig>
   saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig>

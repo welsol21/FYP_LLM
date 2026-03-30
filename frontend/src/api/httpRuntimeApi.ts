@@ -454,6 +454,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     forceFullReprocess?: boolean
     onProgress?: (payload: MediaProgressPayload) => void
     signal?: AbortSignal
+    translatorOptions?: { id: string; credentials: Record<string, string> }[]
   }): Promise<MediaSubmissionPayload> {
     recordRuntimeDiagnostic('api.media', 'submit.start', {
       mediaPath: input.mediaPath,
@@ -588,6 +589,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     signal?: AbortSignal
     fileName: string
     settings: string
+    translatorOptions?: { id: string; credentials: Record<string, string> }[]
   }): Promise<MediaSubmissionPayload> {
     const startedAt = Date.now()
     const stageLogs: string[] = []
@@ -751,7 +753,27 @@ export class HttpRuntimeApi implements RuntimeApi {
       let sourceType: string
       let contract: VisualizerPayload
 
+      const fileExt = input.fileName.split('.').pop()?.toLowerCase() ?? ''
+      const isTextFile = ['txt', 'md', 'rtf', 'pdf', 'docx', 'doc'].includes(fileExt)
+
       if (resumePoint === 'full' && resumeSentences === null) {
+        if (isTextFile) {
+          // Text/PDF/DOCX — extract sentences via backend, no Whisper
+          log(1, 'Extracting text from document…', 10)
+          const extractResult = await requestJson<{ source_type: string; sentences: Array<{ text: string; start_sec: number | null; end_sec: number | null }> }>(
+            apiUrl('/api/extract-text'),
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mediaPath: input.mediaPath }),
+              signal: input.signal,
+            },
+          )
+          sentences = (extractResult.sentences || []).map((s) => ({ text: s.text, start_sec: s.start_sec, end_sec: s.end_sec }))
+          sourceType = extractResult.source_type || 'text'
+          log(1, `Extracted ${sentences.length} sentences from document`, 100)
+          ensureNotAborted()
+        } else {
         const durationMin = Math.round((input.durationSec ?? 0) / 60)
         const timeHint = durationMin > 2 ? ` (~${durationMin * 2}–${durationMin * 4} min on CPU)` : ''
         log(1, `Loading Whisper model…${timeHint}`, 3)
@@ -765,6 +787,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         sourceType = String(transcribeResult.source_type || 'audio').trim()
         log(1, `Transcribed ${sentences.length} sentences`, 100)
         ensureNotAborted()
+        }
 
         // Persist sentences under immutableDocId — independent of voice/subs/provider
         await LocalWorkspace.cacheAnalysisArtifactBlob(
@@ -828,24 +851,53 @@ export class HttpRuntimeApi implements RuntimeApi {
       }
 
       // ── Stage 3: Translation ─────────────────────────────────────
+      const BACKEND_PROVIDERS = new Set(['gpt', 'deepl', 'lara'])
+      const providerIsOriginal = provider === 'original'
+
       let translations: Record<string, string> = {}
       if (resumePoint === 'tts' && resumeTranslations) {
         translations = resumeTranslations
         log(2, 'Reusing existing translations', 100)
+      } else if (providerIsOriginal) {
+        // "Original only" — no translation; Russian text stays empty
+        log(2, 'Original language selected — skipping translation', 100)
       } else {
         const sentenceKeys = Object.keys(contract)
         if (sentenceKeys.length > 0) {
           log(2, `Translating sentences (0/${sentenceKeys.length})...`, 50)
-          translations = await this.clientTranslateAnalysis(
-            contractDocId,
-            contract,
-            (done, ttl) => log(2, `Translating sentences (${done}/${ttl})`, 50 + Math.round((done / Math.max(ttl, 1)) * 48)),
-            input.signal,
-          ).catch((err: unknown) => {
-            if (err instanceof DOMException && err.name === 'AbortError') throw err
-            recordRuntimeDiagnostic('api.media.backend', 'translate.error', String(err instanceof Error ? err.message : err), 'error')
-            return {}
-          })
+          if (BACKEND_PROVIDERS.has(provider)) {
+            // Translate via backend (GPT/DeepL/Lara — API keys live server-side)
+            const enabledProvider = input.translatorOptions?.find((p: { id: string }) => p.id === provider)
+            const credentials = (enabledProvider as any)?.credentials || {}
+            translations = await requestJson<{ translations: Record<string, string> }>(
+              apiUrl('/api/translate'),
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sentences: sentenceKeys, provider, credentials }),
+                signal: input.signal,
+              },
+            ).then((r) => r.translations || {}).catch((err: unknown) => {
+              if (err instanceof DOMException && err.name === 'AbortError') throw err
+              recordRuntimeDiagnostic('api.media.backend', 'translate.error', String(err instanceof Error ? err.message : err), 'error')
+              log(2, `Translation error: ${err instanceof Error ? err.message : String(err)}`, 50)
+              return {}
+            })
+            log(2, `Translated ${Object.keys(translations).length}/${sentenceKeys.length} sentences`, 98)
+          } else {
+            // Default: use local opus-mt-en-ru model in browser worker
+            translations = await this.clientTranslateAnalysis(
+              contractDocId,
+              contract,
+              (done, ttl) => log(2, `Translating sentences (${done}/${ttl})`, 50 + Math.round((done / Math.max(ttl, 1)) * 48)),
+              input.signal,
+            ).catch((err: unknown) => {
+              if (err instanceof DOMException && err.name === 'AbortError') throw err
+              recordRuntimeDiagnostic('api.media.backend', 'translate.error', String(err instanceof Error ? err.message : err), 'error')
+              log(2, `Translation error: ${err instanceof Error ? err.message : String(err)}`, 50)
+              return {}
+            })
+          }
         }
         log(2, 'Translation complete', 100)
         // Save translated contract at contractDocId so future runs with a different
@@ -869,13 +921,14 @@ export class HttpRuntimeApi implements RuntimeApi {
       ensureNotAborted()
 
       // ── Stage 4: Backend render (TTS + audio assembly + video) ───────────────
-      if (sourceType === 'audio' || sourceType === 'video') {
+      const TEXT_SOURCE_TYPES = new Set(['text', 'pdf', 'docx', 'doc'])
+      if (sourceType === 'audio' || sourceType === 'video' || TEXT_SOURCE_TYPES.has(sourceType)) {
         const voiceForCache = String(input.voiceChoice || '').trim().toLowerCase() === 'backend_svetlana' ? 'female' : 'male'
         const timedSentences = sentences.map((sent) => ({
           text_eng: sent.text,
           text_ru: String(translations[sent.text] || ''),
-          start_ms: typeof sent.start_sec === 'number' ? Math.round(sent.start_sec * 1000) : 0,
-          end_ms: typeof sent.end_sec === 'number' ? Math.round(sent.end_sec * 1000) : 0,
+          start_ms: typeof sent.start_sec === 'number' ? Math.round(sent.start_sec * 1000) : null,
+          end_ms: typeof sent.end_sec === 'number' ? Math.round(sent.end_sec * 1000) : null,
         }))
 
         const [existingAudio, existingVideo] = await Promise.all([

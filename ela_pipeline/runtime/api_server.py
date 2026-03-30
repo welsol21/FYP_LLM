@@ -223,14 +223,16 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
             src_len = len(source_pcm)
             out_samples = 0  # running output position in samples
             SILENCE_10MS = int(0.01 * TARGET_RATE)  # 10 ms gap between eng and TTS
+            # 200 ms padding around each Whisper segment to avoid clipping phrase edges
+            TIMING_PAD = int(0.20 * TARGET_RATE)
 
             # Per-sentence output-time entries for all three SRT variants
             en_out_entries:  "list[tuple[int,int,str]]" = []
             ru_out_entries:  "list[tuple[int,int,str]]" = []
 
             for idx, (sent, tts_pcm) in enumerate(zip(sentences, tts_pcms)):
-                start_s = int(max(0, int(sent.get("start_ms") or 0)) / 1000 * TARGET_RATE)
-                end_s = min(int(max(0, int(sent.get("end_ms") or 0)) / 1000 * TARGET_RATE), src_len)
+                start_s = max(0, int(max(0, int(sent.get("start_ms") or 0)) / 1000 * TARGET_RATE) - TIMING_PAD)
+                end_s = min(int(max(0, int(sent.get("end_ms") or 0)) / 1000 * TARGET_RATE) + TIMING_PAD, src_len)
                 en = str(sent.get("text_eng") or "").strip()
                 ru = str(sent.get("text_ru") or "").strip()
 
@@ -302,23 +304,52 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                     ))
 
         else:
-            # Target-only: TTS at original sentence positions, no source audio
-            output_pcm = np.zeros(TARGET_RATE, dtype=np.float32)
-            for sent, tts_pcm in zip(sentences, tts_pcms):
-                if tts_pcm is None:
-                    continue
-                start_sample = int(max(0, int(sent.get("start_ms") or 0)) / 1000 * TARGET_RATE)
-                end_sample = start_sample + len(tts_pcm)
-                if end_sample > len(output_pcm):
-                    output_pcm = np.concatenate([output_pcm, np.zeros(end_sample - len(output_pcm), dtype=np.float32)])
-                output_pcm[start_sample:end_sample] = tts_pcm
-                ru = str(sent.get("text_ru") or "").strip()
-                if ru:
-                    video_srt_entries.append((
-                        max(0, int(sent.get("start_ms") or 0)),
-                        max(300, int(sent.get("end_ms") or 0)),
-                        ru,
-                    ))
+            # Target-only / text-file TTS: no source audio.
+            # If timestamps are absent (text files), concatenate sequentially with 200ms gaps.
+            # Otherwise place TTS at the specified positions.
+            has_timestamps = any(
+                (sent.get("start_ms") is not None and int(sent.get("start_ms") or 0) > 0)
+                or (sent.get("end_ms") is not None and int(sent.get("end_ms") or 0) > 0)
+                for sent in sentences
+            )
+            output_chunks: "list[np.ndarray]" = []
+            out_pos = 0
+            INTER_GAP = int(0.2 * TARGET_RATE)  # 200ms between sequential TTS segments
+
+            if has_timestamps:
+                output_pcm = np.zeros(TARGET_RATE, dtype=np.float32)
+                for sent, tts_pcm in zip(sentences, tts_pcms):
+                    if tts_pcm is None:
+                        continue
+                    start_sample = int(max(0, int(sent.get("start_ms") or 0)) / 1000 * TARGET_RATE)
+                    end_sample = start_sample + len(tts_pcm)
+                    if end_sample > len(output_pcm):
+                        output_pcm = np.concatenate([output_pcm, np.zeros(end_sample - len(output_pcm), dtype=np.float32)])
+                    output_pcm[start_sample:end_sample] = tts_pcm
+                    ru = str(sent.get("text_ru") or "").strip()
+                    if ru:
+                        video_srt_entries.append((
+                            max(0, int(sent.get("start_ms") or 0)),
+                            max(300, int(sent.get("end_ms") or 0)),
+                            ru,
+                        ))
+            else:
+                # Text file — no timestamps: concatenate TTS segments sequentially
+                for sent, tts_pcm in zip(sentences, tts_pcms):
+                    ru = str(sent.get("text_ru") or "").strip()
+                    if tts_pcm is None or len(tts_pcm) == 0:
+                        if ru:
+                            out_pos += INTER_GAP
+                        continue
+                    start_ms = int(out_pos / TARGET_RATE * 1000)
+                    out_pos += len(tts_pcm)
+                    end_ms = int(out_pos / TARGET_RATE * 1000)
+                    output_chunks.append(tts_pcm)
+                    output_chunks.append(np.zeros(INTER_GAP, dtype=np.float32))
+                    out_pos += INTER_GAP
+                    if ru:
+                        video_srt_entries.append((start_ms, max(start_ms + 300, end_ms), ru))
+                output_pcm = np.concatenate(output_chunks) if output_chunks else np.zeros(TARGET_RATE, dtype=np.float32)
 
     # ── 3. Encode assembled PCM → MP3 (needed for audio or video) ────────────
     mp3_bytes = b""
@@ -694,6 +725,56 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
             return
 
         body = self._read_json_body()
+
+        if path == "/api/extract-text":
+            # Extract sentences from a text/PDF/DOCX file (no audio).
+            # Returns {source_type, sentences: [{text, start_sec, end_sec}]}
+            media_path = str(body.get("mediaPath") or body.get("media_path") or "").strip()
+            if not media_path:
+                self._send_json({"error": "mediaPath is required"}, status=400)
+                return
+            try:
+                result = extract_media_text_and_sentences(source_path=media_path)
+                sentences = [
+                    {
+                        "text": text,
+                        "start_sec": (timing["start_sec"] if timing else None),
+                        "end_sec": (timing["end_sec"] if timing else None),
+                    }
+                    for text, timing in zip(result.sentence_stream, result.sentence_timeline)
+                ]
+                self._send_json({"source_type": result.source_type, "sentences": sentences})
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=500)
+            return
+
+        if path == "/api/translate":
+            # Translate an array of English sentences to Russian using a specified provider.
+            # Body: {sentences: string[], provider: string, credentials?: {}}
+            sentences_raw = body.get("sentences") or []
+            provider = str(body.get("provider") or "m2m100").strip().lower()
+            credentials = body.get("credentials") or {}
+            if not isinstance(sentences_raw, list):
+                self._send_json({"error": "sentences must be an array"}, status=400)
+                return
+            try:
+                from .media_pipeline import translate_text_with_provider
+                translations: dict[str, str] = {}
+                for sentence in sentences_raw:
+                    text = str(sentence or "").strip()
+                    if not text:
+                        continue
+                    translated = translate_text_with_provider(
+                        text=text,
+                        translation_provider=provider,
+                        provider_credentials=credentials,
+                    )
+                    translations[text] = translated
+                self._send_json({"translations": translations})
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=500)
+            return
+
         if path == "/api/submit-media":
             media_path = str(body.get("mediaPath") or body.get("media_path") or "").strip()
             duration = _env_int("ELA_DEFAULT_DURATION_SEC", 1) if body.get("durationSec") is None else int(body.get("durationSec") or 0)

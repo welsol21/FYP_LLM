@@ -71,13 +71,41 @@ export function getTranslationProviderFromSettings(settings: string, fallback = 
   return parsed.translator || fallback
 }
 
-/** Build the user-facing download filename: {file_stem}_{voice}_{subs}_{artifact_name} */
+// Maps internal artifact names to clean file suffixes (extension with optional type tag)
+const ARTIFACT_SUFFIX: Record<string, string> = {
+  'translated_video_ru.mp4': '.mp4',
+  'translated_audio_ru.mp3': '.mp3',
+  'subtitles_en.srt': '_en.srt',
+  'subtitles_bilingual.srt': '_bilingual.srt',
+  'subtitles_target.srt': '_target.srt',
+  'media_contract.json': '_contract.json',
+}
+
+function shortVoice(raw: string): string {
+  const v = (raw || '').toLowerCase().replace(/[^a-z]/g, '')
+  if (v.includes('svetlana')) return 'svetlana'
+  if (v.includes('dmitry') || v.includes('dmitri')) return 'dmitry'
+  return v || ''
+}
+
+function shortSubs(raw: string): string {
+  const v = (raw || '').toLowerCase().replace(/[^a-z_]/g, '')
+  if (v === 'bilingual_sequential') return 'bilingual'
+  if (v === 'bilingual_simultaneous') return 'bilingual_sim'
+  if (v.includes('target')) return 'target'
+  if (v.includes('source')) return 'source'
+  return v || ''
+}
+
+/** Build the user-facing download filename: {file_stem}_{voice}_{subs}{clean_suffix} */
 export function buildExportFileName(fileName: string, settings: string, artifactName: string): string {
   const stem = String(fileName || '').replace(/\.[^.]+$/, '').trim()
   const parsed = parseAnalysisSettings(settings)
-  const tags = [parsed.voice, parsed.subtitles].filter(Boolean)
-  const prefix = [stem, ...tags].filter(Boolean).join('_')
-  return prefix ? `${prefix}_${artifactName}` : artifactName
+  const voice = shortVoice(parsed.voice || '')
+  const subs = shortSubs(parsed.subtitles || '')
+  const features = [voice, subs].filter(Boolean)
+  const suffix = ARTIFACT_SUFFIX[artifactName] ?? `_${artifactName}`
+  return [stem, ...features].filter(Boolean).join('_') + suffix
 }
 
 export function buildAnalysisFeatureBadges(settings: string): AnalysisFeatureBadge[] {

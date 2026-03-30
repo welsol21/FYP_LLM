@@ -168,7 +168,7 @@ export function FilesPage() {
         ref={inputRef}
         aria-label="Media File"
         type="file"
-        accept=".mp3,.wav,.m4a,.flac,.ogg,.mp4,.mkv,.mov,.avi,.webm,.pdf,.txt"
+        accept=".mp3,.wav,.m4a,.flac,.ogg,.mp4,.mkv,.mov,.avi,.webm,.pdf,.txt,.md,.rtf,.docx,.doc"
         style={{ display: 'none' }}
         onChange={async (e) => {
           recordRuntimeDiagnostic('ui.files', 'file_input.change', {
