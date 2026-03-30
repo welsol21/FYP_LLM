@@ -211,7 +211,8 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
     source_pcm: "np.ndarray | None" = None
     if source_audio_bytes:
         try:
-            source_pcm = _decode_audio(source_audio_bytes)
+            pcm = _decode_audio(source_audio_bytes)
+            source_pcm = pcm if len(pcm) > 0 else None
         except Exception:
             source_pcm = None
 
