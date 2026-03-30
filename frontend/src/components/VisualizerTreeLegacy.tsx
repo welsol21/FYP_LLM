@@ -236,16 +236,16 @@ export function VisualizerTreeLegacy({
         <div className="lv-detail-row"><strong>Tense:</strong><span>{tenseText}</span></div>
         {noteLevel === 'all' ? (
           <>
-            {notes.elementary ? <div className="lv-detail-row"><strong>Linguistic Notes (Elementary):</strong><span>{notes.elementary}</span></div> : null}
-            <div className="lv-detail-row"><strong>Linguistic Notes (Intermediate):</strong><span>{intermediateText}</span></div>
-            {notes.advanced ? <div className="lv-detail-row"><strong>Linguistic Notes (Advanced):</strong><span>{notes.advanced}</span></div> : null}
+            {notes.elementary ? <div className="lv-detail-row"><strong>Linguistic Notes:</strong><span>{notes.elementary}</span></div> : null}
+            <div className="lv-detail-row"><strong>Linguistic Notes:</strong><span>{intermediateText}</span></div>
+            {notes.advanced ? <div className="lv-detail-row"><strong>Linguistic Notes:</strong><span>{notes.advanced}</span></div> : null}
           </>
-        ) : noteLevel === 'elementary' ? (
-          <div className="lv-detail-row"><strong>Linguistic Notes (Elementary):</strong><span>{notes.elementary || intermediateText}</span></div>
-        ) : noteLevel === 'advanced' ? (
-          <div className="lv-detail-row"><strong>Linguistic Notes (Advanced):</strong><span>{notes.advanced || intermediateText}</span></div>
         ) : (
-          <div className="lv-detail-row"><strong>Linguistic Notes (Intermediate):</strong><span>{intermediateText}</span></div>
+          <div className="lv-detail-row"><strong>Linguistic Notes:</strong><span>{
+            noteLevel === 'elementary' ? (notes.elementary || intermediateText) :
+            noteLevel === 'advanced' ? (notes.advanced || intermediateText) :
+            intermediateText
+          }</span></div>
         )}
         <div className="lv-detail-row"><strong>Translation ({translationProvider}):</strong><span>{translationText}</span></div>
         {showAlternativeTranslations && alternativeTranslations.length > 0 ? (
