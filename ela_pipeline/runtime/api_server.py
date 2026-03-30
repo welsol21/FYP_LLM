@@ -1193,7 +1193,6 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/tts-batch":
-            import uuid as _uuid
             sentences = body.get("sentences") or []
             if not isinstance(sentences, list):
                 self._send_json({"error": "sentences must be an array"}, status=400)
