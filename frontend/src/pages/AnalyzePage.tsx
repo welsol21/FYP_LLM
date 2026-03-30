@@ -375,6 +375,13 @@ export function AnalyzePage() {
       ) : null}
       <MediaSubmitForm
         onSubmitted={(payload) => {
+          if (payload.result.status === 'cancelled') {
+            // Return to initial state — clear submission card, reset timer
+            setSubmission(null)
+            setIsSubmittingPipeline(false)
+            setAnalysisStartedAt(null)
+            return
+          }
           setSubmission(payload)
           setIsSubmittingPipeline(false)
           if (!analysisStartedAt) {

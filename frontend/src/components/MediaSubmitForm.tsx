@@ -130,10 +130,43 @@ export function MediaSubmitForm({
         onProgress,
         signal: controller.signal,
       })
-      if (controller.signal.aborted || currentControllerRef.current !== controller) return
+      if (controller.signal.aborted) {
+        // Abort raced with normal completion — still treat as cancelled
+        onSubmitted({
+          result: {
+            route: 'reject',
+            message: 'Analysis cancelled.',
+            status: 'cancelled',
+            stage_name: 'completed',
+          },
+          ui_feedback: {
+            severity: 'warning',
+            title: 'Processing cancelled',
+            message: 'Analysis cancelled.',
+          },
+        })
+        return
+      }
       onSubmitted(payload)
     } catch (err) {
-      if (!(err instanceof DOMException && err.name === 'AbortError')) throw err
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // Pipeline was aborted — notify parent so it can reset state
+        onSubmitted({
+          result: {
+            route: 'reject',
+            message: 'Analysis cancelled.',
+            status: 'cancelled',
+            stage_name: 'completed',
+          },
+          ui_feedback: {
+            severity: 'warning',
+            title: 'Processing cancelled',
+            message: 'Analysis cancelled.',
+          },
+        })
+      } else {
+        throw err
+      }
     } finally {
       if (currentControllerRef.current === controller) {
         currentControllerRef.current = null
@@ -144,23 +177,10 @@ export function MediaSubmitForm({
   }
 
   function handleCancel(): void {
+    // Only abort — let the pipeline's catch/finally handle UI reset and onSubmitted.
+    // Do NOT null the ref here: that would open the submit guard before the async pipeline
+    // has unwound, allowing an immediate re-submission.
     currentControllerRef.current?.abort()
-    currentControllerRef.current = null
-    setSubmitting(false)
-    onSubmittingChange?.(false)
-    onSubmitted({
-      result: {
-        route: 'reject',
-        message: 'Analysis cancelled.',
-        status: 'cancelled',
-        stage_name: 'completed',
-      },
-      ui_feedback: {
-        severity: 'warning',
-        title: 'Processing cancelled',
-        message: 'Analysis cancelled.',
-      },
-    })
   }
 
   return (
