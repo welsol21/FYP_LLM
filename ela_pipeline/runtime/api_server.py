@@ -11,8 +11,38 @@ from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+import time as _time
+import uuid as _uuid
+
 from .media_pipeline import extract_media_text_and_sentences, warmup_media_models
 from .service import RuntimeMediaService
+
+# ── Async render job store ────────────────────────────────────────────────────
+# job_id → {"status": "running"|"done"|"error", "zip": bytes|None, "error": str|None, "ts": float}
+_render_jobs: "dict[str, dict]" = {}
+_render_jobs_lock = _threading.Lock()
+
+def _render_job_run(job_id: str, sentences: list, voice: str, subtitles_mode: str,
+                    need_audio: bool, need_video: bool, source_audio_bytes: bytes) -> None:
+    try:
+        zip_bytes = _render_media_artifacts(sentences, voice, subtitles_mode,
+                                            need_audio=need_audio, need_video=need_video,
+                                            source_audio_bytes=source_audio_bytes)
+        with _render_jobs_lock:
+            _render_jobs[job_id] = {"status": "done", "zip": zip_bytes, "error": None, "ts": _time.time()}
+    except Exception as exc:
+        import traceback as _tb
+        _tb.print_exc()
+        with _render_jobs_lock:
+            _render_jobs[job_id] = {"status": "error", "zip": None, "error": str(exc), "ts": _time.time()}
+
+def _render_jobs_cleanup() -> None:
+    """Remove jobs older than 10 minutes."""
+    cutoff = _time.time() - 600
+    with _render_jobs_lock:
+        stale = [jid for jid, j in _render_jobs.items() if j["ts"] < cutoff]
+        for jid in stale:
+            del _render_jobs[jid]
 
 
 def _env_int(name: str, default: int) -> int:
@@ -750,6 +780,33 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(SERVICE.get_backend_job_status(job_id=job_id))
             return
+        if path.startswith("/api/render-status/"):
+            job_id = path[len("/api/render-status/"):]
+            with _render_jobs_lock:
+                job = _render_jobs.get(job_id)
+            if job is None:
+                self._send_json({"error": "job not found"}, status=404)
+                return
+            if job["status"] == "running":
+                self._send_json({"status": "running"})
+                return
+            if job["status"] == "error":
+                with _render_jobs_lock:
+                    _render_jobs.pop(job_id, None)
+                self._send_json({"status": "error", "error": job["error"]}, status=500)
+                return
+            # done — send ZIP and remove job
+            zip_bytes = job["zip"]
+            with _render_jobs_lock:
+                _render_jobs.pop(job_id, None)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Length", str(len(zip_bytes)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(zip_bytes)
+            return
+
         if path == "/api/document-artifacts":
             document_id = (query.get("document_id") or [""])[0]
             if not document_id:
@@ -833,18 +890,17 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
             if not sentences:
                 self._send_json({"error": "sentences is required"}, status=400)
                 return
-            try:
-                zip_bytes = _render_media_artifacts(sentences, voice, subtitles_mode, need_audio=need_audio, need_video=need_video, source_audio_bytes=source_audio_bytes)
-                self.send_response(200)
-                self.send_header("Content-Type", "application/zip")
-                self.send_header("Content-Length", str(len(zip_bytes)))
-                self.send_header("Access-Control-Allow-Origin", "*")
-                self.end_headers()
-                self.wfile.write(zip_bytes)
-            except Exception as exc:
-                import traceback as _tb
-                _tb.print_exc()
-                self._send_json({"error": str(exc)}, status=500)
+            _render_jobs_cleanup()
+            job_id = str(_uuid.uuid4())
+            with _render_jobs_lock:
+                _render_jobs[job_id] = {"status": "running", "zip": None, "error": None, "ts": _time.time()}
+            t = _threading.Thread(
+                target=_render_job_run,
+                args=(job_id, sentences, voice, subtitles_mode, need_audio, need_video, source_audio_bytes),
+                daemon=True,
+            )
+            t.start()
+            self._send_json({"job_id": job_id, "status": "running"})
             return
 
         if path == "/api/extract-text":

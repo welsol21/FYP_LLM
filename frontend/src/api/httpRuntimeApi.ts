@@ -968,23 +968,42 @@ export class HttpRuntimeApi implements RuntimeApi {
               const srcBlob = await LocalWorkspace.getCachedUploadedMedia(input.mediaPath)
               if (srcBlob) form.append('audio', srcBlob, 'source.bin')
             } catch { /* non-fatal — backend falls back to TTS-only */ }
-            const renderRes = await fetchWithRetry(
+            // Submit render job — returns {job_id} immediately (no timeout risk)
+            const submitRes = await fetchWithRetry(
               apiUrl('/api/render-media'),
-              {
-                method: 'POST',
-                body: form,
-                signal: input.signal,
-              },
+              { method: 'POST', body: form, signal: input.signal },
               { retries: 0 },
             )
-            if (!renderRes.ok) {
-              const txt = await renderRes.text().catch(() => '')
-              throw new Error(`Backend render failed: HTTP ${renderRes.status}: ${txt}`)
+            if (!submitRes.ok) {
+              const txt = await submitRes.text().catch(() => '')
+              throw new Error(`Backend render failed: HTTP ${submitRes.status}: ${txt}`)
+            }
+            const { job_id: jobId } = await submitRes.json() as { job_id: string }
+
+            // Poll /api/render-status/<job_id> until done
+            let zipBuf: ArrayBuffer | null = null
+            let pollAttempt = 0
+            while (zipBuf === null) {
+              ensureNotAborted()
+              await new Promise<void>((resolve) => setTimeout(resolve, 2000))
+              ensureNotAborted()
+              pollAttempt++
+              log(3, `Rendering… (${pollAttempt * 2}s)`, Math.min(5 + pollAttempt * 2, 48))
+              const statusRes = await fetch(apiUrl(`/api/render-status/${jobId}`), { signal: input.signal })
+              if (statusRes.headers.get('content-type')?.includes('application/zip')) {
+                zipBuf = await statusRes.arrayBuffer()
+                break
+              }
+              const statusJson = await statusRes.json().catch(() => ({ status: 'error', error: `HTTP ${statusRes.status}` })) as { status: string; error?: string }
+              if (statusJson.status === 'error') {
+                throw new Error(`Backend render failed: ${statusJson.error ?? 'unknown error'}`)
+              }
+              // status === 'running' — keep polling
             }
 
             log(3, 'Downloading rendered artifacts…', 50)
-            const zipBuf = await renderRes.arrayBuffer()
-            const files = parseStoredZip(zipBuf)
+            const zipBuf2 = zipBuf!
+            const files = parseStoredZip(zipBuf2)
 
             const getFileBytes = (name: string): ArrayBuffer => (files.get(name) ?? new Uint8Array(0)).buffer as ArrayBuffer
             if (needAudio) audioBlob = new Blob([getFileBytes('translated_audio_ru.mp3')], { type: 'audio/mpeg' })
