@@ -188,8 +188,7 @@ export function VisualizerTreeLegacy({
     () => listAlternativeTranslations(node, preferredTranslationProvider),
     [node, preferredTranslationProvider],
   )
-  const [showMoreTranslations, setShowMoreTranslations] = useState(false)
-  const showAlternativeTranslations = showAllTranslations || showMoreTranslations
+  const showAlternativeTranslations = showAllTranslations
   const phoneticText =
     node.phonetic?.uk || node.phonetic?.us
       ? `${node.phonetic?.uk ? `UK /${node.phonetic.uk}/` : ''}${node.phonetic?.uk && node.phonetic?.us ? ' | ' : ''}${node.phonetic?.us ? `US /${node.phonetic.us}/` : ''}`
@@ -247,26 +246,15 @@ export function VisualizerTreeLegacy({
           <div><strong>Linguistic Notes (Intermediate):</strong> {intermediateText}</div>
         )}
         <div><strong>Translation ({translationProvider}):</strong> {translationText}</div>
-        {alternativeTranslations.length > 0 ? (
+        {showAlternativeTranslations && alternativeTranslations.length > 0 ? (
           <div className="lv-more-translations">
-            {!showAllTranslations ? (
-              <button
-                type="button"
-                className="lv-more-translations-toggle"
-                onClick={() => setShowMoreTranslations((prev) => !prev)}
-              >
-                {showMoreTranslations ? 'Hide more translations' : `More translations (${alternativeTranslations.length})`}
-              </button>
-            ) : null}
-            {showAlternativeTranslations ? (
-              <div className="lv-more-translations-list">
-                {alternativeTranslations.map((item) => (
-                  <div key={`${node.node_id}-${item.provider}`}>
-                    <strong>{providerLabel(item.provider)}:</strong> {item.text}
-                  </div>
-                ))}
-              </div>
-            ) : null}
+            <div className="lv-more-translations-list">
+              {alternativeTranslations.map((item) => (
+                <div key={`${node.node_id}-${item.provider}`}>
+                  <strong>{providerLabel(item.provider)}:</strong> {item.text}
+                </div>
+              ))}
+            </div>
           </div>
         ) : null}
         <div><strong>Phonetic:</strong> {phoneticText}</div>
