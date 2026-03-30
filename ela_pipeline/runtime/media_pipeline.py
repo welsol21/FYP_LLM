@@ -545,8 +545,12 @@ class _LaraTranslator:
 
 
 @lru_cache(maxsize=8)
+@lru_cache(maxsize=2)
 def _get_m2m100_media_translator_cached(model_name: str, device: str) -> M2M100Translator:
     return M2M100Translator(model_name=model_name, device=device)
+
+
+_m2m100_lock = threading.Lock()
 
 
 def _resolve_media_translator(
@@ -708,6 +712,10 @@ def translate_text_with_provider(
     )
     source_lang_resolved = source_lang or os.getenv("ELA_MEDIA_TRANSLATION_SOURCE_LANG", "en")
     target_lang_resolved = target_lang or os.getenv("ELA_MEDIA_TRANSLATION_TARGET_LANG", "ru")
+    lock = _m2m100_lock if isinstance(translator, M2M100Translator) else None
+    if lock:
+        with lock:
+            return str(translator.translate_text(source_text, source_lang=source_lang_resolved, target_lang=target_lang_resolved) or "").strip()
     return str(
         translator.translate_text(source_text, source_lang=source_lang_resolved, target_lang=target_lang_resolved) or ""
     ).strip()
