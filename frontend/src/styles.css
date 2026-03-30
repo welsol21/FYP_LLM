@@ -903,6 +903,17 @@ button {
   margin-bottom: 8px;
 }
 
+.lv-detail-row {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 4px;
+  align-items: baseline;
+}
+
+.lv-detail-row > span {
+  min-width: 0;
+}
+
 .lv-more-translations {
   display: grid;
   gap: 6px;

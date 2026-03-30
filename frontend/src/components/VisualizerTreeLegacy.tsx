@@ -189,10 +189,6 @@ export function VisualizerTreeLegacy({
     [node, preferredTranslationProvider],
   )
   const showAlternativeTranslations = showAllTranslations
-  const phoneticText =
-    node.phonetic?.uk || node.phonetic?.us
-      ? `${node.phonetic?.uk ? `UK /${node.phonetic.uk}/` : ''}${node.phonetic?.uk && node.phonetic?.us ? ' | ' : ''}${node.phonetic?.us ? `US /${node.phonetic.us}/` : ''}`
-      : '-'
 
   return (
     <div className="lv-node-wrap">
@@ -236,34 +232,36 @@ export function VisualizerTreeLegacy({
       </div>
 
       <div className="lv-details-card">
-        <div><strong>CEFR:</strong> {cefrText}</div>
-        <div><strong>Tense:</strong> {tenseText}</div>
+        <div className="lv-detail-row"><strong>CEFR:</strong><span>{cefrText}</span></div>
+        <div className="lv-detail-row"><strong>Tense:</strong><span>{tenseText}</span></div>
         {noteLevel === 'all' ? (
           <>
-            {notes.elementary ? <div><strong>Linguistic Notes (Elementary):</strong> {notes.elementary}</div> : null}
-            <div><strong>Linguistic Notes (Intermediate):</strong> {intermediateText}</div>
-            {notes.advanced ? <div><strong>Linguistic Notes (Advanced):</strong> {notes.advanced}</div> : null}
+            {notes.elementary ? <div className="lv-detail-row"><strong>Linguistic Notes (Elementary):</strong><span>{notes.elementary}</span></div> : null}
+            <div className="lv-detail-row"><strong>Linguistic Notes (Intermediate):</strong><span>{intermediateText}</span></div>
+            {notes.advanced ? <div className="lv-detail-row"><strong>Linguistic Notes (Advanced):</strong><span>{notes.advanced}</span></div> : null}
           </>
         ) : noteLevel === 'elementary' ? (
-          <div><strong>Linguistic Notes (Elementary):</strong> {notes.elementary || intermediateText}</div>
+          <div className="lv-detail-row"><strong>Linguistic Notes (Elementary):</strong><span>{notes.elementary || intermediateText}</span></div>
         ) : noteLevel === 'advanced' ? (
-          <div><strong>Linguistic Notes (Advanced):</strong> {notes.advanced || intermediateText}</div>
+          <div className="lv-detail-row"><strong>Linguistic Notes (Advanced):</strong><span>{notes.advanced || intermediateText}</span></div>
         ) : (
-          <div><strong>Linguistic Notes (Intermediate):</strong> {intermediateText}</div>
+          <div className="lv-detail-row"><strong>Linguistic Notes (Intermediate):</strong><span>{intermediateText}</span></div>
         )}
-        <div><strong>Translation ({translationProvider}):</strong> {translationText}</div>
+        <div className="lv-detail-row"><strong>Translation ({translationProvider}):</strong><span>{translationText}</span></div>
         {showAlternativeTranslations && alternativeTranslations.length > 0 ? (
           <div className="lv-more-translations">
             <div className="lv-more-translations-list">
               {alternativeTranslations.map((item) => (
-                <div key={`${node.node_id}-${item.provider}`}>
-                  <strong>{providerLabel(item.provider)}:</strong> {item.text}
+                <div key={`${node.node_id}-${item.provider}`} className="lv-detail-row">
+                  <strong>{providerLabel(item.provider)}:</strong><span>{item.text}</span>
                 </div>
               ))}
             </div>
           </div>
         ) : null}
-        <div><strong>Phonetic:</strong> {phoneticText}</div>
+        {node.phonetic?.uk ? <div className="lv-detail-row"><strong>Phonetic UK:</strong><span>/{node.phonetic.uk}/</span></div> : null}
+        {node.phonetic?.us ? <div className="lv-detail-row"><strong>Phonetic US:</strong><span>/{node.phonetic.us}/</span></div> : null}
+        {!node.phonetic?.uk && !node.phonetic?.us ? <div className="lv-detail-row"><strong>Phonetic:</strong><span>-</span></div> : null}
       </div>
 
       {hasChildren && childrenOpen ? (
