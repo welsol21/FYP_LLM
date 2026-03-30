@@ -851,7 +851,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       }
 
       // ── Stage 3: Translation ─────────────────────────────────────
-      const BACKEND_PROVIDERS = new Set(['gpt', 'deepl', 'lara'])
+      const BACKEND_PROVIDERS = new Set(['m2m100', 'gpt', 'deepl', 'lara'])
       const providerIsOriginal = provider === 'original'
 
       let translations: Record<string, string> = {}
