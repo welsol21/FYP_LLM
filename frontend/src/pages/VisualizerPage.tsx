@@ -330,7 +330,7 @@ export function VisualizerPage() {
   })()
 
   const showAllTranslations = selectedTranslationProvider === 'all'
-  const effectiveTranslationProvider = showAllTranslations ? 'm2m100' : selectedTranslationProvider
+  const effectiveTranslationProvider = showAllTranslations ? undefined : selectedTranslationProvider
 
   useEffect(() => {
     const preferred = normalizeTranslationProviderForUi(activeRow?.tree?.active_translation_provider)
