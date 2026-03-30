@@ -144,6 +144,8 @@ function nodeTokens(node: VisualizerNode, level: number): Token[] {
   return [{ text: node.content, tone }]
 }
 
+type NoteLevel = 'elementary' | 'intermediate' | 'advanced'
+
 type Props = {
   node: VisualizerNode
   isRoot?: boolean
@@ -151,6 +153,7 @@ type Props = {
   selectedNodeId?: string
   preferredTranslationProvider?: string
   showAllTranslations?: boolean
+  noteLevel?: NoteLevel
   onNodeSelect?: (node: VisualizerNode) => void
 }
 
@@ -161,11 +164,10 @@ export function VisualizerTreeLegacy({
   selectedNodeId,
   preferredTranslationProvider,
   showAllTranslations = false,
+  noteLevel = 'intermediate',
   onNodeSelect,
 }: Props) {
   const [childrenOpen, setChildrenOpen] = useState(false)
-  const [showElementary, setShowElementary] = useState(false)
-  const [showAdvanced, setShowAdvanced] = useState(false)
   const label = labelOf(node)
   const tone = useMemo(() => {
     if (level === 1 && node.linguistic_elements.length === 0) return stableTopLevelTone(node.node_id)
@@ -237,23 +239,13 @@ export function VisualizerTreeLegacy({
       <div className="lv-details-card">
         <div><strong>CEFR:</strong> {cefrText}</div>
         <div><strong>Tense:</strong> {tenseText}</div>
-        <div><strong>Linguistic Notes (Intermediate):</strong> {intermediateText}</div>
-        {notes.elementary ? (
-          <div>
-            <button type="button" className="lv-more-translations-toggle" onClick={() => setShowElementary((prev) => !prev)}>
-              {showElementary ? 'Hide Elementary' : 'Show Elementary'}
-            </button>
-            {showElementary ? <div>{notes.elementary}</div> : null}
-          </div>
-        ) : null}
-        {notes.advanced ? (
-          <div>
-            <button type="button" className="lv-more-translations-toggle" onClick={() => setShowAdvanced((prev) => !prev)}>
-              {showAdvanced ? 'Hide Advanced' : 'Show Advanced'}
-            </button>
-            {showAdvanced ? <div>{notes.advanced}</div> : null}
-          </div>
-        ) : null}
+        {noteLevel === 'elementary' ? (
+          <div><strong>Linguistic Notes (Elementary):</strong> {notes.elementary || intermediateText}</div>
+        ) : noteLevel === 'advanced' ? (
+          <div><strong>Linguistic Notes (Advanced):</strong> {notes.advanced || intermediateText}</div>
+        ) : (
+          <div><strong>Linguistic Notes (Intermediate):</strong> {intermediateText}</div>
+        )}
         <div><strong>Translation ({translationProvider}):</strong> {translationText}</div>
         {alternativeTranslations.length > 0 ? (
           <div className="lv-more-translations">
@@ -290,6 +282,7 @@ export function VisualizerTreeLegacy({
                 selectedNodeId={selectedNodeId}
                 preferredTranslationProvider={preferredTranslationProvider}
                 showAllTranslations={showAllTranslations}
+                noteLevel={noteLevel}
                 onNodeSelect={onNodeSelect}
               />
             </div>

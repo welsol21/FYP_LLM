@@ -254,7 +254,8 @@ export function VisualizerPage() {
   const [isNarrowScreen, setIsNarrowScreen] = useState(
     typeof window !== 'undefined' ? window.innerWidth <= 860 : false,
   )
-  const [editorMode, setEditorMode] = useState<'quick' | 'translate' | 'none'>('none')
+  const [editorMode, setEditorMode] = useState<'quick' | 'translate' | 'noteLevel' | 'none'>('none')
+  const [noteLevel, setNoteLevel] = useState<'elementary' | 'intermediate' | 'advanced'>('intermediate')
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [nodeId, setNodeId] = useState('')
   const [selectedNodeLabel, setSelectedNodeLabel] = useState('')
@@ -409,6 +410,7 @@ export function VisualizerPage() {
   const activeFieldPath = advancedOpen ? advancedField : basicField
   const quickEditOpen = editorMode === 'quick'
   const translateOpen = editorMode === 'translate'
+  const noteLevelOpen = editorMode === 'noteLevel'
   const advancedOptions = ADVANCED_SELECT_OPTIONS[advancedField] || []
   const useAdvancedSelect = advancedOpen && advancedOptions.length > 0
   const valueGridColumns = isNarrowScreen ? 1 : 2
@@ -446,6 +448,16 @@ export function VisualizerPage() {
                 aria-label="toggle-translate-controls"
               >
                 Translate
+              </button>
+            ) : null}
+            {!noteLevelOpen ? (
+              <button
+                type="button"
+                className="translation-control-btn"
+                onClick={() => setEditorMode('noteLevel')}
+                aria-label="toggle-note-level"
+              >
+                Note Level
               </button>
             ) : null}
           </div>
@@ -492,6 +504,34 @@ export function VisualizerPage() {
                   Close
                 </button>
               </div>
+              </div>
+            </section>
+          ) : null}
+          {noteLevelOpen ? (
+            <section className="quick-edit-section quick-edit-section-translate">
+              <h2 className="quick-edit-section-title">Note Level</h2>
+              <div className="quick-edit-translate-panel">
+                <div className="touch-options-grid translation-view-options">
+                  {(['elementary', 'intermediate', 'advanced'] as const).map((lvl) => (
+                    <button
+                      key={lvl}
+                      type="button"
+                      className={`touch-option-btn ${noteLevel === lvl ? 'active' : ''}`}
+                      onClick={() => setNoteLevel(lvl)}
+                    >
+                      {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <div className="quick-edit-actions quick-edit-actions-right">
+                  <button
+                    type="button"
+                    className="quick-edit-close-btn"
+                    onClick={() => setEditorMode('none')}
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </section>
           ) : null}
@@ -631,6 +671,7 @@ export function VisualizerPage() {
                 selectedNodeId={nodeId}
                 preferredTranslationProvider={selectedTranslationProvider}
                 showAllTranslations={showAllTranslations}
+                noteLevel={noteLevel}
                 onNodeSelect={onSelectNode}
               />
             </article>
