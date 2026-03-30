@@ -32,6 +32,7 @@ services:
       HF_HOME: /opt/hf-cache
       ELA_CLIENT_DB_PATH: /app/artifacts/client_state.sqlite3
       ELA_MEDIA_DISABLE_RUNTIME_DOWNLOADS: "1"
+      ELA_MEDIA_WARMUP_TRANSLATION: "0"
       ELA_MEDIA_ASR_MODEL: ${ELA_MEDIA_ASR_MODEL:-base}
       ELA_MEDIA_ASR_CACHE_DIR: /opt/hf-cache/whisper
       ELA_MEDIA_TRANSLATION_MODEL: /app/artifacts/models/m2m100_418M

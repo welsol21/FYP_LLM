@@ -129,6 +129,23 @@ def _start_translation_worker() -> None:
     print("[runtime-api] translation worker process started "
           f"(pid={_translate_worker_proc.pid})", flush=True)
 
+    # Pre-warm the worker: load M2M100 in the child process before the first
+    # real user request arrives.  The result lands in _render_jobs and is
+    # cleaned up after the normal 10-minute TTL.
+    # NOTE: ELA_MEDIA_WARMUP_TRANSLATION must be False so the main process
+    # never loads M2M100 — two simultaneous copies exhaust RAM and cause OOM/502.
+    warmup_job_id = f"warmup-{_uuid.uuid4().hex[:8]}"
+    with _render_jobs_lock:
+        _render_jobs[warmup_job_id] = {"status": "running", "zip": None,
+                                       "error": None, "ts": _time.time()}
+    _translate_req_q.put({
+        "job_id": warmup_job_id,
+        "sentences": ["Hello world."],
+        "provider": "m2m100",
+        "credentials": {},
+    })
+    print(f"[runtime-api] translation worker warmup job sent ({warmup_job_id})", flush=True)
+
 
 def _env_int(name: str, default: int) -> int:
     raw = os.getenv(name)
