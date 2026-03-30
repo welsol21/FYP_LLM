@@ -780,6 +780,33 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 return
             self._send_json(SERVICE.get_backend_job_status(job_id=job_id))
             return
+        if path.startswith("/api/translate-status/"):
+            job_id = path[len("/api/translate-status/"):]
+            with _render_jobs_lock:
+                job = _render_jobs.get(job_id)
+            if job is None:
+                self._send_json({"error": "job not found"}, status=404)
+                return
+            if job["status"] == "running":
+                self._send_json({"status": "running"})
+                return
+            if job["status"] == "error":
+                with _render_jobs_lock:
+                    _render_jobs.pop(job_id, None)
+                self._send_json({"status": "error", "error": job["error"]}, status=500)
+                return
+            # done — zip field contains JSON bytes
+            payload_bytes = job["zip"]
+            with _render_jobs_lock:
+                _render_jobs.pop(job_id, None)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload_bytes)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(payload_bytes)
+            return
+
         if path.startswith("/api/render-status/"):
             job_id = path[len("/api/render-status/"):]
             with _render_jobs_lock:
@@ -952,30 +979,38 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
         body = self._read_json_body()
 
         if path == "/api/translate":
-            # Translate an array of English sentences to Russian using a specified provider.
-            # Body: {sentences: string[], provider: string, credentials?: {}}
+            # Async batch translation. Body: {sentences: string[], provider, credentials?}
+            # Returns {job_id} immediately; poll /api/translate-status/<job_id>.
             sentences_raw = body.get("sentences") or []
             provider = str(body.get("provider") or "m2m100").strip().lower()
             credentials = body.get("credentials") or {}
             if not isinstance(sentences_raw, list):
                 self._send_json({"error": "sentences must be an array"}, status=400)
                 return
-            try:
-                from .media_pipeline import translate_text_with_provider
-                translations: dict[str, str] = {}
-                for sentence in sentences_raw:
-                    text = str(sentence or "").strip()
-                    if not text:
-                        continue
-                    translated = translate_text_with_provider(
-                        text=text,
-                        translation_provider=provider,
-                        provider_credentials=credentials,
-                    )
-                    translations[text] = translated
-                self._send_json({"translations": translations})
-            except Exception as exc:
-                self._send_json({"error": str(exc)}, status=500)
+            _render_jobs_cleanup()
+            job_id = str(_uuid.uuid4())
+            with _render_jobs_lock:
+                _render_jobs[job_id] = {"status": "running", "zip": None, "error": None, "ts": _time.time()}
+
+            def _translate_job(jid: str, sentences_list: list, prov: str, creds: dict) -> None:
+                try:
+                    from .media_pipeline import translate_text_with_provider
+                    result: dict[str, str] = {}
+                    for sentence in sentences_list:
+                        text = str(sentence or "").strip()
+                        if not text:
+                            continue
+                        result[text] = translate_text_with_provider(
+                            text=text, translation_provider=prov, provider_credentials=creds)
+                    payload = json.dumps({"translations": result}, ensure_ascii=False).encode("utf-8")
+                    with _render_jobs_lock:
+                        _render_jobs[jid] = {"status": "done", "zip": payload, "error": None, "ts": _time.time()}
+                except Exception as exc:
+                    with _render_jobs_lock:
+                        _render_jobs[jid] = {"status": "error", "zip": None, "error": str(exc), "ts": _time.time()}
+
+            _threading.Thread(target=_translate_job, args=(job_id, list(sentences_raw), provider, credentials), daemon=True).start()
+            self._send_json({"job_id": job_id, "status": "running"})
             return
 
         if path == "/api/submit-media":

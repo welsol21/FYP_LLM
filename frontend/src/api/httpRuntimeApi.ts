@@ -868,32 +868,39 @@ export class HttpRuntimeApi implements RuntimeApi {
         if (sentenceKeys.length > 0) {
           log(2, `Translating sentences (0/${sentenceKeys.length})...`, 50)
           if (BACKEND_PROVIDERS.has(provider)) {
-            // One request per sentence, up to 3 concurrent.
+            // Submit all sentences in one async batch job — server translates sequentially
+            // with cached model; no per-sentence HTTP round-trips through Cloudflare.
             const enabledProvider = input.translatorOptions?.find((p: { id: string }) => p.id === provider)
             const credentials = (enabledProvider as any)?.credentials || {}
-            let done = 0
-            await runConcurrent(
-              sentenceKeys.map((sentence) => async () => {
-                ensureNotAborted()
-                const result = await requestJson<{ translations: Record<string, string> }>(
-                  apiUrl('/api/translate'),
-                  {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sentences: [sentence], provider, credentials }),
-                    signal: input.signal,
-                  },
-                ).catch((err: unknown) => {
-                  if (err instanceof DOMException && err.name === 'AbortError') throw err
-                  recordRuntimeDiagnostic('api.media.backend', 'translate.error', String(err instanceof Error ? err.message : err), 'error')
-                  return { translations: {} as Record<string, string> }
-                })
-                Object.assign(translations, result.translations || {})
-                done++
-                log(2, `Translating sentences (${done}/${sentenceKeys.length})`, 50 + Math.round((done / Math.max(sentenceKeys.length, 1)) * 48))
-              }),
-              3,
+            const submitRes = await requestJson<{ job_id: string }>(
+              apiUrl('/api/translate'),
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sentences: sentenceKeys, provider, credentials }),
+                signal: input.signal,
+              },
             )
+            const translateJobId = submitRes.job_id
+            let pollCount = 0
+            while (true) {
+              ensureNotAborted()
+              await new Promise<void>((resolve) => setTimeout(resolve, 1500))
+              ensureNotAborted()
+              pollCount++
+              log(2, `Translating… (${pollCount * 1.5 | 0}s)`, 50 + Math.min(pollCount * 2, 45))
+              const statusRes = await fetch(apiUrl(`/api/translate-status/${translateJobId}`), { signal: input.signal })
+              const statusJson = await statusRes.json() as { status: string; translations?: Record<string, string>; error?: string }
+              if (statusJson.status === 'error') {
+                recordRuntimeDiagnostic('api.media.backend', 'translate.error', statusJson.error ?? 'unknown', 'error')
+                break
+              }
+              if (statusJson.status === 'done' || statusJson.translations) {
+                Object.assign(translations, statusJson.translations || {})
+                break
+              }
+              // still running — keep polling
+            }
             log(2, `Translated ${Object.keys(translations).length}/${sentenceKeys.length} sentences`, 98)
           } else {
             // Default: use local opus-mt-en-ru model in browser worker
