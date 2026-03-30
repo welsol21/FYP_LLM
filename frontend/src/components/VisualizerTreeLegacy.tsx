@@ -144,7 +144,7 @@ function nodeTokens(node: VisualizerNode, level: number): Token[] {
   return [{ text: node.content, tone }]
 }
 
-type NoteLevel = 'elementary' | 'intermediate' | 'advanced'
+type NoteLevel = 'elementary' | 'intermediate' | 'advanced' | 'all'
 
 type Props = {
   node: VisualizerNode
@@ -238,7 +238,13 @@ export function VisualizerTreeLegacy({
       <div className="lv-details-card">
         <div><strong>CEFR:</strong> {cefrText}</div>
         <div><strong>Tense:</strong> {tenseText}</div>
-        {noteLevel === 'elementary' ? (
+        {noteLevel === 'all' ? (
+          <>
+            {notes.elementary ? <div><strong>Linguistic Notes (Elementary):</strong> {notes.elementary}</div> : null}
+            <div><strong>Linguistic Notes (Intermediate):</strong> {intermediateText}</div>
+            {notes.advanced ? <div><strong>Linguistic Notes (Advanced):</strong> {notes.advanced}</div> : null}
+          </>
+        ) : noteLevel === 'elementary' ? (
           <div><strong>Linguistic Notes (Elementary):</strong> {notes.elementary || intermediateText}</div>
         ) : noteLevel === 'advanced' ? (
           <div><strong>Linguistic Notes (Advanced):</strong> {notes.advanced || intermediateText}</div>

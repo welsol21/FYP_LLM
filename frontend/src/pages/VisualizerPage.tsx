@@ -255,7 +255,7 @@ export function VisualizerPage() {
     typeof window !== 'undefined' ? window.innerWidth <= 860 : false,
   )
   const [editorMode, setEditorMode] = useState<'quick' | 'translate' | 'noteLevel' | 'none'>('none')
-  const [noteLevel, setNoteLevel] = useState<'elementary' | 'intermediate' | 'advanced'>('intermediate')
+  const [noteLevel, setNoteLevel] = useState<'elementary' | 'intermediate' | 'advanced' | 'all'>('intermediate')
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [nodeId, setNodeId] = useState('')
   const [selectedNodeLabel, setSelectedNodeLabel] = useState('')
@@ -430,36 +430,30 @@ export function VisualizerPage() {
       <section className="visualizer-row">
         <form onSubmit={onApplyEdit} className="card quick-edit-grid" aria-label="edit-form">
           <div className="quick-edit-switches">
-            {!quickEditOpen ? (
-              <button
-                type="button"
-                className="quick-edit-title-btn"
-                onClick={() => setEditorMode('quick')}
-                aria-label="toggle-quick-edit"
-              >
-                Quick Node Edit
-              </button>
-            ) : null}
-            {!translateOpen ? (
-              <button
-                type="button"
-                className="translation-control-btn"
-                onClick={() => setEditorMode('translate')}
-                aria-label="toggle-translate-controls"
-              >
-                Translate
-              </button>
-            ) : null}
-            {!noteLevelOpen ? (
-              <button
-                type="button"
-                className="translation-control-btn"
-                onClick={() => setEditorMode('noteLevel')}
-                aria-label="toggle-note-level"
-              >
-                Note Level
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className={`quick-edit-title-btn${quickEditOpen ? ' active' : ''}`}
+              onClick={() => setEditorMode(quickEditOpen ? 'none' : 'quick')}
+              aria-label="toggle-quick-edit"
+            >
+              Quick Node Edit
+            </button>
+            <button
+              type="button"
+              className={`translation-control-btn${translateOpen ? ' active' : ''}`}
+              onClick={() => setEditorMode(translateOpen ? 'none' : 'translate')}
+              aria-label="toggle-translate-controls"
+            >
+              Translate
+            </button>
+            <button
+              type="button"
+              className={`translation-control-btn${noteLevelOpen ? ' active' : ''}`}
+              onClick={() => setEditorMode(noteLevelOpen ? 'none' : 'noteLevel')}
+              aria-label="toggle-note-level"
+            >
+              Note Level
+            </button>
           </div>
           {translateOpen ? (
             <section className="quick-edit-section quick-edit-section-translate">
@@ -512,14 +506,14 @@ export function VisualizerPage() {
               <h2 className="quick-edit-section-title">Note Level</h2>
               <div className="quick-edit-translate-panel">
                 <div className="touch-options-grid translation-view-options">
-                  {(['elementary', 'intermediate', 'advanced'] as const).map((lvl) => (
+                  {(['elementary', 'intermediate', 'advanced', 'all'] as const).map((lvl) => (
                     <button
                       key={lvl}
                       type="button"
                       className={`touch-option-btn ${noteLevel === lvl ? 'active' : ''}`}
                       onClick={() => setNoteLevel(lvl)}
                     >
-                      {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
+                      {lvl === 'all' ? 'All levels' : lvl.charAt(0).toUpperCase() + lvl.slice(1)}
                     </button>
                   ))}
                 </div>
