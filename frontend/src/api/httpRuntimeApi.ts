@@ -866,39 +866,31 @@ export class HttpRuntimeApi implements RuntimeApi {
         if (sentenceKeys.length > 0) {
           log(2, `Translating sentences (0/${sentenceKeys.length})...`, 50)
           if (BACKEND_PROVIDERS.has(provider)) {
-            // Translate via backend in parallel batches to avoid Cloudflare's 100s timeout.
-            // Each batch of BATCH_SIZE sentences is a separate request; up to CONCURRENCY run at once.
-            const BATCH_SIZE = 8
-            const CONCURRENCY = 3
+            // One request per sentence, up to 3 concurrent.
             const enabledProvider = input.translatorOptions?.find((p: { id: string }) => p.id === provider)
             const credentials = (enabledProvider as any)?.credentials || {}
-            const batches: string[][] = []
-            for (let i = 0; i < sentenceKeys.length; i += BATCH_SIZE) {
-              batches.push(sentenceKeys.slice(i, i + BATCH_SIZE))
-            }
-            let batchesDone = 0
+            let done = 0
             await runConcurrent(
-              batches.map((batch) => async () => {
+              sentenceKeys.map((sentence) => async () => {
                 ensureNotAborted()
                 const result = await requestJson<{ translations: Record<string, string> }>(
                   apiUrl('/api/translate'),
                   {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ sentences: batch, provider, credentials }),
+                    body: JSON.stringify({ sentences: [sentence], provider, credentials }),
                     signal: input.signal,
                   },
                 ).catch((err: unknown) => {
                   if (err instanceof DOMException && err.name === 'AbortError') throw err
                   recordRuntimeDiagnostic('api.media.backend', 'translate.error', String(err instanceof Error ? err.message : err), 'error')
-                  log(2, `Translation error: ${err instanceof Error ? err.message : String(err)}`, 50)
                   return { translations: {} as Record<string, string> }
                 })
                 Object.assign(translations, result.translations || {})
-                batchesDone += batch.length
-                log(2, `Translating sentences (${batchesDone}/${sentenceKeys.length})`, 50 + Math.round((batchesDone / Math.max(sentenceKeys.length, 1)) * 48))
+                done++
+                log(2, `Translating sentences (${done}/${sentenceKeys.length})`, 50 + Math.round((done / Math.max(sentenceKeys.length, 1)) * 48))
               }),
-              CONCURRENCY,
+              3,
             )
             log(2, `Translated ${Object.keys(translations).length}/${sentenceKeys.length} sentences`, 98)
           } else {
