@@ -245,7 +245,8 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
         is_bilingual_text = source_pcm is None and subtitles_mode not in ("target", "source")
 
         async def _generate_all() -> "tuple[list[bytes], list[bytes]]":
-            sem = asyncio.Semaphore(4)
+            # Use higher concurrency for bilingual text (2× the TTS calls) to stay under 100s Cloudflare timeout
+            sem = asyncio.Semaphore(8 if is_bilingual_text else 4)
             async def _empty() -> bytes:
                 return b""
             ru_tasks = [
