@@ -266,7 +266,6 @@ export function VisualizerPage() {
   const [newValue, setNewValue] = useState('')
   const [editStatus, setEditStatus] = useState('')
   const [selectedTranslationProvider, setSelectedTranslationProvider] = useState('m2m100')
-  const [showAllTranslations, setShowAllTranslations] = useState(false)
 
   async function refresh() {
     const normalized: Array<{ sentence_text: string; tree: VisualizerNode; document_id: string }> = []
@@ -330,13 +329,16 @@ export function VisualizerPage() {
     return Array.from(out).sort()
   })()
 
+  const showAllTranslations = selectedTranslationProvider === 'all'
+  const effectiveTranslationProvider = showAllTranslations ? 'm2m100' : selectedTranslationProvider
+
   useEffect(() => {
     const preferred = normalizeTranslationProviderForUi(activeRow?.tree?.active_translation_provider)
     if (preferred && translationProviderOptions.includes(preferred)) {
       setSelectedTranslationProvider(preferred)
       return
     }
-    if (!translationProviderOptions.includes(selectedTranslationProvider)) {
+    if (selectedTranslationProvider !== 'all' && !translationProviderOptions.includes(selectedTranslationProvider)) {
       setSelectedTranslationProvider('m2m100')
     }
   }, [activeRow?.tree?.active_translation_provider, translationProviderOptions.join('|')])
@@ -461,33 +463,16 @@ export function VisualizerPage() {
               <div className="quick-edit-translate-panel">
               <label className="quick-edit-translate-label">Translation provider</label>
               <div className="touch-options-grid translation-provider-options">
-                {translationProviderOptions.map((provider) => (
+                {[...translationProviderOptions, 'all'].map((provider) => (
                   <button
                     key={provider}
                     type="button"
                     className={`touch-option-btn ${selectedTranslationProvider === provider ? 'active' : ''}`}
                     onClick={() => setSelectedTranslationProvider(provider)}
                   >
-                    {formatTranslationProviderLabel(provider)}
+                    {provider === 'all' ? 'All translations' : formatTranslationProviderLabel(provider)}
                   </button>
                 ))}
-              </div>
-              <label className="quick-edit-translate-label">Translations view</label>
-              <div className="touch-options-grid translation-view-options">
-                <button
-                  type="button"
-                  className={`touch-option-btn ${!showAllTranslations ? 'active' : ''}`}
-                  onClick={() => setShowAllTranslations(false)}
-                >
-                  Active only
-                </button>
-                <button
-                  type="button"
-                  className={`touch-option-btn ${showAllTranslations ? 'active' : ''}`}
-                  onClick={() => setShowAllTranslations(true)}
-                >
-                  All translations
-                </button>
               </div>
               <div className="quick-edit-actions quick-edit-actions-right">
                 <button
@@ -663,7 +648,7 @@ export function VisualizerPage() {
                 node={activeRow.tree}
                 isRoot
                 selectedNodeId={nodeId}
-                preferredTranslationProvider={selectedTranslationProvider}
+                preferredTranslationProvider={effectiveTranslationProvider}
                 showAllTranslations={showAllTranslations}
                 noteLevel={noteLevel}
                 onNodeSelect={onSelectNode}
