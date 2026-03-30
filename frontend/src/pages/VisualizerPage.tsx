@@ -442,19 +442,19 @@ export function VisualizerPage() {
             </button>
             <button
               type="button"
-              className={`translation-control-btn${translateOpen ? ' active' : ''}`}
-              onClick={() => setEditorMode(translateOpen ? 'none' : 'translate')}
-              aria-label="toggle-translate-controls"
-            >
-              Translate
-            </button>
-            <button
-              type="button"
               className={`translation-control-btn${noteLevelOpen ? ' active' : ''}`}
               onClick={() => setEditorMode(noteLevelOpen ? 'none' : 'noteLevel')}
               aria-label="toggle-note-level"
             >
               Note Level
+            </button>
+            <button
+              type="button"
+              className={`translation-control-btn${translateOpen ? ' active' : ''}`}
+              onClick={() => setEditorMode(translateOpen ? 'none' : 'translate')}
+              aria-label="toggle-translate-controls"
+            >
+              Translate
             </button>
           </div>
           {translateOpen ? (
@@ -474,15 +474,6 @@ export function VisualizerPage() {
                   </button>
                 ))}
               </div>
-              <div className="quick-edit-actions quick-edit-actions-right">
-                <button
-                  type="button"
-                  className="quick-edit-close-btn"
-                  onClick={() => setEditorMode('none')}
-                >
-                  Close
-                </button>
-              </div>
               </div>
             </section>
           ) : null}
@@ -501,15 +492,6 @@ export function VisualizerPage() {
                       {lvl === 'all' ? 'All levels' : lvl.charAt(0).toUpperCase() + lvl.slice(1)}
                     </button>
                   ))}
-                </div>
-                <div className="quick-edit-actions quick-edit-actions-right">
-                  <button
-                    type="button"
-                    className="quick-edit-close-btn"
-                    onClick={() => setEditorMode('none')}
-                  >
-                    Close
-                  </button>
                 </div>
               </div>
             </section>
@@ -607,13 +589,6 @@ export function VisualizerPage() {
                   onClick={() => setAdvancedOpen((prev) => !prev)}
                 >
                   {advancedOpen ? 'Basic' : 'Advanced'}
-                </button>
-                <button
-                  type="button"
-                  className="quick-edit-close-btn"
-                  onClick={() => setEditorMode('none')}
-                >
-                  Close
                 </button>
                 {editStatus ? <p className="quick-edit-status">{editStatus}</p> : null}
               </div>
