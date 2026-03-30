@@ -758,14 +758,16 @@ export class HttpRuntimeApi implements RuntimeApi {
 
       if (resumePoint === 'full' && resumeSentences === null) {
         if (isTextFile) {
-          // Text/PDF/DOCX — extract sentences via backend, no Whisper
+          // Text/PDF/DOCX — extract sentences via backend, no Whisper.
+          // The file lives in browser IndexedDB (not on the server), so send the blob directly.
           log(1, 'Extracting text from document…', 10)
+          const extractForm = new FormData()
+          extractForm.append('file', input.mediaBlob, input.fileName)
           const extractResult = await requestJson<{ source_type: string; sentences: Array<{ text: string; start_sec: number | null; end_sec: number | null }> }>(
             apiUrl('/api/extract-text'),
             {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ mediaPath: input.mediaPath }),
+              body: extractForm,
               signal: input.signal,
             },
           )

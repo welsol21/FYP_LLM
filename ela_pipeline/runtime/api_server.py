@@ -772,17 +772,33 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": str(exc)}, status=500)
             return
 
-        body = self._read_json_body()
-
         if path == "/api/extract-text":
-            # Extract sentences from a text/PDF/DOCX file (no audio).
+            # Extract sentences from a text/PDF/DOCX file sent as multipart 'file' field.
             # Returns {source_type, sentences: [{text, start_sec, end_sec}]}
-            media_path = str(body.get("mediaPath") or body.get("media_path") or "").strip()
-            if not media_path:
-                self._send_json({"error": "mediaPath is required"}, status=400)
-                return
+            import tempfile as _tempfile
             try:
-                result = extract_media_text_and_sentences(source_path=media_path)
+                if "multipart/form-data" in content_type:
+                    form = cgi.FieldStorage(
+                        fp=self.rfile,
+                        headers=self.headers,
+                        environ={"REQUEST_METHOD": "POST", "CONTENT_TYPE": content_type},
+                    )
+                    file_item = form["file"] if "file" in form else None
+                    if file_item is None:
+                        self._send_json({"error": "file field is required"}, status=400)
+                        return
+                    file_bytes = file_item.file.read()
+                    suffix = Path(str(file_item.filename or "upload.txt")).suffix or ".txt"
+                    with _tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                        tmp.write(file_bytes)
+                        tmp_path = tmp.name
+                else:
+                    body_et = self._read_json_body()
+                    tmp_path = str(body_et.get("mediaPath") or body_et.get("media_path") or "").strip()
+                    if not tmp_path:
+                        self._send_json({"error": "file field or mediaPath is required"}, status=400)
+                        return
+                result = extract_media_text_and_sentences(source_path=tmp_path)
                 sentences = [
                     {
                         "text": text,
@@ -794,7 +810,15 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self._send_json({"source_type": result.source_type, "sentences": sentences})
             except Exception as exc:
                 self._send_json({"error": str(exc)}, status=500)
+            finally:
+                if "multipart/form-data" in content_type:
+                    try:
+                        import os as _os; _os.unlink(tmp_path)
+                    except Exception:
+                        pass
             return
+
+        body = self._read_json_body()
 
         if path == "/api/translate":
             # Translate an array of English sentences to Russian using a specified provider.
