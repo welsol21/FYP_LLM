@@ -595,6 +595,7 @@ export class HttpRuntimeApi implements RuntimeApi {
     const stageNames = ['loading_file', 'transcribing_audio', 'linguistic_parsing', 'generating_media', 'exporting_files']
     let mediaStageClosed = false
     const log = (stage: number, text: string, pct: number): void => {
+      if (input.signal?.aborted) return  // stop progress updates once cancelled
       if (stage >= 4 && !mediaStageClosed) {
         progress[3] = 100
         mediaStageClosed = true
