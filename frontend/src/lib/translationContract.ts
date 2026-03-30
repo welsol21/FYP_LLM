@@ -59,8 +59,17 @@ export function resolveNodeTranslationVariant(
   }
 
   const index = buildTranslationIndex(translations)
-  const preferredResolved = resolveByCanonicalProvider(index, preferredProvider || node.active_translation_provider)
-  if (preferredResolved) return preferredResolved
+
+  // If a provider was explicitly chosen by the user, do not fall back to another provider.
+  if (preferredProvider && normalizeProviderKey(preferredProvider)) {
+    const canonical = canonicalizeProviderKey(preferredProvider)
+    const text = index.get(canonical)
+    return text ? { provider: canonical, text } : { provider: canonical, text: '-' }
+  }
+
+  // No explicit preferred — use active_translation_provider, then canonical, then any.
+  const activeResolved = resolveByCanonicalProvider(index, node.active_translation_provider)
+  if (activeResolved) return activeResolved
 
   const canonicalResolved = resolveByCanonicalProvider(index, canonicalProvider)
   if (canonicalResolved) return canonicalResolved
