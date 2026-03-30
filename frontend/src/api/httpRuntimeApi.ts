@@ -964,8 +964,8 @@ export class HttpRuntimeApi implements RuntimeApi {
           LocalWorkspace.getAnalysisArtifactBlob(documentId, 'translated_audio_ru.mp3'),
           LocalWorkspace.getAnalysisArtifactBlob(documentId, 'translated_video_ru.mp4'),
         ])
-        const needAudio = !existingAudio
-        const needVideo = !existingVideo
+        const needAudio = input.forceFullReprocess || !existingAudio
+        const needVideo = input.forceFullReprocess || !existingVideo
 
         try {
           let audioBlob: Blob = existingAudio ?? new Blob([], { type: 'audio/mpeg' })
