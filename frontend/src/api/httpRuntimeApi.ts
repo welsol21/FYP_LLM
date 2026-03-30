@@ -911,6 +911,17 @@ export class HttpRuntimeApi implements RuntimeApi {
           }
         }
         log(2, 'Translation complete', 100)
+        // Write translations back into contract nodes so resume can recover them.
+        // (clientTranslateAnalysis does this internally; backend providers must do it here.)
+        if (Object.keys(translations).length > 0 && !providerIsOriginal) {
+          for (const [sentenceText, translatedText] of Object.entries(translations)) {
+            const node = contract[sentenceText]
+            if (node && translatedText) {
+              node.translations = { ...(node.translations || {}), [provider]: { text: translatedText } }
+              node.active_translation_provider = provider
+            }
+          }
+        }
         // Save translated contract at contractDocId so future runs with a different
         // voice/subtitles can resume from 'tts' without re-translating.
         if (Object.keys(translations).length > 0) {
