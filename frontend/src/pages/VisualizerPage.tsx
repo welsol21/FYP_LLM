@@ -461,7 +461,6 @@ export function VisualizerPage() {
             <section className="quick-edit-section quick-edit-section-translate">
               <h2 className="quick-edit-section-title">Translate</h2>
               <div className="quick-edit-translate-panel">
-              <label className="quick-edit-translate-label">Translation provider</label>
               <div className="touch-options-grid translation-provider-options">
                 {[...translationProviderOptions, 'all'].map((provider) => (
                   <button
