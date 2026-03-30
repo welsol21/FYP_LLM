@@ -263,15 +263,14 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
 
                 # ── Subtitle entries at output positions ─────────────────────
                 if is_simultaneous:
-                    # EN upper-middle, RU lower-middle — both in the centre zone of
-                    # the 1280×720 frame (not at the very top/bottom edges).
-                    # \an8 = top-anchor → pos y is the top of the text block.
-                    # \an2 = bottom-anchor → pos y is the bottom of the text block.
+                    # EN top-center, RU bottom-center — well separated in the 1280×720 frame.
+                    # \an8 = top-anchor → text grows downward from y=60.
+                    # \an2 = bottom-anchor → text grows upward from y=660.
                     if en:
-                        video_srt_entries.append((pos_en, end_all_ms, r'{\an8\pos(640,250)}' + en))
+                        video_srt_entries.append((pos_en, end_all_ms, r'{\an8\pos(640,60)}' + en))
                         en_out_entries.append((pos_en, end_all_ms, en))
                     if ru:
-                        video_srt_entries.append((pos_en, end_all_ms, r'{\an2\pos(640,470)}' + ru))
+                        video_srt_entries.append((pos_en, end_all_ms, r'{\an2\pos(640,660)}' + ru))
                         ru_out_entries.append((pos_en, end_all_ms, ru))
                 else:
                     # Sequential: EN during source clip (center), RU during TTS (center)
