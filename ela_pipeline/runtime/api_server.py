@@ -110,6 +110,56 @@ def _format_srt_time(ms: int) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
+def _bisim_layout(
+    en: str,
+    ru: str,
+    base_font: int = 54,
+    screen_w: int = 1280,
+    screen_h: int = 720,
+    margin_x: int = 80,
+    margin_top: int = 40,
+    margin_bottom: int = 40,
+) -> tuple[int, int, int]:
+    """Return (font_size, en_y, ru_y) for bilingual-simultaneous ASS tags.
+
+    EN is top-anchored (\an8) at en_y — text grows downward.
+    RU is bottom-anchored (\an2) at ru_y — text grows upward.
+    Font size is reduced until both blocks fit without overlap.
+    """
+    def _text_height(text: str, fs: int) -> float:
+        if not text.strip():
+            return 0.0
+        usable_w = screen_w - 2 * margin_x
+        # Approximate average character width for DejaVu Sans
+        avg_char_w = fs * 0.55
+        chars_per_line = max(1, int(usable_w / avg_char_w))
+        lines = 1
+        col = 0
+        for word in text.split():
+            w = len(word)
+            if col == 0:
+                col = w
+            elif col + 1 + w <= chars_per_line:
+                col += 1 + w
+            else:
+                lines += 1
+                col = w
+        return lines * fs * 1.35  # 1.35 line-height factor
+
+    available_h = screen_h - margin_top - margin_bottom
+    font_size = base_font
+    for fs in range(base_font, 18, -2):
+        if _text_height(en, fs) + _text_height(ru, fs) <= available_h:
+            font_size = fs
+            break
+    else:
+        font_size = 18
+
+    en_y = margin_top
+    ru_y = screen_h - margin_bottom
+    return font_size, en_y, ru_y
+
+
 def _build_srt(sentences: list[dict], mode: str) -> str:
     blocks: list[str] = []
     cue = 1
@@ -263,14 +313,13 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
 
                 # ── Subtitle entries at output positions ─────────────────────
                 if is_simultaneous:
-                    # EN top-center, RU bottom-center — well separated in the 1280×720 frame.
-                    # \an8 = top-anchor → text grows downward from y=60.
-                    # \an2 = bottom-anchor → text grows upward from y=660.
+                    # Dynamic layout: shrink font until both blocks fit without overlap.
+                    _fs, _en_y, _ru_y = _bisim_layout(en, ru)
                     if en:
-                        video_srt_entries.append((pos_en, end_all_ms, r'{\an8\pos(640,60)}' + en))
+                        video_srt_entries.append((pos_en, end_all_ms, f'{{\\an8\\pos(640,{_en_y})\\fs{_fs}}}' + en))
                         en_out_entries.append((pos_en, end_all_ms, en))
                     if ru:
-                        video_srt_entries.append((pos_en, end_all_ms, r'{\an2\pos(640,660)}' + ru))
+                        video_srt_entries.append((pos_en, end_all_ms, f'{{\\an2\\pos(640,{_ru_y})\\fs{_fs}}}' + ru))
                         ru_out_entries.append((pos_en, end_all_ms, ru))
                 else:
                     # Sequential: EN during source clip (center), RU during TTS (center)
@@ -407,7 +456,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
 
     def _entries_to_ass(entries: "list[tuple[int,int,str]]") -> str:
         header = (
-            "[Script Info]\nScriptType: v4.00+\nPlayResX: 1280\nPlayResY: 720\nWrapStyle: 0\n\n"
+            "[Script Info]\nScriptType: v4.00+\nPlayResX: 1280\nPlayResY: 720\nWrapStyle: 1\n\n"
             "[V4+ Styles]\n"
             "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
             "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
