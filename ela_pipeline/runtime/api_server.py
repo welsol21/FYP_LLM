@@ -198,6 +198,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
 
     TARGET_RATE = 24000
     voice_name = "ru-RU-SvetlanaNeural" if voice.startswith("f") else "ru-RU-DmitryNeural"
+    en_voice_name = "en-US-JennyNeural" if voice.startswith("f") else "en-US-GuyNeural"
 
     def _decode_audio(raw_bytes: bytes) -> np.ndarray:
         proc = subprocess.run(
@@ -217,8 +218,9 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
     # ── 2. Generate TTS (only if audio or video needed) ───────────────────────
     output_pcm: "np.ndarray | None" = None
     if need_audio or need_video:
-        async def _tts(text: str, sem: asyncio.Semaphore) -> bytes:
+        async def _tts(text: str, sem: asyncio.Semaphore, voice_override: "str | None" = None) -> bytes:
             import edge_tts as _edge_tts
+            _v = voice_override or voice_name
             # Retry up to 3 times (matches reference try_generate_tts).
             # Returns b"" on permanent failure so one bad sentence doesn't
             # abort the entire render.
@@ -227,7 +229,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                     with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
                         tmp = Path(f.name)
                     try:
-                        await _edge_tts.Communicate(text, voice_name).save(str(tmp))
+                        await _edge_tts.Communicate(text, _v).save(str(tmp))
                         data = tmp.read_bytes()
                         if data:
                             return data
@@ -239,19 +241,31 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                     await asyncio.sleep(1.5)
             return b""
 
-        async def _generate_all() -> list[bytes]:
+        is_bilingual_text = source_pcm is None and subtitles_mode not in ("target", "source")
+
+        async def _generate_all() -> "tuple[list[bytes], list[bytes]]":
             sem = asyncio.Semaphore(4)
             async def _empty() -> bytes:
                 return b""
-            tasks = [
+            ru_tasks = [
                 _tts(str(s.get("text_ru") or ""), sem) if str(s.get("text_ru") or "").strip() else _empty()
                 for s in sentences
             ]
-            return list(await asyncio.gather(*tasks, return_exceptions=False))
+            en_tasks = [
+                _tts(str(s.get("text_eng") or ""), sem, voice_override=en_voice_name)
+                if is_bilingual_text and str(s.get("text_eng") or "").strip() else _empty()
+                for s in sentences
+            ]
+            all_results = list(await asyncio.gather(*(ru_tasks + en_tasks), return_exceptions=False))
+            n = len(sentences)
+            return all_results[:n], all_results[n:]
 
-        tts_blobs: list[bytes] = asyncio.run(_generate_all())
+        tts_blobs, en_tts_blobs = asyncio.run(_generate_all())
         tts_pcms: list["np.ndarray | None"] = [
             _decode_audio(b) if b else None for b in tts_blobs
+        ]
+        en_tts_pcms: list["np.ndarray | None"] = [
+            _decode_audio(b) if b else None for b in en_tts_blobs
         ]
 
         # ── 3. Assemble bilingual PCM; track output positions for video SRT ──────
@@ -350,6 +364,65 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                         max(300, int(sent.get("end_ms") or 0)),
                         en,
                     ))
+
+        elif is_bilingual_text:
+            # Bilingual text-file mode: no source audio — use EN TTS + 10ms gap + RU TTS per sentence.
+            chunks: list[np.ndarray] = []
+            out_samples = 0
+            SILENCE_10MS = int(0.01 * TARGET_RATE)
+            INTER_GAP = int(0.2 * TARGET_RATE)  # 200ms between sentences
+
+            for idx, (sent, en_tts_pcm, tts_pcm) in enumerate(zip(sentences, en_tts_pcms, tts_pcms)):
+                en = str(sent.get("text_eng") or "").strip()
+                ru = str(sent.get("text_ru") or "").strip()
+
+                pos_en = int(out_samples / TARGET_RATE * 1000)
+
+                # English TTS clip
+                dur_e = 0
+                if en_tts_pcm is not None and len(en_tts_pcm) > 0:
+                    chunks.append(en_tts_pcm)
+                    out_samples += len(en_tts_pcm)
+                    dur_e = len(en_tts_pcm)
+                end_en_ms = int(out_samples / TARGET_RATE * 1000)
+
+                # 10ms silence between EN and RU TTS
+                chunks.append(np.zeros(SILENCE_10MS, dtype=np.float32))
+                out_samples += SILENCE_10MS
+
+                # Russian TTS clip
+                pos_ru = int(out_samples / TARGET_RATE * 1000)
+                dur_r = 0
+                if tts_pcm is not None and len(tts_pcm) > 0:
+                    chunks.append(tts_pcm)
+                    out_samples += len(tts_pcm)
+                    dur_r = len(tts_pcm)
+                end_ru_ms = int(out_samples / TARGET_RATE * 1000)
+
+                end_all_ms = end_ru_ms
+
+                if is_simultaneous:
+                    _fs, _en_y, _ru_y = _bisim_layout(en, ru)
+                    if en:
+                        video_srt_entries.append((pos_en, end_all_ms, f'{{\\an8\\pos(640,{_en_y})\\fs{_fs}}}' + en))
+                        en_out_entries.append((pos_en, end_all_ms, en))
+                    if ru:
+                        video_srt_entries.append((pos_en, end_all_ms, f'{{\\an2\\pos(640,{_ru_y})\\fs{_fs}}}' + ru))
+                        ru_out_entries.append((pos_en, end_all_ms, ru))
+                else:
+                    if en and dur_e > 0:
+                        video_srt_entries.append((pos_en, end_en_ms, en))
+                        en_out_entries.append((pos_en, end_en_ms, en))
+                    if ru and dur_r > 0:
+                        video_srt_entries.append((pos_ru, end_ru_ms, ru))
+                        ru_out_entries.append((pos_ru, end_ru_ms, ru))
+
+                # 200ms gap between sentences
+                if idx < len(sentences) - 1:
+                    chunks.append(np.zeros(INTER_GAP, dtype=np.float32))
+                    out_samples += INTER_GAP
+
+            output_pcm = np.concatenate(chunks) if chunks else np.zeros(TARGET_RATE, dtype=np.float32)
 
         else:
             # Target-only / text-file TTS: no source audio.
