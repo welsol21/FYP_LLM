@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import multiprocessing as _mp
 import os
 import cgi
 import queue as _queue
@@ -43,6 +44,90 @@ def _render_jobs_cleanup() -> None:
         stale = [jid for jid, j in _render_jobs.items() if j["ts"] < cutoff]
         for jid in stale:
             del _render_jobs[jid]
+
+
+# ── Translation worker process ────────────────────────────────────────────────
+# M2M100 is CPU-bound and holds the GIL.  Running it in a threading.Thread
+# blocks ThreadingHTTPServer from responding.  We run it in a separate OS
+# process so it has its own GIL and the HTTP server stays responsive.
+_translate_req_q: "_mp.Queue | None" = None
+_translate_res_q: "_mp.Queue | None" = None
+_translate_worker_proc: "_mp.Process | None" = None
+
+
+def _translation_worker_loop(req_q: "_mp.Queue", res_q: "_mp.Queue") -> None:
+    """Runs in a child process.  Loads translate_text_with_provider once, then
+    processes requests from req_q and posts results to res_q."""
+    # Lazy import so the child process loads the model on first use.
+    translate_fn = None
+
+    def _get_translate():
+        nonlocal translate_fn
+        if translate_fn is None:
+            from ela_pipeline.runtime.media_pipeline import translate_text_with_provider
+            translate_fn = translate_text_with_provider
+        return translate_fn
+
+    while True:
+        try:
+            item = req_q.get(timeout=120)
+        except Exception:
+            continue
+        if item is None:
+            break  # shutdown signal
+        job_id: str = item["job_id"]
+        sentences: list = item["sentences"]
+        provider: str = item["provider"]
+        credentials: dict = item["credentials"]
+        try:
+            fn = _get_translate()
+            result: dict[str, str] = {}
+            for text in sentences:
+                text = str(text or "").strip()
+                if text:
+                    result[text] = fn(text=text, translation_provider=provider,
+                                      provider_credentials=credentials)
+            res_q.put({"job_id": job_id, "status": "done", "translations": result})
+        except Exception as exc:
+            res_q.put({"job_id": job_id, "status": "error", "error": str(exc)})
+
+
+def _translation_result_collector() -> None:
+    """Background thread: drains res_q and updates _render_jobs."""
+    while True:
+        try:
+            item = _translate_res_q.get(timeout=5)  # type: ignore[union-attr]
+        except Exception:
+            continue
+        job_id: str = item["job_id"]
+        if item["status"] == "done":
+            payload = json.dumps({"translations": item["translations"]},
+                                 ensure_ascii=False).encode("utf-8")
+            with _render_jobs_lock:
+                _render_jobs[job_id] = {"status": "done", "zip": payload,
+                                        "error": None, "ts": _time.time()}
+        else:
+            with _render_jobs_lock:
+                _render_jobs[job_id] = {"status": "error", "zip": None,
+                                        "error": item.get("error", "translation failed"),
+                                        "ts": _time.time()}
+
+
+def _start_translation_worker() -> None:
+    global _translate_req_q, _translate_res_q, _translate_worker_proc
+    _translate_req_q = _mp.Queue()
+    _translate_res_q = _mp.Queue()
+    _translate_worker_proc = _mp.Process(
+        target=_translation_worker_loop,
+        args=(_translate_req_q, _translate_res_q),
+        daemon=True,
+        name="ela-translate-worker",
+    )
+    _translate_worker_proc.start()
+    _threading.Thread(target=_translation_result_collector, daemon=True,
+                      name="ela-translate-collector").start()
+    print("[runtime-api] translation worker process started "
+          f"(pid={_translate_worker_proc.pid})", flush=True)
 
 
 def _env_int(name: str, default: int) -> int:
@@ -979,7 +1064,8 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
         body = self._read_json_body()
 
         if path == "/api/translate":
-            # Async batch translation. Body: {sentences: string[], provider, credentials?}
+            # Async batch translation via worker process (avoids GIL blocking HTTP server).
+            # Body: {sentences: string[], provider, credentials?}
             # Returns {job_id} immediately; poll /api/translate-status/<job_id>.
             sentences_raw = body.get("sentences") or []
             provider = str(body.get("provider") or "m2m100").strip().lower()
@@ -987,29 +1073,19 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
             if not isinstance(sentences_raw, list):
                 self._send_json({"error": "sentences must be an array"}, status=400)
                 return
+            if _translate_req_q is None:
+                self._send_json({"error": "translation worker not available"}, status=503)
+                return
             _render_jobs_cleanup()
             job_id = str(_uuid.uuid4())
             with _render_jobs_lock:
                 _render_jobs[job_id] = {"status": "running", "zip": None, "error": None, "ts": _time.time()}
-
-            def _translate_job(jid: str, sentences_list: list, prov: str, creds: dict) -> None:
-                try:
-                    from .media_pipeline import translate_text_with_provider
-                    result: dict[str, str] = {}
-                    for sentence in sentences_list:
-                        text = str(sentence or "").strip()
-                        if not text:
-                            continue
-                        result[text] = translate_text_with_provider(
-                            text=text, translation_provider=prov, provider_credentials=creds)
-                    payload = json.dumps({"translations": result}, ensure_ascii=False).encode("utf-8")
-                    with _render_jobs_lock:
-                        _render_jobs[jid] = {"status": "done", "zip": payload, "error": None, "ts": _time.time()}
-                except Exception as exc:
-                    with _render_jobs_lock:
-                        _render_jobs[jid] = {"status": "error", "zip": None, "error": str(exc), "ts": _time.time()}
-
-            _threading.Thread(target=_translate_job, args=(job_id, list(sentences_raw), provider, credentials), daemon=True).start()
+            _translate_req_q.put({
+                "job_id": job_id,
+                "sentences": list(sentences_raw),
+                "provider": provider,
+                "credentials": credentials,
+            })
             self._send_json({"job_id": job_id, "status": "running"})
             return
 
@@ -1217,6 +1293,8 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
 
 def main() -> None:
     import threading
+
+    _start_translation_worker()
 
     host = os.getenv("ELA_RUNTIME_HTTP_HOST", "0.0.0.0")
     port = _env_int("ELA_RUNTIME_HTTP_PORT", 8000)
