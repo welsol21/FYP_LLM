@@ -38,23 +38,36 @@ type Token = { text: string; tone: string }
 const GAP_TONE = '#6b7280'
 
 function orderedChildren(node: VisualizerNode): VisualizerNode[] {
-  const src = node.linguistic_elements.map((child, idx) => ({ child, idx }))
-  const parent = node.content.toLowerCase()
-  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const firstBoundaryIndex = (text: string): number => {
-    const needle = text.trim().toLowerCase()
-    if (!needle) return Number.MAX_SAFE_INTEGER
-    const pattern = new RegExp(`\\b${escapeRegExp(needle)}\\b`, 'i')
-    const match = pattern.exec(parent)
-    return match ? match.index : Number.MAX_SAFE_INTEGER
-  }
+  const seen = new Set<string>()
+  const seenContent = new Set<string>()
+  const src = node.linguistic_elements
+    .filter((child) => {
+      if ((child as any).ref_node_id) return false
+      if (seen.has(child.node_id)) return false
+      seen.add(child.node_id)
+      // Deduplicate leaf word nodes that repeat the same content+pos within the same parent
+      if (child.linguistic_elements.length === 0) {
+        const contentKey = `${child.content?.toLowerCase()}|${child.part_of_speech}`
+        if (seenContent.has(contentKey)) return false
+        seenContent.add(contentKey)
+      }
+      return true
+    })
+    .map((child, idx) => ({ child, idx }))
+  const parentStart = node.source_span?.start ?? 0
   return src
     .sort((a, b) => {
-    const ai = firstBoundaryIndex(a.child.content)
-    const bi = firstBoundaryIndex(b.child.content)
-    const av = ai === -1 ? Number.MAX_SAFE_INTEGER : ai
-    const bv = bi === -1 ? Number.MAX_SAFE_INTEGER : bi
-      if (av !== bv) return av - bv
+      const aSpan = a.child.source_span?.start
+      const bSpan = b.child.source_span?.start
+      if (typeof aSpan === 'number' && typeof bSpan === 'number') {
+        const av = aSpan - parentStart
+        const bv = bSpan - parentStart
+        if (av !== bv) return av - bv
+        const aEnd = (a.child.source_span?.end ?? aSpan) - parentStart
+        const bEnd = (b.child.source_span?.end ?? bSpan) - parentStart
+        if (aEnd !== bEnd) return aEnd - bEnd
+        return a.idx - b.idx
+      }
       return a.idx - b.idx
     })
     .map((entry) => entry.child)

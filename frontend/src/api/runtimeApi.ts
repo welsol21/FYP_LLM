@@ -111,6 +111,7 @@ export type VisualizerNode = {
   linguistic_elements: VisualizerNode[]
   cefr_level?: string
   phonetic?: { uk?: string; us?: string }
+  ref_node_id?: string
   active_translation_provider?: string
   translations: Record<
     string,
