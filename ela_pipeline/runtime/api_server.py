@@ -56,17 +56,14 @@ _translate_worker_proc: "_mp.Process | None" = None
 
 
 def _translation_worker_loop(req_q: "_mp.Queue", res_q: "_mp.Queue") -> None:
-    """Runs in a child process.  Loads translate_text_with_provider once, then
-    processes requests from req_q and posts results to res_q."""
-    # Lazy import so the child process loads the model on first use.
-    translate_fn = None
+    """Runs in a child process. Uses batch translation APIs where available
+    (M2M100 single generate call, Lara single HTTP call)."""
 
-    def _get_translate():
-        nonlocal translate_fn
-        if translate_fn is None:
-            from ela_pipeline.runtime.media_pipeline import translate_text_with_provider
-            translate_fn = translate_text_with_provider
-        return translate_fn
+    def _get_batch_translate():
+        from ela_pipeline.runtime.media_pipeline import translate_texts_with_provider
+        return translate_texts_with_provider
+
+    batch_translate_fn = None
 
     while True:
         try:
@@ -80,13 +77,10 @@ def _translation_worker_loop(req_q: "_mp.Queue", res_q: "_mp.Queue") -> None:
         provider: str = item["provider"]
         credentials: dict = item["credentials"]
         try:
-            fn = _get_translate()
-            result: dict[str, str] = {}
-            for text in sentences:
-                text = str(text or "").strip()
-                if text:
-                    result[text] = fn(text=text, translation_provider=provider,
-                                      provider_credentials=credentials)
+            if batch_translate_fn is None:
+                batch_translate_fn = _get_batch_translate()
+            texts = [str(t or "").strip() for t in sentences if str(t or "").strip()]
+            result = batch_translate_fn(texts, translation_provider=provider, provider_credentials=credentials)
             res_q.put({"job_id": job_id, "status": "done", "translations": result})
         except Exception as exc:
             res_q.put({"job_id": job_id, "status": "error", "error": str(exc)})

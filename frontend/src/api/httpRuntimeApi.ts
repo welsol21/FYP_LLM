@@ -856,6 +856,26 @@ export class HttpRuntimeApi implements RuntimeApi {
       const BACKEND_PROVIDERS = new Set(['m2m100', 'gpt', 'deepl', 'lara'])
       const providerIsOriginal = provider === 'original'
 
+      // Collect all node texts recursively (skipping punctuation)
+      function collectNodeTexts(node: import('./runtimeApi').VisualizerNode, out: Set<string>): void {
+        const content = (node.content || '').trim()
+        if (content && node.part_of_speech !== 'punctuation') out.add(content)
+        for (const child of node.linguistic_elements || []) collectNodeTexts(child, out)
+      }
+      function writeTranslationsToTree(
+        node: import('./runtimeApi').VisualizerNode,
+        translationMap: Record<string, string>,
+        prov: string,
+      ): void {
+        const content = (node.content || '').trim()
+        const translated = translationMap[content]
+        if (content && translated && translated !== content) {
+          node.translations = { ...(node.translations || {}), [prov]: { text: translated } }
+          node.active_translation_provider = prov
+        }
+        for (const child of node.linguistic_elements || []) writeTranslationsToTree(child, translationMap, prov)
+      }
+
       let translations: Record<string, string> = {}
       if (resumePoint === 'tts' && resumeTranslations) {
         translations = resumeTranslations
@@ -866,10 +886,14 @@ export class HttpRuntimeApi implements RuntimeApi {
       } else {
         const sentenceKeys = Object.keys(contract)
         if (sentenceKeys.length > 0) {
-          log(2, `Translating sentences (0/${sentenceKeys.length})...`, 50)
+          // Collect ALL node texts (sentences + all child nodes) for batch translation
+          const allTexts = new Set<string>(sentenceKeys)
+          for (const node of Object.values(contract)) collectNodeTexts(node, allTexts)
+          const allTextsList = Array.from(allTexts)
+          log(2, `Translating ${allTextsList.length} texts (0/${sentenceKeys.length} sentences)...`, 50)
           if (BACKEND_PROVIDERS.has(provider)) {
-            // Submit all sentences in one async batch job — server translates sequentially
-            // with cached model; no per-sentence HTTP round-trips through Cloudflare.
+            // Submit all texts in one async batch job — server uses native batch APIs
+            // (M2M100 single generate call, Lara single HTTP call).
             const enabledProvider = input.translatorOptions?.find((p: { id: string }) => p.id === provider)
             const credentials = (enabledProvider as any)?.credentials || {}
             const submitRes = await requestJson<{ job_id: string }>(
@@ -877,7 +901,7 @@ export class HttpRuntimeApi implements RuntimeApi {
               {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sentences: sentenceKeys, provider, credentials }),
+                body: JSON.stringify({ sentences: allTextsList, provider, credentials }),
                 signal: input.signal,
               },
             )
@@ -901,9 +925,9 @@ export class HttpRuntimeApi implements RuntimeApi {
               }
               // still running — keep polling
             }
-            log(2, `Translated ${Object.keys(translations).length}/${sentenceKeys.length} sentences`, 98)
+            log(2, `Translated ${Object.keys(translations).length}/${allTextsList.length} texts`, 98)
           } else {
-            // Default: use local opus-mt-en-ru model in browser worker
+            // Default: use local opus-mt-en-ru model in browser worker (sentence-level only)
             translations = await this.clientTranslateAnalysis(
               contractDocId,
               contract,
@@ -918,15 +942,11 @@ export class HttpRuntimeApi implements RuntimeApi {
           }
         }
         log(2, 'Translation complete', 100)
-        // Write translations back into contract nodes so resume can recover them.
-        // (clientTranslateAnalysis does this internally; backend providers must do it here.)
+        // Write translations back into all contract nodes (sentence + children).
+        // (clientTranslateAnalysis does sentence nodes internally; backend providers do all here.)
         if (Object.keys(translations).length > 0 && !providerIsOriginal) {
-          for (const [sentenceText, translatedText] of Object.entries(translations)) {
-            const node = contract[sentenceText]
-            if (node && translatedText) {
-              node.translations = { ...(node.translations || {}), [provider]: { text: translatedText } }
-              node.active_translation_provider = provider
-            }
+          for (const rootNode of Object.values(contract)) {
+            writeTranslationsToTree(rootNode, translations, provider)
           }
         }
         // Save translated contract at contractDocId so future runs with a different

@@ -528,20 +528,32 @@ class _LaraTranslator:
         self.api_id = api_id
         self.api_secret = api_secret
 
-    def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
+    def _client(self):  # type: ignore[return]
         try:
             from lara_sdk import Credentials, Translator as LaraTranslator  # type: ignore[import-not-found]
         except Exception as exc:
             raise RuntimeError("Lara provider requires `lara-sdk` package.") from exc
-        creds = Credentials(self.api_id, self.api_secret)
-        client = LaraTranslator(creds)
-        response = client.translate(
+        return LaraTranslator(Credentials(self.api_id, self.api_secret))
+
+    def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
+        response = self._client().translate(
             text,
             source=_lara_locale(source_lang),
             target=_lara_locale(target_lang),
         )
         translated = getattr(response, "translation", "")
         return str(translated or "").strip()
+
+    def translate_texts_batch(self, texts: list[str], source_lang: str, target_lang: str) -> dict[str, str]:
+        response = self._client().translate(
+            texts,
+            source=_lara_locale(source_lang),
+            target=_lara_locale(target_lang),
+        )
+        translations = response.translation  # List[str] when input is List[str]
+        if isinstance(translations, str):
+            translations = [translations]
+        return {text: str(tr or "").strip() for text, tr in zip(texts, translations)}
 
 
 @lru_cache(maxsize=8)
@@ -719,6 +731,42 @@ def translate_text_with_provider(
     return str(
         translator.translate_text(source_text, source_lang=source_lang_resolved, target_lang=target_lang_resolved) or ""
     ).strip()
+
+
+def translate_texts_with_provider(
+    texts: "list[str]",
+    *,
+    translation_provider: "str | None" = None,
+    provider_credentials: "dict[str, str] | None" = None,
+    source_lang: "str | None" = None,
+    target_lang: "str | None" = None,
+) -> "dict[str, str]":
+    """Translate a batch of texts, returning {original_text: translated_text}.
+
+    Uses native batch APIs where available (M2M100 single generate call,
+    Lara single HTTP call). Falls back to sequential translate_text_with_provider
+    for other providers.
+    """
+    unique: list[str] = list(dict.fromkeys(t.strip() for t in texts if t.strip()))
+    if not unique:
+        return {}
+    source_lang_resolved = source_lang or os.getenv("ELA_MEDIA_TRANSLATION_SOURCE_LANG", "en")
+    target_lang_resolved = target_lang or os.getenv("ELA_MEDIA_TRANSLATION_TARGET_LANG", "ru")
+    translator = _resolve_media_translator(
+        provider_override=translation_provider,
+        provider_credentials=provider_credentials,
+    )
+    if isinstance(translator, M2M100Translator):
+        with _m2m100_lock:
+            results = translator.translate_texts(unique, source_lang=source_lang_resolved, target_lang=target_lang_resolved)
+        return {text: tr for text, tr in zip(unique, results)}
+    if isinstance(translator, _LaraTranslator):
+        return translator.translate_texts_batch(unique, source_lang=source_lang_resolved, target_lang=target_lang_resolved)
+    # Other providers: sequential
+    out: dict[str, str] = {}
+    for text in unique:
+        out[text] = str(translator.translate_text(text, source_lang=source_lang_resolved, target_lang=target_lang_resolved) or "").strip()
+    return out
 
 
 def extract_media_text_and_sentences(
