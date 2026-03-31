@@ -856,11 +856,21 @@ export class HttpRuntimeApi implements RuntimeApi {
       const BACKEND_PROVIDERS = new Set(['m2m100', 'gpt', 'deepl', 'lara'])
       const providerIsOriginal = provider === 'original'
 
-      // Collect all node texts recursively (skipping punctuation)
-      function collectNodeTexts(node: import('./runtimeApi').VisualizerNode, out: Set<string>): void {
+      // Collect all node texts recursively (skipping punctuation and already-translated nodes)
+      function collectNodeTexts(
+        node: import('./runtimeApi').VisualizerNode,
+        out: Set<string>,
+        prov: string,
+      ): void {
         const content = (node.content || '').trim()
-        if (content && node.part_of_speech !== 'punctuation') out.add(content)
-        for (const child of node.linguistic_elements || []) collectNodeTexts(child, out)
+        const alreadyTranslated = !!(node.translations as any)?.[prov]?.text
+        if (content && node.part_of_speech !== 'punctuation' && !alreadyTranslated) out.add(content)
+        for (const child of node.linguistic_elements || []) collectNodeTexts(child, out, prov)
+      }
+      // Mark active_translation_provider on all nodes that already have the translation
+      function markActiveProvider(node: import('./runtimeApi').VisualizerNode, prov: string): void {
+        if ((node.translations as any)?.[prov]?.text) node.active_translation_provider = prov
+        for (const child of node.linguistic_elements || []) markActiveProvider(child, prov)
       }
       function writeTranslationsToTree(
         node: import('./runtimeApi').VisualizerNode,
@@ -886,13 +896,22 @@ export class HttpRuntimeApi implements RuntimeApi {
       } else {
         const sentenceKeys = Object.keys(contract)
         if (sentenceKeys.length > 0) {
-          // Collect ALL node texts (sentences + all child nodes) for batch translation
-          const allTexts = new Set<string>(sentenceKeys)
-          for (const node of Object.values(contract)) collectNodeTexts(node, allTexts)
+          // Collect only texts that don't already have a translation from this provider
+          const allTexts = new Set<string>()
+          for (const [sentenceText, node] of Object.entries(contract)) {
+            if (!(node.translations as any)?.[provider]?.text) allTexts.add(sentenceText)
+            collectNodeTexts(node, allTexts, provider)
+          }
+          // Nodes that already have this provider's translation just need active_translation_provider set
+          for (const node of Object.values(contract)) markActiveProvider(node, provider)
           const allTextsList = Array.from(allTexts)
-          log(2, `Translating ${allTextsList.length} texts (0/${sentenceKeys.length} sentences)...`, 50)
-          if (BACKEND_PROVIDERS.has(provider)) {
-            // Submit all texts in one async batch job — server uses native batch APIs
+          if (allTextsList.length === 0) {
+            // Everything already translated — just update active provider
+            log(2, 'All nodes already translated — skipping API call', 100)
+          }
+          log(2, `Translating ${allTextsList.length} texts...`, 50)
+          if (BACKEND_PROVIDERS.has(provider) && allTextsList.length > 0) {
+            // Submit only untranslated texts in one async batch job — server uses native batch APIs
             // (M2M100 single generate call, Lara single HTTP call).
             const enabledProvider = input.translatorOptions?.find((p: { id: string }) => p.id === provider)
             const credentials = (enabledProvider as any)?.credentials || {}
