@@ -213,6 +213,26 @@ function normalizeContractError(errorMessage: string): string {
   return 'Project service is unavailable. Check internet access and service URL.'
 }
 
+function _translateErrorMessage(raw: string): string {
+  const s = String(raw || '').toLowerCase()
+  if (s.includes('429') || s.includes('quota') || s.includes('quotaexceeded')) {
+    return 'Translation quota exceeded — your translation provider account has run out of character credits. Check your account and top up your quota.'
+  }
+  if (s.includes('401') || s.includes('unauthorized') || s.includes('authentication')) {
+    return 'Translation authentication failed — your API credentials are invalid or expired. Go to Settings → Translation and update them.'
+  }
+  if (s.includes('403') || s.includes('forbidden')) {
+    return 'Translation access denied — your API key does not have permission to use this translation service.'
+  }
+  if (s.includes('400') || s.includes('validationerror')) {
+    return `Translation request rejected by the provider: ${raw}`
+  }
+  if (s.includes('500') || s.includes('502') || s.includes('503') || s.includes('504')) {
+    return 'Translation provider is temporarily unavailable. Try again later.'
+  }
+  return `Translation failed: ${raw}`
+}
+
 // Stage-scoped document IDs so that caching at each pipeline stage
 // is invalidated only by the parameters that stage actually depends on.
 //
@@ -896,6 +916,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       }
 
       let translations: Record<string, string> = {}
+      let translateError: string | null = null
       if (resumePoint === 'tts' && resumeTranslations) {
         translations = resumeTranslations
         log(2, 'Reusing existing translations', 100)
@@ -944,7 +965,9 @@ export class HttpRuntimeApi implements RuntimeApi {
               const statusRes = await fetch(apiUrl(`/api/translate-status/${translateJobId}`), { signal: input.signal })
               const statusJson = await statusRes.json() as { status: string; translations?: Record<string, string>; error?: string }
               if (statusJson.status === 'error') {
-                recordRuntimeDiagnostic('api.media.backend', 'translate.error', statusJson.error ?? 'unknown', 'error')
+                const raw = statusJson.error ?? 'unknown'
+                recordRuntimeDiagnostic('api.media.backend', 'translate.error', raw, 'error')
+                translateError = _translateErrorMessage(raw)
                 break
               }
               if (statusJson.status === 'done' || statusJson.translations) {
@@ -1143,7 +1166,9 @@ export class HttpRuntimeApi implements RuntimeApi {
       recordRuntimeDiagnostic('api.media.backend', 'submit.success', { documentId, sentences: Object.keys(contract).length })
       return finish({
         result: { route: 'local', status: 'completed_local', document_id: documentId, message: 'Analysis completed.', stage_name: 'completed' },
-        ui_feedback: { severity: 'info', title: 'Analysis completed', message: 'Media analysis completed and saved locally.' },
+        ui_feedback: translateError
+          ? { severity: 'warning', title: 'Analysis completed (translation failed)', message: translateError }
+          : { severity: 'info', title: 'Analysis completed', message: 'Media analysis completed and saved locally.' },
       })
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') throw err
