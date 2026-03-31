@@ -39,18 +39,11 @@ const GAP_TONE = '#6b7280'
 
 function orderedChildren(node: VisualizerNode): VisualizerNode[] {
   const seen = new Set<string>()
-  const seenContent = new Set<string>()
   const src = node.linguistic_elements
     .filter((child) => {
       if ((child as any).ref_node_id) return false
       if (seen.has(child.node_id)) return false
       seen.add(child.node_id)
-      // Deduplicate leaf word nodes that repeat the same content+pos within the same parent
-      if (child.linguistic_elements.length === 0) {
-        const contentKey = `${child.content?.toLowerCase()}|${child.part_of_speech}`
-        if (seenContent.has(contentKey)) return false
-        seenContent.add(contentKey)
-      }
       return true
     })
     .map((child, idx) => ({ child, idx }))
