@@ -1618,8 +1618,9 @@ class RuntimeMediaService:
         cache_key = content.casefold()
         translated = cache.get(cache_key)
         if translated is None:
+            # Lowercase so M2M100 doesn't treat capitalised words as untranslatable proper nouns
             translated = translate_text_with_provider(
-                text=content,
+                text=content.lower(),
                 translation_provider=provider_name,
                 provider_credentials=provider_credentials,
             )

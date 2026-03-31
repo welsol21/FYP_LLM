@@ -757,14 +757,16 @@ def translate_texts_with_provider(
         provider_credentials=provider_credentials,
     )
     if isinstance(translator, M2M100Translator):
-        # Mini-batch to avoid massive padding overhead on CPU (mixed-length texts)
+        # Lowercase input so M2M100 doesn't treat capitalised words as proper nouns
+        # and refuses to translate them. Map results back to original casing.
+        lowered = [t.lower() for t in unique]
         BATCH_SIZE = 16
         all_results: list[str] = []
         with _m2m100_lock:
-            for i in range(0, len(unique), BATCH_SIZE):
-                chunk = unique[i:i + BATCH_SIZE]
+            for i in range(0, len(lowered), BATCH_SIZE):
+                chunk = lowered[i:i + BATCH_SIZE]
                 all_results.extend(translator.translate_texts(chunk, source_lang=source_lang_resolved, target_lang=target_lang_resolved))
-        return {text: tr for text, tr in zip(unique, all_results)}
+        return {orig: tr for orig, tr in zip(unique, all_results)}
     if isinstance(translator, _LaraTranslator):
         return translator.translate_texts_batch(unique, source_lang=source_lang_resolved, target_lang=target_lang_resolved)
     # Other providers: sequential
