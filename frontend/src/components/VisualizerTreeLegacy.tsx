@@ -97,7 +97,8 @@ function providerLabel(provider: string | undefined): string {
 function flattenForTokens(node: VisualizerNode): VisualizerNode[] {
   const children = orderedChildren(node)
   return children.flatMap((child) => {
-    if (orderedChildren(child).length > 0) return flattenForTokens(child)
+    const grandchildren = orderedChildren(child)
+    if (grandchildren.length > 0) return grandchildren
     return [child]
   })
 }
