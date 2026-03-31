@@ -545,12 +545,14 @@ class _LaraTranslator:
         return str(translated or "").strip()
 
     def translate_texts_batch(self, texts: list[str], source_lang: str, target_lang: str) -> dict[str, str]:
+        from lara_sdk import TextBlock  # type: ignore[import-not-found]
+        blocks = [TextBlock(text=t, translatable=True) for t in texts]
         response = self._client().translate(
-            texts,
+            blocks,
             source=_lara_locale(source_lang),
             target=_lara_locale(target_lang),
         )
-        translations = response.translation  # List[str] when input is List[str]
+        translations = response.translation  # List[str] when input is List[TextBlock]
         if isinstance(translations, str):
             translations = [translations]
         return {text: str(tr or "").strip() for text, tr in zip(texts, translations)}
