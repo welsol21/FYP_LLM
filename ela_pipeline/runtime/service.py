@@ -33,6 +33,7 @@ from .media_pipeline import (
     extract_media_text_and_sentences,
     run_media_pipeline,
     translate_text_with_provider,
+    translate_texts_with_provider,
 )
 from .media_submission import submit_media_for_processing
 from .ui_state import build_runtime_ui_state, build_submission_ui_feedback
@@ -1336,33 +1337,45 @@ class RuntimeMediaService:
                         f"Overlay sentence translation {idx + 1}/{sentence_total} via {selected_provider}",
                     )
 
-            node_total = sum(
-                self._count_nodes_recursive(row.get("sentence_node"))
-                for row in pipeline.contract_sentences
-                if isinstance(row.get("sentence_node"), dict)
-            )
-            node_total = max(node_total, 1)
-            node_done = 0
-            node_cache: dict[str, str] = {}
+            # Collect all unique node contents and batch-translate in one call
+            all_nodes: list[dict] = []
             for row in pipeline.contract_sentences:
                 root = row.get("sentence_node")
-                if not isinstance(root, dict):
+                if isinstance(root, dict):
+                    all_nodes.extend(self._iter_nodes_recursive(root))
+            all_contents = list(dict.fromkeys(
+                str(n.get("content") or "").strip()
+                for n in all_nodes
+                if str(n.get("content") or "").strip()
+            ))
+            if stage_callback is not None:
+                stage_callback("translating_text", 0.5, f"Batch translating {len(all_contents)} nodes via {selected_provider}")
+            node_translations = translate_texts_with_provider(
+                all_contents,
+                translation_provider=selected_provider,
+                provider_credentials=provider_credentials,
+            )
+            for node in all_nodes:
+                content = str(node.get("content") or "").strip()
+                if not content:
                     continue
-                for node in self._iter_nodes_recursive(root):
-                    node_done += 1
-                    self._overlay_translation_on_node(
-                        node=node,
-                        provider_key=normalized_selected_provider,
-                        provider_name=selected_provider,
-                        provider_credentials=provider_credentials,
-                        cache=node_cache,
-                    )
-                    if stage_callback is not None:
-                        stage_callback(
-                            "translating_text",
-                            min(1.0, node_done / node_total),
-                            f"Overlay node translation {node_done}/{node_total} via {selected_provider}",
-                        )
+                translated = node_translations.get(content, "")
+                _ensure_node_translations_map(node, canonical_provider=BACKEND_TRANSLATION_PROVIDER_KEY)
+                translations_map = node.get("translations")
+                if not isinstance(translations_map, dict):
+                    translations_map = {}
+                    node["translations"] = translations_map
+                if not translated or translated.strip().lower() == content.lower():
+                    continue
+                translations_map[normalized_selected_provider] = {
+                    "text": translated,
+                    "source_lang": "en",
+                    "target_lang": "ru",
+                    "origin": "client_overlay",
+                }
+                node["active_translation_provider"] = normalized_selected_provider
+            if stage_callback is not None:
+                stage_callback("translating_text", 1.0, f"Node translation complete via {selected_provider}")
 
         document_id = document_id or f"doc-{uuid.uuid4().hex[:12]}"
         existing_doc = self.repo.get_document(document_id)
