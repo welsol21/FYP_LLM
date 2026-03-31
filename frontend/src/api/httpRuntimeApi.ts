@@ -863,7 +863,8 @@ export class HttpRuntimeApi implements RuntimeApi {
         prov: string,
       ): void {
         const content = (node.content || '').trim()
-        const alreadyTranslated = !!(node.translations as any)?.[prov]?.text
+        const existingTranslation: string = (node.translations as any)?.[prov]?.text || ''
+        const alreadyTranslated = !!existingTranslation && existingTranslation.toLowerCase() !== content.toLowerCase()
         if (content && node.part_of_speech !== 'punctuation' && !alreadyTranslated) out.add(content)
         for (const child of node.linguistic_elements || []) collectNodeTexts(child, out, prov)
       }

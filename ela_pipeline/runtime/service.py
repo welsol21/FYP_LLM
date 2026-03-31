@@ -1629,11 +1629,11 @@ class RuntimeMediaService:
         if not isinstance(translations, dict):
             translations = {}
             node["translations"] = translations
-        # If the model returned nothing, fall back to the source text so the
-        # validator's "text must be non-empty" rule is always satisfied.
-        text_out = translated or content
+        # Skip storing if translation is empty or identical to source (not translated).
+        if not translated or translated.strip().lower() == content.lower():
+            return
         translations[provider_key] = {
-            "text": text_out,
+            "text": translated,
             "source_lang": "en",
             "target_lang": "ru",
             "origin": "client_overlay",
