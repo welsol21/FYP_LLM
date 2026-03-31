@@ -880,9 +880,17 @@ export class HttpRuntimeApi implements RuntimeApi {
       ): void {
         const content = (node.content || '').trim()
         const translated = translationMap[content]
-        if (content && translated && translated !== content) {
-          node.translations = { ...(node.translations || {}), [prov]: { text: translated } }
-          node.active_translation_provider = prov
+        if (content && translated !== undefined) {
+          if (translated && translated.toLowerCase() !== content.toLowerCase()) {
+            // Good translation — store it
+            node.translations = { ...(node.translations || {}), [prov]: { text: translated } }
+            node.active_translation_provider = prov
+          } else {
+            // Model returned same text as source — remove stale cached entry if any
+            const tr = { ...(node.translations || {}) } as Record<string, unknown>
+            delete tr[prov]
+            node.translations = tr as typeof node.translations
+          }
         }
         for (const child of node.linguistic_elements || []) writeTranslationsToTree(child, translationMap, prov)
       }
