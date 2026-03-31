@@ -94,11 +94,19 @@ function providerLabel(provider: string | undefined): string {
   return normalized
 }
 
+function flattenForTokens(node: VisualizerNode): VisualizerNode[] {
+  const children = orderedChildren(node)
+  return children.flatMap((child) => {
+    if (orderedChildren(child).length > 0) return flattenForTokens(child)
+    return [child]
+  })
+}
+
 function nodeTokens(node: VisualizerNode, level: number): Token[] {
   if (level === 0 && node.linguistic_elements.length > 0) {
     const parentText = node.content ?? ''
     const parentStart = node.source_span?.start ?? 0
-    const children = orderedChildren(node)
+    const children = flattenForTokens(node)
       .map((child, idx) => {
         const startAbs = child.source_span?.start
         const endAbs = child.source_span?.end
