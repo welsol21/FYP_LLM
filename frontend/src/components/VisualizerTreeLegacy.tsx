@@ -95,10 +95,8 @@ function providerLabel(provider: string | undefined): string {
 }
 
 function flattenForTokens(node: VisualizerNode): VisualizerNode[] {
-  const children = orderedChildren(node)
-  return children.flatMap((child) => {
-    const grandchildren = orderedChildren(child)
-    if (grandchildren.length > 0) return grandchildren
+  return orderedChildren(node).flatMap((child) => {
+    if ((child as any).type === 'Phrase') return orderedChildren(child)
     return [child]
   })
 }
