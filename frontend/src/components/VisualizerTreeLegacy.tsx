@@ -182,7 +182,8 @@ export function VisualizerTreeLegacy({
   const fallbackNotes = node.notes?.map((note) => note?.text?.trim()).filter(Boolean).join(' ') || ''
   const intermediateText = notes.intermediate || fallbackNotes || '-'
   const translationVariant = resolveNodeTranslationVariant(node, preferredTranslationProvider)
-  const translationText = translationVariant.text
+  const rawTranslationText = translationVariant.text
+  const translationText = rawTranslationText && rawTranslationText.toLowerCase() === (node.content || '').trim().toLowerCase() ? '-' : rawTranslationText
   const translationProvider = providerLabel(translationVariant.provider)
   const alternativeTranslations = useMemo(
     () => listAlternativeTranslations(node, preferredTranslationProvider),
