@@ -27,114 +27,108 @@
     line-height: 1.45;
   }
 
-  /* ── A1 POSTER CONTAINER ─────────────────────────────── */
-  /* Actual A1 printable area: 594mm - 2×10mm margins = 574mm */
+  /* A1 printable area: 594mm - 2x10mm margins = 574mm = 100vw at print time.
+     100vw on screen = viewport width, so layout scales proportionally.
+     What you see in the browser IS what prints on A1. */
   .poster {
-    width: 574mm;
+    width: 100%;
     background: #fff;
     display: grid;
     grid-template-rows: auto 1fr auto;
     box-shadow: 0 4px 24px rgba(0,0,0,0.25);
   }
 
-  /* Screen preview: scale down to ~794px equivalent */
   @media screen {
-    body { margin: 14px; }
-    .poster {
-      zoom: 0.366;          /* 794px / 2170px (574mm@96dpi) ≈ 0.366 */
-      margin: 0 auto;
-      transform-origin: top center;
-    }
+    body { margin: 0.65vw; }
   }
 
-  /* ── HEADER ──────────────────────────────────────────── */
-  /* MTU mandatory: logo top-left, title next to it, QR far right */
+  /* HEADER */
   .header {
     background: var(--navy);
     color: #fff;
-    padding: 14px 20px 12px;
+    padding: 0.65vw 0.92vw 0.55vw;
     display: grid;
     grid-template-columns: auto 1fr auto;
-    gap: 14px;
+    gap: 0.65vw;
     align-items: center;
   }
-  /* MTU Logo block — top left corner as required */
+
   .mtu-logo {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     background: #fff;
-    border-radius: 4px;
-    padding: 5px 8px;
+    border-radius: 0.18vw;
+    padding: 0.23vw 0.37vw;
     flex-shrink: 0;
-    min-width: 72px;
+    min-width: 3.5vw;
   }
   .mtu-crest {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 2px;
-    width: 36px;
-    height: 36px;
-    margin-bottom: 3px;
+    gap: 0.09vw;
+    width: 2.0vw;
+    height: 2.0vw;
+    margin-bottom: 0.14vw;
   }
-  .crest-q { border-radius: 2px; }
-  .crest-q1 { background: #F5A623; } /* gold */
-  .crest-q2 { background: #C0392B; } /* red  */
-  .crest-q3 { background: #2980B9; } /* blue */
-  .crest-q4 { background: #2980B9; } /* blue */
+  .crest-q { border-radius: 0.09vw; }
+  .crest-q1 { background: #F5A623; }
+  .crest-q2 { background: #C0392B; }
+  .crest-q3 { background: #2980B9; }
+  .crest-q4 { background: #2980B9; }
   .mtu-wordmark {
-    font-size: 36pt;
+    font-size: 2.21vw;
     font-weight: 900;
     color: var(--navy);
-    letter-spacing: 1px;
+    letter-spacing: 0.05vw;
     line-height: 1;
   }
   .mtu-full {
-    font-size: 14pt;
+    font-size: 0.86vw;
     color: #555;
     text-align: center;
     line-height: 1.2;
-    margin-top: 2px;
+    margin-top: 0.09vw;
   }
+
   .poster-title {
-    font-size: 54pt;    /* MTU A1 Title */
+    font-size: 3.32vw;
     font-weight: 900;
     line-height: 1.1;
     color: #fff;
   }
   .poster-subtitle {
-    font-size: 28pt;
+    font-size: 1.72vw;
     font-style: italic;
     color: var(--amber);
-    margin-top: 6px;
+    margin-top: 0.28vw;
   }
   .poster-meta {
-    font-size: 40pt;    /* MTU A1 Author & Affiliations */
+    font-size: 2.46vw;
     color: #B0C0D8;
-    margin-top: 10px;
+    margin-top: 0.46vw;
     line-height: 1.4;
   }
   .poster-meta strong { color: #fff; }
+
   .qr-box {
-    width: 84px;
-    height: auto;
+    width: auto;
     background: #fff;
-    border: 2px solid var(--amber);
+    border: 0.09vw solid var(--amber);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    font-size: 6.5pt;
     color: var(--navy);
     text-align: center;
-    padding: 5px 4px 5px;
+    padding: 0.23vw;
     flex-shrink: 0;
-    border-radius: 4px;
+    border-radius: 0.18vw;
     align-self: center;
   }
 
-  /* ── BODY: 3-COLUMN GRID ─────────────────────────────── */
+  /* BODY: 3-COLUMN GRID */
   .body {
     display: grid;
     grid-template-columns: 1fr 1.1fr 1fr;
@@ -143,62 +137,61 @@
   }
 
   .col {
-    padding: 10px 8px;
+    padding: 0.46vw 0.37vw;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0.37vw;
   }
-  /* MTU mandatory: poster background must be white */
   .col-left   { background: #ffffff; }
   .col-centre { background: #ffffff; }
   .col-right  { background: #ffffff; }
 
-  /* ── SECTION CARDS ───────────────────────────────────── */
+  /* SECTION CARDS */
   .card {
     background: var(--card);
-    border-radius: 6px;
-    padding: 10px 12px;
+    border-radius: 0.28vw;
+    padding: 0.46vw 0.55vw;
     box-shadow: 0 1px 4px rgba(0,0,0,0.09);
   }
 
   .card h2 {
-    font-size: 36pt;    /* MTU A1 Sub Heading */
+    font-size: 2.21vw;
     font-weight: 700;
     text-transform: none;
     letter-spacing: 0;
-    padding-bottom: 8px;
-    margin-bottom: 12px;
-    border-bottom: 5px solid currentColor;
+    padding-bottom: 0.37vw;
+    margin-bottom: 0.55vw;
+    border-bottom: 0.23vw solid currentColor;
   }
   .col-left   .card h2 { color: var(--blue); border-color: var(--blue); }
   .col-centre .card h2 { color: var(--red);  border-color: var(--red);  }
   .col-right  .card h2 { color: var(--green);border-color: var(--green);}
 
-  .card p { margin-bottom: 12px; font-size: 30pt; } /* MTU A1 Body Text */
-  .card ul { margin-left: 40px; margin-bottom: 12px; }
-  .card ul li { font-size: 30pt; margin-bottom: 8px; }
+  .card p { margin-bottom: 0.55vw; font-size: 1.84vw; }
+  .card ul { margin-left: 1.84vw; margin-bottom: 0.55vw; }
+  .card ul li { font-size: 1.84vw; margin-bottom: 0.37vw; }
   .card strong { font-weight: 700; }
 
-  /* ── PIPELINE FLOW ───────────────────────────────────── */
+  /* PIPELINE FLOW */
   .pipeline {
     display: flex;
     flex-direction: column;
     gap: 0;
-    margin: 6px 0;
+    margin: 0.28vw 0;
   }
   .pipe-step {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 24pt;
+    gap: 0.28vw;
+    padding: 0.18vw 0.37vw;
+    border-radius: 0.18vw;
+    font-size: 1.48vw;
     font-weight: 500;
     color: #fff;
   }
   .pipe-arrow {
     text-align: center;
-    font-size: 28pt;
+    font-size: 1.72vw;
     color: #888;
     line-height: 1;
   }
@@ -212,79 +205,79 @@
   .p8 { background: #0F1A2E; }
   .pipe-num {
     display: inline-block;
-    width: 18px;
-    height: 18px;
+    width: 0.83vw;
+    height: 0.83vw;
     background: rgba(255,255,255,0.25);
     border-radius: 50%;
     text-align: center;
-    line-height: 18px;
-    font-size: 20pt;
+    line-height: 0.83vw;
+    font-size: 1.23vw;
     flex-shrink: 0;
   }
 
-  /* ── RLE SCHEMA BOX ──────────────────────────────────── */
+  /* RLE SCHEMA BOX */
   .rle-tree {
     background: var(--light);
-    border-left: 3px solid var(--blue);
-    padding: 8px 10px;
+    border-left: 0.14vw solid var(--blue);
+    padding: 0.37vw 0.46vw;
     font-family: 'Courier New', monospace;
-    font-size: 22pt;
+    font-size: 1.35vw;
     line-height: 1.7;
-    border-radius: 0 4px 4px 0;
-    margin: 6px 0;
+    border-radius: 0 0.18vw 0.18vw 0;
+    margin: 0.28vw 0;
   }
 
-  /* ── NEW PHYSICS DIAGRAM ─────────────────────────────── */
+  /* NEW PHYSICS DIAGRAM */
   .duality-diagram {
     background: linear-gradient(135deg, #e8f0ff 0%, #fff0f0 50%, #fff8e0 100%);
-    border: 2px solid var(--red);
-    border-radius: 8px;
-    padding: 10px 8px;
+    border: 0.09vw solid var(--red);
+    border-radius: 0.37vw;
+    padding: 0.46vw 0.37vw;
     text-align: center;
   }
   .duality-grid {
     display: grid;
-    grid-template-columns: 1fr 48px 1fr;
-    gap: 6px;
+    grid-template-columns: 1fr 2.21vw 1fr;
+    gap: 0.28vw;
     align-items: center;
-    margin: 8px 0;
+    margin: 0.37vw 0;
   }
   .panel-open, .panel-closed {
-    border-radius: 6px;
-    padding: 8px;
-    min-height: 140px;
+    border-radius: 0.28vw;
+    padding: 0.37vw;
+    min-height: 6.45vw;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
   }
-  .panel-open   { background: rgba(44,74,140,0.10); border: 1.5px solid var(--blue); }
-  .panel-closed { background: rgba(245,197,24,0.12); border: 1.5px solid #B8860B; }
+  .panel-open   { background: rgba(44,74,140,0.10); border: 0.07vw solid var(--blue); }
+  .panel-closed { background: rgba(245,197,24,0.12); border: 0.07vw solid #B8860B; }
   .panel-label {
-    font-size: 22pt;
+    font-size: 1.35vw;
     font-weight: 700;
     text-transform: none;
     letter-spacing: 0;
-    margin-bottom: 4px;
+    margin-bottom: 0.18vw;
   }
   .panel-open   .panel-label { color: var(--blue); }
   .panel-closed .panel-label { color: #8B6914; }
-  .panel-sublabel { font-size: 20pt; color: #666; margin-bottom: 6px; }
+  .panel-sublabel { font-size: 1.23vw; color: #666; margin-bottom: 0.28vw; }
   .panel-icon {
-    font-size: 24pt;
+    font-size: 1.48vw;
     line-height: 1;
-    margin: 4px 0;
+    margin: 0.18vw 0;
   }
   .panel-desc {
-    font-size: 20pt;
+    font-size: 1.23vw;
     line-height: 1.4;
     color: #333;
   }
   .panel-arrow {
-    font-size: 20pt;
+    font-size: 1.23vw;
     font-weight: 700;
-    margin-top: 4px;
-    padding: 3px 5px;
-    border-radius: 3px;
+    margin-top: 0.18vw;
+    padding: 0.14vw 0.23vw;
+    border-radius: 0.14vw;
   }
   .panel-open   .panel-arrow { background: var(--blue); color: #fff; }
   .panel-closed .panel-arrow { background: #8B6914;     color: #fff; }
@@ -294,23 +287,23 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
+    gap: 0.09vw;
   }
   .connector-circle {
-    width: 90px;
-    height: 90px;
-    border: 4px solid var(--red);
+    width: 4.15vw;
+    height: 4.15vw;
+    border: 0.18vw solid var(--red);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 28pt;
+    font-size: 1.72vw;
     color: var(--red);
     background: #fff;
     font-weight: 900;
   }
   .connector-label {
-    font-size: 18pt;
+    font-size: 1.11vw;
     color: var(--red);
     font-weight: 700;
     text-align: center;
@@ -320,11 +313,11 @@
   .principle-box {
     background: var(--navy);
     color: #fff;
-    border-radius: 6px;
-    padding: 8px 10px;
+    border-radius: 0.28vw;
+    padding: 0.37vw 0.46vw;
     text-align: center;
-    margin: 6px 0;
-    font-size: 28pt;
+    margin: 0.28vw 0;
+    font-size: 1.72vw;
     font-style: italic;
     line-height: 1.5;
   }
@@ -333,46 +326,46 @@
   .mapping-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 8.5pt;
-    margin: 6px 0;
+    font-size: 1.35vw;
+    margin: 0.28vw 0;
   }
   .mapping-table th {
     background: var(--red);
     color: #fff;
-    padding: 4px 6px;
+    padding: 0.18vw 0.28vw;
     text-align: left;
     font-weight: 600;
   }
   .mapping-table td {
-    padding: 4px 6px;
+    padding: 0.18vw 0.28vw;
     border-bottom: 1px solid #E0D0D0;
   }
   .mapping-table tr:nth-child(even) td { background: #FFF5F5; }
 
-  /* ── METRIC CALLOUTS ─────────────────────────────────── */
+  /* METRIC CALLOUTS */
   .metric-box {
-    border-radius: 6px;
-    padding: 10px 12px;
+    border-radius: 0.28vw;
+    padding: 0.46vw 0.55vw;
     text-align: center;
     color: #fff;
-    margin-bottom: 6px;
+    margin-bottom: 0.28vw;
   }
   .metric-box .number {
-    font-size: 76pt;
+    font-size: 4.67vw;
     font-weight: 900;
     line-height: 1;
     display: block;
   }
   .metric-box .label {
-    font-size: 24pt;
+    font-size: 1.48vw;
     font-weight: 700;
     text-transform: none;
     letter-spacing: 0;
-    margin: 3px 0 2px;
+    margin: 0.14vw 0 0.09vw;
     display: block;
   }
   .metric-box .sublabel {
-    font-size: 22pt;
+    font-size: 1.35vw;
     opacity: 0.85;
     display: block;
     line-height: 1.3;
@@ -381,22 +374,22 @@
   .metric-red   { background: linear-gradient(135deg, #8B1A1A, #5C0E0E); }
   .metric-green { background: linear-gradient(135deg, #1A5C2E, #0F3A1C); }
 
-  /* ── COMPARISON TABLE ────────────────────────────────── */
+  /* COMPARISON TABLE */
   .comp-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 22pt;
-    margin: 10px 0;
+    font-size: 1.35vw;
+    margin: 0.46vw 0;
   }
   .comp-table th {
     background: var(--green);
     color: #fff;
-    padding: 4px 5px;
+    padding: 0.18vw 0.23vw;
     text-align: center;
     font-weight: 600;
   }
   .comp-table td {
-    padding: 3px 5px;
+    padding: 0.14vw 0.23vw;
     border-bottom: 1px solid #D0E0D0;
     text-align: center;
   }
@@ -405,78 +398,77 @@
   .tick { color: #1A5C2E; font-weight: 900; }
   .cross { color: #8B1A1A; }
 
-  /* ── INSIGHT BOX ─────────────────────────────────────── */
+  /* INSIGHT BOX */
   .insight {
     background: #FFF8E1;
-    border-left: 4px solid var(--amber);
-    padding: 8px 10px;
-    border-radius: 0 4px 4px 0;
-    font-size: 26pt;
+    border-left: 0.18vw solid var(--amber);
+    padding: 0.37vw 0.46vw;
+    border-radius: 0 0.18vw 0.18vw 0;
+    font-size: 1.60vw;
     font-style: italic;
     color: #4A3800;
-    margin: 5px 0;
+    margin: 0.23vw 0;
   }
 
-  /* ── FUTURE LIST ─────────────────────────────────────── */
+  /* FUTURE LIST */
   .future-item {
     display: flex;
-    gap: 6px;
+    gap: 0.28vw;
     align-items: flex-start;
-    margin-bottom: 5px;
-    font-size: 28pt;
+    margin-bottom: 0.23vw;
+    font-size: 1.72vw;
   }
   .future-dot {
-    width: 14px;
-    height: 14px;
+    width: 0.65vw;
+    height: 0.65vw;
     border-radius: 50%;
     background: var(--green);
     flex-shrink: 0;
-    margin-top: 2px;
+    margin-top: 0.37vw;
   }
 
-  /* ── RESEARCH JOURNEY ───────────────────────────────── */
+  /* RESEARCH JOURNEY */
   .rj-row {
     display: flex;
     align-items: flex-start;
-    gap: 6px;
-    margin-bottom: 8px;
-    font-size: 8pt;
+    gap: 0.28vw;
+    margin-bottom: 0.37vw;
   }
   .rj-label {
-    width: 52px;
+    width: 2.40vw;
     flex-shrink: 0;
     font-weight: 700;
-    font-size: 20pt;
+    font-size: 1.23vw;
     color: var(--navy);
     line-height: 1.3;
-    padding-top: 4px;
+    padding-top: 0.18vw;
   }
   .rj-chain {
     display: flex;
     align-items: flex-start;
-    gap: 3px;
+    gap: 0.14vw;
     flex-wrap: wrap;
   }
   .rj-arrow {
-    font-size: 10pt;
+    font-size: 0.61vw;
     color: #aaa;
-    padding-top: 6px;
+    padding-top: 0.28vw;
     flex-shrink: 0;
   }
   .rj-node {
-    border-radius: 4px;
-    padding: 3px 5px;
-    font-size: 20pt;
+    border-radius: 0.18vw;
+    padding: 0.14vw 0.23vw;
+    font-size: 1.23vw;
     font-weight: 600;
     line-height: 1.3;
     text-align: center;
-    min-width: 44px;
+    min-width: 2.03vw;
   }
   .rj-sub {
-    font-size: 17pt;
+    font-size: 1.04vw;
     font-weight: 400;
     line-height: 1.2;
-    margin-top: 2px;
+    margin-top: 0.09vw;
     opacity: 0.85;
   }
   .rj-rejected {
@@ -490,115 +482,95 @@
   .rj-won {
     background: #E8F5E9;
     color: #1A5C2E;
-    border: 1.5px solid #81C784;
+    border: 0.07vw solid #81C784;
     font-weight: 700;
   }
 
-  /* ── RESEARCH STATS GRID ─────────────────────────────── */
-  .stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 5px;
-    margin-top: 4px;
-  }
-  .stat-cell {
-    border-radius: 5px;
-    padding: 7px 5px;
-    text-align: center;
-    color: #fff;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  .stat-num {
-    font-size: 18pt;
-    font-weight: 900;
-    line-height: 1;
-  }
-  .stat-lbl {
-    font-size: 7pt;
-    line-height: 1.3;
-    margin-top: 3px;
-    opacity: 0.92;
-  }
+  /* STATS GRID (unused but kept for reference) */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.23vw; margin-top: 0.18vw; }
+  .stat-cell  { border-radius: 0.23vw; padding: 0.32vw 0.23vw; text-align: center; color: #fff; display: flex; flex-direction: column; align-items: center; }
+  .stat-num   { font-size: 1.11vw; font-weight: 900; line-height: 1; }
+  .stat-lbl   { font-size: 0.43vw; line-height: 1.3; margin-top: 0.14vw; opacity: 0.92; }
   .stat-blue  { background: #2C4A8C; }
   .stat-red   { background: #8B1A1A; }
   .stat-green { background: #1A5C2E; }
   .stat-navy  { background: #1B2A4A; }
   .stat-amber { background: #8B6914; }
 
-  /* ── CORPUS BARS ─────────────────────────────────────── */
+  /* CORPUS BARS */
   .corpus-row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 2px;
-    margin-top: 6px;
+    gap: 0.28vw;
+    margin-bottom: 0.09vw;
+    margin-top: 0.28vw;
   }
   .corpus-name {
-    width: 52px;
-    font-size: 22pt;
+    width: 2.40vw;
+    font-size: 1.35vw;
     font-weight: 700;
     color: var(--navy);
     flex-shrink: 0;
   }
   .corpus-bar-wrap {
     flex: 1;
-    height: 12px;
+    height: 0.55vw;
     background: #eee;
-    border-radius: 3px;
+    border-radius: 0.14vw;
     overflow: hidden;
   }
   .corpus-bar {
     height: 100%;
-    border-radius: 3px;
-    min-width: 4px;
+    border-radius: 0.14vw;
+    min-width: 0.18vw;
   }
   .corpus-size {
-    width: 70px;
-    font-size: 20pt;
+    width: 3.23vw;
+    font-size: 1.23vw;
     font-weight: 700;
     color: #333;
     text-align: right;
     flex-shrink: 0;
   }
   .corpus-label-sm {
-    font-size: 18pt;
+    font-size: 1.11vw;
     color: #777;
-    margin-left: 58px;
-    margin-bottom: 2px;
+    margin-left: 2.67vw;
+    margin-bottom: 0.09vw;
     line-height: 1.3;
   }
 
-  /* ── FOOTER ──────────────────────────────────────────── */
+  /* FOOTER */
   .footer {
     background: var(--navy);
     color: #B0C0D8;
-    padding: 10px 20px;
+    padding: 0.46vw 0.92vw;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    font-size: 24pt; /* MTU A1 Fine Print — was 8.8pt × 2.73 ≈ 24pt at A1 — MTU Fine Print */
+    gap: 0.92vw;
+    font-size: 1.48vw;
     line-height: 1.6;
   }
   .footer h4 {
     color: var(--amber);
-    font-size: 28pt;
+    font-size: 1.72vw;
     text-transform: none;
     letter-spacing: 0;
-    margin-bottom: 4px;
+    margin-bottom: 0.18vw;
   }
-  .footer ol { margin-left: 14px; }
-  .footer ol li { margin-bottom: 2px; }
+  .footer ol { margin-left: 0.65vw; }
+  .footer ol li { margin-bottom: 0.09vw; }
 
-  /* ── PRINT STYLES ────────────────────────────────────── */
+  /* PRINT STYLES */
   @media print {
     body { background: #fff; margin: 0; }
-    .poster { box-shadow: none; zoom: 1; }
+    .poster { box-shadow: none; }
     @page { size: A1 portrait; margin: 10mm; }
   }
-  #qrcode canvas, #qrcode img { width: 72px !important; height: 72px !important; display: block; }
-  #qrcode-live canvas, #qrcode-live img { width: 110px !important; height: 110px !important; display: block; }
+
+  /* QR codes: generated at 256px, CSS-scaled to proper vw size */
+  #qrcode canvas, #qrcode img { width: 6.5vw !important; height: 6.5vw !important; display: block; }
+  #qrcode-live canvas, #qrcode-live img { width: 9.5vw !important; height: 9.5vw !important; display: block; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
@@ -632,7 +604,7 @@
     </div>
     <div class="qr-box">
       <div id="qrcode" style="line-height:0"></div>
-      <div style="margin-top:4px;font-size:5.5pt;color:#333;line-height:1.4;word-break:break-all;width:72px">
+      <div style="margin-top:0.18vw;font-size:1.11vw;color:#333;line-height:1.4;word-break:break-all;width:6.5vw">
         github.com/<wbr>welsol21/<wbr>FYP_LLM
       </div>
     </div>
@@ -693,7 +665,7 @@ Sentence<br>
           <div class="pipe-arrow">▼</div>
           <div class="pipe-step p8"><span class="pipe-num">⑧</span> RLE JSON → Visualizer / Export</div>
         </div>
-        <p style="font-size:9pt;margin-top:6px;color:#555">
+        <p style="font-size:1.48vw;margin-top:0.28vw;color:#555">
           Deployed as <strong>Progressive Web App (PWA)</strong> — Android-installable, fully client-side.
           No cloud dependency. No data leaves the device.
         </p>
@@ -702,7 +674,7 @@ Sentence<br>
       <!-- Research Journey -->
       <div class="card">
         <h2>Research Journey: What We Tried</h2>
-        <p style="font-size:9pt;color:#555;margin-bottom:8px">Each component went through multiple candidate approaches before the final solution was selected:</p>
+        <p style="font-size:1.48vw;color:#555;margin-bottom:0.37vw">Each component went through multiple candidate approaches before the final solution was selected:</p>
 
         <!-- CEFR row -->
         <div class="rj-row">
@@ -760,7 +732,7 @@ Sentence<br>
           <strong>"In open systems, context forms patterns.</strong><br>
           <strong>In closed systems, patterns form context."</strong>
         </div>
-        <p style="font-size:9.5pt;text-align:center;color:#666;margin-top:4px">
+        <p style="font-size:1.48vw;text-align:center;color:#666;margin-top:0.18vw">
           — Principle discovered empirically during T5 fine-tuning
         </p>
       </div>
@@ -851,7 +823,7 @@ Sentence<br>
       <!-- Broader Implication -->
       <div class="card">
         <h2>Implication for Agentic AI</h2>
-        <p style="font-size:9.5pt">An LLM agent navigating the real world is a <strong>closed system</strong> operating in an <strong>open environment</strong>. Its trained patterns are fixed; the world's context is not. The duality principle predicts exactly where agents succeed (stable structural patterns) and fail (distribution shift beyond the trained pattern's boundary).</p>
+        <p style="font-size:1.48vw">An LLM agent navigating the real world is a <strong>closed system</strong> operating in an <strong>open environment</strong>. Its trained patterns are fixed; the world's context is not. The duality principle predicts exactly where agents succeed (stable structural patterns) and fail (distribution shift beyond the trained pattern's boundary).</p>
         <div class="insight">
           Understanding training as pattern-carving and inference as pattern-imposing offers a new lens for agent reliability research.
         </div>
@@ -860,7 +832,7 @@ Sentence<br>
       <!-- Corpus Scale -->
       <div class="card">
         <h2>Training Data &amp; Corpus Scale</h2>
-        <p style="font-size:9pt;color:#555;margin-bottom:8px">Four open-access corpora merged into a CEFR-labelled full-ladder dataset (A1→C2):</p>
+        <p style="font-size:1.48vw;color:#555;margin-bottom:0.37vw">Four open-access corpora merged into a CEFR-labelled full-ladder dataset (A1→C2):</p>
 
         <div class="corpus-row">
           <div class="corpus-name">OANC</div>
@@ -889,7 +861,7 @@ Sentence<br>
         </div>
         <div class="corpus-label-sm">Project Gutenberg — rare tense patterns (C1–C2: modal perfect, future perfect)</div>
 
-        <div class="corpus-row" style="margin-bottom:2px">
+        <div class="corpus-row" style="margin-bottom:0.09vw">
           <div class="corpus-name">MASC</div>
           <div class="corpus-bar-wrap">
             <div class="corpus-bar" style="width:2%;background:#1A5C2E"></div>
@@ -898,12 +870,12 @@ Sentence<br>
         </div>
         <div class="corpus-label-sm">Manually Annotated Sub-Corpus — validation &amp; control slice</div>
 
-        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:5px">
-          <div style="background:#EEF1F8;border-radius:4px;padding:5px 7px;font-size:8pt">
+        <div style="margin-top:0.46vw;display:grid;grid-template-columns:1fr 1fr;gap:0.23vw">
+          <div style="background:#EEF1F8;border-radius:0.18vw;padding:0.23vw 0.32vw;font-size:1.48vw">
             <strong style="color:#2C4A8C">27,000</strong> raw samples ingested<br>
             <strong style="color:#2C4A8C">685</strong> unique after deduplication
           </div>
-          <div style="background:#EEF5EE;border-radius:4px;padding:5px 7px;font-size:8pt">
+          <div style="background:#EEF5EE;border-radius:0.18vw;padding:0.23vw 0.32vw;font-size:1.48vw">
             <strong style="color:#1A5C2E">6 CEFR levels</strong> covered (A1→C2)<br>
             <strong style="color:#1A5C2E">Full-ladder</strong> per grammar class
           </div>
@@ -970,7 +942,7 @@ Sentence<br>
             <td><span class="tick">✓</span></td>
           </tr>
         </table>
-        <p style="font-size:9pt;color:#555;margin-top:5px">T5 fine-tuning achieves GPT-quality annotation at zero inference cost, running entirely on-device.</p>
+        <p style="font-size:1.48vw;color:#555;margin-top:0.23vw">T5 fine-tuning achieves GPT-quality annotation at zero inference cost, running entirely on-device.</p>
       </div>
 
       <!-- Validation -->
@@ -1021,14 +993,14 @@ Sentence<br>
       </div>
 
       <!-- Live Demo -->
-      <div style="background:#1B2A4A;border-radius:6px;padding:10px 12px;display:flex;align-items:center;gap:10px">
-        <div style="background:#fff;padding:6px;border-radius:4px;flex-shrink:0;line-height:0">
+      <div style="background:#1B2A4A;border-radius:0.28vw;padding:0.46vw 0.55vw;display:flex;align-items:center;gap:0.46vw">
+        <div style="background:#fff;padding:0.28vw;border-radius:0.18vw;flex-shrink:0;line-height:0">
           <div id="qrcode-live"></div>
         </div>
         <div style="color:#fff;line-height:1.5">
-          <strong style="color:#F5C518;font-size:11pt">Live Demo</strong><br>
-          <span style="font-size:12pt;font-weight:700">www.el-a.uk</span><br>
-          <span style="color:#B0C0D8;font-size:9pt">Try it in your browser</span>
+          <strong style="color:#F5C518;font-size:2.21vw">Live Demo</strong><br>
+          <span style="font-size:2.46vw;font-weight:700">www.el-a.uk</span><br>
+          <span style="color:#B0C0D8;font-size:1.48vw">Try it in your browser</span>
         </div>
       </div>
 
@@ -1058,16 +1030,16 @@ Sentence<br>
 <script>
   new QRCode(document.getElementById("qrcode"), {
     text: "https://github.com/welsol21/FYP_LLM",
-    width: 72,
-    height: 72,
+    width: 256,
+    height: 256,
     colorDark: "#1B2A4A",
     colorLight: "#ffffff",
     correctLevel: QRCode.CorrectLevel.M
   });
   new QRCode(document.getElementById("qrcode-live"), {
     text: "https://www.el-a.uk",
-    width: 110,
-    height: 110,
+    width: 256,
+    height: 256,
     colorDark: "#1B2A4A",
     colorLight: "#ffffff",
     correctLevel: QRCode.CorrectLevel.M
