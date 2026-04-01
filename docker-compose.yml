@@ -7,8 +7,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-ela}
       POSTGRES_USER: ${POSTGRES_USER:-ela_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ela_pass}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
