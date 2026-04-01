@@ -8,7 +8,7 @@
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  :root { font-size: 4.081mm;
+  :root {
     --navy:   #1B2A4A;
     --blue:   #2C4A8C;
     --red:    #8B1A1A;
@@ -31,14 +31,15 @@
      100rem on screen = viewport width, so layout scales proportionally.
      What you see in the browser IS what prints on A1. */
   .poster {
-    width: 574mm;
+    width: 100%;
     background: #fff;
     display: grid;
     grid-template-rows: auto 1fr auto;
     box-shadow: 0 4px 24px rgba(0,0,0,0.25);
   }
 
-   /* 1rem = 1vw of viewport on screen */
+  @media screen {
+    :root { font-size: 1vw; } /* 1rem = 1vw of viewport on screen */
     body { margin: 0.65rem; }
   }
 
@@ -563,54 +564,44 @@
   .footer ol { margin-left: 0.65rem; }
   .footer ol li { margin-bottom: 0.09rem; }
 
-  
-    @page { size: A1 portrait; margin: 10mm; }
-    html { zoom: 0.787; }
+  /* PRINT STYLES */
+  @media print {
+    /* 1rem = 5.74mm = 1% of A1 printable width (574mm).
+       This makes rem-based sizes physically correct at A1 print. */
+    :root { font-size: 5.74mm; }
     body { background: #fff; margin: 0; padding: 0; }
-    .poster { box-shadow: none; width: 729mm; }
+    .poster { box-shadow: none; width: 100%; }
+    @page { size: A1 portrait; margin: 10mm; }
+
+    /* Reduce whitespace only (not font sizes) so all content fits on one page */
+    .header  { padding: 0.4rem 0.7rem 0.4rem; gap: 0.5rem; }
+    .col     { padding: 0.28rem 0.3rem; gap: 0.22rem; }
+    .card    { padding: 0.28rem 0.38rem; }
+    .card h2 { padding-bottom: 0.18rem; margin-bottom: 0.28rem; }
+    .card p  { margin-bottom: 0.28rem; }
+    .card ul { margin-bottom: 0.28rem; }
+    .card ul li { margin-bottom: 0.12rem; }
+    .metric-box { padding: 0.28rem 0.38rem; margin-bottom: 0.15rem; }
+    .pipeline   { gap: 0; }
+    .pipe-step  { padding: 0.1rem 0.28rem; }
+    .pipe-arrow { font-size: 1.2rem; line-height: 1; }
+    .insight    { padding: 0.22rem 0.35rem; margin: 0.12rem 0; }
+    .principle-box { padding: 0.25rem 0.38rem; margin: 0.15rem 0; }
+    .rle-tree   { padding: 0.22rem 0.35rem; margin: 0.15rem 0; }
+    .duality-diagram { padding: 0.28rem 0.25rem; }
+    .panel-open, .panel-closed { min-height: 5rem; padding: 0.22rem; }
+    .corpus-row { margin-top: 0.18rem; }
+    .corpus-label-sm { margin-bottom: 0.05rem; }
+    .rj-row  { margin-bottom: 0.22rem; }
+    .footer  { padding: 0.28rem 0.7rem; gap: 0.7rem; }
+    .future-item { margin-bottom: 0.15rem; }
   }
 
   /* QR codes: generated at 256px, CSS-scaled to proper vw size */
   #qrcode canvas, #qrcode img { width: 6.5rem !important; height: 6.5rem !important; display: block; }
   #qrcode-live canvas, #qrcode-live img { width: 9.5rem !important; height: 9.5rem !important; display: block; }
-
-  /* Screen preview: scale 574mm down to ~794px */
-  @media screen {
-    body { margin: 14px; background: #e0e0e0; }
-    .poster { zoom: 0.366; margin: 0 auto; transform-origin: top left; }
-  }
-  @media print {
-    body { margin: 0; padding: 0; background: #fff; }
-    .poster { box-shadow: none; }
-    @page { size: A1 portrait; margin: 10mm; }
-  }
-  /* Compact spacing — auto-tuned so content fits A1 at 4.081mm base font */
-  html { line-height: 1.3; }
-  .header  { padding: 0.297rem 0.510rem; gap: 0.340rem; }
-  .col     { padding: 0.187rem 0.212rem; gap: 0.153rem; }
-  .card    { padding: 0.187rem 0.255rem; }
-  .card h2 { padding-bottom: 0.128rem; margin-bottom: 0.170rem; }
-  .card p  { margin-bottom: 0.153rem; line-height: 1.3; }
-  .card ul { margin-bottom: 0.153rem; margin-left: 1.5rem; }
-  .card ul li { margin-bottom: 0.068rem; line-height: 1.3; }
-  .metric-box { padding: 0.153rem 0.238rem; margin-bottom: 0.085rem; }
-  .pipeline   { gap: 0; }
-  .pipe-step  { padding: 0.051rem 0.153rem; }
-  .pipe-arrow { line-height: 1; margin: 0; font-size: 1.2rem; }
-  .insight    { padding: 0.128rem 0.187rem; margin: 0.068rem 0; }
-  .principle-box { padding: 0.128rem 0.212rem; margin: 0.085rem 0; }
-  .rle-tree   { padding: 0.128rem 0.187rem; margin: 0.085rem 0; line-height: 1.5; }
-  .duality-diagram { padding: 0.153rem 0.136rem; }
-  .duality-grid { margin: 0.128rem 0; }
-  .panel-open, .panel-closed { min-height: 0; padding: 0.119rem; }
-  .corpus-row { margin-top: 0.102rem; }
-  .corpus-label-sm { margin-bottom: 0.025rem; }
-  .rj-row  { margin-bottom: 0.119rem; }
-  .future-item { margin-bottom: 0.085rem; }
-  .footer  { padding: 0.153rem 0.425rem; gap: 0.340rem; }
-  .connector-circle { width: 3rem; height: 3rem; }
 </style>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -632,7 +623,7 @@
         <div class="mtu-full">Munster Technological<br>University</div>
       </div>
       <div class="qr-box">
-        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQgAAAEICAIAAAAslP2oAAAFCUlEQVR4nO3dwY0sNRRAUQYRBhkQCvESChmQR7NghXStLyNbtodz1vzu6qavLNWbsr8+n89PwL/9fPoC4EbCgCAMCMKAIAwIwoAgDAjCgCAMCMKAIAwIwoAgDAjCgCAMCL/M/oNff/t9x3Us99eff0z996PPNXqdU9/D7PXMfg+zvuvvwYoBQRgQhAFBGBCEAUEYEIQBYXqOMbL7fvnI7H30Vffdd88TVl3nqfnGK7+HESsGBGFAEAYEYUAQBgRhQBAGhGVzjJHdc4NVVs0lTj0Hsur7OfX6s3b/HqwYEIQBQRgQhAFBGBCEAUEYELbPMb6r2+73v7Iv1iusGBCEAUEYEIQBQRgQhAFBGBD+d3OM255zmDV7/eYV/40VA4IwIAgDgjAgCAOCMCAIA8L2OcapcxJWue18idm5xKlzOUZe+T1YMSAIA4IwIAgDgjAgCAOCMCAsm2O88nf/u/dfOrW/06nnTEZe+T2MWDEgCAOCMCAIA4IwIAgDgjAgTM8xXvl7+t12zzdWef31T7FiQBAGBGFAEAYEYUAQBgRhQPj6fD5T/+DU/fiR2863XrWP06nXmX39kVP7Wa36vFYMCMKAIAwIwoAgDAjCgCAMCNufxzg1N7jtXO3b5jwjs9e5+xyPU/tTWTEgCAOCMCAIA4IwIAgDgjAgTD+PMXLb3+ufOi/ilecrTr3vbXOeESsGBGFAEAYEYUAQBgRhQBAGhGXnfI+8cv9+1ql5xal9tFZ93tvOIx+xYkAQBgRhQBAGBGFAEAYEYUBYNse4bd+kU+dbn9oHaZVTz8nc9ryHFQOCMCAIA4IwIAgDgjAgCAPC8+d8r/LKOdm7nwNZdT2zTl3/iBUDgjAgCAOCMCAIA4IwIAgDwvbzMV45B/q2fZxGbvs+T537vntuZsWAIAwIwoAgDAjCgCAMCMKAsP18jFmrzls45dR8YPZ9X3/+ZPZ9PY8BCwgDgjAgCAOCMCAIA4IwIGw/H+PU/fLbzpM+dQ73KqfO+Z616v+jFQOCMCAIA4IwIAgDgjAgCAPCsfMxbtu/6La5x8ju7/+2faJOzTesGBCEAUEYEIQBQRgQhAFBGBCWPY/xyt/rzzp1X3/ku34/t81VrBgQhAFBGBCEAUEYEIQBQRgQtj+Pcdu+T6fOI5+9nlm3fT+3nVsyy4oBQRgQhAFBGBCEAUEYEIQB4di+UrNu27/otn2lXmdfKXiAMCAIA4IwIAgDgjAgCAPC9BzjdbfNAXY/RzH7vqeehxk5NS+yYkAQBgRhQBAGBGFAEAYEYUCYPh/jtjnAyOj+923nS+y+r7/78962D9gqVgwIwoAgDAjCgCAMCMKAIAwIy875ts/SP04953Dq+z91/bvnP1YMCMKAIAwIwoAgDAjCgCAMCMvmGCO3nWO96n1Hn+vUcw637Qe16vXtKwUXEQYEYUAQBgRhQBAGBGFA2D7HeMWp++Ujq+YVu+cPu+ckpz6vFQOCMCAIA4IwIAgDgjAgCAOCOcYP7N6/6LbnN1a97267n9+wYkAQBgRhQBAGBGFAEAYEYUDYPse47TmHkVP7Gq2ae7yy39Squcruz2vFgCAMCMKAIAwIwoAgDAjCgLBsjnHbedsjs9d527kNs07NN0Z2PzfieQzYSBgQhAFBGBCEAUEYEIQB4evz+Zy+BriOFQOCMCAIA4IwIAgDgjAgCAOCMCAIA4IwIAgDgjAgCAOCMCAIA8LfOYokVzPreTcAAAAASUVORK5CYII=" style="width:6.5rem;height:6.5rem;display:block">
+        <div id="qrcode" style="line-height:0"></div>
         <div style="margin-top:0.18rem;font-size:1.11rem;color:#333;line-height:1.4;word-break:break-all;width:6.5rem">
           github.com/<wbr>welsol21/<wbr>FYP_LLM
         </div>
@@ -927,7 +918,7 @@ Sentence<br>
       <!-- Live Demo -->
       <div style="background:#1B2A4A;border-radius:0.28rem;padding:0.46rem 0.55rem;display:flex;align-items:center;gap:0.46rem;margin-top:auto">
         <div style="background:#fff;padding:0.28rem;border-radius:0.18rem;flex-shrink:0;line-height:0">
-          <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOgAAADoCAIAAABqyz8vAAAEKElEQVR4nO3dwW1UMRRAUYIogw4ohXophQ7o47PINl44smXfzDlLFAajufLiybHfnuf5BjXfTy8APkO4JAmXJOGSJFyShEuScEkSLknCJUm4JAmXJOGSJFyShEuScEn6MfsXfv76vWMdy/37++fDPx+tf/fPj4w+Z5X69zVixyVJuCQJlyThkiRckoRLknBJmp7jjuyeR45U5pS3qX9fdlyShEuScEkSLknCJUm4JAmXpGVz3JFVc7vbzq2u+n/NnvfdrfJ92XFJEi5JwiVJuCQJlyThkiRckrbPcW9z2zy4cj/Dbey4JAmXJOGSJFyShEuScEkSLkkvN8fdfT/u7vXwzo5LknBJEi5JwiVJuCQJlyThkrR9jnvbPHLV+dfK/QOzblvPiB2XJOGSJFyShEuScEkSLknCJWnZHLfy3tju87i3/fxI5fsaseOSJFyShEuScEkSLknCJUm4JL09z3N6DVeozF95Z8clSbgkCZck4ZIkXJKES5JwSZo+j/tVz4PeNn89dW/Dqvn0rNl12nFJEi5JwiVJuCQJlyThkiRckrafx52d8912n8Du87izblvPrFXzbzsuScIlSbgkCZck4ZIkXJKES9L2d85mrXpvbHZeeGreOfvv7p7XnpqjO4/LSxAuScIlSbgkCZck4ZIkXJKOzXFP/b7/bed9R1adW909nz51rteOS5JwSRIuScIlSbgkCZck4ZK0bI5727nVkfr7ZKfWv+r/u6oTOy5JwiVJuCQJlyThkiRckoRL0vT9uPXf6z/ltvtxR277nBE7LknCJUm4JAmXJOGSJFyShEvSsjnuKpV7DE7NZVepv39mxyVJuCQJlyThkiRckoRLknBJ2n4ed/ZzRipz1q9638Jt56rtuCQJlyThkiRckoRLknBJEi5Jx945W2X3PHL3vPbU+nevx70K8AHhkiRckoRLknBJEi5JwiVpeo67ag532+fMfv6p+wdGbnuHbDc7LknCJUm4JAmXJOGSJFyShEvS9By3Muc7db/Bbe+u7T4Xe+r9MzsuScIlSbgkCZck4ZIkXJKES9KyexVuuxd29+efund21m3fi3sVeGnCJUm4JAmXJOGSJFyShEvS9vtxd783tlvlvoLbzkl75ww+IFyShEuScEkSLknCJUm4JOXfObvNqnsGVv27u8/FjuyeK9txSRIuScIlSbgkCZck4ZIkXJJebo67+36DVXPTU/fO3naud8SOS5JwSRIuScIlSbgkCZck4ZK0fY5727tfs2bno5X7H2bntafu9x2x45IkXJKES5JwSRIuScIlSbgkLZvjVs5xnlrn7vO+I6vmzbed97XjkiRckoRLknBJEi5JwiVJuCS9Pc9zeg0wzY5LknBJEi5JwiVJuCQJlyThkiRckoRLknBJEi5JwiVJuCQJlyThkvQfMZF9oi40U18AAAAASUVORK5CYII=" style="width:9.5rem;height:9.5rem;display:block">
+          <div id="qrcode-live"></div>
         </div>
         <div style="color:#fff;line-height:1.5">
           <strong style="color:#F5C518;font-size:2.21rem">Live Demo</strong><br>
@@ -1069,6 +1060,23 @@ Sentence<br>
   </div>
 
 </div><!-- /poster -->
-
+<script>
+  new QRCode(document.getElementById("qrcode"), {
+    text: "https://github.com/welsol21/FYP_LLM",
+    width: 256,
+    height: 256,
+    colorDark: "#1B2A4A",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  new QRCode(document.getElementById("qrcode-live"), {
+    text: "https://www.el-a.uk",
+    width: 256,
+    height: 256,
+    colorDark: "#1B2A4A",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.M
+  });
+</script>
 </body>
 </html>
