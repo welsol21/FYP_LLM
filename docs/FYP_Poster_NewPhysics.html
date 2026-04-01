@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ELA Poster — Vladyslav Rastvorov</title>
+<style>
+  /* Calibri is the required MTU font; fallback chain for non-Windows */
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:   #1B2A4A;
+    --blue:   #2C4A8C;
+    --red:    #8B1A1A;
+    --green:  #1A5C2E;
+    --amber:  #F5C518;
+    --bg:     #F0F2F5;
+    --card:   #FFFFFF;
+    --text:   #1A1A1A;
+    --light:  #E8ECF4;
+  }
+
+  body {
+    font-family: Calibri, 'Gill Sans', 'Trebuchet MS', Arial, sans-serif;
+    background: #e0e0e0;
+    color: var(--text);
+    font-size: 11.5pt;
+    line-height: 1.45;
+  }
+
+  /* ── A1 POSTER CONTAINER ─────────────────────────────── */
+  .poster {
+    width: 794px;         /* ~A1 proportional at screen res */
+    min-height: 1123px;
+    margin: 20px auto;
+    background: #fff;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+  }
+
+  /* ── HEADER ──────────────────────────────────────────── */
+  /* MTU mandatory: logo top-left, title next to it, QR far right */
+  .header {
+    background: var(--navy);
+    color: #fff;
+    padding: 14px 20px 12px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 14px;
+    align-items: center;
+  }
+  /* MTU Logo block — top left corner as required */
+  .mtu-logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    border-radius: 4px;
+    padding: 5px 8px;
+    flex-shrink: 0;
+    min-width: 72px;
+  }
+  .mtu-crest {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    width: 36px;
+    height: 36px;
+    margin-bottom: 3px;
+  }
+  .crest-q { border-radius: 2px; }
+  .crest-q1 { background: #F5A623; } /* gold */
+  .crest-q2 { background: #C0392B; } /* red  */
+  .crest-q3 { background: #2980B9; } /* blue */
+  .crest-q4 { background: #2980B9; } /* blue */
+  .mtu-wordmark {
+    font-size: 13pt;
+    font-weight: 900;
+    color: var(--navy);
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+  .mtu-full {
+    font-size: 5pt;
+    color: #555;
+    text-align: center;
+    line-height: 1.2;
+    margin-top: 2px;
+  }
+  .poster-title {
+    font-size: 20pt;
+    font-weight: 900;
+    line-height: 1.15;
+    color: #fff;
+  }
+  .poster-subtitle {
+    font-size: 10.5pt;
+    font-style: italic;
+    color: var(--amber);
+    margin-top: 4px;
+  }
+  .poster-meta {
+    font-size: 14.5pt; /* screen 14.5pt × 2.73 ≈ 40pt at A1 — MTU required */
+    color: #B0C0D8;
+    margin-top: 7px;
+    line-height: 1.55;
+  }
+  .poster-meta strong { color: #fff; }
+  .qr-box {
+    width: 84px;
+    height: auto;
+    background: #fff;
+    border: 2px solid var(--amber);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    font-size: 6.5pt;
+    color: var(--navy);
+    text-align: center;
+    padding: 5px 4px 5px;
+    flex-shrink: 0;
+    border-radius: 4px;
+    align-self: center;
+  }
+
+  /* ── BODY: 3-COLUMN GRID ─────────────────────────────── */
+  .body {
+    display: grid;
+    grid-template-columns: 1fr 1.1fr 1fr;
+    gap: 0;
+    background: var(--bg);
+  }
+
+  .col {
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  /* MTU mandatory: poster background must be white */
+  .col-left   { background: #ffffff; }
+  .col-centre { background: #ffffff; }
+  .col-right  { background: #ffffff; }
+
+  /* ── SECTION CARDS ───────────────────────────────────── */
+  .card {
+    background: var(--card);
+    border-radius: 6px;
+    padding: 10px 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.09);
+  }
+
+  .card h2 {
+    font-size: 13.2pt; /* screen 13.2pt × 2.73 ≈ 36pt at A1 — MTU Sub Heading */
+    font-weight: 700;
+    /* MTU mandatory: headings in Title Case, NOT all capitals */
+    text-transform: none;
+    letter-spacing: 0;
+    padding-bottom: 5px;
+    margin-bottom: 7px;
+    border-bottom: 2.5px solid currentColor;
+  }
+  .col-left   .card h2 { color: var(--blue); border-color: var(--blue); }
+  .col-centre .card h2 { color: var(--red);  border-color: var(--red);  }
+  .col-right  .card h2 { color: var(--green);border-color: var(--green);}
+
+  .card p { margin-bottom: 6px; font-size: 11pt; } /* 11pt × 2.73 ≈ 30pt at A1 — MTU Body Text */
+  .card ul { margin-left: 14px; margin-bottom: 6px; }
+  .card ul li { font-size: 11pt; margin-bottom: 3px; }
+  .card strong { font-weight: 700; }
+
+  /* ── PIPELINE FLOW ───────────────────────────────────── */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 6px 0;
+  }
+  .pipe-step {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 9pt;
+    font-weight: 500;
+    color: #fff;
+  }
+  .pipe-arrow {
+    text-align: center;
+    font-size: 11pt;
+    color: #888;
+    line-height: 1;
+  }
+  .p1 { background: #2C4A8C; }
+  .p2 { background: #3A5E9E; }
+  .p3 { background: #8B1A1A; }
+  .p4 { background: #A03020; }
+  .p5 { background: #1A5C2E; }
+  .p6 { background: #246B38; }
+  .p7 { background: #1B2A4A; }
+  .p8 { background: #0F1A2E; }
+  .pipe-num {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 50%;
+    text-align: center;
+    line-height: 18px;
+    font-size: 8pt;
+    flex-shrink: 0;
+  }
+
+  /* ── RLE SCHEMA BOX ──────────────────────────────────── */
+  .rle-tree {
+    background: var(--light);
+    border-left: 3px solid var(--blue);
+    padding: 8px 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 8.5pt;
+    line-height: 1.7;
+    border-radius: 0 4px 4px 0;
+    margin: 6px 0;
+  }
+
+  /* ── NEW PHYSICS DIAGRAM ─────────────────────────────── */
+  .duality-diagram {
+    background: linear-gradient(135deg, #e8f0ff 0%, #fff0f0 50%, #fff8e0 100%);
+    border: 2px solid var(--red);
+    border-radius: 8px;
+    padding: 10px 8px;
+    text-align: center;
+  }
+  .duality-grid {
+    display: grid;
+    grid-template-columns: 1fr 48px 1fr;
+    gap: 6px;
+    align-items: center;
+    margin: 8px 0;
+  }
+  .panel-open, .panel-closed {
+    border-radius: 6px;
+    padding: 8px;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .panel-open   { background: rgba(44,74,140,0.10); border: 1.5px solid var(--blue); }
+  .panel-closed { background: rgba(245,197,24,0.12); border: 1.5px solid #B8860B; }
+  .panel-label {
+    font-size: 8.5pt;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-bottom: 4px;
+  }
+  .panel-open   .panel-label { color: var(--blue); }
+  .panel-closed .panel-label { color: #8B6914; }
+  .panel-sublabel { font-size: 8pt; color: #666; margin-bottom: 6px; }
+  .panel-icon {
+    font-size: 24pt;
+    line-height: 1;
+    margin: 4px 0;
+  }
+  .panel-desc {
+    font-size: 8pt;
+    line-height: 1.4;
+    color: #333;
+  }
+  .panel-arrow {
+    font-size: 8pt;
+    font-weight: 700;
+    margin-top: 4px;
+    padding: 3px 5px;
+    border-radius: 3px;
+  }
+  .panel-open   .panel-arrow { background: var(--blue); color: #fff; }
+  .panel-closed .panel-arrow { background: #8B6914;     color: #fff; }
+
+  .duality-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+  }
+  .connector-circle {
+    width: 40px;
+    height: 40px;
+    border: 2.5px solid var(--red);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11pt;
+    color: var(--red);
+    background: #fff;
+    font-weight: 900;
+  }
+  .connector-label {
+    font-size: 7pt;
+    color: var(--red);
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .principle-box {
+    background: var(--navy);
+    color: #fff;
+    border-radius: 6px;
+    padding: 8px 10px;
+    text-align: center;
+    margin: 6px 0;
+    font-size: 10pt;
+    font-style: italic;
+    line-height: 1.5;
+  }
+  .principle-box strong { color: var(--amber); font-style: normal; }
+
+  .mapping-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+    margin: 6px 0;
+  }
+  .mapping-table th {
+    background: var(--red);
+    color: #fff;
+    padding: 4px 6px;
+    text-align: left;
+    font-weight: 600;
+  }
+  .mapping-table td {
+    padding: 4px 6px;
+    border-bottom: 1px solid #E0D0D0;
+  }
+  .mapping-table tr:nth-child(even) td { background: #FFF5F5; }
+
+  /* ── METRIC CALLOUTS ─────────────────────────────────── */
+  .metric-box {
+    border-radius: 6px;
+    padding: 10px 12px;
+    text-align: center;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .metric-box .number {
+    font-size: 28pt;
+    font-weight: 900;
+    line-height: 1;
+    display: block;
+  }
+  .metric-box .label {
+    font-size: 9pt;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0;
+    margin: 3px 0 2px;
+    display: block;
+  }
+  .metric-box .sublabel {
+    font-size: 8pt;
+    opacity: 0.85;
+    display: block;
+    line-height: 1.3;
+  }
+  .metric-blue  { background: linear-gradient(135deg, #2C4A8C, #1B2A4A); }
+  .metric-red   { background: linear-gradient(135deg, #8B1A1A, #5C0E0E); }
+  .metric-green { background: linear-gradient(135deg, #1A5C2E, #0F3A1C); }
+
+  /* ── COMPARISON TABLE ────────────────────────────────── */
+  .comp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8pt;
+    margin: 5px 0;
+  }
+  .comp-table th {
+    background: var(--green);
+    color: #fff;
+    padding: 4px 5px;
+    text-align: center;
+    font-weight: 600;
+  }
+  .comp-table td {
+    padding: 3px 5px;
+    border-bottom: 1px solid #D0E0D0;
+    text-align: center;
+  }
+  .comp-table tr:nth-child(even) td { background: #F0F8F2; }
+  .comp-table .highlight td { background: #C8E6C9; font-weight: 700; }
+  .tick { color: #1A5C2E; font-weight: 900; }
+  .cross { color: #8B1A1A; }
+
+  /* ── INSIGHT BOX ─────────────────────────────────────── */
+  .insight {
+    background: #FFF8E1;
+    border-left: 4px solid var(--amber);
+    padding: 8px 10px;
+    border-radius: 0 4px 4px 0;
+    font-size: 9.5pt;
+    font-style: italic;
+    color: #4A3800;
+    margin: 5px 0;
+  }
+
+  /* ── FUTURE LIST ─────────────────────────────────────── */
+  .future-item {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    margin-bottom: 5px;
+    font-size: 9.5pt;
+  }
+  .future-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  /* ── RESEARCH JOURNEY ───────────────────────────────── */
+  .rj-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 8px;
+    font-size: 8pt;
+  }
+  .rj-label {
+    width: 52px;
+    flex-shrink: 0;
+    font-weight: 700;
+    font-size: 7.5pt;
+    color: var(--navy);
+    line-height: 1.3;
+    padding-top: 4px;
+  }
+  .rj-chain {
+    display: flex;
+    align-items: flex-start;
+    gap: 3px;
+    flex-wrap: wrap;
+  }
+  .rj-arrow {
+    font-size: 10pt;
+    color: #aaa;
+    padding-top: 6px;
+    flex-shrink: 0;
+  }
+  .rj-node {
+    border-radius: 4px;
+    padding: 3px 5px;
+    font-size: 7.5pt;
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: center;
+    min-width: 44px;
+  }
+  .rj-sub {
+    font-size: 6.5pt;
+    font-weight: 400;
+    line-height: 1.2;
+    margin-top: 2px;
+    opacity: 0.85;
+  }
+  .rj-rejected {
+    background: #FEE8E8;
+    color: #8B1A1A;
+    border: 1px solid #F5BFBF;
+    text-decoration: line-through;
+    text-decoration-color: #C0392B;
+  }
+  .rj-rejected .rj-sub { text-decoration: none; }
+  .rj-won {
+    background: #E8F5E9;
+    color: #1A5C2E;
+    border: 1.5px solid #81C784;
+    font-weight: 700;
+  }
+
+  /* ── RESEARCH STATS GRID ─────────────────────────────── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 5px;
+    margin-top: 4px;
+  }
+  .stat-cell {
+    border-radius: 5px;
+    padding: 7px 5px;
+    text-align: center;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .stat-num {
+    font-size: 18pt;
+    font-weight: 900;
+    line-height: 1;
+  }
+  .stat-lbl {
+    font-size: 7pt;
+    line-height: 1.3;
+    margin-top: 3px;
+    opacity: 0.92;
+  }
+  .stat-blue  { background: #2C4A8C; }
+  .stat-red   { background: #8B1A1A; }
+  .stat-green { background: #1A5C2E; }
+  .stat-navy  { background: #1B2A4A; }
+  .stat-amber { background: #8B6914; }
+
+  /* ── CORPUS BARS ─────────────────────────────────────── */
+  .corpus-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 2px;
+    margin-top: 6px;
+  }
+  .corpus-name {
+    width: 52px;
+    font-size: 8pt;
+    font-weight: 700;
+    color: var(--navy);
+    flex-shrink: 0;
+  }
+  .corpus-bar-wrap {
+    flex: 1;
+    height: 12px;
+    background: #eee;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .corpus-bar {
+    height: 100%;
+    border-radius: 3px;
+    min-width: 4px;
+  }
+  .corpus-size {
+    width: 70px;
+    font-size: 7.5pt;
+    font-weight: 700;
+    color: #333;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .corpus-label-sm {
+    font-size: 7pt;
+    color: #777;
+    margin-left: 58px;
+    margin-bottom: 2px;
+    line-height: 1.3;
+  }
+
+  /* ── FOOTER ──────────────────────────────────────────── */
+  .footer {
+    background: var(--navy);
+    color: #B0C0D8;
+    padding: 10px 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    font-size: 8.8pt; /* 8.8pt × 2.73 ≈ 24pt at A1 — MTU Fine Print */
+    line-height: 1.6;
+  }
+  .footer h4 {
+    color: var(--amber);
+    font-size: 9pt;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-bottom: 4px;
+  }
+  .footer ol { margin-left: 14px; }
+  .footer ol li { margin-bottom: 2px; }
+
+  /* ── PRINT STYLES ────────────────────────────────────── */
+  @media print {
+    body { background: #fff; margin: 0; }
+    .poster {
+      width: 100%;
+      box-shadow: none;
+      margin: 0;
+      page-break-inside: avoid;
+    }
+    @page {
+      size: A1 portrait;
+      margin: 10mm;
+    }
+  }
+  #qrcode canvas, #qrcode img { width: 72px !important; height: 72px !important; display: block; }
+  #qrcode-live canvas, #qrcode-live img { width: 110px !important; height: 110px !important; display: block; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+<div class="poster">
+
+  <!-- ══════════════════ HEADER ══════════════════ -->
+  <!-- MTU mandatory: logo top-left corner, next to poster title -->
+  <div class="header">
+    <div class="mtu-logo">
+      <div class="mtu-crest">
+        <div class="crest-q crest-q1"></div>
+        <div class="crest-q crest-q2"></div>
+        <div class="crest-q crest-q3"></div>
+        <div class="crest-q crest-q4"></div>
+      </div>
+      <div class="mtu-wordmark">MTU</div>
+      <div class="mtu-full">Munster Technological<br>University</div>
+    </div>
+    <div>
+      <div class="poster-title">ELA: Recursive Linguistic Elements &amp; the Context–Pattern Duality</div>
+      <div class="poster-subtitle">An AI-Assisted Framework for Authentic English Comprehension — Where does language end and pattern begin?</div>
+      <div class="poster-meta">
+        <strong>Vladyslav Rastvorov</strong> (R00274535) &nbsp;·&nbsp; BSc Honours in Computer Systems<br>
+        Research Supervisor: <strong>Dr. Alex Vakaloudis</strong> &nbsp;·&nbsp;
+        Implementation Supervisor: <strong>Prof. Nasir Ahmad</strong><br>
+        Department of Computer Science · Faculty of Engineering and Science ·
+        <strong>Munster Technological University Cork</strong> · May 2025
+      </div>
+    </div>
+    <div class="qr-box">
+      <div id="qrcode" style="line-height:0"></div>
+      <div style="margin-top:4px;font-size:5.5pt;color:#333;line-height:1.4;word-break:break-all;width:72px">
+        github.com/<wbr>welsol21/<wbr>FYP_LLM
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ BODY ══════════════════ -->
+  <div class="body">
+
+    <!-- ─────────── LEFT COLUMN ─────────── -->
+    <div class="col col-left">
+
+      <!-- Problem -->
+      <div class="card">
+        <h2>Problem &amp; Motivation</h2>
+        <p>Language-learning platforms rely on <strong>pre-simplified materials</strong>. Authentic English — films, podcasts, news — is linguistically rich but cognitively inaccessible without structural guidance. Simplification destroys the input; learners never encounter real language.</p>
+        <p><strong>Hypothesis:</strong> Deterministic NLP and lightweight generative AI can <em>explain</em> authentic input without altering it — producing hierarchical annotations that scaffold meaning while preserving full linguistic complexity.</p>
+        <ul>
+          <li>How can a hybrid NLP + LLM pipeline produce accurate pedagogical annotations from authentic media?</li>
+          <li>What data model captures recursive linguistic relations while remaining human-interpretable?</li>
+          <li>Can bilingual visualisation reduce cognitive load?</li>
+        </ul>
+      </div>
+
+      <!-- RLE Schema -->
+      <div class="card">
+        <h2>The RLE Data Model</h2>
+        <p>Core innovation: every sentence is a <strong>nested JSON hierarchy</strong> at three levels — Sentence → Phrase → Word — validated against a dual-schema contract before persistence.</p>
+        <div class="rle-tree">
+Sentence<br>
+&nbsp;&nbsp;└── Phrase (NP / VP / PP / ADJP)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── Word<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── translation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── CEFR level (A1–C2)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── POS &amp; IPA<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── TAM (Tense–Aspect–Mood)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── note (T5-generated)
+        </div>
+        <p>Schema is <strong>language-agnostic</strong>. Current focus: English → Russian. Pluggable translator backends support additional target languages.</p>
+      </div>
+
+      <!-- Pipeline -->
+      <div class="card">
+        <h2>Analysis Pipeline</h2>
+        <div class="pipeline">
+          <div class="pipe-step p1"><span class="pipe-num">①</span> Input — Text / PDF / Audio / Video</div>
+          <div class="pipe-arrow">▼</div>
+          <div class="pipe-step p2"><span class="pipe-num">②</span> ASR — Whisper base/medium</div>
+          <div class="pipe-arrow">▼</div>
+          <div class="pipe-step p3"><span class="pipe-num">③</span> spaCy 3.7 — Tokenise · Dependency · POS</div>
+          <div class="pipe-arrow">▼</div>
+          <div class="pipe-step p4"><span class="pipe-num">④</span> TAM Rules Engine — Tense · Aspect · Mood</div>
+          <div class="pipe-arrow">▼</div>
+          <div class="pipe-step p5"><span class="pipe-num">⑤</span> Phrase Builder — NP / VP / PP / ADJP</div>
+          <div class="pipe-arrow">▼</div>
+          <div class="pipe-step p6"><span class="pipe-num">⑥</span> ML Layer — CEFR Classifier + T5 Notes</div>
+          <div class="pipe-arrow">▼</div>
+          <div class="pipe-step p7"><span class="pipe-num">⑦</span> Contract Validator (v1 / v2_strict)</div>
+          <div class="pipe-arrow">▼</div>
+          <div class="pipe-step p8"><span class="pipe-num">⑧</span> RLE JSON → Visualizer / Export</div>
+        </div>
+        <p style="font-size:9pt;margin-top:6px;color:#555">
+          Deployed as <strong>Progressive Web App (PWA)</strong> — Android-installable, fully client-side.
+          No cloud dependency. No data leaves the device.
+        </p>
+      </div>
+
+      <!-- Research Journey -->
+      <div class="card">
+        <h2>Research Journey: What We Tried</h2>
+        <p style="font-size:9pt;color:#555;margin-bottom:8px">Each component went through multiple candidate approaches before the final solution was selected:</p>
+
+        <!-- CEFR row -->
+        <div class="rj-row">
+          <div class="rj-label">CEFR<br>Classification</div>
+          <div class="rj-chain">
+            <div class="rj-node rj-rejected">DeBERTa<div class="rj-sub">underperformed<br>tabular baseline</div></div>
+            <div class="rj-arrow">→</div>
+            <div class="rj-node rj-rejected">BERT<div class="rj-sub">same issue</div></div>
+            <div class="rj-arrow">→</div>
+            <div class="rj-node rj-won">XGBoost<br>Tabular ✓<div class="rj-sub">78.3% accuracy</div></div>
+          </div>
+        </div>
+
+        <!-- Note generation row -->
+        <div class="rj-row">
+          <div class="rj-label">Note<br>Generation</div>
+          <div class="rj-chain">
+            <div class="rj-node rj-rejected">GPT-4o<div class="rj-sub">cost &amp; cloud<br>dependency</div></div>
+            <div class="rj-arrow">→</div>
+            <div class="rj-node rj-rejected">T5 raw<br>notation<div class="rj-sub">failed to<br>generalise</div></div>
+            <div class="rj-arrow">→</div>
+            <div class="rj-node rj-won">T5 +<br>Placeholders ✓<div class="rj-sub">ROUGE-L 0.81</div></div>
+          </div>
+        </div>
+
+        <!-- ASR row -->
+        <div class="rj-row">
+          <div class="rj-label">Speech<br>Recognition</div>
+          <div class="rj-chain">
+            <div class="rj-node rj-won">Whisper ✓<div class="rj-sub">WER 8.2%<br>fully local</div></div>
+          </div>
+        </div>
+
+        <!-- Translation row -->
+        <div class="rj-row" style="margin-bottom:0">
+          <div class="rj-label">Translation</div>
+          <div class="rj-chain">
+            <div class="rj-node rj-rejected">GPT-4o<div class="rj-sub">opt-in only</div></div>
+            <div class="rj-arrow">→</div>
+            <div class="rj-node rj-won">M2M100 ✓<div class="rj-sub">local, offline</div></div>
+          </div>
+        </div>
+      </div>
+
+
+    </div><!-- /col-left -->
+
+    <!-- ─────────── CENTRE COLUMN ─────────── -->
+    <div class="col col-centre">
+
+      <!-- The New Physics heading -->
+      <div class="card">
+        <h2>The New Physics of Context–Pattern Interaction</h2>
+        <div class="principle-box">
+          <strong>"In open systems, context forms patterns.</strong><br>
+          <strong>In closed systems, patterns form context."</strong>
+        </div>
+        <p style="font-size:9.5pt;text-align:center;color:#666;margin-top:4px">
+          — Principle discovered empirically during T5 fine-tuning
+        </p>
+      </div>
+
+      <!-- Duality Diagram -->
+      <div class="card">
+        <h2>The Duality Loop Diagram</h2>
+        <div class="duality-diagram">
+          <div class="duality-grid">
+
+            <!-- LEFT PANEL: Open System -->
+            <div class="panel-open">
+              <div>
+                <div class="panel-label">Open System</div>
+                <div class="panel-sublabel">Training Phase</div>
+              </div>
+              <div class="panel-icon">🌊</div>
+              <div class="panel-desc">
+                <strong>External context flows in.</strong><br>
+                Diverse RLE trees carve a stable<br>
+                internal pattern — the "River Bed"<br>
+                of the encoder's weight space.
+              </div>
+              <div class="panel-arrow">Context → Pattern</div>
+            </div>
+
+            <!-- CONNECTOR -->
+            <div class="duality-connector">
+              <div class="connector-label">Open<br>→</div>
+              <div class="connector-circle">T5</div>
+              <div class="connector-label">→<br>Closed</div>
+            </div>
+
+            <!-- RIGHT PANEL: Closed System -->
+            <div class="panel-closed">
+              <div>
+                <div class="panel-label">Closed System</div>
+                <div class="panel-sublabel">Inference Phase</div>
+              </div>
+              <div class="panel-icon">🔭</div>
+              <div class="panel-desc">
+                <strong>Frozen weights act as a Lens.</strong><br>
+                Novel, unseen input is refracted<br>
+                into structured output: CEFR level,<br>
+                TAM annotation, pedagogical note.
+              </div>
+              <div class="panel-arrow">Pattern → Context</div>
+            </div>
+
+          </div><!-- /duality-grid -->
+
+          <!-- ML Mapping Table -->
+          <table class="mapping-table">
+            <tr>
+              <th>System State</th>
+              <th>ML Phase</th>
+              <th>Mechanism</th>
+            </tr>
+            <tr>
+              <td><strong>Open</strong></td>
+              <td>Training</td>
+              <td>RLE trees shape encoder weights</td>
+            </tr>
+            <tr>
+              <td><strong>Closed</strong></td>
+              <td>Inference</td>
+              <td>Frozen weights interpret novel input</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Key Insight -->
+      <div class="card">
+        <h2>The Key Insight: Placeholder-Driven Learning</h2>
+        <p>Fine-tuning T5 on raw linguistic notation <strong>failed to generalise</strong>. The breakthrough was replacing lexical tokens with structural placeholders:</p>
+        <div class="rle-tree">
+❌ Raw: "She gave him a book" → [VP gave][NP him]<br><br>
+✅ Template: [SUBJ][V-PAST][IOBJ][DET][NOUN]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ [TAM: past-simple][VOICE: active]
+        </div>
+        <p>The abstract grammatical <strong>pattern</strong> — not the words — became the unit of learning. The model generalises to novel vocabulary because the pattern is <em>invariant to lexical substitution</em>.</p>
+        <div class="insight">
+          This is closed-system behaviour: the internal pattern imposes structure on any incoming context — regardless of whether that context was seen during training.
+        </div>
+      </div>
+
+      <!-- Broader Implication -->
+      <div class="card">
+        <h2>Implication for Agentic AI</h2>
+        <p style="font-size:9.5pt">An LLM agent navigating the real world is a <strong>closed system</strong> operating in an <strong>open environment</strong>. Its trained patterns are fixed; the world's context is not. The duality principle predicts exactly where agents succeed (stable structural patterns) and fail (distribution shift beyond the trained pattern's boundary).</p>
+        <div class="insight">
+          Understanding training as pattern-carving and inference as pattern-imposing offers a new lens for agent reliability research.
+        </div>
+      </div>
+
+      <!-- Corpus Scale -->
+      <div class="card">
+        <h2>Training Data &amp; Corpus Scale</h2>
+        <p style="font-size:9pt;color:#555;margin-bottom:8px">Four open-access corpora merged into a CEFR-labelled full-ladder dataset (A1→C2):</p>
+
+        <div class="corpus-row">
+          <div class="corpus-name">OANC</div>
+          <div class="corpus-bar-wrap">
+            <div class="corpus-bar" style="width:100%;background:#2C4A8C"></div>
+          </div>
+          <div class="corpus-size">30M+ tokens</div>
+        </div>
+        <div class="corpus-label-sm">Open American National Corpus — main advanced coverage (B2–C2)</div>
+
+        <div class="corpus-row">
+          <div class="corpus-name">UD GUM</div>
+          <div class="corpus-bar-wrap">
+            <div class="corpus-bar" style="width:17%;background:#3A5E9E"></div>
+          </div>
+          <div class="corpus-size">5.2M tokens</div>
+        </div>
+        <div class="corpus-label-sm">Universal Dependencies GUM — genre-aware (B1–B2)</div>
+
+        <div class="corpus-row">
+          <div class="corpus-name">Gutenberg</div>
+          <div class="corpus-bar-wrap">
+            <div class="corpus-bar" style="width:5%;background:#8B1A1A"></div>
+          </div>
+          <div class="corpus-size">1M+ tokens</div>
+        </div>
+        <div class="corpus-label-sm">Project Gutenberg — rare tense patterns (C1–C2: modal perfect, future perfect)</div>
+
+        <div class="corpus-row" style="margin-bottom:2px">
+          <div class="corpus-name">MASC</div>
+          <div class="corpus-bar-wrap">
+            <div class="corpus-bar" style="width:2%;background:#1A5C2E"></div>
+          </div>
+          <div class="corpus-size">~500k tokens</div>
+        </div>
+        <div class="corpus-label-sm">Manually Annotated Sub-Corpus — validation &amp; control slice</div>
+
+        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:5px">
+          <div style="background:#EEF1F8;border-radius:4px;padding:5px 7px;font-size:8pt">
+            <strong style="color:#2C4A8C">27,000</strong> raw samples ingested<br>
+            <strong style="color:#2C4A8C">685</strong> unique after deduplication
+          </div>
+          <div style="background:#EEF5EE;border-radius:4px;padding:5px 7px;font-size:8pt">
+            <strong style="color:#1A5C2E">6 CEFR levels</strong> covered (A1→C2)<br>
+            <strong style="color:#1A5C2E">Full-ladder</strong> per grammar class
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /col-centre -->
+
+    <!-- ─────────── RIGHT COLUMN ─────────── -->
+    <div class="col col-right">
+
+      <!-- Metrics -->
+      <div class="card">
+        <h2>Performance Metrics</h2>
+        <div class="metric-box metric-blue">
+          <span class="number">78.3%</span>
+          <span class="label">CEFR Classification Accuracy</span>
+          <span class="sublabel">XGBoost + Random Forest + Logistic Regression<br>3,000-sentence CEFR-balanced corpus</span>
+        </div>
+        <div class="metric-box metric-red">
+          <span class="number">0.81</span>
+          <span class="label">Note Relevance (ROUGE-L)</span>
+          <span class="sublabel">Fine-tuned T5 model evaluation<br>on held-out RLE annotation set</span>
+        </div>
+        <div class="metric-box metric-green">
+          <span class="number">8.2%</span>
+          <span class="label">ASR Word Error Rate</span>
+          <span class="sublabel">Whisper base model<br>clean speech test set</span>
+        </div>
+      </div>
+
+      <!-- Comparison Table -->
+      <div class="card">
+        <h2>Annotation Backend Comparison</h2>
+        <table class="comp-table">
+          <tr>
+            <th>Approach</th>
+            <th>Quality</th>
+            <th>Cost</th>
+            <th>Offline</th>
+          </tr>
+          <tr>
+            <td>GPT-4o</td>
+            <td>High</td>
+            <td>$$$</td>
+            <td><span class="cross">✗</span></td>
+          </tr>
+          <tr>
+            <td>Rules only</td>
+            <td>Medium</td>
+            <td>Free</td>
+            <td><span class="tick">✓</span></td>
+          </tr>
+          <tr class="highlight">
+            <td><strong>T5 fine-tuned</strong></td>
+            <td><strong>High</strong></td>
+            <td><strong>Free</strong></td>
+            <td><span class="tick">✓</span></td>
+          </tr>
+          <tr>
+            <td>XGBoost CEFR</td>
+            <td>78.3%</td>
+            <td>Free</td>
+            <td><span class="tick">✓</span></td>
+          </tr>
+        </table>
+        <p style="font-size:9pt;color:#555;margin-top:5px">T5 fine-tuning achieves GPT-quality annotation at zero inference cost, running entirely on-device.</p>
+      </div>
+
+      <!-- Validation -->
+      <div class="card">
+        <h2>System Validation</h2>
+        <ul>
+          <li><strong>O1 (RLE Generation):</strong> spaCy + TAM engine produces schema-valid RLE for all test sentences ✓</li>
+          <li><strong>O2 (ML Enrichment):</strong> CEFR 78.3%; T5 ROUGE-L 0.81 ✓</li>
+          <li><strong>O3 (UI &amp; Export):</strong> Linguistic Visualizer renders full RLE tree; JSON/CSV export verified ✓</li>
+          <li><strong>O4 (Deployment):</strong> Android PWA install — fully client-side, no cloud dependency ✓</li>
+        </ul>
+      </div>
+
+      <!-- Conclusions -->
+      <div class="card">
+        <h2>Conclusions</h2>
+        <ul>
+          <li>Explainable AI annotation makes authentic English <strong>pedagogically accessible without simplification</strong>.</li>
+          <li>The RLE schema is a viable, human-interpretable model of recursive linguistic structure.</li>
+          <li>The <strong>Context–Pattern Duality</strong>, observed empirically during T5 fine-tuning, generalises beyond NLP to any learning system that transitions from open-world training to closed-system inference.</li>
+          <li>Placeholder-driven T5 fine-tuning generalises to novel vocabulary because the abstract structural pattern is lexically invariant.</li>
+        </ul>
+      </div>
+
+      <!-- Future Work -->
+      <div class="card">
+        <h2>Future Directions</h2>
+        <div class="future-item">
+          <div class="future-dot"></div>
+          <div><strong>Tauri 2 Desktop App:</strong> Native offline package (Linux .deb / Windows) with bundled ML models — no browser required, full hardware access for on-device inference.</div>
+        </div>
+        <div class="future-item">
+          <div class="future-dot"></div>
+          <div><strong>Translation Quality Gates:</strong> Round-trip ChrF scorer, length-ratio guards, n-gram repetition penalty, and a human review queue wired into the M2M100 pipeline.</div>
+        </div>
+        <div class="future-item">
+          <div class="future-dot"></div>
+          <div><strong>M2M100 LoRA Fine-Tuning:</strong> Domain-specific refinement of the translation model on accepted English → Russian pairs from the review queue.</div>
+        </div>
+        <div class="future-item">
+          <div class="future-dot"></div>
+          <div><strong>Additional target languages:</strong> Pluggable translator backends support any language beyond the current English → Russian focus.</div>
+        </div>
+        <div class="future-item">
+          <div class="future-dot"></div>
+          <div><strong>Real-time streaming ASR:</strong> Live audio analysis for conversation practice via Whisper streaming mode.</div>
+        </div>
+      </div>
+
+      <!-- Live Demo -->
+      <div style="background:#1B2A4A;border-radius:6px;padding:10px 12px;display:flex;align-items:center;gap:10px">
+        <div style="background:#fff;padding:6px;border-radius:4px;flex-shrink:0;line-height:0">
+          <div id="qrcode-live"></div>
+        </div>
+        <div style="color:#fff;line-height:1.5">
+          <strong style="color:#F5C518;font-size:11pt">Live Demo</strong><br>
+          <span style="font-size:12pt;font-weight:700">www.el-a.uk</span><br>
+          <span style="color:#B0C0D8;font-size:9pt">Try it in your browser</span>
+        </div>
+      </div>
+
+    </div><!-- /col-right -->
+
+  </div><!-- /body -->
+
+  <!-- ══════════════════ FOOTER ══════════════════ -->
+  <div class="footer">
+    <div>
+      <h4>References</h4>
+      <ol>
+        <li>Honnibal, M. &amp; Montani, I. (2017). spaCy: Industrial-strength NLP.</li>
+        <li>Raffel, C. et al. (2020). Exploring the Limits of Transfer Learning with T5. <em>JMLR.</em></li>
+        <li>Radford, A. et al. (2023). Robust Speech Recognition via Large-Scale Weak Supervision. <em>ICML.</em></li>
+        <li>Chen, T. &amp; Guestrin, C. (2016). XGBoost: A Scalable Tree Boosting System. <em>ACM KDD.</em></li>
+        <li>Levy, M. (1997). <em>Computer-Assisted Language Learning.</em> Oxford University Press.</li>
+      </ol>
+    </div>
+    <div>
+      <h4>Acknowledgements</h4>
+      <p>The author sincerely thanks <strong style="color:#fff">Prof. Nasir Ahmad</strong> (Implementation Supervisor) and <strong style="color:#fff">Dr. Alex Vakaloudis</strong> (Research Supervisor) for their invaluable guidance throughout this project. Thanks to the Department of Computer Science at MTU Cork for the academic environment that made this work possible. Inspired by <em>Eleonora Rastvorova</em>.</p>
+    </div>
+  </div>
+
+</div><!-- /poster -->
+<script>
+  new QRCode(document.getElementById("qrcode"), {
+    text: "https://github.com/welsol21/FYP_LLM",
+    width: 72,
+    height: 72,
+    colorDark: "#1B2A4A",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  new QRCode(document.getElementById("qrcode-live"), {
+    text: "https://www.el-a.uk",
+    width: 110,
+    height: 110,
+    colorDark: "#1B2A4A",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.M
+  });
+</script>
+</body>
+</html>
