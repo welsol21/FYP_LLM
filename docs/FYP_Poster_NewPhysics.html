@@ -649,281 +649,176 @@
     <!-- ─────────── LEFT COLUMN ─────────── -->
     <div class="col col-left">
 
-      <!-- Problem -->
       <div class="card">
         <h2>Problem &amp; Motivation</h2>
-        <p>Language-learning platforms rely on <strong>pre-simplified materials</strong>. Authentic English — films, podcasts, news — is linguistically rich but cognitively inaccessible without structural guidance. Simplification destroys the input; learners never encounter real language.</p>
-        <p><strong>Hypothesis:</strong> Deterministic NLP and lightweight generative AI can <em>explain</em> authentic input without altering it — producing hierarchical annotations that scaffold meaning while preserving full linguistic complexity.</p>
+        <p>Language-learning platforms use <strong>pre-simplified materials</strong>. Authentic English — films, podcasts, news — is inaccessible without structural guidance. Simplification destroys the input.</p>
         <ul>
-          <li>How can a hybrid NLP + LLM pipeline produce accurate pedagogical annotations from authentic media?</li>
-          <li>What data model captures recursive linguistic relations while remaining human-interpretable?</li>
-          <li>Can bilingual visualisation reduce cognitive load?</li>
+          <li>Can NLP + AI <em>explain</em> authentic text without altering it?</li>
+          <li>What recursive data model stays human-interpretable?</li>
+          <li>Can bilingual annotation reduce cognitive load?</li>
         </ul>
       </div>
 
-      <!-- RLE Schema -->
       <div class="card">
         <h2>The RLE Data Model</h2>
-        <p>Core innovation: every sentence is a <strong>nested JSON hierarchy</strong> at three levels — Sentence → Phrase → Word — validated against a dual-schema contract before persistence.</p>
+        <p><strong>Sentence → Phrase → Word</strong> — nested JSON validated against a dual-schema contract.</p>
         <div class="rle-tree">
-Sentence<br>
-&nbsp;&nbsp;└── Phrase (NP / VP / PP / ADJP)<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── Word<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── translation<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── CEFR level (A1–C2)<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── POS &amp; IPA<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── TAM (Tense–Aspect–Mood)<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── note (T5-generated)
+Sentence → Phrase (NP/VP/PP/ADJP) → Word<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── translation · CEFR · POS · IPA · TAM · T5 note
         </div>
-        <p>Schema is <strong>language-agnostic</strong>. Current focus: English → Russian. Pluggable translator backends support additional target languages.</p>
+        <p><strong>Language-agnostic.</strong> English → Russian via M2M100 (offline, on-device).</p>
       </div>
 
-      <!-- Pipeline -->
       <div class="card">
         <h2>Analysis Pipeline</h2>
-        <div class="pipeline">
-          <div class="pipe-step p1"><span class="pipe-num">①</span> Input — Text / PDF / Audio / Video</div>
-          <div class="pipe-arrow">▼</div>
-          <div class="pipe-step p2"><span class="pipe-num">②</span> ASR — Whisper base/medium</div>
-          <div class="pipe-arrow">▼</div>
-          <div class="pipe-step p3"><span class="pipe-num">③</span> spaCy 3.7 — Tokenise · Dependency · POS</div>
-          <div class="pipe-arrow">▼</div>
-          <div class="pipe-step p4"><span class="pipe-num">④</span> TAM Rules Engine — Tense · Aspect · Mood</div>
-          <div class="pipe-arrow">▼</div>
-          <div class="pipe-step p5"><span class="pipe-num">⑤</span> Phrase Builder — NP / VP / PP / ADJP</div>
-          <div class="pipe-arrow">▼</div>
-          <div class="pipe-step p6"><span class="pipe-num">⑥</span> ML Layer — CEFR Classifier + T5 Notes</div>
-          <div class="pipe-arrow">▼</div>
-          <div class="pipe-step p7"><span class="pipe-num">⑦</span> Contract Validator (v1 / v2_strict)</div>
-          <div class="pipe-arrow">▼</div>
-          <div class="pipe-step p8"><span class="pipe-num">⑧</span> RLE JSON → Visualizer / Export</div>
+        <div style="margin:0.2rem 0">
+          <div style="display:flex;gap:0.1rem;margin-bottom:0.1rem">
+            <div class="pipe-step p1" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">①</span> Input</div>
+            <div style="display:flex;align-items:center;color:#aaa;font-size:1rem">▶</div>
+            <div class="pipe-step p2" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">②</span> Whisper ASR</div>
+            <div style="display:flex;align-items:center;color:#aaa;font-size:1rem">▶</div>
+            <div class="pipe-step p3" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">③</span> spaCy 3.7</div>
+            <div style="display:flex;align-items:center;color:#aaa;font-size:1rem">▶</div>
+            <div class="pipe-step p4" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">④</span> TAM Engine</div>
+          </div>
+          <div style="text-align:right;color:#aaa;font-size:1rem;padding-right:0.15rem;line-height:1">▼</div>
+          <div style="display:flex;gap:0.1rem;flex-direction:row-reverse;margin-top:0.04rem">
+            <div class="pipe-step p5" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">⑤</span> Phrase Builder</div>
+            <div style="display:flex;align-items:center;color:#aaa;font-size:1rem">▶</div>
+            <div class="pipe-step p6" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">⑥</span> ML Layer</div>
+            <div style="display:flex;align-items:center;color:#aaa;font-size:1rem">▶</div>
+            <div class="pipe-step p7" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">⑦</span> Validator</div>
+            <div style="display:flex;align-items:center;color:#aaa;font-size:1rem">▶</div>
+            <div class="pipe-step p8" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">⑧</span> RLE JSON</div>
+          </div>
         </div>
-        <p style="font-size:1.48rem;margin-top:0.28rem;color:#555">
-          Deployed as <strong>Progressive Web App (PWA)</strong> — Android-installable, fully client-side.
-          No cloud dependency. No data leaves the device.
-        </p>
+        <p style="font-size:1.35rem;color:#555;margin-top:0.15rem"><strong>PWA</strong> — Android-installable, fully client-side, no cloud.</p>
       </div>
 
-      <!-- Research Journey -->
       <div class="card">
         <h2>Research Journey: What We Tried</h2>
-        <p style="font-size:1.48rem;color:#555;margin-bottom:0.37rem">Each component went through multiple candidate approaches before the final solution was selected:</p>
-
-        <!-- CEFR row -->
         <div class="rj-row">
-          <div class="rj-label">CEFR<br>Classification</div>
+          <div class="rj-label">CEFR</div>
           <div class="rj-chain">
-            <div class="rj-node rj-rejected">DeBERTa<div class="rj-sub">underperformed<br>tabular baseline</div></div>
+            <div class="rj-node rj-rejected">DeBERTa<div class="rj-sub">underperformed</div></div>
             <div class="rj-arrow">→</div>
-            <div class="rj-node rj-rejected">BERT<div class="rj-sub">same issue</div></div>
+            <div class="rj-node rj-rejected">BERT<div class="rj-sub">same</div></div>
             <div class="rj-arrow">→</div>
-            <div class="rj-node rj-won">XGBoost<br>Tabular ✓<div class="rj-sub">78.3% accuracy</div></div>
+            <div class="rj-node rj-won">XGBoost ✓<div class="rj-sub">78.3%</div></div>
           </div>
         </div>
-
-        <!-- Note generation row -->
         <div class="rj-row">
-          <div class="rj-label">Note<br>Generation</div>
+          <div class="rj-label">Notes</div>
           <div class="rj-chain">
-            <div class="rj-node rj-rejected">GPT-4o<div class="rj-sub">cost &amp; cloud<br>dependency</div></div>
+            <div class="rj-node rj-rejected">GPT-4o<div class="rj-sub">cost/cloud</div></div>
             <div class="rj-arrow">→</div>
-            <div class="rj-node rj-rejected">T5 raw<br>notation<div class="rj-sub">failed to<br>generalise</div></div>
+            <div class="rj-node rj-rejected">T5 raw<div class="rj-sub">no generalise</div></div>
             <div class="rj-arrow">→</div>
-            <div class="rj-node rj-won">T5 +<br>Placeholders ✓<div class="rj-sub">ROUGE-L 0.81</div></div>
+            <div class="rj-node rj-won">T5+Templates ✓<div class="rj-sub">ROUGE-L 0.81</div></div>
           </div>
         </div>
-
-        <!-- ASR row -->
         <div class="rj-row">
-          <div class="rj-label">Speech<br>Recognition</div>
+          <div class="rj-label">ASR</div>
           <div class="rj-chain">
-            <div class="rj-node rj-won">Whisper ✓<div class="rj-sub">WER 8.2%<br>fully local</div></div>
+            <div class="rj-node rj-won">Whisper ✓<div class="rj-sub">WER 8.2%</div></div>
           </div>
         </div>
-
-        <!-- Translation row -->
         <div class="rj-row" style="margin-bottom:0">
           <div class="rj-label">Translation</div>
           <div class="rj-chain">
-            <div class="rj-node rj-rejected">GPT-4o<div class="rj-sub">opt-in only</div></div>
+            <div class="rj-node rj-rejected">GPT-4o<div class="rj-sub">opt-in</div></div>
             <div class="rj-arrow">→</div>
-            <div class="rj-node rj-won">M2M100 ✓<div class="rj-sub">local, offline</div></div>
+            <div class="rj-node rj-won">M2M100 ✓<div class="rj-sub">offline</div></div>
           </div>
         </div>
       </div>
-
 
     </div><!-- /col-left -->
 
     <!-- ─────────── CENTRE COLUMN ─────────── -->
     <div class="col col-centre">
 
-      <!-- The New Physics heading -->
       <div class="card">
         <h2>The New Physics of Context–Pattern Interaction</h2>
         <div class="principle-box">
-          <strong>"In open systems, context forms patterns.</strong><br>
-          <strong>In closed systems, patterns form context."</strong>
+          <strong>"In open systems, context forms patterns.<br>
+          In closed systems, patterns form context."</strong>
         </div>
-        <p style="font-size:1.48rem;text-align:center;color:#666;margin-top:0.18rem">
-          — Principle discovered empirically during T5 fine-tuning
-        </p>
+        <p style="font-size:1.35rem;text-align:center;color:#B0C0D8;margin:0.1rem 0">— Discovered empirically during T5 fine-tuning</p>
+        <p style="margin-top:0.2rem">T5 on raw notation <strong>failed to generalise</strong>. Structural placeholders were the breakthrough:</p>
+        <div class="rle-tree">
+❌ "She gave him a book" → [VP gave][NP him]<br>
+✅ [SUBJ][V-PAST][IOBJ][DET][NOUN] → [TAM: past-simple]
+        </div>
+        <div class="insight">Abstract grammatical patterns — invariant to lexical substitution — impose structure on novel input. This is <strong>closed-system behaviour</strong>.</div>
       </div>
 
-      <!-- Duality Diagram -->
       <div class="card">
         <h2>The Duality Loop Diagram</h2>
         <div class="duality-diagram">
           <div class="duality-grid">
-
-            <!-- LEFT PANEL: Open System -->
             <div class="panel-open">
-              <div>
-                <div class="panel-label">Open System</div>
-                <div class="panel-sublabel">Training Phase</div>
-              </div>
-              <div class="panel-icon">🌊</div>
-              <div class="panel-desc">
-                <strong>External context flows in.</strong><br>
-                Diverse RLE trees carve a stable<br>
-                internal pattern — the "River Bed"<br>
-                of the encoder's weight space.
-              </div>
+              <div class="panel-label">🌊 Open System</div>
+              <div class="panel-sublabel">Training Phase</div>
+              <div class="panel-desc">RLE trees carve the encoder's weight space — the "River Bed" pattern.</div>
               <div class="panel-arrow">Context → Pattern</div>
             </div>
-
-            <!-- CONNECTOR -->
             <div class="duality-connector">
-              <div class="connector-label">Open<br>→</div>
+              <div class="connector-label">Open →</div>
               <div class="connector-circle">T5</div>
-              <div class="connector-label">→<br>Closed</div>
+              <div class="connector-label">→ Closed</div>
             </div>
-
-            <!-- RIGHT PANEL: Closed System -->
             <div class="panel-closed">
-              <div>
-                <div class="panel-label">Closed System</div>
-                <div class="panel-sublabel">Inference Phase</div>
-              </div>
-              <div class="panel-icon">🔭</div>
-              <div class="panel-desc">
-                <strong>Frozen weights act as a Lens.</strong><br>
-                Novel, unseen input is refracted<br>
-                into structured output: CEFR level,<br>
-                TAM annotation, pedagogical note.
-              </div>
+              <div class="panel-label">🔭 Closed System</div>
+              <div class="panel-sublabel">Inference Phase</div>
+              <div class="panel-desc">Frozen weights refract novel input into CEFR, TAM, pedagogical note.</div>
               <div class="panel-arrow">Pattern → Context</div>
             </div>
-
-          </div><!-- /duality-grid -->
-
-          <!-- ML Mapping Table -->
+          </div>
           <table class="mapping-table">
-            <tr>
-              <th>System State</th>
-              <th>ML Phase</th>
-              <th>Mechanism</th>
-            </tr>
-            <tr>
-              <td><strong>Open</strong></td>
-              <td>Training</td>
-              <td>RLE trees shape encoder weights</td>
-            </tr>
-            <tr>
-              <td><strong>Closed</strong></td>
-              <td>Inference</td>
-              <td>Frozen weights interpret novel input</td>
-            </tr>
+            <tr><th>Phase</th><th>System</th><th>Mechanism</th></tr>
+            <tr><td>Training</td><td>Open</td><td>RLE trees shape encoder weights</td></tr>
+            <tr><td>Inference</td><td>Closed</td><td>Frozen weights interpret novel input</td></tr>
           </table>
         </div>
       </div>
 
-      <!-- Key Insight -->
-      <div class="card">
-        <h2>The Key Insight: Placeholder-Driven Learning</h2>
-        <p>Fine-tuning T5 on raw linguistic notation <strong>failed to generalise</strong>. The breakthrough was replacing lexical tokens with structural placeholders:</p>
-        <div class="rle-tree">
-❌ Raw: "She gave him a book" → [VP gave][NP him]<br><br>
-✅ Template: [SUBJ][V-PAST][IOBJ][DET][NOUN]<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ [TAM: past-simple][VOICE: active]
-        </div>
-        <p>The abstract grammatical <strong>pattern</strong> — not the words — became the unit of learning. The model generalises to novel vocabulary because the pattern is <em>invariant to lexical substitution</em>.</p>
-        <div class="insight">
-          This is closed-system behaviour: the internal pattern imposes structure on any incoming context — regardless of whether that context was seen during training.
-        </div>
-      </div>
-
-      <!-- Broader Implication -->
-      <div class="card">
-        <h2>Implication for Agentic AI</h2>
-        <p style="font-size:1.48rem">An LLM agent navigating the real world is a <strong>closed system</strong> operating in an <strong>open environment</strong>. Its trained patterns are fixed; the world's context is not. The duality principle predicts exactly where agents succeed (stable structural patterns) and fail (distribution shift beyond the trained pattern's boundary).</p>
-        <div class="insight">
-          Understanding training as pattern-carving and inference as pattern-imposing offers a new lens for agent reliability research.
-        </div>
-      </div>
-
-      <!-- Corpus Scale -->
       <div class="card">
         <h2>Training Data &amp; Corpus Scale</h2>
-        <p style="font-size:1.48rem;color:#555;margin-bottom:0.37rem">Four open-access corpora merged into a CEFR-labelled full-ladder dataset (A1→C2):</p>
-
         <div class="corpus-row">
           <div class="corpus-name">OANC</div>
-          <div class="corpus-bar-wrap">
-            <div class="corpus-bar" style="width:100%;background:#2C4A8C"></div>
-          </div>
+          <div class="corpus-bar-wrap"><div class="corpus-bar" style="width:100%;background:#2C4A8C"></div></div>
           <div class="corpus-size">30M+ tokens</div>
         </div>
-        <div class="corpus-label-sm">Open American National Corpus — main advanced coverage (B2–C2)</div>
-
         <div class="corpus-row">
           <div class="corpus-name">UD GUM</div>
-          <div class="corpus-bar-wrap">
-            <div class="corpus-bar" style="width:17%;background:#3A5E9E"></div>
-          </div>
+          <div class="corpus-bar-wrap"><div class="corpus-bar" style="width:17%;background:#3A5E9E"></div></div>
           <div class="corpus-size">5.2M tokens</div>
         </div>
-        <div class="corpus-label-sm">Universal Dependencies GUM — genre-aware (B1–B2)</div>
-
         <div class="corpus-row">
           <div class="corpus-name">Gutenberg</div>
-          <div class="corpus-bar-wrap">
-            <div class="corpus-bar" style="width:5%;background:#8B1A1A"></div>
-          </div>
+          <div class="corpus-bar-wrap"><div class="corpus-bar" style="width:5%;background:#8B1A1A"></div></div>
           <div class="corpus-size">1M+ tokens</div>
         </div>
-        <div class="corpus-label-sm">Project Gutenberg — rare tense patterns (C1–C2: modal perfect, future perfect)</div>
-
-        <div class="corpus-row" style="margin-bottom:0.09rem">
+        <div class="corpus-row" style="margin-bottom:0.15rem">
           <div class="corpus-name">MASC</div>
-          <div class="corpus-bar-wrap">
-            <div class="corpus-bar" style="width:2%;background:#1A5C2E"></div>
-          </div>
+          <div class="corpus-bar-wrap"><div class="corpus-bar" style="width:2%;background:#1A5C2E"></div></div>
           <div class="corpus-size">~500k tokens</div>
         </div>
-        <div class="corpus-label-sm">Manually Annotated Sub-Corpus — validation &amp; control slice</div>
-
-        <div style="margin-top:0.46rem;display:grid;grid-template-columns:1fr 1fr;gap:0.23rem">
-          <div style="background:#EEF1F8;border-radius:0.18rem;padding:0.23rem 0.32rem;font-size:1.48rem">
-            <strong style="color:#2C4A8C">27,000</strong> raw samples ingested<br>
-            <strong style="color:#2C4A8C">685</strong> unique after deduplication
-          </div>
-          <div style="background:#EEF5EE;border-radius:0.18rem;padding:0.23rem 0.32rem;font-size:1.48rem">
-            <strong style="color:#1A5C2E">6 CEFR levels</strong> covered (A1→C2)<br>
-            <strong style="color:#1A5C2E">Full-ladder</strong> per grammar class
-          </div>
+        <div style="display:flex;gap:0.5rem;font-size:1.48rem;margin-top:0.12rem">
+          <span><strong style="color:#2C4A8C">27k→685</strong> unique</span>·
+          <span><strong style="color:#1A5C2E">6 CEFR</strong> A1→C2</span>
         </div>
       </div>
 
-      <!-- Live Demo -->
-      <div style="background:#1B2A4A;border-radius:0.28rem;padding:0.46rem 0.55rem;display:flex;align-items:center;gap:0.46rem;margin-top:auto">
-        <div style="background:#fff;padding:0.28rem;border-radius:0.18rem;flex-shrink:0;line-height:0">
+      <div style="background:#1B2A4A;border-radius:0.28rem;padding:0.35rem 0.45rem;display:flex;align-items:center;gap:0.4rem;margin-top:auto">
+        <div style="background:#fff;padding:0.22rem;border-radius:0.15rem;flex-shrink:0;line-height:0">
           <div id="qrcode-live"></div>
         </div>
-        <div style="color:#fff;line-height:1.5">
+        <div style="color:#fff;line-height:1.4">
           <strong style="color:#F5C518;font-size:2.21rem">Live Demo</strong><br>
           <span style="font-size:2.46rem;font-weight:700">www.el-a.uk</span><br>
-          <span style="color:#B0C0D8;font-size:1.48rem">Try it in your browser</span>
+          <span style="color:#B0C0D8;font-size:1.35rem">Try it in your browser</span>
         </div>
       </div>
 
@@ -932,108 +827,75 @@ Sentence<br>
     <!-- ─────────── RIGHT COLUMN ─────────── -->
     <div class="col col-right">
 
-      <!-- Metrics -->
+      <!-- Metrics as 3-column horizontal grid -->
       <div class="card">
         <h2>Performance Metrics</h2>
-        <div class="metric-box metric-blue">
-          <span class="number">78.3%</span>
-          <span class="label">CEFR Classification Accuracy</span>
-          <span class="sublabel">XGBoost + Random Forest + Logistic Regression<br>3,000-sentence CEFR-balanced corpus</span>
-        </div>
-        <div class="metric-box metric-red">
-          <span class="number">0.81</span>
-          <span class="label">Note Relevance (ROUGE-L)</span>
-          <span class="sublabel">Fine-tuned T5 model evaluation<br>on held-out RLE annotation set</span>
-        </div>
-        <div class="metric-box metric-green">
-          <span class="number">8.2%</span>
-          <span class="label">ASR Word Error Rate</span>
-          <span class="sublabel">Whisper base model<br>clean speech test set</span>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.3rem">
+          <div class="metric-box metric-blue" style="margin-bottom:0">
+            <span class="number">78.3%</span>
+            <span class="label">CEFR Accuracy</span>
+            <span class="sublabel">XGBoost ensemble</span>
+          </div>
+          <div class="metric-box metric-red" style="margin-bottom:0">
+            <span class="number">0.81</span>
+            <span class="label">ROUGE-L</span>
+            <span class="sublabel">T5 fine-tuned</span>
+          </div>
+          <div class="metric-box metric-green" style="margin-bottom:0">
+            <span class="number">8.2%</span>
+            <span class="label">ASR WER</span>
+            <span class="sublabel">Whisper base</span>
+          </div>
         </div>
       </div>
 
-      <!-- Comparison Table -->
       <div class="card">
         <h2>Annotation Backend Comparison</h2>
         <table class="comp-table">
-          <tr>
-            <th>Approach</th>
-            <th>Quality</th>
-            <th>Cost</th>
-            <th>Offline</th>
-          </tr>
-          <tr>
-            <td>GPT-4o</td>
-            <td>High</td>
-            <td>$$$</td>
-            <td><span class="cross">✗</span></td>
-          </tr>
-          <tr>
-            <td>Rules only</td>
-            <td>Medium</td>
-            <td>Free</td>
-            <td><span class="tick">✓</span></td>
-          </tr>
-          <tr class="highlight">
-            <td><strong>T5 fine-tuned</strong></td>
-            <td><strong>High</strong></td>
-            <td><strong>Free</strong></td>
-            <td><span class="tick">✓</span></td>
-          </tr>
-          <tr>
-            <td>XGBoost CEFR</td>
-            <td>78.3%</td>
-            <td>Free</td>
-            <td><span class="tick">✓</span></td>
-          </tr>
+          <tr><th>Approach</th><th>Quality</th><th>Cost</th><th>Offline</th></tr>
+          <tr><td>GPT-4o</td><td>High</td><td>$$$</td><td><span class="cross">✗</span></td></tr>
+          <tr><td>Rules only</td><td>Medium</td><td>Free</td><td><span class="tick">✓</span></td></tr>
+          <tr class="highlight"><td><strong>T5 fine-tuned</strong></td><td><strong>High</strong></td><td><strong>Free</strong></td><td><span class="tick">✓</span></td></tr>
+          <tr><td>XGBoost CEFR</td><td>78.3%</td><td>Free</td><td><span class="tick">✓</span></td></tr>
         </table>
-        <p style="font-size:1.48rem;color:#555;margin-top:0.23rem">T5 fine-tuning achieves GPT-quality annotation at zero inference cost, running entirely on-device.</p>
       </div>
 
-      <!-- Validation -->
       <div class="card">
         <h2>System Validation</h2>
         <ul>
-          <li><strong>O1 (RLE Generation):</strong> spaCy + TAM engine produces schema-valid RLE for all test sentences ✓</li>
-          <li><strong>O2 (ML Enrichment):</strong> CEFR 78.3%; T5 ROUGE-L 0.81 ✓</li>
-          <li><strong>O3 (UI &amp; Export):</strong> Linguistic Visualizer renders full RLE tree; JSON/CSV export verified ✓</li>
-          <li><strong>O4 (Deployment):</strong> Android PWA install — fully client-side, no cloud dependency ✓</li>
+          <li><strong>O1:</strong> spaCy + TAM → schema-valid RLE ✓</li>
+          <li><strong>O2:</strong> CEFR 78.3%; T5 ROUGE-L 0.81 ✓</li>
+          <li><strong>O3:</strong> Visualizer + JSON/CSV export ✓</li>
+          <li><strong>O4:</strong> Android PWA, fully client-side ✓</li>
         </ul>
       </div>
 
-      <!-- Conclusions -->
       <div class="card">
         <h2>Conclusions</h2>
         <ul>
           <li>Explainable AI annotation makes authentic English <strong>pedagogically accessible without simplification</strong>.</li>
-          <li>The RLE schema is a viable, human-interpretable model of recursive linguistic structure.</li>
-          <li>The <strong>Context–Pattern Duality</strong>, observed empirically during T5 fine-tuning, generalises beyond NLP to any learning system that transitions from open-world training to closed-system inference.</li>
-          <li>Placeholder-driven T5 fine-tuning generalises to novel vocabulary because the abstract structural pattern is lexically invariant.</li>
+          <li>The <strong>Context–Pattern Duality</strong> generalises to any open→closed learning system — training carves patterns, inference imposes them.</li>
+          <li>Placeholder-driven T5 is <strong>lexically invariant</strong> — generalises to vocabulary unseen during training.</li>
         </ul>
       </div>
 
-      <!-- Future Work -->
       <div class="card">
         <h2>Future Directions</h2>
         <div class="future-item">
           <div class="future-dot"></div>
-          <div><strong>Tauri 2 Desktop App:</strong> Native offline package (Linux .deb / Windows) with bundled ML models — no browser required, full hardware access for on-device inference.</div>
+          <div><strong>Tauri 2 Desktop App</strong> — native .deb/Windows with bundled ML models.</div>
         </div>
         <div class="future-item">
           <div class="future-dot"></div>
-          <div><strong>Translation Quality Gates:</strong> Round-trip ChrF scorer, length-ratio guards, n-gram repetition penalty, and a human review queue wired into the M2M100 pipeline.</div>
+          <div><strong>Translation Quality Gates</strong> — ChrF scorer, M2M100 review queue.</div>
         </div>
         <div class="future-item">
           <div class="future-dot"></div>
-          <div><strong>M2M100 LoRA Fine-Tuning:</strong> Domain-specific refinement of the translation model on accepted English → Russian pairs from the review queue.</div>
+          <div><strong>M2M100 LoRA Fine-Tuning</strong> — domain-specific EN→RU refinement.</div>
         </div>
         <div class="future-item">
           <div class="future-dot"></div>
-          <div><strong>Additional target languages:</strong> Pluggable translator backends support any language beyond the current English → Russian focus.</div>
-        </div>
-        <div class="future-item">
-          <div class="future-dot"></div>
-          <div><strong>Real-time streaming ASR:</strong> Live audio analysis for conversation practice via Whisper streaming mode.</div>
+          <div><strong>Real-time Streaming ASR</strong> — Whisper streaming for live practice.</div>
         </div>
       </div>
 
