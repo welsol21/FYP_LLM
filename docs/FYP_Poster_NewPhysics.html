@@ -24,19 +24,27 @@
     font-family: Calibri, 'Gill Sans', 'Trebuchet MS', Arial, sans-serif;
     background: #e0e0e0;
     color: var(--text);
-    font-size: 11.5pt;
     line-height: 1.45;
   }
 
   /* ── A1 POSTER CONTAINER ─────────────────────────────── */
+  /* Actual A1 printable area: 594mm - 2×10mm margins = 574mm */
   .poster {
-    width: 794px;         /* ~A1 proportional at screen res */
-    min-height: 1123px;
-    margin: 20px auto;
+    width: 574mm;
     background: #fff;
     display: grid;
     grid-template-rows: auto 1fr auto;
     box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+  }
+
+  /* Screen preview: scale down to ~794px equivalent */
+  @media screen {
+    body { margin: 14px; }
+    .poster {
+      zoom: 0.366;          /* 794px / 2170px (574mm@96dpi) ≈ 0.366 */
+      margin: 0 auto;
+      transform-origin: top center;
+    }
   }
 
   /* ── HEADER ──────────────────────────────────────────── */
@@ -76,36 +84,36 @@
   .crest-q3 { background: #2980B9; } /* blue */
   .crest-q4 { background: #2980B9; } /* blue */
   .mtu-wordmark {
-    font-size: 13pt;
+    font-size: 36pt;
     font-weight: 900;
     color: var(--navy);
     letter-spacing: 1px;
     line-height: 1;
   }
   .mtu-full {
-    font-size: 5pt;
+    font-size: 14pt;
     color: #555;
     text-align: center;
     line-height: 1.2;
     margin-top: 2px;
   }
   .poster-title {
-    font-size: 20pt;
+    font-size: 54pt;    /* MTU A1 Title */
     font-weight: 900;
-    line-height: 1.15;
+    line-height: 1.1;
     color: #fff;
   }
   .poster-subtitle {
-    font-size: 10.5pt;
+    font-size: 28pt;
     font-style: italic;
     color: var(--amber);
-    margin-top: 4px;
+    margin-top: 6px;
   }
   .poster-meta {
-    font-size: 14.5pt; /* screen 14.5pt × 2.73 ≈ 40pt at A1 — MTU required */
+    font-size: 40pt;    /* MTU A1 Author & Affiliations */
     color: #B0C0D8;
-    margin-top: 7px;
-    line-height: 1.55;
+    margin-top: 10px;
+    line-height: 1.4;
   }
   .poster-meta strong { color: #fff; }
   .qr-box {
@@ -154,22 +162,21 @@
   }
 
   .card h2 {
-    font-size: 13.2pt; /* screen 13.2pt × 2.73 ≈ 36pt at A1 — MTU Sub Heading */
+    font-size: 36pt;    /* MTU A1 Sub Heading */
     font-weight: 700;
-    /* MTU mandatory: headings in Title Case, NOT all capitals */
     text-transform: none;
     letter-spacing: 0;
-    padding-bottom: 5px;
-    margin-bottom: 7px;
-    border-bottom: 2.5px solid currentColor;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    border-bottom: 5px solid currentColor;
   }
   .col-left   .card h2 { color: var(--blue); border-color: var(--blue); }
   .col-centre .card h2 { color: var(--red);  border-color: var(--red);  }
   .col-right  .card h2 { color: var(--green);border-color: var(--green);}
 
-  .card p { margin-bottom: 6px; font-size: 11pt; } /* 11pt × 2.73 ≈ 30pt at A1 — MTU Body Text */
-  .card ul { margin-left: 14px; margin-bottom: 6px; }
-  .card ul li { font-size: 11pt; margin-bottom: 3px; }
+  .card p { margin-bottom: 12px; font-size: 30pt; } /* MTU A1 Body Text */
+  .card ul { margin-left: 40px; margin-bottom: 12px; }
+  .card ul li { font-size: 30pt; margin-bottom: 8px; }
   .card strong { font-weight: 700; }
 
   /* ── PIPELINE FLOW ───────────────────────────────────── */
@@ -185,13 +192,13 @@
     gap: 6px;
     padding: 4px 8px;
     border-radius: 4px;
-    font-size: 9pt;
+    font-size: 24pt;
     font-weight: 500;
     color: #fff;
   }
   .pipe-arrow {
     text-align: center;
-    font-size: 11pt;
+    font-size: 28pt;
     color: #888;
     line-height: 1;
   }
@@ -211,7 +218,7 @@
     border-radius: 50%;
     text-align: center;
     line-height: 18px;
-    font-size: 8pt;
+    font-size: 20pt;
     flex-shrink: 0;
   }
 
@@ -221,7 +228,7 @@
     border-left: 3px solid var(--blue);
     padding: 8px 10px;
     font-family: 'Courier New', monospace;
-    font-size: 8.5pt;
+    font-size: 22pt;
     line-height: 1.7;
     border-radius: 0 4px 4px 0;
     margin: 6px 0;
@@ -253,7 +260,7 @@
   .panel-open   { background: rgba(44,74,140,0.10); border: 1.5px solid var(--blue); }
   .panel-closed { background: rgba(245,197,24,0.12); border: 1.5px solid #B8860B; }
   .panel-label {
-    font-size: 8.5pt;
+    font-size: 22pt;
     font-weight: 700;
     text-transform: none;
     letter-spacing: 0;
@@ -261,19 +268,19 @@
   }
   .panel-open   .panel-label { color: var(--blue); }
   .panel-closed .panel-label { color: #8B6914; }
-  .panel-sublabel { font-size: 8pt; color: #666; margin-bottom: 6px; }
+  .panel-sublabel { font-size: 20pt; color: #666; margin-bottom: 6px; }
   .panel-icon {
     font-size: 24pt;
     line-height: 1;
     margin: 4px 0;
   }
   .panel-desc {
-    font-size: 8pt;
+    font-size: 20pt;
     line-height: 1.4;
     color: #333;
   }
   .panel-arrow {
-    font-size: 8pt;
+    font-size: 20pt;
     font-weight: 700;
     margin-top: 4px;
     padding: 3px 5px;
@@ -290,20 +297,20 @@
     gap: 2px;
   }
   .connector-circle {
-    width: 40px;
-    height: 40px;
-    border: 2.5px solid var(--red);
+    width: 90px;
+    height: 90px;
+    border: 4px solid var(--red);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 11pt;
+    font-size: 28pt;
     color: var(--red);
     background: #fff;
     font-weight: 900;
   }
   .connector-label {
-    font-size: 7pt;
+    font-size: 18pt;
     color: var(--red);
     font-weight: 700;
     text-align: center;
@@ -317,7 +324,7 @@
     padding: 8px 10px;
     text-align: center;
     margin: 6px 0;
-    font-size: 10pt;
+    font-size: 28pt;
     font-style: italic;
     line-height: 1.5;
   }
@@ -351,13 +358,13 @@
     margin-bottom: 6px;
   }
   .metric-box .number {
-    font-size: 28pt;
+    font-size: 76pt;
     font-weight: 900;
     line-height: 1;
     display: block;
   }
   .metric-box .label {
-    font-size: 9pt;
+    font-size: 24pt;
     font-weight: 700;
     text-transform: none;
     letter-spacing: 0;
@@ -365,7 +372,7 @@
     display: block;
   }
   .metric-box .sublabel {
-    font-size: 8pt;
+    font-size: 22pt;
     opacity: 0.85;
     display: block;
     line-height: 1.3;
@@ -378,8 +385,8 @@
   .comp-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 8pt;
-    margin: 5px 0;
+    font-size: 22pt;
+    margin: 10px 0;
   }
   .comp-table th {
     background: var(--green);
@@ -404,7 +411,7 @@
     border-left: 4px solid var(--amber);
     padding: 8px 10px;
     border-radius: 0 4px 4px 0;
-    font-size: 9.5pt;
+    font-size: 26pt;
     font-style: italic;
     color: #4A3800;
     margin: 5px 0;
@@ -416,7 +423,7 @@
     gap: 6px;
     align-items: flex-start;
     margin-bottom: 5px;
-    font-size: 9.5pt;
+    font-size: 28pt;
   }
   .future-dot {
     width: 14px;
@@ -439,7 +446,7 @@
     width: 52px;
     flex-shrink: 0;
     font-weight: 700;
-    font-size: 7.5pt;
+    font-size: 20pt;
     color: var(--navy);
     line-height: 1.3;
     padding-top: 4px;
@@ -459,14 +466,14 @@
   .rj-node {
     border-radius: 4px;
     padding: 3px 5px;
-    font-size: 7.5pt;
+    font-size: 20pt;
     font-weight: 600;
     line-height: 1.3;
     text-align: center;
     min-width: 44px;
   }
   .rj-sub {
-    font-size: 6.5pt;
+    font-size: 17pt;
     font-weight: 400;
     line-height: 1.2;
     margin-top: 2px;
@@ -530,7 +537,7 @@
   }
   .corpus-name {
     width: 52px;
-    font-size: 8pt;
+    font-size: 22pt;
     font-weight: 700;
     color: var(--navy);
     flex-shrink: 0;
@@ -549,14 +556,14 @@
   }
   .corpus-size {
     width: 70px;
-    font-size: 7.5pt;
+    font-size: 20pt;
     font-weight: 700;
     color: #333;
     text-align: right;
     flex-shrink: 0;
   }
   .corpus-label-sm {
-    font-size: 7pt;
+    font-size: 18pt;
     color: #777;
     margin-left: 58px;
     margin-bottom: 2px;
@@ -571,12 +578,12 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 20px;
-    font-size: 8.8pt; /* 8.8pt × 2.73 ≈ 24pt at A1 — MTU Fine Print */
+    font-size: 24pt; /* MTU A1 Fine Print — was 8.8pt × 2.73 ≈ 24pt at A1 — MTU Fine Print */
     line-height: 1.6;
   }
   .footer h4 {
     color: var(--amber);
-    font-size: 9pt;
+    font-size: 28pt;
     text-transform: none;
     letter-spacing: 0;
     margin-bottom: 4px;
@@ -587,16 +594,8 @@
   /* ── PRINT STYLES ────────────────────────────────────── */
   @media print {
     body { background: #fff; margin: 0; }
-    .poster {
-      width: 100%;
-      box-shadow: none;
-      margin: 0;
-      page-break-inside: avoid;
-    }
-    @page {
-      size: A1 portrait;
-      margin: 10mm;
-    }
+    .poster { box-shadow: none; zoom: 1; }
+    @page { size: A1 portrait; margin: 10mm; }
   }
   #qrcode canvas, #qrcode img { width: 72px !important; height: 72px !important; display: block; }
   #qrcode-live canvas, #qrcode-live img { width: 110px !important; height: 110px !important; display: block; }
