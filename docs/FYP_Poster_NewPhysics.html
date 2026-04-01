@@ -565,25 +565,23 @@
   .footer ol li { margin-bottom: 0.09rem; }
 
   /* PRINT STYLES
-     Strategy: zoom: 0.787 on .poster shrinks the full layout to fit A1.
-     font-size is scaled UP by 1/0.787 = 1.27x so that after zoom,
-     all font sizes land exactly on MTU spec on paper:
-       Title  3.32rem × 7.29mm × 2.835 × 0.787 = 54pt  ✓
-       Author 2.46rem × 7.29mm × 2.835 × 0.787 = 40pt  ✓
-       SubHd  2.21rem × 7.29mm × 2.835 × 0.787 = 36pt  ✓
-       Body   1.84rem × 7.29mm × 2.835 × 0.787 = 30pt  ✓
-       Fine   1.48rem × 7.29mm × 2.835 × 0.787 = 24pt  ✓
-     Content that fills ~1.27 A1 pages naturally shrinks to exactly 1 page.
+     zoom: 0.787 applied to <html> so Chrome recalculates page breaks
+     based on zoomed dimensions (not original layout).
+     font-size compensated UP by 1/0.787 so final on-paper sizes = MTU spec:
+       Title  3.32rem × 7.29mm/rem × 0.787 zoom = 54pt  ✓
+       Author 2.46rem × 7.29mm/rem × 0.787 zoom = 40pt  ✓
+       SubHd  2.21rem × 7.29mm/rem × 0.787 zoom = 36pt  ✓
+       Body   1.84rem × 7.29mm/rem × 0.787 zoom = 30pt  ✓
+       Fine   1.48rem × 7.29mm/rem × 0.787 zoom = 24pt  ✓
+     Chrome virtual page: 574/0.787=729mm × 821/0.787=1043mm
+     Content height ~1042mm → fits in 1043mm → exactly 1 page.
   */
   @media print {
     :root { font-size: 7.29mm; }
     @page { size: A1 portrait; margin: 10mm; }
+    html { zoom: 0.787; }
     body { background: #fff; margin: 0; padding: 0; }
-    .poster {
-      box-shadow: none;
-      zoom: 0.787;
-      width: 729mm;    /* 574mm / 0.787 — natural width before zoom */
-    }
+    .poster { box-shadow: none; width: 729mm; }
   }
 
   /* QR codes: generated at 256px, CSS-scaled to proper vw size */
