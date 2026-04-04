@@ -438,7 +438,7 @@ export function VisualizerPage() {
               onClick={() => setEditorMode(quickEditOpen ? 'none' : 'quick')}
               aria-label="toggle-quick-edit"
             >
-              Quick Node Edit
+              Node Edit
             </button>
             <button
               type="button"
