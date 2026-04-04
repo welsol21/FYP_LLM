@@ -1,4 +1,9 @@
 # -------------------------
+# Docs (local only)
+# -------------------------
+docs/Pattern Cardinality vs Variant Infinity.docx
+
+# -------------------------
 # Python
 # -------------------------
 __pycache__/
