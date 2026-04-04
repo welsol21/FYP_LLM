@@ -1,152 +1,156 @@
+import { useState } from 'react'
+
+type Section = 'how' | 'investors' | null
+
 export function AboutPage() {
+  const [open, setOpen] = useState<Section>(null)
+
+  const toggle = (s: Section) => setOpen((prev) => (prev === s ? null : s))
+
   return (
     <div className="about-page">
       <section className="about-hero">
         <h2 className="about-product-name">ELA</h2>
-        <p className="about-tagline">English Language Assistant</p>
         <p className="about-lead">
-          A tool that helps non-native English speakers understand authentic content —
-          lectures, articles, videos, podcasts — without dumbing it down.
+          Upload a video, audio, or text — get a full linguistic breakdown of every sentence:
+          grammar structure, CEFR level, translation, and phonetics, all in one interactive view.
         </p>
       </section>
 
-      <section className="about-section">
-        <h3 className="about-section-title">What it does</h3>
-        <p className="about-body">
-          Submit a text, audio file, or video. ELA transcribes the speech (if needed),
-          parses every sentence into a structured hierarchy of phrases and words,
-          and enriches each element with grammar labels, CEFR difficulty levels,
-          EN→RU translations, and IPA phonetics.
-        </p>
-        <p className="about-body">
-          The result is an interactive tree you can explore — click a phrase to see
-          its grammar role, tense, difficulty, and a plain-language explanation
-          of why it works the way it does. No simplification. No paraphrasing.
-          The original language stays intact.
-        </p>
-      </section>
+      <div className="about-btn-row">
+        <button
+          className={`about-big-btn${open === 'how' ? ' active' : ''}`}
+          onClick={() => toggle('how')}
+        >
+          How it works
+        </button>
+        <button
+          className={`about-big-btn${open === 'investors' ? ' active' : ''}`}
+          onClick={() => toggle('investors')}
+        >
+          For investors
+        </button>
+      </div>
 
-      <section className="about-section">
-        <h3 className="about-section-title">How it works</h3>
-        <ul className="about-list">
-          <li><strong>Parsing</strong> — spaCy dependency parser builds a Sentence → Phrase → Word tree deterministically.</li>
-          <li><strong>Grammar enrichment</strong> — rule-based tense, aspect, mood, and voice detection; no LLM guesswork.</li>
-          <li><strong>Linguistic notes</strong> — a fine-tuned T5 model generates concise pedagogical explanations per node, with template fallback.</li>
-          <li><strong>Translation</strong> — local M2M100 model (418M parameters) translates every element; external providers (Lara, DeepL) as fallback.</li>
-          <li><strong>Speech recognition</strong> — OpenAI Whisper, runs locally.</li>
-          <li><strong>Structured output</strong> — every analysis is a validated JSON contract (the RLE schema) that is the same every time for the same input.</li>
-        </ul>
-      </section>
-
-      <section className="about-section">
-        <h3 className="about-section-title">Current state</h3>
-        <p className="about-body">
-          Live working product at{' '}
-          <a className="about-link" href="https://el-a.uk" target="_blank" rel="noreferrer">
-            el-a.uk
-          </a>
-          . Processes text, audio, and video. Bilingual subtitle generation.
-          PWA — installable, works on mobile. All ML inference runs on the server,
-          nothing sent to third-party AI APIs by default.
-        </p>
-      </section>
-
-      <section className="about-section">
-        <h3 className="about-section-title">Using this app</h3>
-        <ol className="about-steps">
-          <li>
-            <strong>Media</strong> — upload audio or video. ELA transcribes it, analyses every
-            sentence, and generates a bilingual subtitle video.
-          </li>
-          <li>
-            <strong>Analyze</strong> — paste any English text for instant analysis. No audio needed.
-          </li>
-          <li>
-            <strong>Vocabulary</strong> — review all words and phrases from your analyses, sorted by CEFR level.
-          </li>
-          <li>
-            <strong>Visualizer</strong> — tap any node in the tree to see grammar role, tense,
-            CEFR level, translation, phonetics, and explanation.
-            The coloured underline shows which phrase is selected.
-          </li>
-          <li>
-            <strong>Config</strong> — choose your translation provider and enter API keys.
-            Default translation runs locally (M2M100), no external API required.
-          </li>
-        </ol>
-      </section>
-
-      <hr className="about-divider" />
-
-      <section className="about-section about-investor">
-        <h3 className="about-section-title about-investor-title">For Investors</h3>
-
-        <div className="about-investor-block">
-          <h4 className="about-investor-subtitle">The problem worth solving</h4>
-          <p className="about-body">
-            1.5 billion people are learning English right now. The overwhelming majority hit a ceiling
-            when they move from classroom materials to real-world content — a TED talk, a technical article,
-            a business podcast. The gap is not vocabulary. It is structure: learners don't have a map
-            of how real sentences are built.
+      {open === 'how' && (
+        <section className="about-panel">
+          <p className="about-panel-intro">
+            The interface is built for touch — every action is a single tap or a swipe.
           </p>
-          <p className="about-body">
-            Existing tools either simplify the content (and defeat the purpose) or hand back a generic
-            GPT explanation that is inconsistent, unchecked, and different every time.
-          </p>
-        </div>
 
-        <div className="about-investor-block">
-          <h4 className="about-investor-subtitle">The technical moat</h4>
-          <p className="about-body">
-            ELA's core output is the <strong>RLE contract</strong> — a validated, schema-enforced JSON
-            structure that maps every sentence to its grammatical skeleton. This contract is:
-          </p>
-          <ul className="about-list">
-            <li><strong>Deterministic</strong> — same input always produces the same structure.</li>
-            <li><strong>Auditable</strong> — every label, note, and CEFR tag has a traceable source.</li>
-            <li><strong>Cheap to produce</strong> — a domain-specific T5 model replaces dozens of GPT-4 calls per document. Cost per analysis is a fraction of a cent.</li>
-            <li><strong>API-ready</strong> — each pipeline stage (parser, enrichment, CEFR tagger, subtitle aligner) is an independent service with a clean HTTP interface.</li>
-          </ul>
-        </div>
+          <div className="about-gesture-list">
+            <div className="about-gesture">
+              <span className="about-gesture-icon">☰</span>
+              <div>
+                <strong>Bottom bar</strong> — tap <em>Media</em>, <em>Analyze</em>, or <em>Vocabulary</em>
+                to switch between the main sections.
+              </div>
+            </div>
 
-        <div className="about-investor-block">
-          <h4 className="about-investor-subtitle">Revenue model</h4>
-          <ul className="about-list">
-            <li><strong>B2C subscriptions</strong> — individual learners, IELTS/TOEFL candidates, professionals. €10–15/month.</li>
-            <li><strong>B2B institutional licensing</strong> — language schools and universities that need CEFR tagging, vocabulary extraction, and annotated materials at scale.</li>
-            <li><strong>API microservices</strong> — EdTech platforms that want to add structured linguistic analysis without building NLP infrastructure. Usage-based billing, €99–499/month tiers.</li>
-          </ul>
-          <p className="about-body">
-            The microservice model is the highest-margin path: it requires no additional headcount to scale
-            and turns ELA's pipeline into infrastructure rather than a consumer product.
-          </p>
-        </div>
+            <div className="about-gesture">
+              <span className="about-gesture-icon">＋</span>
+              <div>
+                <strong>Start analysis</strong> — on the Media screen tap the upload area or the
+                microphone button to add a file. On Analyze, type or paste text and tap <em>Analyse</em>.
+              </div>
+            </div>
 
-        <div className="about-investor-block">
-          <h4 className="about-investor-subtitle">Why now</h4>
-          <p className="about-body">
-            The EdTech market passed $250B and is accelerating. At the same time, LLM fatigue is setting in —
-            enterprise buyers increasingly want outputs that are consistent, explainable, and auditable,
-            not a different answer every time. ELA's deterministic pipeline is positioned precisely at
-            that intersection.
-          </p>
-          <p className="about-body">
-            The core technology is built and working. What comes next is packaging, distribution,
-            and the first institutional partnerships.
-          </p>
-        </div>
+            <div className="about-gesture">
+              <span className="about-gesture-icon">↓</span>
+              <div>
+                <strong>Open a result</strong> — after analysis finishes, tap any sentence card
+                in the list to open the Visualizer for that sentence.
+              </div>
+            </div>
 
-        <div className="about-investor-block">
-          <h4 className="about-investor-subtitle">Get in touch</h4>
-          <p className="about-body">
-            Built by Vladyslav Rastvorov, MTU Cork, BSc Software Development (Final Year Project, 2025–2026).
-            Supervised by Dr. Alex Vakaloudis and Prof. Nasir Ahmad.
-          </p>
-          <p className="about-body">
-            <a className="about-link" href="mailto:r00274535@mymtu.ie">r00274535@mymtu.ie</a>
-          </p>
-        </div>
-      </section>
+            <div className="about-gesture">
+              <span className="about-gesture-icon">◉</span>
+              <div>
+                <strong>Explore the tree</strong> — in the Visualizer, tap any phrase or word node
+                to expand its detail card: grammar role, tense, CEFR level, translation, and phonetics.
+                Tap again to collapse.
+              </div>
+            </div>
+
+            <div className="about-gesture">
+              <span className="about-gesture-icon">_</span>
+              <div>
+                <strong>Sentence highlight</strong> — as you tap nodes in the tree, the coloured
+                underline on the sentence at the top shifts to show exactly which words belong
+                to the selected phrase.
+              </div>
+            </div>
+
+            <div className="about-gesture">
+              <span className="about-gesture-icon">⇐</span>
+              <div>
+                <strong>Go back</strong> — tap <em>Back</em> in the top-left corner to return
+                to the previous screen. Swipe right on mobile also works.
+              </div>
+            </div>
+
+            <div className="about-gesture">
+              <span className="about-gesture-icon">⚙</span>
+              <div>
+                <strong>Config</strong> — tap in the top-right corner to set your translation
+                provider. Default translation runs locally — no account needed.
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {open === 'investors' && (
+        <section className="about-panel">
+          <div className="about-investor-block">
+            <h4 className="about-investor-subtitle">The problem</h4>
+            <p className="about-body">
+              1.5 billion people are learning English. Most hit a ceiling when they move from
+              classroom materials to real content — lectures, podcasts, articles. Existing tools
+              either simplify the content or return a different GPT answer every time.
+            </p>
+          </div>
+
+          <div className="about-investor-block">
+            <h4 className="about-investor-subtitle">The technical moat</h4>
+            <p className="about-body">
+              ELA produces a <strong>validated, schema-enforced JSON contract</strong> for every
+              sentence — deterministic, auditable, same output every time. A domain-specific T5
+              model replaces dozens of GPT-4 calls per document, cutting compute cost by an
+              order of magnitude.
+            </p>
+          </div>
+
+          <div className="about-investor-block">
+            <h4 className="about-investor-subtitle">Revenue model</h4>
+            <ul className="about-list">
+              <li><strong>B2C</strong> — individual learners, €10–15/month subscription.</li>
+              <li><strong>B2B</strong> — language schools and universities licensing CEFR tagging,
+              vocabulary extraction, and annotation at scale.</li>
+              <li><strong>API microservices</strong> — EdTech platforms integrating the pipeline
+              as infrastructure. Usage-based billing, €99–499/month.</li>
+            </ul>
+          </div>
+
+          <div className="about-investor-block">
+            <h4 className="about-investor-subtitle">Current state</h4>
+            <p className="about-body">
+              Live working product at{' '}
+              <a className="about-link" href="https://el-a.uk" target="_blank" rel="noreferrer">el-a.uk</a>.
+              Processes text, audio, and video. All ML inference runs on the server —
+              no dependency on third-party AI APIs. Built as Final Year Project, MTU Cork, 2025–2026.
+            </p>
+          </div>
+
+          <div className="about-investor-block">
+            <h4 className="about-investor-subtitle">Contact</h4>
+            <p className="about-body">
+              Vladyslav Rastvorov —{' '}
+              <a className="about-link" href="mailto:r00274535@mymtu.ie">r00274535@mymtu.ie</a>
+            </p>
+          </div>
+        </section>
+      )}
     </div>
   )
 }
