@@ -904,7 +904,9 @@ export class HttpRuntimeApi implements RuntimeApi {
       }
 
       // ── Stage 3: Translation ─────────────────────────────────────
-      const BACKEND_PROVIDERS = new Set(['gpt', 'deepl', 'lara'])
+      // Android ONNX WASM can't load opus-mt (protobuf parse error) — route m2m100 server-side on Android
+      const isAndroidDevice = /android/i.test(navigator.userAgent)
+      const BACKEND_PROVIDERS = new Set(['gpt', 'deepl', 'lara', ...(isAndroidDevice ? ['m2m100'] : [])])
       const providerIsOriginal = provider === 'original'
 
       // Collect all node texts recursively (skipping punctuation and already-translated nodes)
