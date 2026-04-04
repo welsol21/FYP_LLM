@@ -1640,3 +1640,124 @@ button {
     padding: 18px;
   }
 }
+
+/* ── About page ──────────────────────────────────────────── */
+.about-page {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 8px 0 40px;
+}
+
+.about-hero {
+  text-align: center;
+  padding: 32px 0 24px;
+}
+
+.about-product-name {
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--accent);
+  margin: 0 0 4px;
+}
+
+.about-tagline {
+  font-size: 16px;
+  color: var(--muted);
+  margin: 0 0 16px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.about-lead {
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--text);
+  margin: 0;
+}
+
+.about-section {
+  margin-top: 28px;
+}
+
+.about-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+.about-body {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text);
+  margin: 0 0 10px;
+}
+
+.about-list {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text);
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.about-list li {
+  margin-bottom: 6px;
+}
+
+.about-steps {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text);
+  margin: 0;
+  padding-left: 20px;
+}
+
+.about-steps li {
+  margin-bottom: 10px;
+}
+
+.about-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.about-link:hover {
+  text-decoration: underline;
+}
+
+.about-divider {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 32px 0;
+}
+
+.about-investor {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 0;
+}
+
+.about-investor-title {
+  color: var(--accent);
+}
+
+.about-investor-block {
+  margin-bottom: 22px;
+}
+
+.about-investor-block:last-child {
+  margin-bottom: 0;
+}
+
+.about-investor-subtitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 6px;
+}
