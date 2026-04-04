@@ -151,6 +151,17 @@ export function AboutPage() {
                   <div><strong>Translation</strong> — enabled by default using the local M2M100 model.
                   Switch provider in Config if you have a Lara or DeepL key.</div>
                 </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">🎬</span>
+                  <div><strong>Subtitle video (MP4)</strong> — generated after analysis completes.
+                  The original video re-rendered with bilingual subtitles (EN + RU) and
+                  dual-language voiceover. Download from the results screen.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">🎵</span>
+                  <div><strong>Audio (MP3)</strong> — dual-language voiceover of the full content,
+                  available alongside the video on the results screen.</div>
+                </div>
               </div>
             </div>
           )}
@@ -191,9 +202,8 @@ export function AboutPage() {
                 </div>
                 <div className="about-gesture">
                   <span className="about-gesture-icon">🌐</span>
-                  <div><strong>Translate</strong> — re-runs translation on the current sentence
-                  using a selected provider (M2M100, Lara, DeepL, or all at once).
-                  Useful if the default translation was missing or wrong.</div>
+                  <div><strong>Translate</strong> — switches which provider's translation is
+                  displayed on each node (M2M100, Lara, DeepL, or all at once).</div>
                 </div>
                 <div className="about-gesture">
                   <span className="about-gesture-icon">⇅</span>
@@ -227,17 +237,6 @@ export function AboutPage() {
                   <div><strong>Export JSON / CSV</strong> — tap <em>Export JSON</em> or
                   <em> Export CSV</em> to download the selected vocabulary with all metadata.
                   Choose which fields to include before confirming.</div>
-                </div>
-                <div className="about-gesture">
-                  <span className="about-gesture-icon">🎬</span>
-                  <div><strong>Subtitle video (MP4)</strong> — available on the analysis results
-                  screen. The original video re-rendered with bilingual subtitles and
-                  dual-language voiceover.</div>
-                </div>
-                <div className="about-gesture">
-                  <span className="about-gesture-icon">🎵</span>
-                  <div><strong>Audio (MP3)</strong> — dual-language voiceover of the full
-                  content. Tap the download icon on the results screen to save to device.</div>
                 </div>
                 <div className="about-gesture">
                   <span className="about-gesture-icon">✕</span>
