@@ -180,7 +180,7 @@ export function AboutPage() {
                 </div>
                 <div className="about-gesture">
                   <span className="about-gesture-icon">✎</span>
-                  <div><strong>Quick Node Edit</strong> — tap this button in the toolbar to
+                  <div><strong>Node Edit</strong> — tap this button in the toolbar to
                   manually edit the text or metadata of the currently selected node.</div>
                 </div>
                 <div className="about-gesture">
