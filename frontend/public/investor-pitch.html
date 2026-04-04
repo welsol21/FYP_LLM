@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELA — Investor Pitch</title>
+<style>
+  :root {
+    --accent: #c8a800;
+    --text: #1a1a1a;
+    --muted: #555;
+    --line: #ddd;
+    --panel: #f7f7f7;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: "Georgia", serif;
+    font-size: 13pt;
+    line-height: 1.65;
+    color: var(--text);
+    background: #fff;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 48px 40px;
+  }
+
+  .print-btn {
+    display: block;
+    margin: 0 auto 36px;
+    padding: 10px 28px;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+  }
+
+  .print-btn:hover { opacity: 0.85; }
+
+  @media print {
+    .print-btn { display: none; }
+    body { padding: 0; }
+  }
+
+  /* ── Header ── */
+  .cover {
+    text-align: center;
+    padding: 32px 0 40px;
+    border-bottom: 2px solid var(--line);
+    margin-bottom: 40px;
+  }
+
+  .cover-name {
+    font-size: 52pt;
+    font-weight: 700;
+    letter-spacing: 6px;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .cover-full {
+    font-size: 11pt;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 8px 0 20px;
+  }
+
+  .cover-tagline {
+    font-size: 15pt;
+    font-style: italic;
+    color: var(--text);
+    max-width: 560px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+
+  /* ── Sections ── */
+  .section { margin-bottom: 36px; }
+
+  h2 {
+    font-size: 10pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 6px;
+    margin-bottom: 14px;
+  }
+
+  p { margin-bottom: 10px; }
+
+  p:last-child { margin-bottom: 0; }
+
+  /* ── Key numbers ── */
+  .stats-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 10px;
+  }
+
+  .stat-box {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+
+  .stat-num {
+    font-size: 20pt;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1.1;
+  }
+
+  .stat-label {
+    font-size: 9pt;
+    color: var(--muted);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Feature table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11pt;
+    margin-bottom: 10px;
+  }
+
+  th {
+    text-align: left;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
+    padding: 6px 8px;
+  }
+
+  td {
+    padding: 7px 8px;
+    border-bottom: 1px solid #eee;
+    vertical-align: top;
+  }
+
+  td:first-child { font-weight: 600; width: 30%; }
+
+  /* ── Revenue model ── */
+  .tier-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .tier {
+    flex: 1;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+
+  .tier-name {
+    font-size: 9pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .tier-price {
+    font-size: 13pt;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+
+  .tier-desc {
+    font-size: 10pt;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  /* ── Roadmap ── */
+  .roadmap-row { display: flex; gap: 0; margin-bottom: 10px; }
+
+  .roadmap-step {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-right: none;
+    font-size: 10pt;
+  }
+
+  .roadmap-step:last-child { border-right: 1px solid var(--line); border-radius: 0 6px 6px 0; }
+  .roadmap-step:first-child { border-radius: 6px 0 0 6px; }
+
+  .roadmap-phase {
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .roadmap-title { font-weight: 700; margin-bottom: 4px; }
+
+  .roadmap-items { font-size: 9pt; color: var(--muted); line-height: 1.5; }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    font-size: 10pt;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  .footer a { color: var(--accent); text-decoration: none; }
+
+  ul { padding-left: 20px; margin-bottom: 10px; }
+  li { margin-bottom: 5px; }
+
+  strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<button class="print-btn" onclick="window.print()">Save as PDF (Ctrl+P / ⌘P)</button>
+
+<div class="cover">
+  <div class="cover-name">ELA</div>
+  <div class="cover-full">English Language Assistant</div>
+  <div class="cover-tagline">
+    AI-powered linguistic infrastructure for English language learning —
+    structured, deterministic, and auditable.
+  </div>
+</div>
+
+<div class="section">
+  <h2>The Problem</h2>
+  <p>
+    1.5 billion people are learning English. The overwhelming majority hit a ceiling
+    when they move from classroom materials to real-world content — lectures, podcasts,
+    technical articles, business meetings. The gap is not vocabulary. It is structure:
+    learners lack a map of how real English sentences are built.
+  </p>
+  <p>
+    Existing tools avoid the problem. Duolingo simplifies content. LingQ tracks word
+    frequency without analysis. ChatGPT generates a different explanation every time.
+    None produce consistent, auditable, schema-validated linguistic output.
+  </p>
+</div>
+
+<div class="section">
+  <h2>Market Size</h2>
+  <div class="stats-row">
+    <div class="stat-box">
+      <div class="stat-num">1.5B</div>
+      <div class="stat-label">English learners worldwide</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">40,000+</div>
+      <div class="stat-label">Private language schools globally</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">$400B+</div>
+      <div class="stat-label">Global EdTech market (projected)</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">~$0.001</div>
+      <div class="stat-label">Cost per sentence analysis</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>The Solution</h2>
+  <p>
+    ELA is the first platform to combine deterministic NLP parsing with LLM-based
+    enrichment into a <strong>validated, schema-enforced JSON contract</strong> — the
+    RLE (Recursive Linguistic Elements) schema. Every sentence is broken into a
+    Sentence → Phrase → Word hierarchy, each node annotated with grammar role,
+    tense/aspect/mood, CEFR difficulty level, EN→RU translation, and IPA phonetics.
+  </p>
+  <p>
+    The output is always the same for the same input. It is auditable, machine-readable,
+    and cheap to produce. A domain-specific T5 model replaces dozens of GPT-4 calls
+    per document — reducing compute cost by an order of magnitude.
+  </p>
+</div>
+
+<div class="section">
+  <h2>What ELA Produces</h2>
+  <table>
+    <tr>
+      <th>Artifact</th>
+      <th>Description</th>
+    </tr>
+    <tr>
+      <td>RLE JSON Contract</td>
+      <td>Full linguistic contract for every sentence — grammar, CEFR, translation, phonetics. Schema-validated, deterministic.</td>
+    </tr>
+    <tr>
+      <td>Bilingual Video (MP4)</td>
+      <td>Original video re-rendered with EN+RU subtitles and dual-language voiceover burned in.</td>
+    </tr>
+    <tr>
+      <td>Bilingual Audio (MP3)</td>
+      <td>Each sentence spoken in English then Russian via TTS. Ready for listening practice.</td>
+    </tr>
+    <tr>
+      <td>Subtitle Files (SRT)</td>
+      <td>Bilingual, English-only, and Russian-only subtitle files for any video player or editor.</td>
+    </tr>
+    <tr>
+      <td>Vocabulary Export</td>
+      <td>All extracted words and phrases with CEFR levels, exportable as JSON or CSV for integration with SRS tools.</td>
+    </tr>
+  </table>
+</div>
+
+<div class="section">
+  <h2>Competitive Advantage</h2>
+  <table>
+    <tr>
+      <th>Capability</th>
+      <th>ELA</th>
+      <th>Duolingo</th>
+      <th>LingQ</th>
+      <th>GPT tools</th>
+    </tr>
+    <tr>
+      <td>Authentic content</td>
+      <td>✓</td><td>✗</td><td>✓</td><td>✓</td>
+    </tr>
+    <tr>
+      <td>Deterministic output</td>
+      <td>✓</td><td>✗</td><td>✗</td><td>✗</td>
+    </tr>
+    <tr>
+      <td>CEFR-aligned analysis</td>
+      <td>✓</td><td>Partial</td><td>✗</td><td>✗</td>
+    </tr>
+    <tr>
+      <td>Grammar tree + TAM</td>
+      <td>✓</td><td>✗</td><td>✗</td><td>✗</td>
+    </tr>
+    <tr>
+      <td>Structured API output</td>
+      <td>✓</td><td>✗</td><td>✗</td><td>✗</td>
+    </tr>
+    <tr>
+      <td>Local inference (no API costs)</td>
+      <td>✓</td><td>—</td><td>—</td><td>✗</td>
+    </tr>
+  </table>
+</div>
+
+<div class="section">
+  <h2>Revenue Model</h2>
+  <div class="tier-row">
+    <div class="tier">
+      <div class="tier-name">B2C Learners</div>
+      <div class="tier-price">€10–15 / mo</div>
+      <div class="tier-desc">Individual learners. IELTS/TOEFL candidates. Professionals.</div>
+    </div>
+    <div class="tier">
+      <div class="tier-name">B2B Institutions</div>
+      <div class="tier-price">€6 / user / mo</div>
+      <div class="tier-desc">Language schools, universities, corporate training. Annual contracts.</div>
+    </div>
+    <div class="tier">
+      <div class="tier-name">API Microservices</div>
+      <div class="tier-price">€99–499 / mo</div>
+      <div class="tier-desc">EdTech platforms integrating the pipeline as infrastructure. Usage-based tiers.</div>
+    </div>
+  </div>
+  <p style="font-size:10pt; color:var(--muted)">
+    The API tier is the highest-margin path. Each linguistic function (parsing, enrichment,
+    CEFR tagging, vocabulary extraction, subtitle alignment) is available as a standalone
+    endpoint — requiring no additional headcount to scale.
+  </p>
+</div>
+
+<div class="section">
+  <h2>Roadmap</h2>
+  <div class="roadmap-row">
+    <div class="roadmap-step">
+      <div class="roadmap-phase">Now → Summer 2026</div>
+      <div class="roadmap-title">MVP Live</div>
+      <div class="roadmap-items">
+        Working product at el-a.uk<br>
+        Text, audio, video processing<br>
+        Full artifact generation<br>
+        Local ML inference
+      </div>
+    </div>
+    <div class="roadmap-step">
+      <div class="roadmap-phase">Autumn 2026</div>
+      <div class="roadmap-title">First Release</div>
+      <div class="roadmap-items">
+        B2C subscription launch<br>
+        UX refinement<br>
+        First institutional pilots<br>
+        Public demo environment
+      </div>
+    </div>
+    <div class="roadmap-step">
+      <div class="roadmap-phase">Winter 2026–27</div>
+      <div class="roadmap-title">Scale</div>
+      <div class="roadmap-items">
+        API microservice launch<br>
+        B2B institutional licensing<br>
+        SRS / LMS integrations<br>
+        Investor-ready metrics
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Current State</h2>
+  <ul>
+    <li><strong>Live product</strong> at <a href="https://el-a.uk">el-a.uk</a> — fully functional, deployed on Hetzner.</li>
+    <li><strong>All ML runs locally</strong> — no dependency on OpenAI or other paid APIs by default.</li>
+    <li><strong>Full pipeline implemented</strong> — ASR (Whisper), parsing (spaCy), notes (fine-tuned T5), translation (M2M100 418M), phonetics (espeak-ng), CEFR classification.</li>
+    <li><strong>Schema-validated output</strong> — RLE v2 contract, frozen-structure validation, regression test suite.</li>
+    <li>Built as Final Year Project, MTU Cork (BSc Software Development, 2025–2026).</li>
+    <li>Supervised by Dr. Alex Vakaloudis and Prof. Nasir Ahmad.</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h2>The Ask</h2>
+  <p>
+    Seeking early-stage investment or a strategic partner to accelerate the transition from
+    working prototype to commercial product. Funding will be directed toward:
+  </p>
+  <ul>
+    <li>UX polish and first public B2C launch</li>
+    <li>Modularisation of the pipeline into production-grade API microservices</li>
+    <li>First institutional partnership development</li>
+    <li>SRS / LMS export integrations (Anki, Notion, Moodle)</li>
+  </ul>
+  <p>
+    Open to acquisition discussions, B2B partnership, or pre-seed investment.
+  </p>
+</div>
+
+<div class="footer">
+  <div>
+    <strong>Vladyslav Rastvorov</strong><br>
+    <a href="mailto:r00274535@mymtu.ie">r00274535@mymtu.ie</a>
+  </div>
+  <div style="text-align:right">
+    <a href="https://el-a.uk">el-a.uk</a><br>
+    MTU Cork, 2026
+  </div>
+</div>
+
+</body>
+</html>

@@ -152,15 +152,40 @@ export function AboutPage() {
                   Switch provider in Config if you have a Lara or DeepL key.</div>
                 </div>
                 <div className="about-gesture">
-                  <span className="about-gesture-icon">🎬</span>
-                  <div><strong>Subtitle video (MP4)</strong> — generated after analysis completes.
-                  The original video re-rendered with bilingual subtitles (EN + RU) and
-                  dual-language voiceover. Download from the results screen.</div>
+                  <span className="about-gesture-icon">📄</span>
+                  <div><strong>full_text.txt</strong> — plain text transcript of the entire file.
+                  For audio/video this is the Whisper transcription; for documents it is the extracted text.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">📋</span>
+                  <div><strong>media_contract.json</strong> — the full linguistic contract for the
+                  entire document: every sentence, phrase, and word with all enrichment data.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">📋</span>
+                  <div><strong>contract_sentences.json</strong> — the same contract split into
+                  individual sentence records, easier to process programmatically.</div>
                 </div>
                 <div className="about-gesture">
                   <span className="about-gesture-icon">🎵</span>
-                  <div><strong>Audio (MP3)</strong> — dual-language voiceover of the full content,
-                  available alongside the video on the results screen.</div>
+                  <div><strong>translated_audio_ru.mp3</strong> — bilingual audio track:
+                  each sentence spoken in English then in Russian (TTS).</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">💬</span>
+                  <div><strong>subtitles_bilingual.srt</strong> — subtitle file with both English
+                  and Russian on each cue. Drop it into any video player or editor.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">💬</span>
+                  <div><strong>subtitles_en.srt / subtitles_target.srt</strong> — English-only
+                  and Russian-only subtitle files separately.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">🎬</span>
+                  <div><strong>Rendered video (MP4)</strong> — the original video with bilingual
+                  subtitles and dual-language voiceover burned in. Generated on demand via the
+                  Render button on the results screen.</div>
                 </div>
               </div>
             </div>
@@ -298,6 +323,15 @@ export function AboutPage() {
               <a className="about-link" href="mailto:r00274535@mymtu.ie">r00274535@mymtu.ie</a>
             </p>
           </div>
+
+          <a
+            className="about-pitch-btn"
+            href="/investor-pitch.html"
+            target="_blank"
+            rel="noreferrer"
+          >
+            ↓ Full investor pitch (open &amp; save as PDF)
+          </a>
         </section>
       )}
     </div>
