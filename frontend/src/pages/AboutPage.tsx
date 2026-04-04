@@ -1,9 +1,19 @@
 import { useState } from 'react'
 
 type Section = 'how' | 'investors' | null
+type HowSub = 'overview' | 'projects' | 'analysis' | 'visualizer' | 'export'
+
+const HOW_TABS: { id: HowSub; label: string }[] = [
+  { id: 'overview',   label: 'Overview'  },
+  { id: 'projects',   label: 'Projects'  },
+  { id: 'analysis',   label: 'Analysis'  },
+  { id: 'visualizer', label: 'Visualizer'},
+  { id: 'export',     label: 'Export'    },
+]
 
 export function AboutPage() {
   const [open, setOpen] = useState<Section>(null)
+  const [howSub, setHowSub] = useState<HowSub>('overview')
 
   const toggle = (s: Section) => setOpen((prev) => (prev === s ? null : s))
 
@@ -11,10 +21,22 @@ export function AboutPage() {
     <div className="about-page">
       <section className="about-hero">
         <h2 className="about-product-name">ELA</h2>
-        <p className="about-lead">
-          Upload a video, audio, or text — get a full linguistic breakdown of every sentence:
-          grammar structure, CEFR level, translation, and phonetics, all in one interactive view.
-        </p>
+        <p className="about-lead-label">You upload a video, audio, or text. You get:</p>
+        <ol className="about-get-list">
+          <li>
+            <strong>Linguistic analysis</strong> of every sentence — grammar structure,
+            CEFR difficulty, translation, and phonetics in an interactive tree view.
+          </li>
+          <li>
+            <strong>Ready-made artifacts</strong> — an MP4 video with dual-language
+            audio and subtitles (EN + RU), an MP3 with dual-language voiceover,
+            and a vocabulary list extracted from the content.
+          </li>
+          <li>
+            <strong>Export</strong> of words and phrases for independent study
+            or integration with other tools (spaced-repetition apps, dictionaries, LMS platforms).
+          </li>
+        </ol>
       </section>
 
       <div className="about-btn-row">
@@ -34,69 +56,162 @@ export function AboutPage() {
 
       {open === 'how' && (
         <section className="about-panel">
-          <p className="about-panel-intro">
-            The interface is built for touch — every action is a single tap or a swipe.
-          </p>
-
-          <div className="about-gesture-list">
-            <div className="about-gesture">
-              <span className="about-gesture-icon">☰</span>
-              <div>
-                <strong>Bottom bar</strong> — tap <em>Media</em>, <em>Analyze</em>, or <em>Vocabulary</em>
-                to switch between the main sections.
-              </div>
-            </div>
-
-            <div className="about-gesture">
-              <span className="about-gesture-icon">＋</span>
-              <div>
-                <strong>Start analysis</strong> — on the Media screen tap the upload area or the
-                microphone button to add a file. On Analyze, type or paste text and tap <em>Analyse</em>.
-              </div>
-            </div>
-
-            <div className="about-gesture">
-              <span className="about-gesture-icon">↓</span>
-              <div>
-                <strong>Open a result</strong> — after analysis finishes, tap any sentence card
-                in the list to open the Visualizer for that sentence.
-              </div>
-            </div>
-
-            <div className="about-gesture">
-              <span className="about-gesture-icon">◉</span>
-              <div>
-                <strong>Explore the tree</strong> — in the Visualizer, tap any phrase or word node
-                to expand its detail card: grammar role, tense, CEFR level, translation, and phonetics.
-                Tap again to collapse.
-              </div>
-            </div>
-
-            <div className="about-gesture">
-              <span className="about-gesture-icon">_</span>
-              <div>
-                <strong>Sentence highlight</strong> — as you tap nodes in the tree, the coloured
-                underline on the sentence at the top shifts to show exactly which words belong
-                to the selected phrase.
-              </div>
-            </div>
-
-            <div className="about-gesture">
-              <span className="about-gesture-icon">⇐</span>
-              <div>
-                <strong>Go back</strong> — tap <em>Back</em> in the top-left corner to return
-                to the previous screen. Swipe right on mobile also works.
-              </div>
-            </div>
-
-            <div className="about-gesture">
-              <span className="about-gesture-icon">⚙</span>
-              <div>
-                <strong>Config</strong> — tap in the top-right corner to set your translation
-                provider. Default translation runs locally — no account needed.
-              </div>
-            </div>
+          <div className="about-how-tabs">
+            {HOW_TABS.map((t) => (
+              <button
+                key={t.id}
+                className={`about-how-tab${howSub === t.id ? ' active' : ''}`}
+                onClick={() => setHowSub(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
+
+          {howSub === 'overview' && (
+            <div className="about-how-body">
+              <p className="about-panel-intro">
+                The interface is built for touch — every action is a single tap.
+              </p>
+              <div className="about-gesture-list">
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">☰</span>
+                  <div><strong>Bottom bar</strong> — tap <em>Media</em>, <em>Analyze</em>,
+                  or <em>Vocabulary</em> to switch sections.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">⇐</span>
+                  <div><strong>Back</strong> — top-left corner returns to the previous screen.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">⚙</span>
+                  <div><strong>Config / About</strong> — top-right corner.
+                  Set your translation provider and API keys in Config.</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {howSub === 'projects' && (
+            <div className="about-how-body">
+              <p className="about-panel-intro">
+                All your work is organised into projects. Each project holds its own files and analyses.
+              </p>
+              <div className="about-gesture-list">
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">＋</span>
+                  <div><strong>Create a project</strong> — tap the <em>+</em> button on the
+                  home screen. Give it a name and tap Save.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">↗</span>
+                  <div><strong>Upload files</strong> — open a project, tap <em>Add file</em>.
+                  Supported: MP4, MP3, WAV, PDF, DOCX, plain text. Files are stored locally in your browser.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">✕</span>
+                  <div><strong>Delete</strong> — long-press a project or file card to get the
+                  delete option.</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {howSub === 'analysis' && (
+            <div className="about-how-body">
+              <p className="about-panel-intro">
+                Analysis processes your file sentence by sentence and produces the full linguistic contract.
+              </p>
+              <div className="about-gesture-list">
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">▶</span>
+                  <div><strong>Start analysis</strong> — open a file and tap <em>Analyse</em>.
+                  For audio/video, speech is transcribed first via Whisper, then each sentence is parsed.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">⟳</span>
+                  <div><strong>Progress</strong> — a progress bar shows sentence-by-sentence processing.
+                  You can leave the screen; analysis continues in the background.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">T</span>
+                  <div><strong>Text input</strong> — tap <em>Analyze</em> in the bottom bar to
+                  type or paste text directly, without uploading a file.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">🌐</span>
+                  <div><strong>Translation</strong> — enabled by default using the local M2M100 model.
+                  Switch provider in Config if you have a Lara or DeepL key.</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {howSub === 'visualizer' && (
+            <div className="about-how-body">
+              <p className="about-panel-intro">
+                The Visualizer shows the grammatical tree of a sentence. Tap anything to explore it.
+              </p>
+              <div className="about-gesture-list">
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">↓</span>
+                  <div><strong>Open</strong> — tap any sentence card in the results list
+                  to open its Visualizer.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">◉</span>
+                  <div><strong>Expand a node</strong> — tap a phrase or word node to open
+                  its detail card: grammar role, tense, CEFR level, translation, phonetics,
+                  and a plain-language explanation.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">◎</span>
+                  <div><strong>Collapse</strong> — tap the same node again to close the card.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">_</span>
+                  <div><strong>Sentence highlight</strong> — a coloured underline on the sentence
+                  at the top shifts as you tap nodes, showing exactly which words belong
+                  to the selected phrase.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">⇅</span>
+                  <div><strong>Scroll</strong> — swipe up/down to navigate a long sentence tree.</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {howSub === 'export' && (
+            <div className="about-how-body">
+              <p className="about-panel-intro">
+                After analysis, several ready-made artifacts are available to download or share.
+              </p>
+              <div className="about-gesture-list">
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">🎬</span>
+                  <div><strong>Subtitle video (MP4)</strong> — the original video re-rendered with
+                  bilingual subtitles (EN + RU) and dual-language voiceover burned in.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">🎵</span>
+                  <div><strong>Audio (MP3)</strong> — dual-language voiceover of the full content,
+                  ready for listening practice.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">📋</span>
+                  <div><strong>Vocabulary list</strong> — all words and phrases extracted from
+                  the analysis, with CEFR levels. Browse in the <em>Vocabulary</em> tab
+                  or export as a file.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">⬇</span>
+                  <div><strong>Download</strong> — tap the download icon next to any artifact
+                  on the results screen to save it to your device.</div>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
       )}
 

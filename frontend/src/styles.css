@@ -1786,3 +1786,55 @@ button {
 .about-link:hover {
   text-decoration: underline;
 }
+
+.about-lead-label {
+  font-size: 15px;
+  color: var(--muted);
+  margin: 0 0 8px;
+  text-align: left;
+}
+
+.about-get-list {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+  margin: 0;
+  padding-left: 20px;
+}
+
+.about-get-list li {
+  margin-bottom: 8px;
+}
+
+.about-how-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.about-how-tab {
+  padding: 6px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.about-how-tab.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.about-how-body {
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
