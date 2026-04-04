@@ -77,15 +77,10 @@ self.addEventListener('message', async (event: MessageEvent) => {
     const total = sentences.length
     for (let index = 0; index < total; index += 1) {
       const sentence = sentences[index]
-      const output: any = await t(sentence, { clean_up_tokenization_spaces: true })
-      const rawText = String(
+      const output: any = await t(sentence)
+      const text = String(
         (Array.isArray(output) ? (output[0] as any)?.translation_text : '') || '',
       ).trim()
-      // Sentencepiece sometimes outputs "П р и в е т" — collapse if every token is 1 char
-      const words = rawText.split(' ')
-      const text = words.length > 1 && words.every((w: string) => w.length <= 1)
-        ? words.join('')
-        : rawText
       self.postMessage({ type: 'result', id, index, total, text })
     }
     self.postMessage({ type: 'done', id })
