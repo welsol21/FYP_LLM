@@ -962,7 +962,7 @@ export class HttpRuntimeApi implements RuntimeApi {
           // Collect only texts that don't already have a translation from this provider
           const allTexts = new Set<string>()
           for (const [sentenceText, node] of Object.entries(contract)) {
-            if (!(node.translations as any)?.[provider]?.text) allTexts.add(sentenceText)
+            if (!(node.translations as any)?.[provider]?.text) allTexts.add(sentenceText.trim())
             collectNodeTexts(node, allTexts, provider)
           }
           // Nodes that already have this provider's translation just need active_translation_provider set
@@ -1005,6 +1005,10 @@ export class HttpRuntimeApi implements RuntimeApi {
               }
               if (statusJson.status === 'done' || statusJson.translations) {
                 Object.assign(translations, statusJson.translations || {})
+                recordRuntimeDiagnostic('api.media.backend', 'translate.result', {
+                  keys: Object.keys(statusJson.translations || {}).length,
+                  sample: Object.entries(statusJson.translations || {}).slice(0, 2).map(([k, v]) => ({ k: k.slice(0, 40), v: String(v).slice(0, 40) })),
+                })
                 break
               }
               // still running — keep polling
@@ -1058,7 +1062,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         const voiceForCache = String(input.voiceChoice || '').trim().toLowerCase() === 'backend_svetlana' ? 'female' : 'male'
         const timedSentences = sentences.map((sent) => ({
           text_eng: sent.text,
-          text_ru: String(translations[sent.text] || ''),
+          text_ru: String(translations[sent.text.trim()] || translations[sent.text] || ''),
           start_ms: typeof sent.start_sec === 'number' ? Math.round(sent.start_sec * 1000) : null,
           end_ms: typeof sent.end_sec === 'number' ? Math.round(sent.end_sec * 1000) : null,
         }))
