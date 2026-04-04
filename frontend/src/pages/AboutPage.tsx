@@ -21,22 +21,25 @@ export function AboutPage() {
     <div className="about-page">
       <section className="about-hero">
         <h2 className="about-product-name">ELA</h2>
-        <p className="about-lead-label">You upload a video, audio, or text. You get:</p>
-        <ol className="about-get-list">
-          <li>
-            <strong>Linguistic analysis</strong> of every sentence — grammar structure,
-            CEFR difficulty, translation, and phonetics in an interactive tree view.
-          </li>
-          <li>
-            <strong>Ready-made artifacts</strong> — an MP4 video with dual-language
-            audio and subtitles (EN + RU), an MP3 with dual-language voiceover,
-            and a vocabulary list extracted from the content.
-          </li>
-          <li>
-            <strong>Export</strong> of words and phrases for independent study
-            or integration with other tools (spaced-repetition apps, dictionaries, LMS platforms).
-          </li>
-        </ol>
+        <p className="about-product-full">English Language Assistant</p>
+        <div className="about-get-card">
+          <p className="about-get-label">Upload a video, audio, or text. You get:</p>
+          <ol className="about-get-list">
+            <li>
+              <strong>Linguistic analysis</strong> of every sentence — grammar structure,
+              CEFR difficulty, translation, and phonetics in an interactive tree view.
+            </li>
+            <li>
+              <strong>Ready-made artifacts</strong> — an MP4 video with dual-language
+              audio and subtitles (EN + RU), an MP3 with dual-language voiceover,
+              and a vocabulary list extracted from the content.
+            </li>
+            <li>
+              <strong>Export</strong> of words and phrases for independent study
+              or integration with other tools (spaced-repetition apps, dictionaries, LMS platforms).
+            </li>
+          </ol>
+        </div>
       </section>
 
       <div className="about-btn-row">
