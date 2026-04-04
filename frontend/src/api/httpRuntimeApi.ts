@@ -796,6 +796,36 @@ export class HttpRuntimeApi implements RuntimeApi {
           log(1, `Extracted ${sentences.length} sentences from document`, 100)
           ensureNotAborted()
         } else {
+        const isAndroid = /android/i.test(navigator.userAgent)
+        if (isAndroid && input.mediaBlob) {
+          // Android ONNX WASM crashes with raw exception numbers — use server-side Whisper instead
+          log(1, 'Uploading audio for server-side transcription…', 5)
+          const transcribeForm = new FormData()
+          transcribeForm.append('audio', input.mediaBlob, input.fileName)
+          const transcribeSubmit = await requestJson<{ job_id: string }>(
+            apiUrl('/api/transcribe'),
+            { method: 'POST', body: transcribeForm, signal: input.signal },
+          )
+          const transcribeJobId = transcribeSubmit.job_id
+          let tPoll = 0
+          while (true) {
+            ensureNotAborted()
+            await new Promise<void>((resolve) => setTimeout(resolve, 2000))
+            ensureNotAborted()
+            tPoll += 2
+            log(1, `Transcribing on server… (${tPoll}s)`, 5 + Math.min(tPoll * 2, 88))
+            const tStatus = await fetch(apiUrl(`/api/transcribe-status/${transcribeJobId}`), { signal: input.signal })
+            const tJson = await tStatus.json() as { status: string; sentences?: Array<{ text: string; start_sec: number | null; end_sec: number | null }>; source_type?: string; error?: string }
+            if (tJson.status === 'error') throw new Error(tJson.error ?? 'Transcription failed')
+            if (tJson.status === 'done') {
+              sentences = tJson.sentences || []
+              sourceType = String(tJson.source_type || 'audio').trim()
+              break
+            }
+          }
+          log(1, `Transcribed ${sentences.length} sentences`, 100)
+          ensureNotAborted()
+        } else {
         const durationMin = Math.round((input.durationSec ?? 0) / 60)
         const timeHint = durationMin > 2 ? ` (~${durationMin * 2}–${durationMin * 4} min on CPU)` : ''
         log(1, `Loading Whisper model…${timeHint}`, 3)
@@ -809,6 +839,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         sourceType = String(transcribeResult.source_type || 'audio').trim()
         log(1, `Transcribed ${sentences.length} sentences`, 100)
         ensureNotAborted()
+        }
         }
 
         // Persist sentences under immutableDocId — independent of voice/subs/provider
