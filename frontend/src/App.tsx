@@ -6,6 +6,7 @@ import { ProjectsPage } from './pages/ProjectsPage'
 import { VisualizerPage } from './pages/VisualizerPage'
 import { VocabularyPage } from './pages/VocabularyPage'
 import { ConfigPage } from './pages/ConfigPage'
+import { AboutPage } from './pages/AboutPage'
 import { NewProjectPage } from './pages/NewProjectPage'
 import { NewFilePage } from './pages/NewFilePage'
 import { AnalyzeListPage } from './pages/AnalyzeListPage'
@@ -33,6 +34,7 @@ export default function App() {
     '/vocabulary': 'Vocabulary',
     '/visualizer': 'Linguistic Visualizer',
     '/config': 'Config',
+    '/about': 'About',
     '/new-project': 'New Project',
     '/new-file': 'New File',
   }
@@ -61,6 +63,9 @@ export default function App() {
         <h1 className="top-title">{pageTitle}</h1>
         <div className="top-actions">
           <PwaInstallButton />
+          <NavLink to="/about" className={({ isActive }) => (isActive ? 'top-link active' : 'top-link')}>
+            About
+          </NavLink>
           <NavLink to="/config" className={({ isActive }) => (isActive ? 'top-link active' : 'top-link')}>
             Config
           </NavLink>
@@ -76,6 +81,7 @@ export default function App() {
             <Route path="/vocabulary" element={<VocabularyPage />} />
             <Route path="/visualizer" element={<VisualizerPage />} />
             <Route path="/config" element={<ConfigPage />} />
+        <Route path="/about" element={<AboutPage />} />
             <Route path="/new-project" element={<NewProjectPage />} />
             <Route path="/new-file" element={<NewFilePage />} />
           </Routes>
