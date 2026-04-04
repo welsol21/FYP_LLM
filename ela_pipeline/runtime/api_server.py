@@ -930,6 +930,30 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
             self.wfile.write(zip_bytes)
             return
 
+        if path.startswith("/api/transcribe-status/"):
+            job_id = path[len("/api/transcribe-status/"):]
+            with _render_jobs_lock:
+                job = _render_jobs.get(job_id)
+            if job is None:
+                self._send_json({"status": "not_found"}, status=404)
+                return
+            if job["status"] == "running":
+                self._send_json({"status": "running"})
+                return
+            if job["status"] == "done":
+                sentences = job.get("sentences", [])
+                source_type = job.get("source_type", "audio")
+                with _render_jobs_lock:
+                    _render_jobs.pop(job_id, None)
+                self._send_json({"status": "done", "sentences": sentences, "source_type": source_type})
+                return
+            # error
+            err = job.get("error", "unknown")
+            with _render_jobs_lock:
+                _render_jobs.pop(job_id, None)
+            self._send_json({"status": "error", "error": err}, status=500)
+            return
+
         if path == "/api/document-artifacts":
             document_id = (query.get("document_id") or [""])[0]
             if not document_id:
@@ -1070,6 +1094,63 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                         import os as _os; _os.unlink(tmp_path)
                     except Exception:
                         pass
+            return
+
+        if path == "/api/transcribe":
+            # Mobile-friendly async transcription: accepts multipart audio, returns {job_id}.
+            # Poll /api/transcribe-status/<job_id> until status=done|error.
+            if "multipart/form-data" not in content_type:
+                self._send_json({"error": "multipart/form-data is required"}, status=400)
+                return
+            import tempfile as _tempfile
+            form = cgi.FieldStorage(
+                fp=self.rfile,
+                headers=self.headers,
+                environ={"REQUEST_METHOD": "POST", "CONTENT_TYPE": content_type},
+            )
+            audio_item = form["audio"] if "audio" in form else None
+            if audio_item is None:
+                self._send_json({"error": "audio field is required"}, status=400)
+                return
+            audio_bytes = audio_item.file.read()
+            suffix = Path(str(audio_item.filename or "upload.m4a")).suffix or ".m4a"
+
+            def _transcribe_job(jid: str, audio_data: bytes, suf: str) -> None:
+                tmp_path = None
+                try:
+                    with _tempfile.NamedTemporaryFile(suffix=suf, delete=False) as tmp:
+                        tmp.write(audio_data)
+                        tmp_path = tmp.name
+                    result = extract_media_text_and_sentences(source_path=tmp_path)
+                    sents = [
+                        {
+                            "text": text,
+                            "start_sec": timing["start_sec"] if timing else None,
+                            "end_sec": timing["end_sec"] if timing else None,
+                        }
+                        for text, timing in zip(result.sentence_stream, result.sentence_timeline)
+                    ]
+                    with _render_jobs_lock:
+                        _render_jobs[jid] = {
+                            "status": "done", "zip": None, "error": None,
+                            "ts": _time.time(), "sentences": sents, "source_type": result.source_type,
+                        }
+                except Exception as exc:
+                    with _render_jobs_lock:
+                        _render_jobs[jid] = {"status": "error", "zip": None, "error": str(exc), "ts": _time.time()}
+                finally:
+                    if tmp_path:
+                        try:
+                            import os as _os2; _os2.unlink(tmp_path)
+                        except Exception:
+                            pass
+
+            _render_jobs_cleanup()
+            job_id = str(_uuid.uuid4())
+            with _render_jobs_lock:
+                _render_jobs[job_id] = {"status": "running", "zip": None, "error": None, "ts": _time.time()}
+            _threading.Thread(target=_transcribe_job, args=(job_id, audio_bytes, suffix), daemon=True).start()
+            self._send_json({"job_id": job_id, "status": "running"})
             return
 
         body = self._read_json_body()
