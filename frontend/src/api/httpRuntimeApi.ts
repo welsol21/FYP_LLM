@@ -873,7 +873,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       }
 
       // ── Stage 3: Translation ─────────────────────────────────────
-      const BACKEND_PROVIDERS = new Set(['m2m100', 'gpt', 'deepl', 'lara'])
+      const BACKEND_PROVIDERS = new Set(['gpt', 'deepl', 'lara'])
       const providerIsOriginal = provider === 'original'
 
       // Collect all node texts recursively (skipping punctuation and already-translated nodes)
@@ -977,12 +977,11 @@ export class HttpRuntimeApi implements RuntimeApi {
               // still running — keep polling
             }
             log(2, `Translated ${Object.keys(translations).length}/${allTextsList.length} texts`, 98)
-          } else {
-            // Default: use local opus-mt-en-ru model in browser worker (sentence-level only)
-            translations = await this.clientTranslateAnalysis(
-              contractDocId,
-              contract,
-              (done, ttl) => log(2, `Translating sentences (${done}/${ttl})`, 50 + Math.round((done / Math.max(ttl, 1)) * 48)),
+          } else if (allTextsList.length > 0) {
+            // Use local opus-mt-en-ru WASM worker — translate all collected texts (sentences + phrases)
+            translations = await this._clientTranslateTexts(
+              allTextsList,
+              (done, ttl) => log(2, `Translating (${done}/${ttl})`, 50 + Math.round((done / Math.max(ttl, 1)) * 48)),
               input.signal,
             ).catch((err: unknown) => {
               if (err instanceof DOMException && err.name === 'AbortError') throw err
@@ -1295,6 +1294,43 @@ export class HttpRuntimeApi implements RuntimeApi {
         reject(new Error(String(err.message || 'Translation worker crashed')))
       }
       worker.postMessage({ type: 'translate', id, sentences })
+    })
+  }
+
+  private _clientTranslateTexts(
+    texts: string[],
+    onProgress: (done: number, total: number) => void,
+    signal?: AbortSignal,
+  ): Promise<Record<string, string>> {
+    return new Promise((resolve, reject) => {
+      if (!texts.length) { resolve({}); return }
+      const worker = new Worker(new URL('../workers/translationWorker.ts', import.meta.url), { type: 'module' })
+      const id = 'batch-' + Date.now()
+      const translations: Record<string, string> = {}
+      const onAbort = (): void => { worker.terminate(); reject(new DOMException('Analysis cancelled.', 'AbortError')) }
+      signal?.addEventListener('abort', onAbort)
+      worker.onmessage = (ev: MessageEvent): void => {
+        const msg = ev.data as { type: string; id?: string; index?: number; total?: number; text?: string; message?: string }
+        if (msg.type === 'result' && msg.id === id && typeof msg.index === 'number') {
+          const src = texts[msg.index]
+          if (src) translations[src] = String(msg.text || '')
+          onProgress(msg.index + 1, msg.total ?? texts.length)
+        } else if (msg.type === 'done' && msg.id === id) {
+          signal?.removeEventListener('abort', onAbort)
+          worker.terminate()
+          resolve(translations)
+        } else if (msg.type === 'error') {
+          signal?.removeEventListener('abort', onAbort)
+          worker.terminate()
+          reject(new Error(String(msg.message || 'Translation worker error')))
+        }
+      }
+      worker.onerror = (err): void => {
+        signal?.removeEventListener('abort', onAbort)
+        worker.terminate()
+        reject(new Error(String(err.message || 'Translation worker crashed')))
+      }
+      worker.postMessage({ type: 'translate', id, sentences: texts })
     })
   }
 
