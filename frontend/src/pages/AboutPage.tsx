@@ -4,11 +4,11 @@ type Section = 'how' | 'investors' | null
 type HowSub = 'overview' | 'projects' | 'analysis' | 'visualizer' | 'export'
 
 const HOW_TABS: { id: HowSub; label: string }[] = [
-  { id: 'overview',   label: 'Overview'  },
-  { id: 'projects',   label: 'Projects'  },
-  { id: 'analysis',   label: 'Analysis'  },
-  { id: 'visualizer', label: 'Visualizer'},
-  { id: 'export',     label: 'Export'    },
+  { id: 'overview',   label: 'Overview'    },
+  { id: 'projects',   label: 'Projects'    },
+  { id: 'analysis',   label: 'Analysis'    },
+  { id: 'visualizer', label: 'Visualizer'  },
+  { id: 'export',     label: 'Vocab & Export' },
 ]
 
 export function AboutPage() {
@@ -112,9 +112,14 @@ export function AboutPage() {
                   Supported: MP4, MP3, WAV, PDF, DOCX, plain text. Files are stored locally in your browser.</div>
                 </div>
                 <div className="about-gesture">
+                  <span className="about-gesture-icon">◉◉</span>
+                  <div><strong>Open analysis</strong> — <strong>double-tap</strong> a file row
+                  (two taps within 350 ms) to open it for analysis. A single tap only selects the row.</div>
+                </div>
+                <div className="about-gesture">
                   <span className="about-gesture-icon">✕</span>
-                  <div><strong>Delete</strong> — long-press a project or file card to get the
-                  delete option.</div>
+                  <div><strong>Delete a file</strong> — tap the delete icon on the file card.
+                  Confirm in the dialog — this also removes all related analyses and artifacts.</div>
                 </div>
               </div>
             </div>
@@ -165,17 +170,30 @@ export function AboutPage() {
                   <span className="about-gesture-icon">◉</span>
                   <div><strong>Expand a node</strong> — tap a phrase or word node to open
                   its detail card: grammar role, tense, CEFR level, translation, phonetics,
-                  and a plain-language explanation.</div>
-                </div>
-                <div className="about-gesture">
-                  <span className="about-gesture-icon">◎</span>
-                  <div><strong>Collapse</strong> — tap the same node again to close the card.</div>
+                  and a plain-language explanation. Tap again to collapse.</div>
                 </div>
                 <div className="about-gesture">
                   <span className="about-gesture-icon">_</span>
                   <div><strong>Sentence highlight</strong> — a coloured underline on the sentence
                   at the top shifts as you tap nodes, showing exactly which words belong
                   to the selected phrase.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">✎</span>
+                  <div><strong>Quick Node Edit</strong> — tap this button in the toolbar to
+                  manually edit the text or metadata of the currently selected node.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">📖</span>
+                  <div><strong>Note Level</strong> — switches the linguistic explanation between
+                  <em> Elementary</em>, <em>Intermediate</em>, <em>Advanced</em>, or <em>All</em> levels
+                  so you see the explanation that fits your proficiency.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">🌐</span>
+                  <div><strong>Translate</strong> — re-runs translation on the current sentence
+                  using a selected provider (M2M100, Lara, DeepL, or all at once).
+                  Useful if the default translation was missing or wrong.</div>
                 </div>
                 <div className="about-gesture">
                   <span className="about-gesture-icon">⇅</span>
@@ -188,29 +206,43 @@ export function AboutPage() {
           {howSub === 'export' && (
             <div className="about-how-body">
               <p className="about-panel-intro">
-                After analysis, several ready-made artifacts are available to download or share.
+                The Vocabulary tab aggregates everything extracted across all your analyses.
+                Select entries to export or open in the Visualizer.
               </p>
               <div className="about-gesture-list">
                 <div className="about-gesture">
-                  <span className="about-gesture-icon">🎬</span>
-                  <div><strong>Subtitle video (MP4)</strong> — the original video re-rendered with
-                  bilingual subtitles (EN + RU) and dual-language voiceover burned in.</div>
+                  <span className="about-gesture-icon">☑</span>
+                  <div><strong>Select entries</strong> — tap any row in the Vocabulary list to
+                  select it. Tap again to deselect. The action bar appears when at least one
+                  row is selected.</div>
                 </div>
                 <div className="about-gesture">
-                  <span className="about-gesture-icon">🎵</span>
-                  <div><strong>Audio (MP3)</strong> — dual-language voiceover of the full content,
-                  ready for listening practice.</div>
-                </div>
-                <div className="about-gesture">
-                  <span className="about-gesture-icon">📋</span>
-                  <div><strong>Vocabulary list</strong> — all words and phrases extracted from
-                  the analysis, with CEFR levels. Browse in the <em>Vocabulary</em> tab
-                  or export as a file.</div>
+                  <span className="about-gesture-icon">◉</span>
+                  <div><strong>Open in Visualizer</strong> — with rows selected, tap
+                  <em> Visualizer</em> in the action bar to jump directly to the grammatical
+                  tree for those sentences.</div>
                 </div>
                 <div className="about-gesture">
                   <span className="about-gesture-icon">⬇</span>
-                  <div><strong>Download</strong> — tap the download icon next to any artifact
-                  on the results screen to save it to your device.</div>
+                  <div><strong>Export JSON / CSV</strong> — tap <em>Export JSON</em> or
+                  <em> Export CSV</em> to download the selected vocabulary with all metadata.
+                  Choose which fields to include before confirming.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">🎬</span>
+                  <div><strong>Subtitle video (MP4)</strong> — available on the analysis results
+                  screen. The original video re-rendered with bilingual subtitles and
+                  dual-language voiceover.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">🎵</span>
+                  <div><strong>Audio (MP3)</strong> — dual-language voiceover of the full
+                  content. Tap the download icon on the results screen to save to device.</div>
+                </div>
+                <div className="about-gesture">
+                  <span className="about-gesture-icon">✕</span>
+                  <div><strong>Delete analyses</strong> — select rows and tap
+                  <em> Delete Analyses</em> to remove them and free up storage.</div>
                 </div>
               </div>
             </div>
