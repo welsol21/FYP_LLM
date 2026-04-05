@@ -745,6 +745,7 @@ def translate_texts_with_provider(
     provider_credentials: "dict[str, str] | None" = None,
     source_lang: "str | None" = None,
     target_lang: "str | None" = None,
+    progress_callback: "Callable[[int, int], None] | None" = None,
 ) -> "dict[str, str]":
     """Translate a batch of texts, returning {original_text: translated_text}.
 
@@ -752,9 +753,22 @@ def translate_texts_with_provider(
     Lara single HTTP call). Falls back to sequential translate_text_with_provider
     for other providers.
     """
-    unique: list[str] = list(dict.fromkeys(t.strip() for t in texts if t.strip()))
-    if not unique:
+    unique_exact: list[str] = list(dict.fromkeys(t.strip() for t in texts if t.strip()))
+    if not unique_exact:
         return {}
+
+    groups_by_casefold: dict[str, list[str]] = {}
+    casefold_order: list[str] = []
+    for original_text in unique_exact:
+        key = original_text.casefold()
+        if key not in groups_by_casefold:
+            groups_by_casefold[key] = []
+            casefold_order.append(key)
+        groups_by_casefold[key].append(original_text)
+
+    if progress_callback is not None:
+        progress_callback(0, len(unique_exact))
+
     source_lang_resolved = source_lang or os.getenv("ELA_MEDIA_TRANSLATION_SOURCE_LANG", "en")
     target_lang_resolved = target_lang or os.getenv("ELA_MEDIA_TRANSLATION_TARGET_LANG", "ru")
     translator = _resolve_media_translator(
@@ -762,23 +776,79 @@ def translate_texts_with_provider(
         provider_credentials=provider_credentials,
     )
     if isinstance(translator, M2M100Translator):
-        # Lowercase input so M2M100 doesn't treat capitalised words as proper nouns
-        # and refuses to translate them. Map results back to original casing.
-        lowered = [t.lower() for t in unique]
-        BATCH_SIZE = 16
-        all_results: list[str] = []
+        # Lowercase input so M2M100 doesn't treat capitalised words as proper nouns.
+        # Translate one representative per case-insensitive group, then map back.
+        representatives = [groups_by_casefold[key][0] for key in casefold_order]
+        lowered = [t.lower() for t in representatives]
+        batch_size = _select_m2m100_batch_size(lowered)
+        total_batches = max(1, (len(lowered) + batch_size - 1) // batch_size)
+        translated_by_casefold: dict[str, str] = {}
+        translated_exact_count = 0
+        started_at = time.perf_counter()
         with _m2m100_lock:
-            for i in range(0, len(lowered), BATCH_SIZE):
-                chunk = lowered[i:i + BATCH_SIZE]
-                all_results.extend(translator.translate_texts(chunk, source_lang=source_lang_resolved, target_lang=target_lang_resolved))
-        return {orig: tr for orig, tr in zip(unique, all_results)}
+            for batch_index, i in enumerate(range(0, len(lowered), batch_size), start=1):
+                chunk = lowered[i:i + batch_size]
+                chunk_casefold_keys = casefold_order[i:i + batch_size]
+                chunk_results = translator.translate_texts(
+                    chunk,
+                    source_lang=source_lang_resolved,
+                    target_lang=target_lang_resolved,
+                )
+                for casefold_key, translated_text in zip(chunk_casefold_keys, chunk_results):
+                    normalized = str(translated_text or "").strip()
+                    for original_text in groups_by_casefold.get(casefold_key, []):
+                        translated_by_casefold[original_text] = normalized
+                        translated_exact_count += 1
+                if progress_callback is not None:
+                    progress_callback(min(translated_exact_count, len(unique_exact)), len(unique_exact))
+                print(
+                    f"[runtime-translate] provider=m2m100 "
+                    f"batch={batch_index}/{total_batches} "
+                    f"done={min(translated_exact_count, len(unique_exact))}/{len(unique_exact)}",
+                    flush=True,
+                )
+        elapsed_sec = time.perf_counter() - started_at
+        print(
+            f"[runtime-translate] provider=m2m100 "
+            f"texts={len(texts)} unique_exact={len(unique_exact)} "
+            f"unique_casefold={len(casefold_order)} batch_size={batch_size} "
+            f"batches={total_batches} sec={elapsed_sec:.2f}",
+            flush=True,
+        )
+        return translated_by_casefold
     if isinstance(translator, _LaraTranslator):
-        return translator.translate_texts_batch(unique, source_lang=source_lang_resolved, target_lang=target_lang_resolved)
+        out = translator.translate_texts_batch(unique_exact, source_lang=source_lang_resolved, target_lang=target_lang_resolved)
+        if progress_callback is not None:
+            progress_callback(len(unique_exact), len(unique_exact))
+        return out
     # Other providers: sequential
     out: dict[str, str] = {}
-    for text in unique:
+    for idx, text in enumerate(unique_exact, start=1):
         out[text] = str(translator.translate_text(text, source_lang=source_lang_resolved, target_lang=target_lang_resolved) or "").strip()
+        if progress_callback is not None:
+            progress_callback(idx, len(unique_exact))
     return out
+
+
+def _select_m2m100_batch_size(texts: "list[str]") -> int:
+    override = str(os.getenv("ELA_MEDIA_M2M100_BATCH_SIZE", "")).strip()
+    if override:
+        try:
+            forced = int(override)
+            return max(1, min(forced, 128))
+        except ValueError:
+            pass
+    if not texts:
+        return 16
+    lengths = sorted(len(str(text or "")) for text in texts)
+    p90_idx = int(round((len(lengths) - 1) * 0.9))
+    p90_len = lengths[p90_idx]
+    max_len = lengths[-1]
+    if p90_len <= 32 and max_len <= 64:
+        return 64
+    if p90_len <= 80 and max_len <= 160:
+        return 48
+    return 32
 
 
 def extract_media_text_and_sentences(

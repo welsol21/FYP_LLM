@@ -241,15 +241,51 @@ function _translateErrorMessage(raw: string): string {
 //  immutableDocId  = hash(fileName)                          — Whisper output
 //  contractDocId   = hash(fileName | translationProvider)    — contracts + translations
 //  variantDocId    = hash(fileName | provider | voice | subs)— TTS audio + video + done-marker
+function fallbackHashHex64(input: string): string {
+  // Deterministic non-crypto fallback for environments where SubtleCrypto
+  // is unavailable (e.g. insecure HTTP context on some mobile browsers).
+  const seeds = [
+    0x811c9dc5,
+    0x9e3779b9,
+    0x85ebca6b,
+    0xc2b2ae35,
+    0x27d4eb2f,
+    0x165667b1,
+    0xd3a2646c,
+    0xfd7046c5,
+  ]
+  const text = String(input || '')
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i)
+    for (let s = 0; s < seeds.length; s += 1) {
+      seeds[s] ^= (code + ((i + 1) * (s + 17))) & 0xff
+      seeds[s] = Math.imul(seeds[s], 16777619) >>> 0
+      seeds[s] ^= seeds[s] >>> 13
+    }
+  }
+  return seeds.map((h) => h.toString(16).padStart(8, '0')).join('')
+}
+
+async function computeHashHex(input: string): Promise<string> {
+  const subtle = globalThis.crypto?.subtle
+  if (subtle && typeof subtle.digest === 'function') {
+    try {
+      const hashBuf = await subtle.digest('SHA-256', new TextEncoder().encode(input))
+      return Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, '0')).join('')
+    } catch {
+      // Fall through to deterministic non-crypto hash.
+    }
+  }
+  return fallbackHashHex64(input)
+}
+
 async function computeImmutableDocId(fileName: string): Promise<string> {
-  const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(fileName))
-  return Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, '0')).join('')
+  return await computeHashHex(fileName)
 }
 
 async function computeContractDocId(fileName: string, translationProvider: string): Promise<string> {
   const input = `${fileName}|${translationProvider}`
-  const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
-  return Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, '0')).join('')
+  return await computeHashHex(input)
 }
 
 async function computeVariantDocId(
@@ -257,8 +293,7 @@ async function computeVariantDocId(
   settings: { translationProvider: string; voiceChoice: string; subtitlesMode: string },
 ): Promise<string> {
   const input = `${fileName}|${settings.translationProvider}|${settings.voiceChoice}|${settings.subtitlesMode}`
-  const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
-  return Array.from(new Uint8Array(hashBuf)).map((b) => b.toString(16).padStart(2, '0')).join('')
+  return await computeHashHex(input)
 }
 
 function formatVoiceSetting(voiceChoice: string | undefined): string {
@@ -1058,9 +1093,14 @@ export class HttpRuntimeApi implements RuntimeApi {
               await new Promise<void>((resolve) => setTimeout(resolve, 1500))
               ensureNotAborted()
               pollCount++
-              log(2, `Translating… (${pollCount * 1.5 | 0}s)`, 50 + Math.min(pollCount * 2, 45))
               const statusRes = await fetch(apiUrl(`/api/translate-status/${translateJobId}`), { signal: input.signal })
-              const statusJson = await statusRes.json() as { status: string; translations?: Record<string, string>; error?: string }
+              const statusJson = await statusRes.json() as {
+                status: string
+                translations?: Record<string, string>
+                error?: string
+                done?: number
+                total?: number
+              }
               if (statusRes.status === 404) {
                 if (translateResubmitCount >= MAX_LOST_JOB_RESUBMITS) {
                   const raw = 'Translation job was lost after a server restart.'
@@ -1089,7 +1129,15 @@ export class HttpRuntimeApi implements RuntimeApi {
                 })
                 break
               }
-              // still running — keep polling
+              // still running — keep polling (prefer backend progress when available)
+              const done = Number(statusJson.done ?? 0)
+              const total = Number(statusJson.total ?? 0)
+              if (Number.isFinite(done) && Number.isFinite(total) && total > 0) {
+                const pct = Math.max(0, Math.min(45, Math.round((done / total) * 45)))
+                log(2, `Translating (${Math.max(0, Math.round(done))}/${Math.round(total)})`, 50 + pct)
+              } else {
+                log(2, `Translating… (${pollCount * 1.5 | 0}s)`, 50 + Math.min(pollCount * 2, 45))
+              }
             }
             log(2, `Translated ${Object.keys(translations).length}/${allTextsList.length} texts`, 98)
           } else if (allTextsList.length > 0) {

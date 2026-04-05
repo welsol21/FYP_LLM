@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ELA Poster — Vladyslav Rastvorov</title>
+<style>
+  /* Calibri is the required MTU font; fallback chain for non-Windows */
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:   #1B2A4A;
+    --blue:   #2C4A8C;
+    --red:    #8B1A1A;
+    --green:  #1A5C2E;
+    --amber:  #F5C518;
+    --bg:     #F0F2F5;
+    --card:   #FFFFFF;
+    --text:   #1A1A1A;
+    --light:  #E8ECF4;
+  }
+
+  body {
+    font-family: Calibri, 'Gill Sans', 'Trebuchet MS', Arial, sans-serif;
+    background: #e0e0e0;
+    color: var(--text);
+    line-height: 1.45;
+  }
+
+  /* A1 printable area: 594mm - 2x10mm margins = 574mm = 100rem at print time.
+     100rem on screen = viewport width, so layout scales proportionally.
+     What you see in the browser IS what prints on A1. */
+  .poster {
+    width: 100%;
+    background: #fff;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+  }
+
+  @media screen {
+    :root { font-size: 1vw; } /* 1rem = 1vw of viewport on screen */
+    body { margin: 0.65rem; }
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--navy);
+    color: #fff;
+    padding: 0.65rem 0.92rem 0.55rem;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.65rem;
+    align-items: center;
+  }
+
+  .mtu-logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    border-radius: 0.18rem;
+    padding: 0.23rem 0.37rem;
+    flex-shrink: 0;
+    min-width: 3.5rem;
+  }
+  .mtu-crest {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.09rem;
+    width: 2.0rem;
+    height: 2.0rem;
+    margin-bottom: 0.14rem;
+  }
+  .crest-q { border-radius: 0.09rem; }
+  .crest-q1 { background: #F5A623; }
+  .crest-q2 { background: #C0392B; }
+  .crest-q3 { background: #2980B9; }
+  .crest-q4 { background: #2980B9; }
+  .mtu-wordmark {
+    font-size: 2.21rem;
+    font-weight: 900;
+    color: var(--navy);
+    letter-spacing: 0.05rem;
+    line-height: 1;
+  }
+  .mtu-full {
+    font-size: 0.86rem;
+    color: #555;
+    text-align: center;
+    line-height: 1.2;
+    margin-top: 0.09rem;
+  }
+
+  .poster-title {
+    font-size: 3.32rem;
+    font-weight: 900;
+    line-height: 1.1;
+    color: #fff;
+  }
+  .poster-subtitle {
+    font-size: 2.21rem;
+    font-style: italic;
+    color: var(--amber);
+    margin-top: 0.28rem;
+  }
+  .poster-meta {
+    font-size: 2.46rem;
+    color: #B0C0D8;
+    margin-top: 0.46rem;
+    line-height: 1.4;
+  }
+  .poster-meta strong { color: #fff; }
+
+  .qr-box {
+    width: auto;
+    background: #fff;
+    border: 0.09rem solid var(--amber);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    color: var(--navy);
+    text-align: center;
+    padding: 0.23rem;
+    flex-shrink: 0;
+    border-radius: 0.18rem;
+    align-self: center;
+  }
+
+  /* BODY: 3-COLUMN GRID */
+  .body {
+    display: grid;
+    grid-template-columns: 1fr 1.1fr 1fr;
+    gap: 0;
+    background: var(--bg);
+  }
+
+  .col {
+    padding: 0.46rem 0.37rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.37rem;
+  }
+  .col-left   { background: #ffffff; }
+  .col-centre { background: #ffffff; }
+  .col-right  { background: #ffffff; }
+
+  /* SECTION CARDS */
+  .card {
+    background: var(--card);
+    border-radius: 0.28rem;
+    padding: 0.46rem 0.55rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.09);
+  }
+
+  .card h2 {
+    font-size: 2.21rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0;
+    padding-bottom: 0.37rem;
+    margin-bottom: 0.55rem;
+    border-bottom: 0.23rem solid currentColor;
+  }
+  .col-left   .card h2 { color: var(--blue); border-color: var(--blue); }
+  .col-centre .card h2 { color: var(--red);  border-color: var(--red);  }
+  .col-right  .card h2 { color: var(--green);border-color: var(--green);}
+
+  .card p { margin-bottom: 0.55rem; font-size: 1.84rem; }
+  .card ul { margin-left: 1.84rem; margin-bottom: 0.55rem; }
+  .card ul li { font-size: 1.84rem; margin-bottom: 0.37rem; }
+  .card strong { font-weight: 700; }
+
+  /* PIPELINE FLOW */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 0.28rem 0;
+  }
+  .pipe-step {
+    display: flex;
+    align-items: center;
+    gap: 0.28rem;
+    padding: 0.18rem 0.37rem;
+    border-radius: 0.18rem;
+    font-size: 1.48rem;
+    font-weight: 500;
+    color: #fff;
+  }
+  .pipe-arrow {
+    text-align: center;
+    font-size: 1.72rem;
+    color: #888;
+    line-height: 1;
+  }
+  .p1 { background: #2C4A8C; }
+  .p2 { background: #3A5E9E; }
+  .p3 { background: #8B1A1A; }
+  .p4 { background: #A03020; }
+  .p5 { background: #1A5C2E; }
+  .p6 { background: #246B38; }
+  .p7 { background: #1B2A4A; }
+  .p8 { background: #0F1A2E; }
+  .pipe-num {
+    display: inline-block;
+    width: 0.83rem;
+    height: 0.83rem;
+    background: rgba(255,255,255,0.25);
+    border-radius: 50%;
+    text-align: center;
+    line-height: 0.83rem;
+    font-size: 1.23rem;
+    flex-shrink: 0;
+  }
+
+  /* RLE SCHEMA BOX */
+  .rle-tree {
+    background: var(--light);
+    border-left: 0.14rem solid var(--blue);
+    padding: 0.37rem 0.46rem;
+    font-family: 'Courier New', monospace;
+    font-size: 1.35rem;
+    line-height: 1.7;
+    border-radius: 0 0.18rem 0.18rem 0;
+    margin: 0.28rem 0;
+  }
+
+  /* NEW PHYSICS DIAGRAM */
+  .duality-diagram {
+    background: linear-gradient(135deg, #e8f0ff 0%, #fff0f0 50%, #fff8e0 100%);
+    border: 0.09rem solid var(--red);
+    border-radius: 0.37rem;
+    padding: 0.46rem 0.37rem;
+    text-align: center;
+  }
+  .duality-grid {
+    display: grid;
+    grid-template-columns: 1fr 2.21rem 1fr;
+    gap: 0.28rem;
+    align-items: center;
+    margin: 0.37rem 0;
+  }
+  .panel-open, .panel-closed {
+    border-radius: 0.28rem;
+    padding: 0.28rem;
+    min-height: 4.5rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .panel-open   { background: rgba(44,74,140,0.10); border: 0.07rem solid var(--blue); }
+  .panel-closed { background: rgba(245,197,24,0.12); border: 0.07rem solid #B8860B; }
+  .panel-label {
+    font-size: 1.35rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-bottom: 0.18rem;
+  }
+  .panel-open   .panel-label { color: var(--blue); }
+  .panel-closed .panel-label { color: #8B6914; }
+  .panel-sublabel { font-size: 1.23rem; color: #666; margin-bottom: 0.28rem; }
+  .panel-icon {
+    font-size: 1.48rem;
+    line-height: 1;
+    margin: 0.18rem 0;
+  }
+  .panel-desc {
+    font-size: 1.23rem;
+    line-height: 1.4;
+    color: #333;
+  }
+  .panel-arrow {
+    font-size: 1.23rem;
+    font-weight: 700;
+    margin-top: 0.18rem;
+    padding: 0.14rem 0.23rem;
+    border-radius: 0.14rem;
+  }
+  .panel-open   .panel-arrow { background: var(--blue); color: #fff; }
+  .panel-closed .panel-arrow { background: #8B6914;     color: #fff; }
+
+  .duality-connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.09rem;
+  }
+  .connector-circle {
+    width: 4.15rem;
+    height: 4.15rem;
+    border: 0.18rem solid var(--red);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.72rem;
+    color: var(--red);
+    background: #fff;
+    font-weight: 900;
+  }
+  .connector-label {
+    font-size: 1.11rem;
+    color: var(--red);
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .principle-box {
+    background: var(--navy);
+    color: #fff;
+    border-radius: 0.28rem;
+    padding: 0.28rem 0.46rem;
+    text-align: center;
+    margin: 0.18rem 0;
+    font-size: 1.48rem;
+    font-style: italic;
+    line-height: 1.45;
+  }
+  .principle-box strong { color: var(--amber); font-style: normal; }
+
+  .mapping-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1.35rem;
+    margin: 0.28rem 0;
+  }
+  .mapping-table th {
+    background: var(--red);
+    color: #fff;
+    padding: 0.18rem 0.28rem;
+    text-align: left;
+    font-weight: 600;
+  }
+  .mapping-table td {
+    padding: 0.18rem 0.28rem;
+    border-bottom: 1px solid #E0D0D0;
+  }
+  .mapping-table tr:nth-child(even) td { background: #FFF5F5; }
+
+  /* METRIC CALLOUTS */
+  .metric-box {
+    border-radius: 0.28rem;
+    padding: 0.46rem 0.55rem;
+    text-align: center;
+    color: #fff;
+    margin-bottom: 0.28rem;
+  }
+  .metric-box .number {
+    font-size: 4.67rem;
+    font-weight: 900;
+    line-height: 1;
+    display: block;
+  }
+  .metric-box .label {
+    font-size: 1.48rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0;
+    margin: 0.14rem 0 0.09rem;
+    display: block;
+  }
+  .metric-box .sublabel {
+    font-size: 1.35rem;
+    opacity: 0.85;
+    display: block;
+    line-height: 1.3;
+  }
+  .metric-blue  { background: linear-gradient(135deg, #2C4A8C, #1B2A4A); }
+  .metric-red   { background: linear-gradient(135deg, #8B1A1A, #5C0E0E); }
+  .metric-green { background: linear-gradient(135deg, #1A5C2E, #0F3A1C); }
+
+  /* COMPARISON TABLE */
+  .comp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 1.35rem;
+    margin: 0.46rem 0;
+  }
+  .comp-table th {
+    background: var(--green);
+    color: #fff;
+    padding: 0.18rem 0.23rem;
+    text-align: center;
+    font-weight: 600;
+  }
+  .comp-table td {
+    padding: 0.14rem 0.23rem;
+    border-bottom: 1px solid #D0E0D0;
+    text-align: center;
+  }
+  .comp-table tr:nth-child(even) td { background: #F0F8F2; }
+  .comp-table .highlight td { background: #C8E6C9; font-weight: 700; }
+  .tick { color: #1A5C2E; font-weight: 900; }
+  .cross { color: #8B1A1A; }
+
+  /* INSIGHT BOX */
+  .insight {
+    background: #FFF8E1;
+    border-left: 0.18rem solid var(--amber);
+    padding: 0.37rem 0.46rem;
+    border-radius: 0 0.18rem 0.18rem 0;
+    font-size: 1.60rem;
+    font-style: italic;
+    color: #4A3800;
+    margin: 0.23rem 0;
+  }
+
+  /* FUTURE LIST */
+  .future-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.22rem 0.37rem;
+  }
+  .future-item {
+    display: flex;
+    gap: 0.28rem;
+    align-items: flex-start;
+    margin-bottom: 0;
+    font-size: 1.60rem;
+  }
+  .future-dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+    margin-top: 0.37rem;
+  }
+
+  /* RESEARCH JOURNEY */
+  .rj-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.22rem 0.37rem;
+  }
+  .rj-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.09rem;
+  }
+  .rj-label2 {
+    font-weight: 700;
+    font-size: 1.11rem;
+    color: var(--navy);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .rj-chain {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.14rem;
+    flex-wrap: wrap;
+  }
+  .rj-arrow {
+    font-size: 0.61rem;
+    color: #aaa;
+    padding-top: 0.28rem;
+    flex-shrink: 0;
+  }
+  .rj-node {
+    border-radius: 0.18rem;
+    padding: 0.14rem 0.23rem;
+    font-size: 1.23rem;
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: center;
+    min-width: 4rem;
+  }
+  .rj-sub {
+    font-size: 1.04rem;
+    font-weight: 400;
+    line-height: 1.2;
+    margin-top: 0.09rem;
+    opacity: 0.85;
+  }
+  .rj-rejected {
+    background: #FEE8E8;
+    color: #8B1A1A;
+    border: 1px solid #F5BFBF;
+    text-decoration: line-through;
+    text-decoration-color: #C0392B;
+  }
+  .rj-rejected .rj-sub { text-decoration: none; }
+  .rj-won {
+    background: #E8F5E9;
+    color: #1A5C2E;
+    border: 0.07rem solid #81C784;
+    font-weight: 700;
+  }
+
+  /* STATS GRID (unused but kept for reference) */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.23rem; margin-top: 0.18rem; }
+  .stat-cell  { border-radius: 0.23rem; padding: 0.32rem 0.23rem; text-align: center; color: #fff; display: flex; flex-direction: column; align-items: center; }
+  .stat-num   { font-size: 1.11rem; font-weight: 900; line-height: 1; }
+  .stat-lbl   { font-size: 0.43rem; line-height: 1.3; margin-top: 0.14rem; opacity: 0.92; }
+  .stat-blue  { background: #2C4A8C; }
+  .stat-red   { background: #8B1A1A; }
+  .stat-green { background: #1A5C2E; }
+  .stat-navy  { background: #1B2A4A; }
+  .stat-amber { background: #8B6914; }
+
+  /* CORPUS BARS */
+  .corpus-row {
+    display: flex;
+    align-items: center;
+    gap: 0.28rem;
+    margin-bottom: 0.09rem;
+    margin-top: 0.28rem;
+  }
+  .corpus-name {
+    width: 7.5rem;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--navy);
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .corpus-bar-wrap {
+    flex: 1;
+    height: 0.55rem;
+    background: #eee;
+    border-radius: 0.14rem;
+    overflow: hidden;
+  }
+  .corpus-bar {
+    height: 100%;
+    border-radius: 0.14rem;
+    min-width: 0.18rem;
+  }
+  .corpus-size {
+    width: 8.5rem;
+    font-size: 1.23rem;
+    font-weight: 700;
+    color: #333;
+    text-align: right;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .corpus-label-sm {
+    font-size: 1.11rem;
+    color: #777;
+    margin-left: 7.78rem;
+    margin-bottom: 0.09rem;
+    line-height: 1.3;
+  }
+
+  /* FOOTER */
+  .footer {
+    background: var(--navy);
+    color: #B0C0D8;
+    padding: 0.46rem 0.92rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.92rem;
+    font-size: 1.48rem;
+    line-height: 1.6;
+  }
+  .footer h4 {
+    color: var(--amber);
+    font-size: 1.72rem;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-bottom: 0.18rem;
+  }
+  .footer ol { margin-left: 0.65rem; }
+  .footer ol li { margin-bottom: 0.09rem; }
+
+  /* PRINT STYLES */
+  @media print {
+    /* 1rem = 5.74mm = 1% of A1 printable width (574mm).
+       This makes rem-based sizes physically correct at A1 print. */
+    :root { font-size: 5.5mm; }
+    body { background: #fff; margin: 0; padding: 0; }
+    .poster { box-shadow: none; width: 100%; }
+    @page { size: A1 portrait; margin: 10mm; }
+
+    /* Reduce whitespace only (not font sizes) so all content fits on one page */
+    .header  { padding: 0.4rem 0.7rem 0.4rem; gap: 0.5rem; }
+    .col     { padding: 0.28rem 0.3rem; gap: 0.22rem; }
+    .card    { padding: 0.28rem 0.38rem; }
+    .card h2 { padding-bottom: 0.18rem; margin-bottom: 0.28rem; }
+    .card p  { margin-bottom: 0.28rem; }
+    .card ul { margin-bottom: 0.28rem; }
+    .card ul li { margin-bottom: 0.12rem; }
+    .metric-box { padding: 0.28rem 0.38rem; margin-bottom: 0.15rem; }
+    .pipeline   { gap: 0; }
+    .pipe-step  { padding: 0.1rem 0.28rem; }
+    .pipe-arrow { font-size: 1.2rem; line-height: 1; }
+    .insight    { padding: 0.22rem 0.35rem; margin: 0.12rem 0; }
+    .principle-box { padding: 0.25rem 0.38rem; margin: 0.15rem 0; }
+    .rle-tree   { padding: 0.22rem 0.35rem; margin: 0.15rem 0; }
+    .duality-diagram { padding: 0.28rem 0.25rem; }
+    .panel-open, .panel-closed { min-height: 5rem; padding: 0.22rem; }
+    .corpus-row { margin-top: 0.18rem; }
+    .corpus-label-sm { margin-bottom: 0.05rem; }
+    .rj-2col { gap: 0.12rem 0.22rem; }
+    .future-2col { gap: 0.12rem 0.22rem; }
+    .footer  { padding: 0.28rem 0.7rem; gap: 0.7rem; }
+  }
+
+  /* QR codes: generated at 256px, CSS-scaled to proper vw size */
+  #qrcode canvas, #qrcode img { width: 6.5rem !important; height: 6.5rem !important; display: block; }
+  #qrcode-live canvas, #qrcode-live img { width: 9.5rem !important; height: 9.5rem !important; display: block; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+<div class="poster">
+
+  <!-- ══════════════════ HEADER ══════════════════ -->
+  <!-- MTU mandatory: logo top-left corner, next to poster title -->
+  <div class="header">
+    <!-- Left stack: MTU logo top, GitHub QR bottom -->
+    <div style="display:flex;flex-direction:column;justify-content:space-between;align-items:center;gap:0.5rem;align-self:stretch">
+      <div class="mtu-logo">
+        <div class="mtu-crest">
+          <div class="crest-q crest-q1"></div>
+          <div class="crest-q crest-q2"></div>
+          <div class="crest-q crest-q3"></div>
+          <div class="crest-q crest-q4"></div>
+        </div>
+        <div class="mtu-wordmark">MTU</div>
+        <div class="mtu-full">Munster Technological<br>University</div>
+      </div>
+      <div class="qr-box">
+        <div id="qrcode" style="line-height:0"></div>
+        <div style="margin-top:0.18rem;font-size:1.11rem;color:#333;line-height:1.4;word-break:break-all;width:6.5rem">
+          github.com/<wbr>welsol21/<wbr>FYP_LLM
+        </div>
+      </div>
+    </div>
+    <!-- Title block -->
+    <div>
+      <div class="poster-title">ELA: Recursive Linguistic Elements &amp; the Context–Pattern Duality</div>
+      <div class="poster-subtitle">An AI-Assisted Framework for Authentic English Comprehension — Where does language end and pattern begin?</div>
+      <div class="poster-meta">
+        <strong>Vladyslav Rastvorov</strong> (R00274535) &nbsp;·&nbsp; BSc Honours in Computer Systems<br>
+        Research Supervisor: <strong>Dr. Alex Vakaloudis</strong><br>
+        Implementation Supervisor: <strong>Prof. Nasir Ahmad</strong><br>
+        Department of Computer Science · Faculty of Engineering and Science ·
+        <strong>Munster Technological University Cork</strong> · May 2025
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ BODY ══════════════════ -->
+  <div class="body">
+
+    <!-- ─────────── LEFT COLUMN ─────────── -->
+    <div class="col col-left">
+
+      <div class="card">
+        <h2>Problem &amp; Motivation</h2>
+        <p>Platforms simplify authentic input. We annotate it — <strong>structure intact</strong>.</p>
+        <ul>
+          <li>Can NLP + AI explain English without simplifying it?</li>
+          <li>What recursive schema stays human-interpretable?</li>
+          <li>Does bilingual annotation scaffold comprehension?</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>The RLE Data Model</h2>
+        <div class="rle-tree" style="font-size:1.11rem">
+Sentence<br>
+&nbsp;&nbsp;└── Phrase (NP/VP/PP/ADJP)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── Word: translation<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CEFR · POS · IPA · TAM · note
+        </div>
+        <p>Language-agnostic · EN→RU via M2M100 (offline).</p>
+      </div>
+
+      <div class="card">
+        <h2>Analysis Pipeline</h2>
+        <div style="margin:0.2rem 0">
+          <div style="display:flex;gap:0.1rem;margin-bottom:0.1rem">
+            <div class="pipe-step p1" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">①</span> Input</div>
+            <div style="display:flex;align-items:center;color:#aaa;font-size:1rem">▶</div>
+            <div class="pipe-step p2" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">②</span> Whisper ASR</div>
+            <div style="display:flex;align-items:center;color:#aaa;font-size:1rem">▶</div>
+            <div class="pipe-step p3" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">③</span> spaCy 3.7</div>
+            <div style="display:flex;align-items:center;color:#aaa;font-size:1rem">▶</div>
+            <div class="pipe-step p4" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">④</span> TAM Engine</div>
+          </div>
+          <div style="text-align:right;color:#aaa;font-size:1rem;padding-right:0.15rem;line-height:1">▼</div>
+          <div style="display:flex;gap:0.1rem;flex-direction:row-reverse;margin-top:0.04rem">
+            <div class="pipe-step p5" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">⑤</span> Phrase Builder</div>
+            <div style="display:flex;align-items:center;color:#aaa;font-size:1rem">▶</div>
+            <div class="pipe-step p6" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">⑥</span> ML Layer</div>
+            <div style="display:flex;align-items:center;color:#aaa;font-size:1rem">▶</div>
+            <div class="pipe-step p7" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">⑦</span> Validator</div>
+            <div style="display:flex;align-items:center;color:#aaa;font-size:1rem">▶</div>
+            <div class="pipe-step p8" style="flex:1;justify-content:center;text-align:center;font-size:1.11rem"><span class="pipe-num">⑧</span> RLE JSON</div>
+          </div>
+        </div>
+        <p style="font-size:1.35rem;color:#555;margin-top:0.15rem"><strong>PWA</strong> — Android-installable, fully client-side, no cloud.</p>
+      </div>
+
+      <div class="card">
+        <h2>Research Journey: What We Tried</h2>
+        <div class="rj-2col">
+          <div class="rj-item">
+            <div class="rj-label2">CEFR Classification</div>
+            <div class="rj-chain">
+              <div class="rj-node rj-rejected">DeBERTa<div class="rj-sub">underperformed</div></div>
+              <div class="rj-arrow">→</div>
+              <div class="rj-node rj-rejected">BERT<div class="rj-sub">same</div></div>
+              <div class="rj-arrow">→</div>
+              <div class="rj-node rj-won">XGBoost ✓<div class="rj-sub">78.3%</div></div>
+            </div>
+          </div>
+          <div class="rj-item">
+            <div class="rj-label2">Note Generation</div>
+            <div class="rj-chain">
+              <div class="rj-node rj-rejected">GPT-4o<div class="rj-sub">cost/cloud</div></div>
+              <div class="rj-arrow">→</div>
+              <div class="rj-node rj-rejected">T5 raw<div class="rj-sub">no generalise</div></div>
+              <div class="rj-arrow">→</div>
+              <div class="rj-node rj-won">T5+Templates ✓<div class="rj-sub">ROUGE-L 0.81</div></div>
+            </div>
+          </div>
+          <div class="rj-item">
+            <div class="rj-label2">ASR</div>
+            <div class="rj-chain">
+              <div class="rj-node rj-won">Whisper ✓<div class="rj-sub">WER 8.2%</div></div>
+            </div>
+          </div>
+          <div class="rj-item">
+            <div class="rj-label2">Translation</div>
+            <div class="rj-chain">
+              <div class="rj-node rj-rejected">GPT-4o<div class="rj-sub">opt-in</div></div>
+              <div class="rj-arrow">→</div>
+              <div class="rj-node rj-won">M2M100 ✓<div class="rj-sub">offline</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /col-left -->
+
+    <!-- ─────────── CENTRE COLUMN ─────────── -->
+    <div class="col col-centre">
+
+      <div class="card">
+        <h2>Context–Pattern Interaction</h2>
+        <div class="principle-box">
+          <strong>"In open systems, context forms patterns.<br>
+          In closed systems, patterns form context."</strong>
+        </div>
+        <p style="font-size:1.35rem;text-align:center;color:#B0C0D8;margin:0.1rem 0">— Discovered empirically during T5 fine-tuning</p>
+        <p style="margin-top:0.15rem">T5 on raw notation <strong>failed</strong>. Structural templates — <strong>lexically invariant</strong> — were the breakthrough:</p>
+        <div class="rle-tree">
+❌ "gave him" → [VP gave][NP him]<br>
+✅ [V-PAST][IOBJ] → [TAM:past-simple][VOICE:active]
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>The Duality Loop Diagram</h2>
+        <div class="duality-diagram">
+          <div class="duality-grid">
+            <div class="panel-open">
+              <div class="panel-label">🌊 Open System</div>
+              <div class="panel-sublabel">Training Phase</div>
+              <div class="panel-desc">RLE trees carve the encoder's weight space — the "River Bed" pattern.</div>
+              <div class="panel-arrow">Context → Pattern</div>
+            </div>
+            <div class="duality-connector">
+              <div class="connector-label">Open →</div>
+              <div class="connector-circle">T5</div>
+              <div class="connector-label">→ Closed</div>
+            </div>
+            <div class="panel-closed">
+              <div class="panel-label">🔭 Closed System</div>
+              <div class="panel-sublabel">Inference Phase</div>
+              <div class="panel-desc">Frozen weights refract novel input into CEFR, TAM, pedagogical note.</div>
+              <div class="panel-arrow">Pattern → Context</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.28rem;font-size:1.11rem;margin-top:0.15rem;justify-content:center">
+            <span style="background:#e8f0ff;padding:0.09rem 0.28rem;border-radius:0.14rem"><strong>Training:</strong> RLE trees → encoder weights</span>
+            <span style="background:#fff0e8;padding:0.09rem 0.28rem;border-radius:0.14rem"><strong>Inference:</strong> frozen weights → annotations</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Training Data &amp; Corpus Scale</h2>
+        <div class="corpus-row">
+          <div class="corpus-name">OANC</div>
+          <div class="corpus-bar-wrap"><div class="corpus-bar" style="width:100%;background:#2C4A8C"></div></div>
+          <div class="corpus-size">30M+ tokens</div>
+        </div>
+        <div class="corpus-row">
+          <div class="corpus-name">UD GUM</div>
+          <div class="corpus-bar-wrap"><div class="corpus-bar" style="width:17%;background:#3A5E9E"></div></div>
+          <div class="corpus-size">5.2M tokens</div>
+        </div>
+        <div class="corpus-row">
+          <div class="corpus-name">Gutenberg</div>
+          <div class="corpus-bar-wrap"><div class="corpus-bar" style="width:5%;background:#8B1A1A"></div></div>
+          <div class="corpus-size">1M+ tokens</div>
+        </div>
+        <div class="corpus-row" style="margin-bottom:0.15rem">
+          <div class="corpus-name">MASC</div>
+          <div class="corpus-bar-wrap"><div class="corpus-bar" style="width:2%;background:#1A5C2E"></div></div>
+          <div class="corpus-size">~500k tokens</div>
+        </div>
+        <div style="display:flex;gap:0.5rem;font-size:1.48rem;margin-top:0.12rem">
+          <span><strong style="color:#2C4A8C">27k→685</strong> unique</span>·
+          <span><strong style="color:#1A5C2E">6 CEFR</strong> A1→C2</span>
+        </div>
+      </div>
+
+      <div style="background:#1B2A4A;border-radius:0.28rem;padding:0.35rem 0.45rem;display:flex;align-items:center;gap:0.4rem;margin-top:auto">
+        <div style="background:#fff;padding:0.22rem;border-radius:0.15rem;flex-shrink:0;line-height:0">
+          <div id="qrcode-live"></div>
+        </div>
+        <div style="color:#fff;line-height:1.4">
+          <strong style="color:#F5C518;font-size:2.21rem">Live Demo</strong><br>
+          <span style="font-size:2.46rem;font-weight:700">www.el-a.uk</span><br>
+          <span style="color:#B0C0D8;font-size:1.35rem">Try it in your browser</span>
+        </div>
+      </div>
+
+    </div><!-- /col-centre -->
+
+    <!-- ─────────── RIGHT COLUMN ─────────── -->
+    <div class="col col-right">
+
+      <!-- Metrics as 3-column horizontal grid -->
+      <div class="card">
+        <h2>Performance Metrics</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.3rem">
+          <div class="metric-box metric-blue" style="margin-bottom:0">
+            <span class="number">78.3%</span>
+            <span class="label">CEFR Accuracy</span>
+            <span class="sublabel">XGBoost ensemble</span>
+          </div>
+          <div class="metric-box metric-red" style="margin-bottom:0">
+            <span class="number">0.81</span>
+            <span class="label">ROUGE-L</span>
+            <span class="sublabel">T5 fine-tuned</span>
+          </div>
+          <div class="metric-box metric-green" style="margin-bottom:0">
+            <span class="number">8.2%</span>
+            <span class="label">ASR WER</span>
+            <span class="sublabel">Whisper base</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Annotation Backend Comparison</h2>
+        <table class="comp-table">
+          <tr><th>Approach</th><th>Quality</th><th>Cost</th><th>Offline</th></tr>
+          <tr><td>GPT-4o</td><td>High</td><td>$$$</td><td><span class="cross">✗</span></td></tr>
+          <tr><td>Rules only</td><td>Medium</td><td>Free</td><td><span class="tick">✓</span></td></tr>
+          <tr class="highlight"><td><strong>T5 fine-tuned</strong></td><td><strong>High</strong></td><td><strong>Free</strong></td><td><span class="tick">✓</span></td></tr>
+          <tr><td>XGBoost CEFR</td><td>78.3%</td><td>Free</td><td><span class="tick">✓</span></td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>System Validation</h2>
+        <ul>
+          <li><strong>O1:</strong> spaCy + TAM → schema-valid RLE ✓</li>
+          <li><strong>O2:</strong> CEFR 78.3%; T5 ROUGE-L 0.81 ✓</li>
+          <li><strong>O3:</strong> Visualizer + JSON/CSV export ✓</li>
+          <li><strong>O4:</strong> Android PWA, fully client-side ✓</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Conclusions</h2>
+        <ul>
+          <li>AI annotation makes authentic English <strong>accessible without simplification</strong>.</li>
+          <li>The <strong>Context↔Pattern duality</strong> generalises to any open→closed system; T5 placeholders are <strong>lexically invariant</strong>.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Future Directions</h2>
+        <div class="future-2col">
+          <div class="future-item">
+            <div class="future-dot"></div>
+            <div><strong>Tauri 2 Desktop App</strong> — native .deb/Windows with bundled ML models.</div>
+          </div>
+          <div class="future-item">
+            <div class="future-dot"></div>
+            <div><strong>Translation Quality Gates</strong> — ChrF scorer, M2M100 review queue.</div>
+          </div>
+          <div class="future-item">
+            <div class="future-dot"></div>
+            <div><strong>M2M100 LoRA Fine-Tuning</strong> — domain-specific EN→RU refinement.</div>
+          </div>
+          <div class="future-item">
+            <div class="future-dot"></div>
+            <div><strong>Real-time Streaming ASR</strong> — Whisper streaming for live practice.</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /col-right -->
+
+  </div><!-- /body -->
+
+  <!-- ══════════════════ FOOTER ══════════════════ -->
+  <div class="footer">
+    <div>
+      <h4>References</h4>
+      <ol>
+        <li>Honnibal, M. &amp; Montani, I. (2017). spaCy: Industrial-strength NLP.</li>
+        <li>Raffel, C. et al. (2020). Exploring the Limits of Transfer Learning with T5. <em>JMLR.</em></li>
+        <li>Radford, A. et al. (2023). Robust Speech Recognition via Large-Scale Weak Supervision. <em>ICML.</em></li>
+        <li>Chen, T. &amp; Guestrin, C. (2016). XGBoost: A Scalable Tree Boosting System. <em>ACM KDD.</em></li>
+        <li>Levy, M. (1997). <em>Computer-Assisted Language Learning.</em> Oxford University Press.</li>
+      </ol>
+    </div>
+    <div>
+      <h4>Acknowledgements</h4>
+      <p>The author sincerely thanks <strong style="color:#fff">Prof. Nasir Ahmad</strong> (Implementation Supervisor) and <strong style="color:#fff">Dr. Alex Vakaloudis</strong> (Research Supervisor) for their invaluable guidance throughout this project. Thanks to the Department of Computer Science at MTU Cork for the academic environment that made this work possible. Inspired by <em>Eleonora Rastvorova</em>.</p>
+    </div>
+  </div>
+
+</div><!-- /poster -->
+<script>
+  new QRCode(document.getElementById("qrcode"), {
+    text: "https://github.com/welsol21/FYP_LLM",
+    width: 256,
+    height: 256,
+    colorDark: "#1B2A4A",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.M
+  });
+  new QRCode(document.getElementById("qrcode-live"), {
+    text: "https://www.el-a.uk",
+    width: 256,
+    height: 256,
+    colorDark: "#1B2A4A",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.M
+  });
+</script>
+</body>
+</html>

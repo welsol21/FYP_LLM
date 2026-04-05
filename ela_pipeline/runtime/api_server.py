@@ -188,7 +188,20 @@ def _translation_worker_loop(req_q: "_mp.Queue", res_q: "_mp.Queue") -> None:
             if batch_translate_fn is None:
                 batch_translate_fn = _get_batch_translate()
             texts = [str(t or "").strip() for t in sentences if str(t or "").strip()]
-            result = batch_translate_fn(texts, translation_provider=provider, provider_credentials=credentials)
+            def _on_progress(done: int, total: int) -> None:
+                res_q.put({
+                    "job_id": job_id,
+                    "status": "progress",
+                    "done": int(done),
+                    "total": int(total),
+                })
+
+            result = batch_translate_fn(
+                texts,
+                translation_provider=provider,
+                provider_credentials=credentials,
+                progress_callback=_on_progress,
+            )
             res_q.put({"job_id": job_id, "status": "done", "translations": result})
         except Exception as exc:
             res_q.put({"job_id": job_id, "status": "error", "error": str(exc)})
@@ -202,6 +215,24 @@ def _translation_result_collector() -> None:
         except Exception:
             continue
         job_id: str = item["job_id"]
+        if item["status"] == "progress":
+            job = _load_job("translate", job_id)
+            if not isinstance(job, dict) or str(job.get("status") or "") != "running":
+                continue
+            done = int(item.get("done") or 0)
+            total = int(item.get("total") or 0)
+            _store_job(
+                "translate",
+                job_id,
+                {
+                    "status": "running",
+                    "zip": None,
+                    "error": None,
+                    "ts": _time.time(),
+                    "progress": {"done": max(0, done), "total": max(0, total)},
+                },
+            )
+            continue
         if item["status"] == "done":
             payload = json.dumps({"translations": item["translations"]},
                                  ensure_ascii=False).encode("utf-8")
@@ -1001,7 +1032,10 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": "job not found"}, status=404)
                 return
             if job["status"] == "running":
-                self._send_json({"status": "running"})
+                progress = job.get("progress") if isinstance(job.get("progress"), dict) else {}
+                done = int(progress.get("done") or 0) if isinstance(progress, dict) else 0
+                total = int(progress.get("total") or 0) if isinstance(progress, dict) else 0
+                self._send_json({"status": "running", "done": max(0, done), "total": max(0, total)})
                 return
             if job["status"] == "error":
                 _consume_job("translate", job_id)
@@ -1279,7 +1313,18 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 return
             _render_jobs_cleanup()
             job_id = str(_uuid.uuid4())
-            _store_job("translate", job_id, {"status": "running", "zip": None, "error": None, "ts": _time.time()})
+            total = len([str(t or "").strip() for t in list(sentences_raw) if str(t or "").strip()])
+            _store_job(
+                "translate",
+                job_id,
+                {
+                    "status": "running",
+                    "zip": None,
+                    "error": None,
+                    "ts": _time.time(),
+                    "progress": {"done": 0, "total": max(0, total)},
+                },
+            )
             _translate_req_q.put({
                 "job_id": job_id,
                 "sentences": list(sentences_raw),

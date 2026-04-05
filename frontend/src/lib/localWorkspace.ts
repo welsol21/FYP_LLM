@@ -206,10 +206,12 @@ async function idbPutBlob(key: string, blob: Blob): Promise<void> {
     data_blob: blob,
     updated_at: nowIso(),
   }
-  memoryBlobs.set(key, record)
   await withStore(IDB_BLOB_STORE, 'readwrite', async (store) => {
     await requestToPromise(store.put(record))
   })
+  // IndexedDB is the source of truth in modern browsers. Keeping large blobs
+  // in the in-memory fallback map duplicates RAM usage and can crash mobile tabs.
+  memoryBlobs.delete(key)
 }
 
 async function idbGetBlobRecord(key: string): Promise<BlobRecord | null> {
