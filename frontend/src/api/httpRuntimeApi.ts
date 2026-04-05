@@ -871,12 +871,13 @@ export class HttpRuntimeApi implements RuntimeApi {
           let transcribeJobId = await submitTranscribeJob()
           let transcribeResubmitCount = 0
           let tPoll = 0
+          const transcribeStatusText = 'Transcribing audio on server (Whisper CPU) — extracting sentences and timings…'
           while (true) {
             ensureNotAborted()
             await new Promise<void>((resolve) => setTimeout(resolve, 2000))
             ensureNotAborted()
             tPoll += 2
-            log(1, `Transcribing on server… (${tPoll}s)`, 5 + Math.min(tPoll * 2, 88))
+            log(1, transcribeStatusText, 5 + Math.min(tPoll * 2, 88))
             const tStatus = await fetch(apiUrl(`/api/transcribe-status/${transcribeJobId}`), { signal: input.signal })
             const tJson = await tStatus.json() as { status: string; sentences?: Array<{ text: string; start_sec: number | null; end_sec: number | null }>; source_type?: string; error?: string }
             if (tStatus.status === 404 || tJson.status === 'not_found') {
@@ -1206,7 +1207,7 @@ export class HttpRuntimeApi implements RuntimeApi {
           const artifactMapSrt = new Map<string, DocumentArtifact>()
 
           if (needAudio || needVideo) {
-            log(3, 'Sending to server for rendering…', 5)
+            log(3, 'Starting server media render (voice synthesis + subtitles + muxing)…', 5)
             const form = new FormData()
             form.append('meta', JSON.stringify({
               sentences: timedSentences,
@@ -1234,12 +1235,14 @@ export class HttpRuntimeApi implements RuntimeApi {
             // Poll /api/render-status/<job_id> until done
             let zipBuf: ArrayBuffer | null = null
             let pollAttempt = 0
+            const renderTarget = needVideo ? 'audio + video' : 'audio'
+            const renderStatusText = `Server is rendering ${renderTarget} for ${timedSentences.length} sentence(s)…`
             while (zipBuf === null) {
               ensureNotAborted()
               await new Promise<void>((resolve) => setTimeout(resolve, 2000))
               ensureNotAborted()
               pollAttempt++
-              log(3, `Rendering… (${pollAttempt * 2}s)`, Math.min(5 + pollAttempt * 2, 48))
+              log(3, renderStatusText, Math.min(5 + pollAttempt * 2, 48))
               const statusRes = await fetch(apiUrl(`/api/render-status/${jobId}`), { signal: input.signal })
               if (statusRes.headers.get('content-type')?.includes('application/zip')) {
                 zipBuf = await statusRes.arrayBuffer()
