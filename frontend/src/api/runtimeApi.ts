@@ -76,6 +76,7 @@ export type MediaFileRow = {
   updated: string
   analyzed: boolean
   document_id?: string
+  project_id?: string
 }
 
 export type AnalysisHistoryRow = {

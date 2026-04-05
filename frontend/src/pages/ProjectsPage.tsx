@@ -17,16 +17,19 @@ export function ProjectsPage() {
   const tapRef = useRef<{ rowId: string; ts: number } | null>(null)
 
   async function refresh() {
-    const [projects, selected] = await Promise.all([api.listProjects(), api.getSelectedProject()])
+    const [projects, selected, allFiles] = await Promise.all([
+      api.listProjects(),
+      api.getSelectedProject(),
+      api.listFiles(),
+    ])
     setRows(projects)
     setSelectedId(selected.project_id ?? null)
-    const pairs = await Promise.all(
-      projects.map(async (p) => {
-        const files = await api.listFiles(p.id)
-        return [p.id, { analyzed: files.filter((f) => f.analyzed).length, total: files.length }] as const
-      }),
-    )
-    setStats(Object.fromEntries(pairs))
+    const statsMap: Record<string, ProjectStat> = {}
+    for (const p of projects) {
+      const pFiles = allFiles.filter((f) => f.project_id === p.id)
+      statsMap[p.id] = { analyzed: pFiles.filter((f) => f.analyzed).length, total: pFiles.length }
+    }
+    setStats(statsMap)
   }
 
   useEffect(() => {
