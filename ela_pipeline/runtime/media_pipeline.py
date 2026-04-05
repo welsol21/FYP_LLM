@@ -246,6 +246,18 @@ def _probe_media_duration_seconds(source_path: Path) -> float:
         return 0.0
 
 
+def _read_text_file(path: Path) -> str:
+    """Read a plain-text file, auto-detecting encoding from BOM."""
+    raw = path.read_bytes()
+    if raw[:2] == b"\xff\xfe":
+        return raw.decode("utf-16-le", errors="ignore").lstrip("\ufeff")
+    if raw[:2] == b"\xfe\xff":
+        return raw.decode("utf-16-be", errors="ignore").lstrip("\ufeff")
+    if raw[:3] == b"\xef\xbb\xbf":
+        return raw[3:].decode("utf-8", errors="ignore")
+    return raw.decode("utf-8", errors="ignore")
+
+
 def _extract_text_and_sentence_chunks(
     source_path: Path,
     source_type: str,
@@ -253,7 +265,7 @@ def _extract_text_and_sentence_chunks(
     progress_callback: Callable[[str, float | None, str | None], None] | None = None,
 ) -> tuple[str, list[dict[str, Any]]]:
     if source_type == "text":
-        return source_path.read_text(encoding="utf-8", errors="ignore").strip(), []
+        return _read_text_file(source_path).strip(), []
 
     if source_type == "pdf":
         try:
@@ -381,7 +393,7 @@ def _extract_text_and_sentence_chunks(
             raise RuntimeError("ASR produced no transcript segments for media file.")
         return " ".join(texts).strip(), segments
 
-    return source_path.read_text(encoding="utf-8", errors="ignore").strip(), []
+    return _read_text_file(source_path).strip(), []
 
 
 def _sentenceize_timed_chunks(
