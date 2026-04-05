@@ -14,6 +14,45 @@ const MAX_RUNTIME_DIAGNOSTICS = 200
 const sessionId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 const listeners = new Set<() => void>()
 
+// In-memory buffer — mutations are instant; localStorage flush is debounced.
+// Previously every recordRuntimeDiagnostic() did a synchronous read+parse+
+// stringify+write of the full 200-entry blob on the main thread, causing
+// 50-100ms freezes per event in WebKitGTK / slower localStorage environments.
+let memDiagnostics: RuntimeDiagnosticEntry[] | null = null
+let flushTimer: ReturnType<typeof setTimeout> | null = null
+
+function getMemDiagnostics(): RuntimeDiagnosticEntry[] {
+  if (memDiagnostics !== null) return memDiagnostics
+  if (typeof window === 'undefined') {
+    memDiagnostics = []
+    return memDiagnostics
+  }
+  try {
+    const raw = String(window.localStorage.getItem(RUNTIME_DIAG_KEY) || '')
+    const parsed = raw ? (JSON.parse(raw) as RuntimeDiagnosticEntry[]) : []
+    memDiagnostics = Array.isArray(parsed) ? parsed : []
+  } catch {
+    memDiagnostics = []
+  }
+  return memDiagnostics
+}
+
+function scheduleFlush(): void {
+  if (flushTimer !== null) return
+  flushTimer = setTimeout(() => {
+    flushTimer = null
+    if (typeof window === 'undefined' || memDiagnostics === null) return
+    try {
+      window.localStorage.setItem(
+        RUNTIME_DIAG_KEY,
+        JSON.stringify(memDiagnostics.slice(-MAX_RUNTIME_DIAGNOSTICS)),
+      )
+    } catch {
+      // ignore
+    }
+  }, 800)
+}
+
 function notify(): void {
   for (const listener of listeners) listener()
 }
@@ -29,24 +68,11 @@ function safeStringify(value: unknown): string {
 }
 
 export function getRuntimeDiagnostics(): RuntimeDiagnosticEntry[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = String(window.localStorage.getItem(RUNTIME_DIAG_KEY) || '')
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as RuntimeDiagnosticEntry[]
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
+  return getMemDiagnostics()
 }
 
-function writeRuntimeDiagnostics(entries: RuntimeDiagnosticEntry[]): void {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(RUNTIME_DIAG_KEY, JSON.stringify(entries.slice(-MAX_RUNTIME_DIAGNOSTICS)))
-  } catch {
-    // ignore logging failures
-  }
+function writeRuntimeDiagnostics(_entries: RuntimeDiagnosticEntry[]): void {
+  // no-op: writes are now handled by scheduleFlush()
 }
 
 export function recordRuntimeDiagnostic(
@@ -55,7 +81,7 @@ export function recordRuntimeDiagnostic(
   details?: unknown,
   level: RuntimeDiagnosticLevel = 'info',
 ): void {
-  const entries = getRuntimeDiagnostics()
+  const entries = getMemDiagnostics()
   entries.push({
     at: new Date().toISOString(),
     session: sessionId,
@@ -64,14 +90,32 @@ export function recordRuntimeDiagnostic(
     event: String(event || 'event'),
     details: details == null ? undefined : safeStringify(details),
   })
-  writeRuntimeDiagnostics(entries)
+  if (entries.length > MAX_RUNTIME_DIAGNOSTICS * 2) {
+    memDiagnostics = entries.slice(-MAX_RUNTIME_DIAGNOSTICS)
+  }
+  scheduleFlush()
   notify()
 }
 
 export function clearRuntimeDiagnostics(): void {
   if (typeof window === 'undefined') return
+  memDiagnostics = []
+  if (flushTimer !== null) { clearTimeout(flushTimer); flushTimer = null }
   window.localStorage.removeItem(RUNTIME_DIAG_KEY)
   notify()
+}
+
+function flushNow(): void {
+  if (flushTimer !== null) { clearTimeout(flushTimer); flushTimer = null }
+  if (typeof window === 'undefined' || memDiagnostics === null) return
+  try {
+    window.localStorage.setItem(
+      RUNTIME_DIAG_KEY,
+      JSON.stringify(memDiagnostics.slice(-MAX_RUNTIME_DIAGNOSTICS)),
+    )
+  } catch {
+    // ignore
+  }
 }
 
 export function subscribeRuntimeDiagnostics(listener: () => void): () => void {
@@ -96,9 +140,11 @@ export function initRuntimeDiagnostics(): void {
   })
   window.addEventListener('pagehide', (event) => {
     recordRuntimeDiagnostic('window', 'pagehide', { persisted: Boolean((event as PageTransitionEvent).persisted) })
+    flushNow()
   })
   window.addEventListener('beforeunload', () => {
     recordRuntimeDiagnostic('window', 'beforeunload')
+    flushNow()
   })
   document.addEventListener('visibilitychange', () => {
     recordRuntimeDiagnostic('document', 'visibilitychange', document.visibilityState)
