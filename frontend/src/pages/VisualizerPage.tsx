@@ -249,7 +249,7 @@ export function VisualizerPage() {
   const documentIds = Array.isArray(state?.documentIds) ? state?.documentIds.filter(Boolean) : []
   const documentMeta = state?.documentMeta || {}
   const effectiveDocumentIds = documentIds.length > 0 ? documentIds : (documentId ? [documentId] : [])
-  const [rows, setRows] = useState<Array<{ sentence_text: string; tree: VisualizerNode; document_id: string }>>([])
+  const [rows, setRows] = useState<Array<{ sentence_key: string; sentence_text: string; tree: VisualizerNode; document_id: string }>>([])
   const [activeSentenceIndex, setActiveSentenceIndex] = useState(0)
   const [isNarrowScreen, setIsNarrowScreen] = useState(
     typeof window !== 'undefined' ? window.innerWidth <= 860 : false,
@@ -268,26 +268,30 @@ export function VisualizerPage() {
   const [selectedTranslationProvider, setSelectedTranslationProvider] = useState('m2m100')
 
   async function refresh() {
-    const normalized: Array<{ sentence_text: string; tree: VisualizerNode; document_id: string }> = []
-    if (effectiveDocumentIds.length === 0) {
-      const payload = await api.getVisualizerPayload(documentId)
-      for (const [sentence_text, tree] of Object.entries(payload as VisualizerPayload)) {
+    const normalized: Array<{ sentence_key: string; sentence_text: string; tree: VisualizerNode; document_id: string }> = []
+    const pushPayloadRows = (payload: VisualizerPayload, docId: string) => {
+      const ordered = Object.entries(payload as VisualizerPayload).sort((a, b) => {
+        const aIdx = typeof a[1]?.sentence_idx === 'number' ? a[1].sentence_idx : Number.MAX_SAFE_INTEGER
+        const bIdx = typeof b[1]?.sentence_idx === 'number' ? b[1].sentence_idx : Number.MAX_SAFE_INTEGER
+        if (aIdx !== bIdx) return aIdx - bIdx
+        return a[0].localeCompare(b[0])
+      })
+      for (const [sentence_key, tree] of ordered) {
         normalized.push({
-          sentence_text,
+          sentence_key,
+          sentence_text: String(tree?.content || sentence_key || '').trim(),
           tree,
-          document_id: String(documentId || ''),
+          document_id: docId,
         })
       }
+    }
+    if (effectiveDocumentIds.length === 0) {
+      const payload = await api.getVisualizerPayload(documentId)
+      pushPayloadRows(payload as VisualizerPayload, String(documentId || ''))
     } else {
       for (const docId of effectiveDocumentIds) {
         const payload = await api.getVisualizerPayload(docId)
-        for (const [sentence_text, tree] of Object.entries(payload as VisualizerPayload)) {
-          normalized.push({
-            sentence_text,
-            tree,
-            document_id: docId,
-          })
-        }
+        pushPayloadRows(payload as VisualizerPayload, docId)
       }
     }
     setRows(normalized)
@@ -346,7 +350,7 @@ export function VisualizerPage() {
   async function onApplyEdit(e: React.FormEvent) {
     e.preventDefault()
     const active = rows[activeSentenceIndex]
-    const sentenceText = active?.sentence_text ?? ''
+    const sentenceText = active?.sentence_key ?? ''
     const activeDocumentId = active?.document_id ?? documentId
     const fieldPath = advancedOpen ? advancedField : basicField
     if (!sentenceText || !nodeId) {
@@ -617,7 +621,7 @@ export function VisualizerPage() {
             </div>
           ) : null}
           {activeRow ? (
-            <article key={activeRow.sentence_text} className="visualizer-article">
+            <article key={`${activeRow.document_id}:${activeRow.sentence_key}:${activeRow.tree.node_id}`} className="visualizer-article">
               <VisualizerTreeLegacy
                 node={activeRow.tree}
                 isRoot

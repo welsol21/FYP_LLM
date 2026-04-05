@@ -377,6 +377,27 @@ function replaceTextArtifact(artifacts: DocumentArtifact[], name: string, mime: 
   else artifacts.push(next)
 }
 
+function buildFallbackSentenceNode(sentenceText: string, sentenceIdx: number, sentenceHash?: string): VisualizerPayload[string] {
+  const content = String(sentenceText || '').trim()
+  const resolvedSentenceHash = String(sentenceHash || simpleHash(`${sentenceIdx}:${content}`))
+  return {
+    node_id: resolvedSentenceHash,
+    type: 'sentence',
+    content,
+    sentence_idx: sentenceIdx,
+    sentence_hash: resolvedSentenceHash,
+    tense: '',
+    linguistic_notes: {
+      elementary: '',
+      intermediate: '',
+      advanced: '',
+    },
+    part_of_speech: 'sentence',
+    linguistic_elements: [],
+    translations: {},
+  }
+}
+
 export class HttpRuntimeApi implements RuntimeApi {
   async getUiState(): Promise<RuntimeUiState> {
     return requestJson<RuntimeUiState>('/api/ui-state')
@@ -890,10 +911,17 @@ export class HttpRuntimeApi implements RuntimeApi {
                 body: JSON.stringify({ sentenceText: sent.text, sentenceIdx: i }),
                 signal: input.signal,
               })
-              if (result.sentence_node && sent.text) contract[sent.text] = result.sentence_node
+              if (result.sentence_node && sent.text) {
+                result.sentence_node.sentence_idx = i
+                if (result.sentence_hash) result.sentence_node.sentence_hash = result.sentence_hash
+                contract[sent.text] = result.sentence_node
+              }
             } catch (err) {
               if (err instanceof DOMException && err.name === 'AbortError') throw err
               contractFailures += 1
+              if (sent.text && !contract[sent.text]) {
+                contract[sent.text] = buildFallbackSentenceNode(sent.text, i)
+              }
               recordRuntimeDiagnostic('api.media.backend', 'sentence-contract.error', String(err instanceof Error ? err.message : err), 'error')
             }
             contractsDone++

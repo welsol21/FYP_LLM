@@ -529,8 +529,12 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
             ru_out_entries:  "list[tuple[int,int,str]]" = []
 
             for idx, (sent, tts_pcm) in enumerate(zip(sentences, tts_pcms)):
-                start_s = max(0, int(max(0, int(sent.get("start_ms") or 0)) / 1000 * TARGET_RATE) - TIMING_PAD)
-                end_s = min(int(max(0, int(sent.get("end_ms") or 0)) / 1000 * TARGET_RATE) + TIMING_PAD, src_len)
+                sent_start_ms = max(0, int(sent.get("start_ms") or 0))
+                sent_end_ms = max(sent_start_ms, int(sent.get("end_ms") or 0))
+                sent_start_s = int(sent_start_ms / 1000 * TARGET_RATE)
+                sent_end_s = int(sent_end_ms / 1000 * TARGET_RATE)
+                start_s = max(0, sent_start_s - TIMING_PAD)
+                end_s = min(sent_end_s + TIMING_PAD, src_len)
                 en = str(sent.get("text_eng") or "").strip()
                 ru = str(sent.get("text_ru") or "").strip()
 
@@ -543,6 +547,9 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                     out_samples += len(seg)
                     dur_e = len(seg)
                 end_en_ms = int(out_samples / TARGET_RATE * 1000)
+                en_sub_start_ms = pos_en + int(max(0, sent_start_s - start_s) / TARGET_RATE * 1000)
+                en_sub_end_ms = pos_en + int(max(0, sent_end_s - start_s) / TARGET_RATE * 1000)
+                en_sub_end_ms = max(en_sub_start_ms + 300, min(end_en_ms, en_sub_end_ms))
 
                 # 10 ms silence between eng and TTS (matches reference)
                 chunks.append(np.zeros(SILENCE_10MS, dtype=np.float32))
@@ -572,8 +579,8 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                 else:
                     # Sequential: EN during source clip (center), RU during TTS (center)
                     if en and dur_e > 0:
-                        video_srt_entries.append((pos_en, end_en_ms, en))
-                        en_out_entries.append((pos_en, end_en_ms, en))
+                        video_srt_entries.append((en_sub_start_ms, en_sub_end_ms, en))
+                        en_out_entries.append((en_sub_start_ms, en_sub_end_ms, en))
                     if ru and dur_r > 0:
                         video_srt_entries.append((pos_ru, end_ru_ms, ru))
                         ru_out_entries.append((pos_ru, end_ru_ms, ru))

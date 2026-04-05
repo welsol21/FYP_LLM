@@ -76,27 +76,29 @@ describe('VisualizerPage', () => {
 
   it('loads document-scoped payload and navigates within selected document', async () => {
     const docPayload: VisualizerPayload = {
-      'Sentence one.': {
-        node_id: 's1',
-        type: 'Sentence',
-        content: 'Sentence one.',
-        tense: 'null',
-        linguistic_notes: [],
-        part_of_speech: 'sentence',
-        translations: {
-          m2m100: { text: 'Sentence one.' },
-        },
-        linguistic_elements: [],
-      },
       'Sentence two.': {
         node_id: 's2',
         type: 'Sentence',
         content: 'Sentence two.',
+        sentence_idx: 1,
         tense: 'null',
         linguistic_notes: [],
         part_of_speech: 'sentence',
         translations: {
           m2m100: { text: 'Sentence two.' },
+        },
+        linguistic_elements: [],
+      },
+      'Sentence one.': {
+        node_id: 's1',
+        type: 'Sentence',
+        content: 'Sentence one.',
+        sentence_idx: 0,
+        tense: 'null',
+        linguistic_notes: [],
+        part_of_speech: 'sentence',
+        translations: {
+          m2m100: { text: 'Sentence one.' },
         },
         linguistic_elements: [],
       },
