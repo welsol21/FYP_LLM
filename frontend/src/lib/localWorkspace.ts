@@ -717,18 +717,24 @@ function simpleHash(input: string): string {
 }
 
 function buildArtifactRowsFromContract(contract: VisualizerPayload): MediaSentenceArtifactRow[] {
-  const entries = Object.entries(contract)
+  const entries = Object.entries(contract).sort((a, b) => {
+    const aIdx = typeof a[1]?.sentence_idx === 'number' ? a[1].sentence_idx : Number.MAX_SAFE_INTEGER
+    const bIdx = typeof b[1]?.sentence_idx === 'number' ? b[1].sentence_idx : Number.MAX_SAFE_INTEGER
+    if (aIdx !== bIdx) return aIdx - bIdx
+    return a[0].localeCompare(b[0])
+  })
   const out: MediaSentenceArtifactRow[] = []
   for (let idx = 0; idx < entries.length; idx += 1) {
     const [sentenceText, sentenceNode] = entries[idx]
+    const resolvedSentenceText = String(sentenceNode?.content || sentenceText || '').trim()
     const startMs = idx * 3000
     const endMs = startMs + 2600
     const textRu = pickNodeTranslation(sentenceNode)
     out.push({
-      sentence_idx: idx,
-      sentence_text: sentenceText,
-      sentence_hash: simpleHash(`${idx}:${sentenceText}`),
-      text_eng: sentenceText,
+      sentence_idx: typeof sentenceNode?.sentence_idx === 'number' ? sentenceNode.sentence_idx : idx,
+      sentence_text: resolvedSentenceText,
+      sentence_hash: String(sentenceNode?.sentence_hash || simpleHash(`${idx}:${resolvedSentenceText}`)),
+      text_eng: resolvedSentenceText,
       text_ru: textRu,
       start: startMs / 1000,
       end: endMs / 1000,
@@ -742,12 +748,18 @@ function buildArtifactRowsFromContract(contract: VisualizerPayload): MediaSenten
 }
 
 function buildContractArtifacts(documentId: string, contract: VisualizerPayload): DocumentArtifact[] {
+  const orderedEntries = Object.entries(contract).sort((a, b) => {
+    const aIdx = typeof a[1]?.sentence_idx === 'number' ? a[1].sentence_idx : Number.MAX_SAFE_INTEGER
+    const bIdx = typeof b[1]?.sentence_idx === 'number' ? b[1].sentence_idx : Number.MAX_SAFE_INTEGER
+    if (aIdx !== bIdx) return aIdx - bIdx
+    return a[0].localeCompare(b[0])
+  })
   const mediaSentences = buildArtifactRowsFromContract(contract)
   const fullText = mediaSentences.map((row) => row.sentence_text).join(' ')
   const contractJson = JSON.stringify(contract, null, 2)
-  const contractSentences = mediaSentences.map((row) => ({
-    sentence_text: row.sentence_text,
-    sentence_node: contract[row.sentence_text],
+  const contractSentences = orderedEntries.map(([sentenceText, sentenceNode]) => ({
+    sentence_text: String(sentenceNode?.content || sentenceText || '').trim(),
+    sentence_node: sentenceNode,
   }))
   const mediaContract = {
     document_id: documentId,

@@ -100,6 +100,8 @@ export type VisualizerNode = {
   node_id: string
   type: string
   content: string
+  sentence_idx?: number
+  sentence_hash?: string
   source_span?: { start: number; end: number }
   tense: string
   linguistic_notes: {
