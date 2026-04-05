@@ -88,6 +88,62 @@ describe('HttpRuntimeApi', () => {
     expect(history.length).toBe(0)
   })
 
+  it('keeps file analyzed when latest analysis row is contract_current=false but a valid contract exists', async () => {
+    const selected = await LocalWorkspace.getSelectedProject()
+    const projectId = String(selected.project_id || '')
+    const file = await LocalWorkspace.registerMediaFile({
+      projectId,
+      name: 'current-contract-priority.mp3',
+      mediaPath: '/uploads/current-contract-priority.mp3',
+      sizeBytes: 1024,
+      durationSec: 10,
+    })
+
+    const contract = {
+      'She came home.': {
+        node_id: 's-1',
+        type: 'Sentence',
+        content: 'She came home.',
+        tense: 'past',
+        linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
+        part_of_speech: 'sentence',
+        linguistic_elements: [],
+        translations: { m2m100: { text: 'Она пришла домой.' } },
+      },
+    }
+
+    await LocalWorkspace.upsertAnalysis({
+      documentId: 'doc-current',
+      projectId,
+      mediaFileId: file.id,
+      fileName: file.name,
+      filePath: file.path || '',
+      sizeBytes: file.size_bytes,
+      durationSeconds: file.duration_seconds,
+      settings: 'Transl: m2m100 / Subs: bilingual_sequential / Voice: male / Proc: incremental',
+      contract,
+      contractCurrent: true,
+    })
+
+    await LocalWorkspace.upsertAnalysis({
+      documentId: 'doc-staging',
+      projectId,
+      mediaFileId: file.id,
+      fileName: file.name,
+      filePath: file.path || '',
+      sizeBytes: file.size_bytes,
+      durationSeconds: file.duration_seconds,
+      settings: 'Transl: m2m100 / Subs: bilingual_simultaneous / Voice: male / Proc: incremental',
+      contract,
+      contractCurrent: false,
+    })
+
+    const files = await LocalWorkspace.listFiles(projectId)
+    const tracked = files.find((row) => row.id === file.id)
+    expect(tracked?.analyzed).toBe(true)
+    expect(tracked?.document_id).toBe('doc-current')
+  })
+
   it('enriches visualizer payload with translations from other analysis versions of the same file', async () => {
     const selected = await LocalWorkspace.getSelectedProject()
     const projectId = String(selected.project_id || '')

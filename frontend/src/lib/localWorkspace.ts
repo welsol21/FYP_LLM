@@ -395,9 +395,16 @@ async function saveRawState(state: WorkspaceState): Promise<void> {
 
 async function ensureState(): Promise<WorkspaceState> {
   const state = await loadRawState()
+  const fileFlagsBefore = state.files
+    .map((file) => `${file.id}|${file.analyzed ? 1 : 0}|${String(file.document_id || '')}|${String(file.settings || '')}`)
+    .join('||')
+  syncFileAnalysisFlags(state)
+  const fileFlagsAfter = state.files
+    .map((file) => `${file.id}|${file.analyzed ? 1 : 0}|${String(file.document_id || '')}|${String(file.settings || '')}`)
+    .join('||')
   const hasSelected = Boolean(state.selected_project_id && state.projects.some((p) => p.id === state.selected_project_id))
   const nextSelected = hasSelected ? state.selected_project_id : (state.projects[0]?.id || null)
-  if (state.selected_project_id !== nextSelected) {
+  if (state.selected_project_id !== nextSelected || fileFlagsBefore !== fileFlagsAfter) {
     state.selected_project_id = nextSelected
     await saveRawState(state)
   }
@@ -570,13 +577,13 @@ function syncFileAnalysisFlags(state: WorkspaceState): void {
       continue
     }
     const latest = matches[0]
-    if (latest.contract_current === false) {
+    const latestContract = matches.find((analysis) => analysis.contract_current !== false)
+    if (!latestContract) {
       file.analyzed = false
       file.document_id = undefined
       file.settings = normalizeSettings(latest.settings)
       continue
     }
-    const latestContract = matches.find((analysis) => analysis.contract_current !== false) || latest
     file.analyzed = true
     file.document_id = String(latestContract.document_id || '').trim() || undefined
     file.settings = normalizeSettings(latestContract.settings)
