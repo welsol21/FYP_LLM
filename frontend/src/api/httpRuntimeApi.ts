@@ -105,6 +105,16 @@ async function requestBlob(url: string, init?: RequestInit): Promise<Blob> {
   return await normalizeBlobLike(await res.blob())
 }
 
+async function readJsonResponse<T>(res: Response): Promise<{ json: T | null; raw: string }> {
+  const raw = await res.text()
+  if (!raw) return { json: null, raw: '' }
+  try {
+    return { json: JSON.parse(raw) as T, raw }
+  } catch {
+    return { json: null, raw }
+  }
+}
+
 function shouldRetryBackendRequest(status: number): boolean {
   return status === 502 || status === 503 || status === 504
 }
@@ -233,6 +243,21 @@ function _translateErrorMessage(raw: string): string {
     return 'Translation provider is temporarily unavailable. Try again later.'
   }
   return `Translation failed: ${raw}`
+}
+
+function contractHasProviderTranslations(contract: VisualizerPayload | null | undefined, provider: string): boolean {
+  if (!contract || typeof contract !== 'object') return false
+  const wanted = String(provider || '').trim()
+  if (!wanted) return false
+  const stack = Object.values(contract || {})
+  while (stack.length > 0) {
+    const node = stack.pop()
+    if (!node || typeof node !== 'object') continue
+    const translated = String((node.translations as Record<string, { text?: string }> | undefined)?.[wanted]?.text || '').trim()
+    if (translated.length > 0) return true
+    for (const child of node.linguistic_elements || []) stack.push(child)
+  }
+  return false
 }
 
 // Stage-scoped document IDs so that caching at each pipeline stage
@@ -870,6 +895,7 @@ export class HttpRuntimeApi implements RuntimeApi {
           }
           let transcribeJobId = await submitTranscribeJob()
           let transcribeResubmitCount = 0
+          let transcribeStatusDecodeFailures = 0
           let tPoll = 0
           const transcribeStatusText = 'Transcribing audio on server (Whisper CPU) — extracting sentences and timings…'
           while (true) {
@@ -879,8 +905,9 @@ export class HttpRuntimeApi implements RuntimeApi {
             tPoll += 2
             log(1, transcribeStatusText, 5 + Math.min(tPoll * 2, 88))
             const tStatus = await fetch(apiUrl(`/api/transcribe-status/${transcribeJobId}`), { signal: input.signal })
-            const tJson = await tStatus.json() as { status: string; sentences?: Array<{ text: string; start_sec: number | null; end_sec: number | null }>; source_type?: string; error?: string }
-            if (tStatus.status === 404 || tJson.status === 'not_found') {
+            const parsed = await readJsonResponse<{ status: string; sentences?: Array<{ text: string; start_sec: number | null; end_sec: number | null }>; source_type?: string; error?: string }>(tStatus)
+            const tJson = parsed.json
+            if (tStatus.status === 404 || tJson?.status === 'not_found') {
               if (transcribeResubmitCount >= MAX_LOST_JOB_RESUBMITS) {
                 throw new Error('Transcription job was lost after a server restart. Please retry the analysis.')
               }
@@ -890,10 +917,22 @@ export class HttpRuntimeApi implements RuntimeApi {
               tPoll = 0
               continue
             }
+            if (!tJson) {
+              transcribeStatusDecodeFailures += 1
+              if (transcribeStatusDecodeFailures <= 3) {
+                recordRuntimeDiagnostic('api.media.backend', 'transcribe.status.non_json', {
+                  status: tStatus.status,
+                  sample: parsed.raw.slice(0, 120),
+                }, 'error')
+                continue
+              }
+              throw new Error(`Transcription status returned non-JSON payload (HTTP ${tStatus.status}).`)
+            }
+            transcribeStatusDecodeFailures = 0
             if (!tStatus.ok || tJson.status === 'error') {
+              if (shouldRetryBackendRequest(tStatus.status)) continue
               throw new Error(tJson.error ?? `Transcription failed (HTTP ${tStatus.status})`)
             }
-            if (tJson.status === 'error') throw new Error(tJson.error ?? 'Transcription failed')
             if (tJson.status === 'done') {
               sentences = tJson.sentences || []
               sourceType = String(tJson.source_type || 'audio').trim()
@@ -977,20 +1016,32 @@ export class HttpRuntimeApi implements RuntimeApi {
           )
         }
 
-        // Intermediate save under contractDocId — shared across voice/subs variants
-        await LocalWorkspace.upsertAnalysis({
-          documentId: contractDocId,
-          projectId: input.projectId,
-          mediaFileId: input.mediaFileId,
-          fileName: input.fileName,
-          filePath: input.mediaPath,
-          sizeBytes: input.sizeBytes,
-          durationSeconds: input.durationSec,
-          settings: input.settings,
-          contract,
-          artifacts: LocalWorkspace.buildDocumentArtifacts(contractDocId, contract),
-          contractCurrent: false,
-        })
+        // Intermediate save under contractDocId — shared across voice/subs variants.
+        // Do not overwrite an already translated cached contract with a fresh
+        // untranslated one: if this run fails before translation completes, we
+        // would otherwise lose the translation cache and force a full re-translate.
+        const existingContractAnalysis = await LocalWorkspace.getRawAnalysis(contractDocId).catch(() => null)
+        const hasCachedProviderTranslations = contractHasProviderTranslations(
+          (existingContractAnalysis as { contract?: VisualizerPayload } | null)?.contract,
+          provider,
+        )
+        if (!hasCachedProviderTranslations) {
+          await LocalWorkspace.upsertAnalysis({
+            documentId: contractDocId,
+            projectId: input.projectId,
+            mediaFileId: input.mediaFileId,
+            fileName: input.fileName,
+            filePath: input.mediaPath,
+            sizeBytes: input.sizeBytes,
+            durationSeconds: input.durationSec,
+            settings: input.settings,
+            contract,
+            artifacts: LocalWorkspace.buildDocumentArtifacts(contractDocId, contract),
+            contractCurrent: false,
+          })
+        } else {
+          log(2, 'Preserving previous translated cache while rebuilding contracts', 45)
+        }
       } else {
         contract = resumeContract!
         log(2, 'Reusing existing contracts', 45)
@@ -1088,6 +1139,7 @@ export class HttpRuntimeApi implements RuntimeApi {
             }
             let translateJobId = await submitTranslateJob()
             let translateResubmitCount = 0
+            let translateStatusDecodeFailures = 0
             let pollCount = 0
             while (true) {
               ensureNotAborted()
@@ -1095,13 +1147,14 @@ export class HttpRuntimeApi implements RuntimeApi {
               ensureNotAborted()
               pollCount++
               const statusRes = await fetch(apiUrl(`/api/translate-status/${translateJobId}`), { signal: input.signal })
-              const statusJson = await statusRes.json() as {
+              const parsed = await readJsonResponse<{
                 status: string
                 translations?: Record<string, string>
                 error?: string
                 done?: number
                 total?: number
-              }
+              }>(statusRes)
+              const statusJson = parsed.json
               if (statusRes.status === 404) {
                 if (translateResubmitCount >= MAX_LOST_JOB_RESUBMITS) {
                   const raw = 'Translation job was lost after a server restart.'
@@ -1116,7 +1169,24 @@ export class HttpRuntimeApi implements RuntimeApi {
                 pollCount = 0
                 continue
               }
+              if (!statusJson) {
+                translateStatusDecodeFailures += 1
+                if (translateStatusDecodeFailures <= 3) {
+                  recordRuntimeDiagnostic('api.media.backend', 'translate.status.non_json', {
+                    status: statusRes.status,
+                    sample: parsed.raw.slice(0, 120),
+                  }, 'error')
+                  if (shouldRetryBackendRequest(statusRes.status)) continue
+                  continue
+                }
+                const raw = `Translate-status returned non-JSON payload (HTTP ${statusRes.status})`
+                recordRuntimeDiagnostic('api.media.backend', 'translate.error', raw, 'error')
+                translateError = _translateErrorMessage(raw)
+                break
+              }
+              translateStatusDecodeFailures = 0
               if (!statusRes.ok || statusJson.status === 'error') {
+                if (shouldRetryBackendRequest(statusRes.status)) continue
                 const raw = statusJson.error ?? `HTTP ${statusRes.status}`
                 recordRuntimeDiagnostic('api.media.backend', 'translate.error', raw, 'error')
                 translateError = _translateErrorMessage(raw)
