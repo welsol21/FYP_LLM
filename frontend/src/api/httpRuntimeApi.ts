@@ -1000,8 +1000,8 @@ export class HttpRuntimeApi implements RuntimeApi {
               log(2, `Translating… (${pollCount * 1.5 | 0}s)`, 50 + Math.min(pollCount * 2, 45))
               const statusRes = await fetch(apiUrl(`/api/translate-status/${translateJobId}`), { signal: input.signal })
               const statusJson = await statusRes.json() as { status: string; translations?: Record<string, string>; error?: string }
-              if (statusJson.status === 'error') {
-                const raw = statusJson.error ?? 'unknown'
+              if (!statusRes.ok || statusJson.status === 'error' || statusJson.error) {
+                const raw = statusJson.error ?? `HTTP ${statusRes.status}`
                 recordRuntimeDiagnostic('api.media.backend', 'translate.error', raw, 'error')
                 translateError = _translateErrorMessage(raw)
                 break
