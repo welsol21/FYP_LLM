@@ -906,7 +906,10 @@ export class HttpRuntimeApi implements RuntimeApi {
       // ── Stage 3: Translation ─────────────────────────────────────
       // Android ONNX WASM can't load opus-mt (protobuf parse error) — route m2m100 server-side on Android
       const isAndroidDevice = /android/i.test(navigator.userAgent)
-      const BACKEND_PROVIDERS = new Set(['gpt', 'deepl', 'lara', ...(isAndroidDevice ? ['m2m100'] : [])])
+      // Client-side opus-mt inference only runs in Tauri (offline desktop).
+      // Browser PWA (desktop or Android) always routes m2m100 to the server.
+      const isTauriRuntime = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+      const BACKEND_PROVIDERS = new Set(['gpt', 'deepl', 'lara', ...(!isTauriRuntime || isAndroidDevice ? ['m2m100'] : [])])
       const providerIsOriginal = provider === 'original'
 
       // Collect all node texts recursively (skipping punctuation and already-translated nodes)
