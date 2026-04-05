@@ -661,6 +661,7 @@ export class HttpRuntimeApi implements RuntimeApi {
 
     try {
       recordRuntimeDiagnostic('api.media.backend', 'submit.start', { mediaPath: input.mediaPath, fileName: input.fileName })
+      const MAX_LOST_JOB_RESUBMITS = 1
 
       // ── Resume detection ──────────────────────────────────────────
       // Three stage-scoped IDs so each stage is invalidated only by what it depends on:
@@ -800,13 +801,17 @@ export class HttpRuntimeApi implements RuntimeApi {
         if (isAndroid && input.mediaBlob) {
           // Android ONNX WASM crashes with raw exception numbers — use server-side Whisper instead
           log(1, 'Uploading audio for server-side transcription…', 5)
-          const transcribeForm = new FormData()
-          transcribeForm.append('audio', input.mediaBlob, input.fileName)
-          const transcribeSubmit = await requestJson<{ job_id: string }>(
-            apiUrl('/api/transcribe'),
-            { method: 'POST', body: transcribeForm, signal: input.signal },
-          )
-          const transcribeJobId = transcribeSubmit.job_id
+          const submitTranscribeJob = async (): Promise<string> => {
+            const transcribeForm = new FormData()
+            transcribeForm.append('audio', input.mediaBlob, input.fileName)
+            const transcribeSubmit = await requestJson<{ job_id: string }>(
+              apiUrl('/api/transcribe'),
+              { method: 'POST', body: transcribeForm, signal: input.signal },
+            )
+            return transcribeSubmit.job_id
+          }
+          let transcribeJobId = await submitTranscribeJob()
+          let transcribeResubmitCount = 0
           let tPoll = 0
           while (true) {
             ensureNotAborted()
@@ -816,6 +821,19 @@ export class HttpRuntimeApi implements RuntimeApi {
             log(1, `Transcribing on server… (${tPoll}s)`, 5 + Math.min(tPoll * 2, 88))
             const tStatus = await fetch(apiUrl(`/api/transcribe-status/${transcribeJobId}`), { signal: input.signal })
             const tJson = await tStatus.json() as { status: string; sentences?: Array<{ text: string; start_sec: number | null; end_sec: number | null }>; source_type?: string; error?: string }
+            if (tStatus.status === 404 || tJson.status === 'not_found') {
+              if (transcribeResubmitCount >= MAX_LOST_JOB_RESUBMITS) {
+                throw new Error('Transcription job was lost after a server restart. Please retry the analysis.')
+              }
+              transcribeResubmitCount += 1
+              recordRuntimeDiagnostic('api.media.backend', 'transcribe.resubmit', transcribeJobId)
+              transcribeJobId = await submitTranscribeJob()
+              tPoll = 0
+              continue
+            }
+            if (!tStatus.ok || tJson.status === 'error') {
+              throw new Error(tJson.error ?? `Transcription failed (HTTP ${tStatus.status})`)
+            }
             if (tJson.status === 'error') throw new Error(tJson.error ?? 'Transcription failed')
             if (tJson.status === 'done') {
               sentences = tJson.sentences || []
@@ -860,6 +878,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         contract = {}
         const total = sentences.length
         let contractsDone = 0
+        let contractFailures = 0
         log(2, `Building sentence contracts (0/${total})...`, 0)
         await runConcurrent(
           sentences.map((sent, i) => async () => {
@@ -874,6 +893,7 @@ export class HttpRuntimeApi implements RuntimeApi {
               if (result.sentence_node && sent.text) contract[sent.text] = result.sentence_node
             } catch (err) {
               if (err instanceof DOMException && err.name === 'AbortError') throw err
+              contractFailures += 1
               recordRuntimeDiagnostic('api.media.backend', 'sentence-contract.error', String(err instanceof Error ? err.message : err), 'error')
             }
             contractsDone++
@@ -883,6 +903,13 @@ export class HttpRuntimeApi implements RuntimeApi {
         )
         log(2, `Contracts built (${Object.keys(contract).length}/${total})`, 45)
         ensureNotAborted()
+        if (Object.keys(contract).length === 0) {
+          throw new Error(
+            contractFailures > 0
+              ? 'Failed to build sentence contracts for all extracted sentences.'
+              : 'Sentence contract stage completed without producing any contract nodes.',
+          )
+        }
 
         // Intermediate save under contractDocId — shared across voice/subs variants
         await LocalWorkspace.upsertAnalysis({
@@ -994,6 +1021,7 @@ export class HttpRuntimeApi implements RuntimeApi {
               return res.job_id
             }
             let translateJobId = await submitTranslateJob()
+            let translateResubmitCount = 0
             let pollCount = 0
             while (true) {
               ensureNotAborted()
@@ -1004,7 +1032,14 @@ export class HttpRuntimeApi implements RuntimeApi {
               const statusRes = await fetch(apiUrl(`/api/translate-status/${translateJobId}`), { signal: input.signal })
               const statusJson = await statusRes.json() as { status: string; translations?: Record<string, string>; error?: string }
               if (statusRes.status === 404) {
+                if (translateResubmitCount >= MAX_LOST_JOB_RESUBMITS) {
+                  const raw = 'Translation job was lost after a server restart.'
+                  recordRuntimeDiagnostic('api.media.backend', 'translate.error', raw, 'error')
+                  translateError = _translateErrorMessage(raw)
+                  break
+                }
                 // Job lost (server restarted) — resubmit once and keep polling
+                translateResubmitCount += 1
                 recordRuntimeDiagnostic('api.media.backend', 'translate.resubmit', translateJobId)
                 translateJobId = await submitTranslateJob()
                 pollCount = 0

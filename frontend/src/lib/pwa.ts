@@ -120,9 +120,12 @@ export function initPwaSupport(): void {
       recordDiagnostic('sw.controllerchange')
     })
     window.addEventListener('load', () => {
-      void navigator.serviceWorker.register('/sw.js')
+      void navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
         .then((registration) => {
           recordDiagnostic('sw.registered', diagDetails(`scope=${registration.scope}`))
+          void registration.update().catch((error) => {
+            recordDiagnostic('sw.update_failed', diagDetails(error instanceof Error ? error.message : String(error)))
+          })
           registration.addEventListener('updatefound', () => {
             recordDiagnostic('sw.updatefound')
           })

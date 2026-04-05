@@ -7,6 +7,7 @@ import multiprocessing as _mp
 import os
 import cgi
 import queue as _queue
+import shutil as _shutil
 import threading as _threading
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -19,9 +20,99 @@ from .media_pipeline import extract_media_text_and_sentences, warmup_media_model
 from .service import RuntimeMediaService
 
 # ── Async render job store ────────────────────────────────────────────────────
-# job_id → {"status": "running"|"done"|"error", "zip": bytes|None, "error": str|None, "ts": float}
+# job_id → {"kind": str, "status": "running"|"done"|"error", "zip": bytes|None, "error": str|None, "ts": float}
 _render_jobs: "dict[str, dict]" = {}
 _render_jobs_lock = _threading.Lock()
+_RUNTIME_JOBS_DIR = Path(os.getenv("ELA_RUNTIME_JOBS_DIR", "artifacts/runtime_jobs"))
+_JOB_KINDS = ("render", "translate", "transcribe")
+
+
+def _job_dir(kind: str, job_id: str) -> Path:
+    return _RUNTIME_JOBS_DIR / kind / job_id
+
+
+def _job_meta_path(kind: str, job_id: str) -> Path:
+    return _job_dir(kind, job_id) / "meta.json"
+
+
+def _job_payload_path(kind: str, job_id: str) -> Path:
+    return _job_dir(kind, job_id) / "payload.bin"
+
+
+def _job_is_terminal(job: dict | None) -> bool:
+    return bool(job) and str(job.get("status") or "") in {"done", "error"}
+
+
+def _persist_job(kind: str, job_id: str, job: dict) -> None:
+    job_dir = _job_dir(kind, job_id)
+    job_dir.mkdir(parents=True, exist_ok=True)
+    meta = {k: v for k, v in job.items() if k != "zip"}
+    meta["kind"] = kind
+    _job_meta_path(kind, job_id).write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+    payload = job.get("zip")
+    payload_path = _job_payload_path(kind, job_id)
+    if payload is None:
+        if payload_path.exists():
+            payload_path.unlink()
+    else:
+        payload_path.write_bytes(payload)
+
+
+def _load_persisted_job(kind: str, job_id: str) -> dict | None:
+    meta_path = _job_meta_path(kind, job_id)
+    if not meta_path.exists():
+        return None
+    try:
+        job = json.loads(meta_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(job, dict):
+        return None
+    payload_path = _job_payload_path(kind, job_id)
+    job["zip"] = payload_path.read_bytes() if payload_path.exists() else None
+    job["kind"] = kind
+    return job
+
+
+def _delete_persisted_job(kind: str, job_id: str) -> None:
+    job_dir = _job_dir(kind, job_id)
+    if job_dir.exists():
+        _shutil.rmtree(job_dir, ignore_errors=True)
+
+
+def _store_job(kind: str, job_id: str, job: dict) -> None:
+    stored = dict(job)
+    stored["kind"] = kind
+    stored.setdefault("ts", _time.time())
+    with _render_jobs_lock:
+        _render_jobs[job_id] = stored
+    _persist_job(kind, job_id, stored)
+
+
+def _load_job(kind: str, job_id: str) -> dict | None:
+    with _render_jobs_lock:
+        job = _render_jobs.get(job_id)
+    if job is not None:
+        return job
+    job = _load_persisted_job(kind, job_id)
+    if job is None:
+        return None
+    if job.get("status") == "running":
+        job = {
+            "kind": kind,
+            "status": "error",
+            "zip": None,
+            "error": "Job interrupted by server restart before completion.",
+            "ts": _time.time(),
+        }
+        _persist_job(kind, job_id, job)
+    return job
+
+
+def _consume_job(kind: str, job_id: str) -> None:
+    with _render_jobs_lock:
+        _render_jobs.pop(job_id, None)
+    _delete_persisted_job(kind, job_id)
 
 def _render_job_run(job_id: str, sentences: list, voice: str, subtitles_mode: str,
                     need_audio: bool, need_video: bool, source_audio_bytes: bytes) -> None:
@@ -29,21 +120,38 @@ def _render_job_run(job_id: str, sentences: list, voice: str, subtitles_mode: st
         zip_bytes = _render_media_artifacts(sentences, voice, subtitles_mode,
                                             need_audio=need_audio, need_video=need_video,
                                             source_audio_bytes=source_audio_bytes)
-        with _render_jobs_lock:
-            _render_jobs[job_id] = {"status": "done", "zip": zip_bytes, "error": None, "ts": _time.time()}
+        _store_job("render", job_id, {"status": "done", "zip": zip_bytes, "error": None, "ts": _time.time()})
     except Exception as exc:
         import traceback as _tb
         _tb.print_exc()
-        with _render_jobs_lock:
-            _render_jobs[job_id] = {"status": "error", "zip": None, "error": str(exc), "ts": _time.time()}
+        _store_job("render", job_id, {"status": "error", "zip": None, "error": str(exc), "ts": _time.time()})
 
 def _render_jobs_cleanup() -> None:
     """Remove jobs older than 10 minutes."""
     cutoff = _time.time() - 600
     with _render_jobs_lock:
-        stale = [jid for jid, j in _render_jobs.items() if j["ts"] < cutoff]
-        for jid in stale:
+        stale = [(jid, str(j.get("kind") or "")) for jid, j in _render_jobs.items() if _job_is_terminal(j) and float(j.get("ts") or 0) < cutoff]
+        for jid, _kind in stale:
             del _render_jobs[jid]
+    for jid, kind in stale:
+        if kind:
+            _delete_persisted_job(kind, jid)
+    for kind in _JOB_KINDS:
+        kind_dir = _RUNTIME_JOBS_DIR / kind
+        if not kind_dir.exists():
+            continue
+        for job_dir in kind_dir.iterdir():
+            if not job_dir.is_dir():
+                continue
+            try:
+                meta = json.loads((job_dir / "meta.json").read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if str(meta.get("status") or "") not in {"done", "error"}:
+                continue
+            if float(meta.get("ts") or 0) >= cutoff:
+                continue
+            _shutil.rmtree(job_dir, ignore_errors=True)
 
 
 # ── Translation worker process ────────────────────────────────────────────────
@@ -97,14 +205,14 @@ def _translation_result_collector() -> None:
         if item["status"] == "done":
             payload = json.dumps({"translations": item["translations"]},
                                  ensure_ascii=False).encode("utf-8")
-            with _render_jobs_lock:
-                _render_jobs[job_id] = {"status": "done", "zip": payload,
-                                        "error": None, "ts": _time.time()}
+            _store_job("translate", job_id, {"status": "done", "zip": payload, "error": None, "ts": _time.time()})
         else:
-            with _render_jobs_lock:
-                _render_jobs[job_id] = {"status": "error", "zip": None,
-                                        "error": item.get("error", "translation failed"),
-                                        "ts": _time.time()}
+            _store_job("translate", job_id, {
+                "status": "error",
+                "zip": None,
+                "error": item.get("error", "translation failed"),
+                "ts": _time.time(),
+            })
 
 
 def _start_translation_worker() -> None:
@@ -129,9 +237,7 @@ def _start_translation_worker() -> None:
     # NOTE: ELA_MEDIA_WARMUP_TRANSLATION must be False so the main process
     # never loads M2M100 — two simultaneous copies exhaust RAM and cause OOM/502.
     warmup_job_id = f"warmup-{_uuid.uuid4().hex[:8]}"
-    with _render_jobs_lock:
-        _render_jobs[warmup_job_id] = {"status": "running", "zip": None,
-                                       "error": None, "ts": _time.time()}
+    _store_job("translate", warmup_job_id, {"status": "running", "zip": None, "error": None, "ts": _time.time()})
     _translate_req_q.put({
         "job_id": warmup_job_id,
         "sentences": ["Hello world."],
@@ -878,8 +984,7 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/translate-status/"):
             job_id = path[len("/api/translate-status/"):]
-            with _render_jobs_lock:
-                job = _render_jobs.get(job_id)
+            job = _load_job("translate", job_id)
             if job is None:
                 self._send_json({"error": "job not found"}, status=404)
                 return
@@ -887,14 +992,12 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self._send_json({"status": "running"})
                 return
             if job["status"] == "error":
-                with _render_jobs_lock:
-                    _render_jobs.pop(job_id, None)
+                _consume_job("translate", job_id)
                 self._send_json({"status": "error", "error": job["error"]}, status=500)
                 return
             # done — zip field contains JSON bytes
             payload_bytes = job["zip"]
-            with _render_jobs_lock:
-                _render_jobs.pop(job_id, None)
+            _consume_job("translate", job_id)
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(payload_bytes)))
@@ -905,8 +1008,7 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
 
         if path.startswith("/api/render-status/"):
             job_id = path[len("/api/render-status/"):]
-            with _render_jobs_lock:
-                job = _render_jobs.get(job_id)
+            job = _load_job("render", job_id)
             if job is None:
                 self._send_json({"error": "job not found"}, status=404)
                 return
@@ -914,14 +1016,12 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self._send_json({"status": "running"})
                 return
             if job["status"] == "error":
-                with _render_jobs_lock:
-                    _render_jobs.pop(job_id, None)
+                _consume_job("render", job_id)
                 self._send_json({"status": "error", "error": job["error"]}, status=500)
                 return
             # done — send ZIP and remove job
             zip_bytes = job["zip"]
-            with _render_jobs_lock:
-                _render_jobs.pop(job_id, None)
+            _consume_job("render", job_id)
             self.send_response(200)
             self.send_header("Content-Type", "application/zip")
             self.send_header("Content-Length", str(len(zip_bytes)))
@@ -932,8 +1032,7 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
 
         if path.startswith("/api/transcribe-status/"):
             job_id = path[len("/api/transcribe-status/"):]
-            with _render_jobs_lock:
-                job = _render_jobs.get(job_id)
+            job = _load_job("transcribe", job_id)
             if job is None:
                 self._send_json({"status": "not_found"}, status=404)
                 return
@@ -943,14 +1042,12 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
             if job["status"] == "done":
                 sentences = job.get("sentences", [])
                 source_type = job.get("source_type", "audio")
-                with _render_jobs_lock:
-                    _render_jobs.pop(job_id, None)
+                _consume_job("transcribe", job_id)
                 self._send_json({"status": "done", "sentences": sentences, "source_type": source_type})
                 return
             # error
             err = job.get("error", "unknown")
-            with _render_jobs_lock:
-                _render_jobs.pop(job_id, None)
+            _consume_job("transcribe", job_id)
             self._send_json({"status": "error", "error": err}, status=500)
             return
 
@@ -1039,8 +1136,7 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 return
             _render_jobs_cleanup()
             job_id = str(_uuid.uuid4())
-            with _render_jobs_lock:
-                _render_jobs[job_id] = {"status": "running", "zip": None, "error": None, "ts": _time.time()}
+            _store_job("render", job_id, {"status": "running", "zip": None, "error": None, "ts": _time.time()})
             t = _threading.Thread(
                 target=_render_job_run,
                 args=(job_id, sentences, voice, subtitles_mode, need_audio, need_video, source_audio_bytes),
@@ -1130,14 +1226,16 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                         }
                         for text, timing in zip(result.sentence_stream, result.sentence_timeline)
                     ]
-                    with _render_jobs_lock:
-                        _render_jobs[jid] = {
-                            "status": "done", "zip": None, "error": None,
-                            "ts": _time.time(), "sentences": sents, "source_type": result.source_type,
-                        }
+                    _store_job("transcribe", jid, {
+                        "status": "done",
+                        "zip": None,
+                        "error": None,
+                        "ts": _time.time(),
+                        "sentences": sents,
+                        "source_type": result.source_type,
+                    })
                 except Exception as exc:
-                    with _render_jobs_lock:
-                        _render_jobs[jid] = {"status": "error", "zip": None, "error": str(exc), "ts": _time.time()}
+                    _store_job("transcribe", jid, {"status": "error", "zip": None, "error": str(exc), "ts": _time.time()})
                 finally:
                     if tmp_path:
                         try:
@@ -1147,8 +1245,7 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
 
             _render_jobs_cleanup()
             job_id = str(_uuid.uuid4())
-            with _render_jobs_lock:
-                _render_jobs[job_id] = {"status": "running", "zip": None, "error": None, "ts": _time.time()}
+            _store_job("transcribe", job_id, {"status": "running", "zip": None, "error": None, "ts": _time.time()})
             _threading.Thread(target=_transcribe_job, args=(job_id, audio_bytes, suffix), daemon=True).start()
             self._send_json({"job_id": job_id, "status": "running"})
             return
@@ -1170,8 +1267,7 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 return
             _render_jobs_cleanup()
             job_id = str(_uuid.uuid4())
-            with _render_jobs_lock:
-                _render_jobs[job_id] = {"status": "running", "zip": None, "error": None, "ts": _time.time()}
+            _store_job("translate", job_id, {"status": "running", "zip": None, "error": None, "ts": _time.time()})
             _translate_req_q.put({
                 "job_id": job_id,
                 "sentences": list(sentences_raw),
