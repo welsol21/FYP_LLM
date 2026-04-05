@@ -16,10 +16,10 @@ import { LocalWorkspace } from '../lib/localWorkspace'
 import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics'
 
 /** Parse a ZIP file (STORED entries only) into a filename→Uint8Array map. */
-function parseStoredZip(buf: ArrayBuffer): Map<string, Uint8Array> {
+function parseStoredZip(buf: ArrayBuffer): Map<string, Uint8Array<ArrayBuffer>> {
   const view = new DataView(buf)
-  const bytes = new Uint8Array(buf)
-  const result = new Map<string, Uint8Array>()
+  const bytes = new Uint8Array(buf) as Uint8Array<ArrayBuffer>
+  const result = new Map<string, Uint8Array<ArrayBuffer>>()
   // Find End of Central Directory signature (0x06054b50)
   let eocd = buf.byteLength - 22
   while (eocd >= 0 && view.getUint32(eocd, true) !== 0x06054b50) eocd--
@@ -40,7 +40,9 @@ function parseStoredZip(buf: ArrayBuffer): Map<string, Uint8Array> {
     const leLen = view.getUint16(localOffset + 28, true)
     const compSize = view.getUint32(localOffset + 18, true)
     const dataStart = localOffset + 30 + lnLen + leLen
-    result.set(name, bytes.slice(dataStart, dataStart + compSize))
+    // Use a zero-copy view into the original ZIP buffer to avoid doubling
+    // memory usage on low-RAM mobile devices when large video artifacts exist.
+    result.set(name, bytes.subarray(dataStart, dataStart + compSize) as Uint8Array<ArrayBuffer>)
   }
   return result
 }
@@ -1206,12 +1208,13 @@ export class HttpRuntimeApi implements RuntimeApi {
             const zipBuf2 = zipBuf!
             const files = parseStoredZip(zipBuf2)
 
-            const getFileBytes = (name: string): ArrayBuffer => (files.get(name) ?? new Uint8Array(0)).buffer as ArrayBuffer
+            const getFileBytes = (name: string): Uint8Array<ArrayBuffer> =>
+              files.get(name) ?? (new Uint8Array(0) as Uint8Array<ArrayBuffer>)
             if (needAudio) audioBlob = new Blob([getFileBytes('translated_audio_ru.mp3')], { type: 'audio/mpeg' })
             if (needVideo) videoBlob = new Blob([getFileBytes('translated_video_ru.mp4')], { type: 'video/mp4' })
-            const srtEn = new TextDecoder().decode(files.get('subtitles_en.srt') ?? new Uint8Array())
-            const srtBilingual = new TextDecoder().decode(files.get('subtitles_bilingual.srt') ?? new Uint8Array())
-            const srtTarget = new TextDecoder().decode(files.get('subtitles_target.srt') ?? new Uint8Array())
+            const srtEn = new TextDecoder().decode(getFileBytes('subtitles_en.srt'))
+            const srtBilingual = new TextDecoder().decode(getFileBytes('subtitles_bilingual.srt'))
+            const srtTarget = new TextDecoder().decode(getFileBytes('subtitles_target.srt'))
             ensureNotAborted()
 
             artifactMapSrt.set('subtitles_en.srt', { name: 'subtitles_en.srt', size_bytes: srtEn.length, download_url: encodeTextArtifact('text/plain', srtEn) })
