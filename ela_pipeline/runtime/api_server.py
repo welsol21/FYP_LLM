@@ -533,8 +533,13 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                 sent_end_ms = max(sent_start_ms, int(sent.get("end_ms") or 0))
                 sent_start_s = int(sent_start_ms / 1000 * TARGET_RATE)
                 sent_end_s = int(sent_end_ms / 1000 * TARGET_RATE)
-                start_s = max(0, sent_start_s - TIMING_PAD)
-                end_s = min(sent_end_s + TIMING_PAD, src_len)
+                prev_end_s = int(max(0, int(sentences[idx - 1].get("end_ms") or 0)) / 1000 * TARGET_RATE) if idx > 0 else 0
+                next_start_s = int(max(0, int(sentences[idx + 1].get("start_ms") or 0)) / 1000 * TARGET_RATE) if idx < len(sentences) - 1 else src_len
+                # Add small context around each Whisper segment, but never bleed into
+                # the neighbouring sentence's spoken region. This keeps the old
+                # reference timing stable while avoiding clipped phrase edges.
+                start_s = max(prev_end_s, max(0, sent_start_s - TIMING_PAD))
+                end_s = min(next_start_s, min(sent_end_s + TIMING_PAD, src_len))
                 en = str(sent.get("text_eng") or "").strip()
                 ru = str(sent.get("text_ru") or "").strip()
 
@@ -570,12 +575,13 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                 if is_simultaneous:
                     # Dynamic layout: shrink font until both blocks fit without overlap.
                     _fs, _en_y, _ru_y = _bisim_layout(en, ru)
+                    sim_start_ms = en_sub_start_ms
                     if en:
-                        video_srt_entries.append((pos_en, end_all_ms, f'{{\\an8\\pos(640,{_en_y})\\fs{_fs}}}' + en))
-                        en_out_entries.append((pos_en, end_all_ms, en))
+                        video_srt_entries.append((sim_start_ms, end_all_ms, f'{{\\an8\\pos(640,{_en_y})\\fs{_fs}}}' + en))
+                        en_out_entries.append((sim_start_ms, end_all_ms, en))
                     if ru:
-                        video_srt_entries.append((pos_en, end_all_ms, f'{{\\an2\\pos(640,{_ru_y})\\fs{_fs}}}' + ru))
-                        ru_out_entries.append((pos_en, end_all_ms, ru))
+                        video_srt_entries.append((sim_start_ms, end_all_ms, f'{{\\an2\\pos(640,{_ru_y})\\fs{_fs}}}' + ru))
+                        ru_out_entries.append((sim_start_ms, end_all_ms, ru))
                 else:
                     # Sequential: EN during source clip (center), RU during TTS (center)
                     if en and dur_e > 0:
@@ -587,7 +593,6 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
 
                 # Inter-sentence gap → 1/3-length silence (matches reference)
                 if idx < len(sentences) - 1:
-                    next_start_s = int(max(0, int(sentences[idx + 1].get("start_ms") or 0)) / 1000 * TARGET_RATE)
                     gap_s = max(0, next_start_s - end_s)
                     silence_s = max(gap_s // 3, SILENCE_10MS)
                     chunks.append(np.zeros(silence_s, dtype=np.float32))
