@@ -981,16 +981,19 @@ export class HttpRuntimeApi implements RuntimeApi {
             // (M2M100 single generate call, Lara single HTTP call).
             const enabledProvider = input.translatorOptions?.find((p: { id: string }) => p.id === provider)
             const credentials = (enabledProvider as any)?.credentials || {}
-            const submitRes = await requestJson<{ job_id: string }>(
-              apiUrl('/api/translate'),
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sentences: allTextsList, provider, credentials }),
-                signal: input.signal,
-              },
-            )
-            const translateJobId = submitRes.job_id
+            const submitTranslateJob = async (): Promise<string> => {
+              const res = await requestJson<{ job_id: string }>(
+                apiUrl('/api/translate'),
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ sentences: allTextsList, provider, credentials }),
+                  signal: input.signal,
+                },
+              )
+              return res.job_id
+            }
+            let translateJobId = await submitTranslateJob()
             let pollCount = 0
             while (true) {
               ensureNotAborted()
@@ -1000,7 +1003,14 @@ export class HttpRuntimeApi implements RuntimeApi {
               log(2, `Translating… (${pollCount * 1.5 | 0}s)`, 50 + Math.min(pollCount * 2, 45))
               const statusRes = await fetch(apiUrl(`/api/translate-status/${translateJobId}`), { signal: input.signal })
               const statusJson = await statusRes.json() as { status: string; translations?: Record<string, string>; error?: string }
-              if (!statusRes.ok || statusJson.status === 'error' || statusJson.error) {
+              if (statusRes.status === 404) {
+                // Job lost (server restarted) — resubmit once and keep polling
+                recordRuntimeDiagnostic('api.media.backend', 'translate.resubmit', translateJobId)
+                translateJobId = await submitTranslateJob()
+                pollCount = 0
+                continue
+              }
+              if (!statusRes.ok || statusJson.status === 'error') {
                 const raw = statusJson.error ?? `HTTP ${statusRes.status}`
                 recordRuntimeDiagnostic('api.media.backend', 'translate.error', raw, 'error')
                 translateError = _translateErrorMessage(raw)
