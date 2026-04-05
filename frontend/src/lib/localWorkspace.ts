@@ -12,7 +12,7 @@ import { getTranslationProviderFromSettings } from './analysisSettings'
 import { recordRuntimeDiagnostic } from './runtimeDiagnostics'
 
 const IDB_DB_NAME = 'ela_frontend_workspace'
-const IDB_DB_VERSION = 1
+const IDB_DB_VERSION = 2
 const IDB_STATE_STORE = 'kv_store'
 const IDB_BLOB_STORE = 'blob_store'
 const SQLITE_STATE_KEY = 'workspace_state_v1'
@@ -130,23 +130,43 @@ async function withStore<T>(
   mode: IDBTransactionMode,
   fn: (store: IDBObjectStore) => void | Promise<T>,
 ): Promise<T | undefined> {
-  const db = await openIndexedDb()
-  if (!db) return undefined
-  return await new Promise<T>((resolve, reject) => {
-    const tx = db.transaction(storeName, mode)
-    const store = tx.objectStore(storeName)
-    Promise.resolve(fn(store)).then((value) => {
-      tx.oncomplete = () => resolve(value as T)
-      tx.onerror = () => {
-        recordRuntimeDiagnostic('workspace.idb', 'tx.error', { storeName, mode, error: tx.error || 'IndexedDB transaction failed' }, 'error')
-        reject(tx.error || new Error('IndexedDB transaction failed'))
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const db = await openIndexedDb()
+    if (!db) return undefined
+    if (!db.objectStoreNames.contains(storeName)) {
+      recordRuntimeDiagnostic('workspace.idb', 'store.missing', { storeName, mode, version: db.version, attempt }, 'error')
+      db.close()
+      idbPromise = null
+      if (attempt === 0) continue
+      throw new Error(`IndexedDB store is missing: ${storeName}`)
+    }
+    try {
+      return await new Promise<T>((resolve, reject) => {
+        const tx = db.transaction(storeName, mode)
+        const store = tx.objectStore(storeName)
+        Promise.resolve(fn(store)).then((value) => {
+          tx.oncomplete = () => resolve(value as T)
+          tx.onerror = () => {
+            recordRuntimeDiagnostic('workspace.idb', 'tx.error', { storeName, mode, error: tx.error || 'IndexedDB transaction failed' }, 'error')
+            reject(tx.error || new Error('IndexedDB transaction failed'))
+          }
+          tx.onabort = () => {
+            recordRuntimeDiagnostic('workspace.idb', 'tx.abort', { storeName, mode, error: tx.error || 'IndexedDB transaction aborted' }, 'error')
+            reject(tx.error || new Error('IndexedDB transaction aborted'))
+          }
+        }).catch(reject)
+      })
+    } catch (error) {
+      if (attempt === 0 && error instanceof DOMException && error.name === 'NotFoundError') {
+        recordRuntimeDiagnostic('workspace.idb', 'tx.retry_missing_store', { storeName, mode }, 'error')
+        db.close()
+        idbPromise = null
+        continue
       }
-      tx.onabort = () => {
-        recordRuntimeDiagnostic('workspace.idb', 'tx.abort', { storeName, mode, error: tx.error || 'IndexedDB transaction aborted' }, 'error')
-        reject(tx.error || new Error('IndexedDB transaction aborted'))
-      }
-    }).catch(reject)
-  })
+      throw error
+    }
+  }
+  return undefined
 }
 
 function requestToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
