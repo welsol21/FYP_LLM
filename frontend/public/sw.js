@@ -1,5 +1,5 @@
-const APP_SHELL_CACHE = 'ela-app-shell-v7'
-const RUNTIME_CACHE = 'ela-runtime-v7'
+const APP_SHELL_CACHE = 'ela-app-shell-v8'
+const RUNTIME_CACHE = 'ela-runtime-v8'
 const MODELS_CACHE = 'ela-models-v1'
 
 const APP_SHELL_FILES = [
