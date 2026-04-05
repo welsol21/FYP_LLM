@@ -141,16 +141,6 @@ export function canInstallPwa(): boolean {
   return deferredPrompt != null
 }
 
-function isStandaloneDisplayMode(): boolean {
-  if (typeof window === 'undefined') return false
-  const nav = window.navigator as Navigator & { standalone?: boolean }
-  return window.matchMedia('(display-mode: standalone)').matches || nav.standalone === true
-}
-
-export function shouldShowInstallControl(): boolean {
-  return !isStandaloneDisplayMode()
-}
-
 export async function triggerPwaInstall(): Promise<boolean> {
   if (!deferredPrompt) return false
   const prompt = deferredPrompt
