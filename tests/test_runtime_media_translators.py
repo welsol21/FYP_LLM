@@ -2,7 +2,11 @@ import unittest
 from types import ModuleType
 from unittest.mock import patch
 
-from ela_pipeline.runtime.media_pipeline import _resolve_media_translator
+from ela_pipeline.runtime.media_pipeline import (
+    _resolve_media_translator,
+    _select_m2m100_batch_size,
+    translate_texts_with_provider,
+)
 
 
 class RuntimeMediaTranslatorTests(unittest.TestCase):
@@ -60,6 +64,40 @@ class RuntimeMediaTranslatorTests(unittest.TestCase):
         ):
             with self.assertRaises(RuntimeError):
                 _resolve_media_translator(provider_override="m2m100", provider_credentials={})
+
+    def test_select_m2m100_batch_size_uses_length_buckets(self):
+        self.assertEqual(_select_m2m100_batch_size(["a"] * 10), 64)
+        self.assertEqual(_select_m2m100_batch_size(["x" * 70] * 10), 48)
+        self.assertEqual(_select_m2m100_batch_size(["x" * 200] * 10), 32)
+
+    def test_translate_texts_with_provider_deduplicates_casefold_for_m2m100(self):
+        class FakeM2M100:
+            def __init__(self) -> None:
+                self.calls: list[list[str]] = []
+
+            def translate_texts(self, texts: list[str], source_lang: str, target_lang: str) -> list[str]:  # noqa: ARG002
+                self.calls.append(list(texts))
+                return [f"ru:{text}" for text in texts]
+
+        fake_translator = FakeM2M100()
+        progress_history: list[tuple[int, int]] = []
+
+        with patch("ela_pipeline.runtime.media_pipeline.M2M100Translator", FakeM2M100), patch(
+            "ela_pipeline.runtime.media_pipeline._resolve_media_translator",
+            return_value=fake_translator,
+        ):
+            out = translate_texts_with_provider(
+                ["Hello", "hello", "HELLO", "World"],
+                translation_provider="m2m100",
+                progress_callback=lambda done, total: progress_history.append((done, total)),
+            )
+
+        self.assertEqual(fake_translator.calls, [["hello", "world"]])
+        self.assertEqual(out["Hello"], "ru:hello")
+        self.assertEqual(out["hello"], "ru:hello")
+        self.assertEqual(out["HELLO"], "ru:hello")
+        self.assertEqual(out["World"], "ru:world")
+        self.assertIn((4, 4), progress_history)
 
 
 if __name__ == "__main__":

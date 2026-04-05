@@ -1058,9 +1058,14 @@ export class HttpRuntimeApi implements RuntimeApi {
               await new Promise<void>((resolve) => setTimeout(resolve, 1500))
               ensureNotAborted()
               pollCount++
-              log(2, `Translating… (${pollCount * 1.5 | 0}s)`, 50 + Math.min(pollCount * 2, 45))
               const statusRes = await fetch(apiUrl(`/api/translate-status/${translateJobId}`), { signal: input.signal })
-              const statusJson = await statusRes.json() as { status: string; translations?: Record<string, string>; error?: string }
+              const statusJson = await statusRes.json() as {
+                status: string
+                translations?: Record<string, string>
+                error?: string
+                done?: number
+                total?: number
+              }
               if (statusRes.status === 404) {
                 if (translateResubmitCount >= MAX_LOST_JOB_RESUBMITS) {
                   const raw = 'Translation job was lost after a server restart.'
@@ -1089,7 +1094,15 @@ export class HttpRuntimeApi implements RuntimeApi {
                 })
                 break
               }
-              // still running — keep polling
+              // still running — keep polling (prefer backend progress when available)
+              const done = Number(statusJson.done ?? 0)
+              const total = Number(statusJson.total ?? 0)
+              if (Number.isFinite(done) && Number.isFinite(total) && total > 0) {
+                const pct = Math.max(0, Math.min(45, Math.round((done / total) * 45)))
+                log(2, `Translating (${Math.max(0, Math.round(done))}/${Math.round(total)})`, 50 + pct)
+              } else {
+                log(2, `Translating… (${pollCount * 1.5 | 0}s)`, 50 + Math.min(pollCount * 2, 45))
+              }
             }
             log(2, `Translated ${Object.keys(translations).length}/${allTextsList.length} texts`, 98)
           } else if (allTextsList.length > 0) {
