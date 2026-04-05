@@ -334,10 +334,33 @@ async function ensureDbFresh(): Promise<void> {
 async function loadRawState(): Promise<WorkspaceState> {
   await ensureDbReady()
   await ensureDbFresh()
-  if (!hasIndexedDb()) return clone(memoryState)
-  const state = await idbGetState()
-  memoryState = clone(state)
-  return state
+  // ensureDbReady() loads memoryState from IndexedDB on first call; all writes
+  // go through saveRawState() which keeps memoryState current.
+  // Re-reading from IDB on every call is unnecessary and very slow on WebKitGTK.
+  //
+  // We do a SHALLOW clone of the state: scalar fields and lightweight arrays are
+  // copied, but analysis contracts (large VisualizerPayload objects) are kept as
+  // shared references. This is safe because:
+  //   - read-only callers never mutate contract objects;
+  //   - applyEdit() mutates in-place but immediately calls saveRawState() which
+  //     replaces memoryState with a full deep-clone of the modified state;
+  //   - upsertAnalysis() always replaces the entire analysis entry with a fresh clone.
+  const m = memoryState
+  return {
+    projects: m.projects.map((p) => ({ ...p })),
+    selected_project_id: m.selected_project_id,
+    files: m.files.map((f) => ({ ...f })),
+    analyses: m.analyses.map((a) => ({ ...a })),
+    translation_config: m.translation_config
+      ? {
+          ...m.translation_config,
+          providers: m.translation_config.providers.map((p) => ({
+            ...p,
+            credentials: { ...p.credentials },
+          })),
+        }
+      : null,
+  }
 }
 
 async function saveRawState(state: WorkspaceState): Promise<void> {
@@ -932,10 +955,10 @@ export const LocalWorkspace = {
 
   async listFiles(projectId?: string): Promise<MediaFileRow[]> {
     const state = await ensureState()
-    const rows = state.files
+    return state.files
       .filter((f) => !projectId || f.project_id === projectId)
       .sort((a, b) => String(b.updated).localeCompare(String(a.updated)))
-    return clone(rows)
+      .map((f) => ({ ...f }))
   },
 
   async deleteFile(fileId: string): Promise<{ status: 'ok' | 'error'; message: string; file_id?: string }> {
