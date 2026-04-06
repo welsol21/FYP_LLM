@@ -1612,25 +1612,63 @@ export class HttpRuntimeApi implements RuntimeApi {
             const renderScope = needVideo
               ? 'Server render: TTS + subtitles + video muxing'
               : 'Server render: TTS + subtitles'
+            const renderStageLabel = (stage: string): string => {
+              const key = String(stage || '').trim().toLowerCase()
+              if (key === 'queued') return 'queued'
+              if (key === 'preparing') return 'preparing'
+              if (key === 'decoding_source') return 'decoding source audio'
+              if (key === 'tts_synth') return 'tts synthesis'
+              if (key === 'assembling_audio') return 'assembling audio'
+              if (key === 'encoding_mp3') return 'encoding mp3'
+              if (key === 'muxing_video') return 'muxing video'
+              if (key === 'packaging') return 'packaging artifacts'
+              return 'rendering'
+            }
             while (zipBuf === null) {
               ensureNotAborted()
               await new Promise<void>((resolve) => setTimeout(resolve, 2000))
               ensureNotAborted()
               pollAttempt++
               const renderElapsed = pollAttempt * 2
-              const renderHint = renderElapsed >= 90
-                ? `${renderScope} (heavy stage, please wait)`
-                : renderScope
-              log(3, `${renderHint} · elapsed ${formatElapsed(renderElapsed)}`, Math.min(5 + pollAttempt * 2, 48))
               const statusRes = await fetch(apiUrl(`/api/render-status/${jobId}`), { signal: input.signal })
               if (statusRes.headers.get('content-type')?.includes('application/zip')) {
                 zipBuf = await statusRes.arrayBuffer()
                 break
               }
-              const statusJson = await statusRes.json().catch(() => ({ status: 'error', error: `HTTP ${statusRes.status}` })) as { status: string; error?: string }
+              const statusJson = await statusRes.json().catch(() => ({ status: 'error', error: `HTTP ${statusRes.status}` })) as {
+                status: string
+                error?: string
+                done?: number
+                total?: number
+                stage?: string
+                message?: string
+              }
               if (statusJson.status === 'error') {
                 throw new Error(`Backend render failed: ${statusJson.error ?? 'unknown error'}`)
               }
+              const done = Math.max(0, Number(statusJson.done ?? 0))
+              const total = Math.max(0, Number(statusJson.total ?? 0))
+              const stage = renderStageLabel(String(statusJson.stage || ''))
+              const counter = total > 0 ? ` (${Math.min(done, total)}/${total})` : ''
+              const stageHint = statusJson.message ? ` · ${String(statusJson.message).trim()}` : ''
+              const renderHint = renderElapsed >= 90
+                ? `${renderScope}: ${stage}${counter}${stageHint} (heavy stage, please wait)`
+                : `${renderScope}: ${stage}${counter}${stageHint}`
+              const renderRatio = total > 0 ? Math.min(Math.max(done / total, 0), 1) : 0
+              const baseProgress = stage === 'tts synthesis' ? 5
+                : stage === 'assembling audio' ? 28
+                : stage === 'encoding mp3' ? 40
+                : stage === 'muxing video' ? 44
+                : stage === 'packaging artifacts' ? 47
+                : 5
+              const dynamicProgress = stage === 'tts synthesis' ? 23
+                : stage === 'assembling audio' ? 12
+                : stage === 'encoding mp3' ? 3
+                : stage === 'muxing video' ? 3
+                : stage === 'packaging artifacts' ? 1
+                : 18
+              const renderProgress = Math.min(48, Math.round(baseProgress + dynamicProgress * renderRatio))
+              log(3, `${renderHint} · elapsed ${formatElapsed(renderElapsed)}`, renderProgress)
               // status === 'running' — keep polling
             }
 

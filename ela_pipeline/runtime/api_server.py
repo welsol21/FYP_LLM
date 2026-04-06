@@ -117,9 +117,32 @@ def _consume_job(kind: str, job_id: str) -> None:
 def _render_job_run(job_id: str, sentences: list, voice: str, subtitles_mode: str,
                     need_audio: bool, need_video: bool, source_audio_bytes: bytes) -> None:
     try:
+        total_units = max(len(sentences), 1)
+        def _on_progress(stage: str, done: int, total: int, message: "str | None" = None) -> None:
+            current = _load_job("render", job_id)
+            if not isinstance(current, dict) or str(current.get("status") or "") != "running":
+                return
+            safe_total = max(int(total or 0), 1)
+            safe_done = min(max(int(done or 0), 0), safe_total)
+            payload = {
+                "status": "running",
+                "zip": None,
+                "error": None,
+                "ts": _time.time(),
+                "progress": {
+                    "stage": str(stage or "rendering"),
+                    "done": safe_done,
+                    "total": safe_total,
+                    "message": str(message or ""),
+                },
+            }
+            _store_job("render", job_id, payload)
+
+        _on_progress("queued", 0, total_units, "Render job queued")
         zip_bytes = _render_media_artifacts(sentences, voice, subtitles_mode,
                                             need_audio=need_audio, need_video=need_video,
-                                            source_audio_bytes=source_audio_bytes)
+                                            source_audio_bytes=source_audio_bytes,
+                                            progress_callback=_on_progress)
         _store_job("render", job_id, {"status": "done", "zip": zip_bytes, "error": None, "ts": _time.time()})
     except Exception as exc:
         import traceback as _tb
@@ -448,7 +471,15 @@ def _build_srt(sentences: list[dict], mode: str) -> str:
     return "\n".join(blocks)
 
 
-def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: str, need_audio: bool = True, need_video: bool = True, source_audio_bytes: bytes = b"") -> bytes:
+def _render_media_artifacts(
+    sentences: list[dict],
+    voice: str,
+    subtitles_mode: str,
+    need_audio: bool = True,
+    need_video: bool = True,
+    source_audio_bytes: bytes = b"",
+    progress_callback: "Callable[[str, int, int, str | None], None] | None" = None,
+) -> bytes:
     """Generate TTS → assemble bilingual audio → compose video → return ZIP bytes."""
     import asyncio
     import io
@@ -458,6 +489,17 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
     import zipfile
 
     import numpy as np
+
+    total_sentences = max(len(sentences), 1)
+    def _progress(stage: str, done: int, total: int, message: "str | None" = None) -> None:
+        if progress_callback is None:
+            return
+        try:
+            progress_callback(stage, done, total, message)
+        except Exception:
+            pass
+
+    _progress("preparing", 0, total_sentences, "Preparing render inputs")
 
     TARGET_RATE = 24000
     voice_name = "ru-RU-SvetlanaNeural" if voice.startswith("f") else "ru-RU-DmitryNeural"
@@ -473,6 +515,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
     # ── 1. Decode source audio if provided ────────────────────────────────────
     source_pcm: "np.ndarray | None" = None
     if source_audio_bytes:
+        _progress("decoding_source", 0, total_sentences, "Decoding source audio")
         try:
             pcm = _decode_audio(source_audio_bytes)
             source_pcm = pcm if len(pcm) > 0 else None
@@ -482,6 +525,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
     # ── 2. Generate TTS (only if audio or video needed) ───────────────────────
     output_pcm: "np.ndarray | None" = None
     if need_audio or need_video:
+        _progress("tts_synth", 0, total_sentences, "Synthesizing speech")
         async def _tts(text: str, sem: asyncio.Semaphore, voice_override: "str | None" = None) -> bytes:
             import edge_tts as _edge_tts
             _v = voice_override or voice_name
@@ -510,20 +554,44 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
         async def _generate_all() -> "tuple[list[bytes], list[bytes]]":
             # Use higher concurrency for bilingual text (2× the TTS calls) to stay under 100s Cloudflare timeout
             sem = asyncio.Semaphore(8 if is_bilingual_text else 4)
-            async def _empty() -> bytes:
-                return b""
-            ru_tasks = [
-                _tts(str(s.get("text_ru") or ""), sem) if str(s.get("text_ru") or "").strip() else _empty()
-                for s in sentences
-            ]
-            en_tasks = [
-                _tts(str(s.get("text_eng") or ""), sem, voice_override=en_voice_name)
-                if is_bilingual_text and str(s.get("text_eng") or "").strip() else _empty()
-                for s in sentences
-            ]
-            all_results = list(await asyncio.gather(*(ru_tasks + en_tasks), return_exceptions=False))
             n = len(sentences)
-            return all_results[:n], all_results[n:]
+            ru_results: list[bytes] = [b""] * n
+            en_results: list[bytes] = [b""] * n
+            required_parts: list[int] = [0] * n
+            completed_parts: list[int] = [0] * n
+            done_sentences = 0
+
+            tasks: list["asyncio.Task[tuple[str, int, bytes]]"] = []
+
+            async def _run_part(kind: str, idx: int, text: str, voice_override: "str | None" = None) -> tuple[str, int, bytes]:
+                data = await _tts(text, sem, voice_override=voice_override)
+                return (kind, idx, data)
+
+            for idx, sent in enumerate(sentences):
+                ru_text = str(sent.get("text_ru") or "").strip()
+                en_text = str(sent.get("text_eng") or "").strip()
+                if ru_text:
+                    required_parts[idx] += 1
+                    tasks.append(asyncio.create_task(_run_part("ru", idx, ru_text)))
+                if is_bilingual_text and en_text:
+                    required_parts[idx] += 1
+                    tasks.append(asyncio.create_task(_run_part("en", idx, en_text, voice_override=en_voice_name)))
+                if required_parts[idx] == 0:
+                    done_sentences += 1
+
+            _progress("tts_synth", done_sentences, total_sentences, f"TTS {done_sentences}/{total_sentences}")
+            for task in asyncio.as_completed(tasks):
+                kind, idx, data = await task
+                if kind == "ru":
+                    ru_results[idx] = data
+                else:
+                    en_results[idx] = data
+                completed_parts[idx] += 1
+                if required_parts[idx] > 0 and completed_parts[idx] == required_parts[idx]:
+                    done_sentences += 1
+                    _progress("tts_synth", done_sentences, total_sentences, f"TTS {done_sentences}/{total_sentences}")
+
+            return ru_results, en_results
 
         tts_blobs, en_tts_blobs = asyncio.run(_generate_all())
         tts_pcms: list["np.ndarray | None"] = [
@@ -560,6 +628,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
             ru_out_entries:  "list[tuple[int,int,str]]" = []
 
             for idx, (sent, tts_pcm) in enumerate(zip(sentences, tts_pcms)):
+                _progress("assembling_audio", idx, total_sentences, f"Assembling audio {idx}/{total_sentences}")
                 sent_start_ms = max(0, int(sent.get("start_ms") or 0))
                 sent_end_ms = max(sent_start_ms, int(sent.get("end_ms") or 0))
                 sent_start_s = int(sent_start_ms / 1000 * TARGET_RATE)
@@ -630,6 +699,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                     out_samples += silence_s
 
             output_pcm = np.concatenate(chunks) if chunks else source_pcm
+            _progress("assembling_audio", total_sentences, total_sentences, "Audio assembly completed")
 
         elif subtitles_mode == "source" and source_pcm is not None:
             output_pcm = source_pcm
@@ -650,6 +720,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
             INTER_GAP = int(0.2 * TARGET_RATE)  # 200ms between sentences
 
             for idx, (sent, en_tts_pcm, tts_pcm) in enumerate(zip(sentences, en_tts_pcms, tts_pcms)):
+                _progress("assembling_audio", idx, total_sentences, f"Assembling audio {idx}/{total_sentences}")
                 en = str(sent.get("text_eng") or "").strip()
                 ru = str(sent.get("text_ru") or "").strip()
 
@@ -700,6 +771,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                     out_samples += INTER_GAP
 
             output_pcm = np.concatenate(chunks) if chunks else np.zeros(TARGET_RATE, dtype=np.float32)
+            _progress("assembling_audio", total_sentences, total_sentences, "Audio assembly completed")
 
         else:
             # Target-only / text-file TTS: no source audio.
@@ -716,7 +788,8 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
 
             if has_timestamps:
                 output_pcm = np.zeros(TARGET_RATE, dtype=np.float32)
-                for sent, tts_pcm in zip(sentences, tts_pcms):
+                for idx, (sent, tts_pcm) in enumerate(zip(sentences, tts_pcms)):
+                    _progress("assembling_audio", idx, total_sentences, f"Assembling audio {idx}/{total_sentences}")
                     if tts_pcm is None:
                         continue
                     start_sample = int(max(0, int(sent.get("start_ms") or 0)) / 1000 * TARGET_RATE)
@@ -731,9 +804,11 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                             max(300, int(sent.get("end_ms") or 0)),
                             ru,
                         ))
+                _progress("assembling_audio", total_sentences, total_sentences, "Audio assembly completed")
             else:
                 # Text file — no timestamps: concatenate TTS segments sequentially
-                for sent, tts_pcm in zip(sentences, tts_pcms):
+                for idx, (sent, tts_pcm) in enumerate(zip(sentences, tts_pcms)):
+                    _progress("assembling_audio", idx, total_sentences, f"Assembling audio {idx}/{total_sentences}")
                     ru = str(sent.get("text_ru") or "").strip()
                     if tts_pcm is None or len(tts_pcm) == 0:
                         if ru:
@@ -748,10 +823,12 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
                     if ru:
                         video_srt_entries.append((start_ms, max(start_ms + 300, end_ms), ru))
                 output_pcm = np.concatenate(output_chunks) if output_chunks else np.zeros(TARGET_RATE, dtype=np.float32)
+                _progress("assembling_audio", total_sentences, total_sentences, "Audio assembly completed")
 
     # ── 3. Encode assembled PCM → MP3 (needed for audio or video) ────────────
     mp3_bytes = b""
     if (need_audio or need_video) and output_pcm is not None:
+        _progress("encoding_mp3", total_sentences, total_sentences, "Encoding MP3")
         proc = subprocess.run(
             ["ffmpeg", "-f", "f32le", "-ar", str(TARGET_RATE), "-ac", "1", "-i", "pipe:0",
              "-c:a", "libmp3lame", "-q:a", "2", "-f", "mp3", "pipe:1"],
@@ -833,6 +910,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
     # reliably terminates at the audio stream end without libass duration hints.
     mp4_bytes = b""
     if need_video:
+        _progress("muxing_video", total_sentences, total_sentences, "Muxing video with subtitles")
         tmpdir = Path(tempfile.mkdtemp())
         try:
             audio_path = tmpdir / "audio.mp3"
@@ -877,6 +955,7 @@ def _render_media_artifacts(sentences: list[dict], voice: str, subtitles_mode: s
 
     # ── 6. Pack into ZIP (STORED — files already compressed) ──────────────────
     buf = io.BytesIO()
+    _progress("packaging", total_sentences, total_sentences, "Packaging artifacts")
     with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_STORED) as zf:
         if need_audio:
             zf.writestr("translated_audio_ru.mp3", mp3_bytes)
@@ -1059,7 +1138,18 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 self._send_json({"error": "job not found"}, status=404)
                 return
             if job["status"] == "running":
-                self._send_json({"status": "running"})
+                progress = job.get("progress") if isinstance(job.get("progress"), dict) else {}
+                done = int(progress.get("done") or 0) if isinstance(progress, dict) else 0
+                total = int(progress.get("total") or 0) if isinstance(progress, dict) else 0
+                stage = str(progress.get("stage") or "rendering") if isinstance(progress, dict) else "rendering"
+                message = str(progress.get("message") or "") if isinstance(progress, dict) else ""
+                self._send_json({
+                    "status": "running",
+                    "done": max(0, done),
+                    "total": max(0, total),
+                    "stage": stage,
+                    "message": message,
+                })
                 return
             if job["status"] == "error":
                 _consume_job("render", job_id)
@@ -1182,7 +1272,18 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 return
             _render_jobs_cleanup()
             job_id = str(_uuid.uuid4())
-            _store_job("render", job_id, {"status": "running", "zip": None, "error": None, "ts": _time.time()})
+            total_units = max(len(sentences), 1)
+            _store_job(
+                "render",
+                job_id,
+                {
+                    "status": "running",
+                    "zip": None,
+                    "error": None,
+                    "ts": _time.time(),
+                    "progress": {"stage": "queued", "done": 0, "total": total_units, "message": "Render job queued"},
+                },
+            )
             t = _threading.Thread(
                 target=_render_job_run,
                 args=(job_id, sentences, voice, subtitles_mode, need_audio, need_video, source_audio_bytes),
