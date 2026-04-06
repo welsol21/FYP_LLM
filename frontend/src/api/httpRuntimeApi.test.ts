@@ -549,6 +549,71 @@ describe('HttpRuntimeApi', () => {
     expect(recovered?.media_file_id).toBe(file.id)
   })
 
+  it('does not return already-analyzed when only stale done-marker exists without analysis rows', async () => {
+    const api = new HttpRuntimeApi()
+    const selected = await LocalWorkspace.getSelectedProject()
+    const projectId = String(selected.project_id || '')
+    const mediaPath = '/client-media/stale-done/01.Intro.mp3'
+    const fileName = '01.Intro.mp3'
+
+    await LocalWorkspace.cacheUploadedMedia(mediaPath, new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'audio/mpeg' }))
+    const file = await LocalWorkspace.registerMediaFile({
+      projectId,
+      name: fileName,
+      mediaPath,
+      sizeBytes: 4,
+      durationSec: 1,
+    })
+
+    const immutableDocId = await hashHex(fileName)
+    const variantDocId = await hashHex(`${fileName}|gpt|backend_dmitry|bilingual_sequential`)
+    await LocalWorkspace.cacheAnalysisArtifactBlob(
+      immutableDocId,
+      'sentences.json',
+      new Blob(
+        [
+          JSON.stringify([
+            { text: 'Hello world.', start_sec: 0, end_sec: 1 },
+          ]),
+        ],
+        { type: 'application/json' },
+      ),
+    )
+    await LocalWorkspace.cacheAnalysisArtifactBlob(
+      variantDocId,
+      'pipeline_settings.json',
+      new Blob(
+        [
+          JSON.stringify({
+            translationProvider: 'gpt',
+            voiceChoice: 'backend_dmitry',
+            subtitlesMode: 'bilingual_sequential',
+            sourceType: 'audio',
+          }),
+        ],
+        { type: 'application/json' },
+      ),
+    )
+
+    const abortController = new AbortController()
+    abortController.abort()
+
+    const out = await api.submitMedia({
+      mediaPath,
+      durationSec: 1,
+      sizeBytes: 4,
+      projectId,
+      mediaFileId: file.id,
+      translationProvider: 'gpt',
+      subtitlesMode: 'bilingual_sequential',
+      voiceChoice: 'backend_dmitry',
+      signal: abortController.signal,
+      translatorOptions: [{ id: 'gpt', credentials: { api_key: 'x' } }],
+    })
+    expect(String(out.ui_feedback.title || '')).not.toMatch(/already analyzed/i)
+    expect(String(out.ui_feedback.message || '')).not.toMatch(/already been analyzed/i)
+  })
+
   it('routes DeepL provider translation through browser API (not backend /api/translate)', async () => {
     const api = new HttpRuntimeApi()
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(

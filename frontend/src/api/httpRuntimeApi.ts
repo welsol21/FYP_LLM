@@ -967,9 +967,45 @@ export class HttpRuntimeApi implements RuntimeApi {
         })
 
         if (settBlob) {
-          // pipeline_settings.json only exists after a fully successful run for this variant
-          resumePoint = 'done'
-        } else if (sentBlob) {
+          // done-marker alone is not enough: stale blobs may survive while analysis rows were deleted.
+          const variantCurrent = await LocalWorkspace.getRawAnalysis(documentId).catch(() => null)
+          const variantVisible = Boolean(
+            variantCurrent &&
+            variantCurrent.contract_current !== false &&
+            Object.keys(variantCurrent.contract || {}).length > 0,
+          )
+          if (variantVisible) {
+            resumePoint = 'done'
+          } else {
+            const recovered = await LocalWorkspace.getRawAnalysis(contractDocId).catch(() => null)
+            if (recovered && Object.keys(recovered.contract || {}).length > 0) {
+              await LocalWorkspace.upsertAnalysis({
+                documentId,
+                projectId: input.projectId,
+                mediaFileId: input.mediaFileId,
+                fileName: input.fileName,
+                filePath: input.mediaPath,
+                sizeBytes: input.sizeBytes,
+                durationSeconds: input.durationSec,
+                settings: input.settings,
+                contract: recovered.contract,
+                artifacts: LocalWorkspace.buildDocumentArtifacts(documentId, recovered.contract),
+                contractCurrent: true,
+              })
+              resumePoint = 'done'
+              recordRuntimeDiagnostic('api.media.resume', 'history.recovered_from_contract_cache', {
+                documentId,
+                contractDocId,
+              })
+            } else {
+              recordRuntimeDiagnostic('api.media.resume', 'history.missing_on_done_marker', {
+                documentId,
+                contractDocId,
+              }, 'error')
+            }
+          }
+        }
+        if (resumePoint !== 'done' && sentBlob) {
           const prevSentences = JSON.parse(await sentBlob.text()) as StoredSentence[]
           if (prevSentences.length > 0) {
             const rawAnalysis = await LocalWorkspace.getRawAnalysis(contractDocId)
@@ -1018,43 +1054,6 @@ export class HttpRuntimeApi implements RuntimeApi {
       })
 
       if (resumePoint === 'done') {
-        try {
-          const existingCurrent = await LocalWorkspace.getRawAnalysis(documentId).catch(() => null)
-          const existingIsVisible = Boolean(
-            existingCurrent &&
-            existingCurrent.contract_current !== false &&
-            Object.keys(existingCurrent.contract || {}).length > 0,
-          )
-          if (!existingIsVisible) {
-            const recovered = await LocalWorkspace.getRawAnalysis(contractDocId).catch(() => null)
-            if (recovered && Object.keys(recovered.contract || {}).length > 0) {
-              await LocalWorkspace.upsertAnalysis({
-                documentId,
-                projectId: input.projectId,
-                mediaFileId: input.mediaFileId,
-                fileName: input.fileName,
-                filePath: input.mediaPath,
-                sizeBytes: input.sizeBytes,
-                durationSeconds: input.durationSec,
-                settings: input.settings,
-                contract: recovered.contract,
-                artifacts: LocalWorkspace.buildDocumentArtifacts(documentId, recovered.contract),
-                contractCurrent: true,
-              })
-              recordRuntimeDiagnostic('api.media.resume', 'history.recovered_from_contract_cache', {
-                documentId,
-                contractDocId,
-              })
-            } else {
-              recordRuntimeDiagnostic('api.media.resume', 'history.missing_on_done_marker', {
-                documentId,
-                contractDocId,
-              }, 'error')
-            }
-          }
-        } catch (recoverErr) {
-          recordRuntimeDiagnostic('api.media.resume', 'history.recovery_failed', recoverErr, 'error')
-        }
         progress.fill(100)
         log(0, 'Already analyzed — returning existing result', 100)
         return finish({
