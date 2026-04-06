@@ -3,6 +3,11 @@ import { HttpRuntimeApi } from './httpRuntimeApi'
 import { LocalWorkspace } from '../lib/localWorkspace'
 
 describe('HttpRuntimeApi', () => {
+  async function hashHex(input: string): Promise<string> {
+    const buf = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(input))
+    return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('')
+  }
+
   beforeEach(async () => {
     window.localStorage.clear()
     await LocalWorkspace.__resetForTests()
@@ -463,6 +468,85 @@ describe('HttpRuntimeApi', () => {
     expect(translatedVideo).toBeDefined()
     expect(Number(translatedVideo?.size_bytes || 0)).toBeGreaterThan(0)
     expect(String(translatedVideo?.download_url || '')).not.toBe('')
+  })
+
+  it('recovers visible history row when done-marker exists but current variant row is missing', async () => {
+    const api = new HttpRuntimeApi()
+    const selected = await LocalWorkspace.getSelectedProject()
+    const projectId = String(selected.project_id || '')
+    const mediaPath = '/client-media/done-recovery/01.Intro.mp3'
+    const fileName = '01.Intro.mp3'
+
+    await LocalWorkspace.cacheUploadedMedia(mediaPath, new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'audio/mpeg' }))
+    const file = await LocalWorkspace.registerMediaFile({
+      projectId,
+      name: fileName,
+      mediaPath,
+      sizeBytes: 4,
+      durationSec: 1,
+    })
+
+    const contractDocId = await hashHex(`${fileName}|m2m100`)
+    const variantDocId = await hashHex(`${fileName}|m2m100|backend_dmitry|bilingual_sequential`)
+    const contract = {
+      'Hello world.': {
+        node_id: 's1',
+        type: 'Sentence',
+        content: 'Hello world.',
+        tense: 'present',
+        linguistic_notes: { elementary: '', intermediate: 'x', advanced: '' },
+        part_of_speech: 'sentence',
+        linguistic_elements: [],
+        translations: { m2m100: { text: 'Привет, мир.' } },
+      },
+    }
+
+    await LocalWorkspace.upsertAnalysis({
+      documentId: contractDocId,
+      projectId,
+      mediaFileId: file.id,
+      fileName,
+      filePath: mediaPath,
+      sizeBytes: 4,
+      durationSeconds: 1,
+      settings: 'Transl: m2m100 / Subs: bilingual_sequential / Voice: dmitry / Proc: incremental',
+      contract,
+      artifacts: LocalWorkspace.buildDocumentArtifacts(contractDocId, contract),
+      contractCurrent: false,
+    })
+
+    await LocalWorkspace.cacheAnalysisArtifactBlob(
+      variantDocId,
+      'pipeline_settings.json',
+      new Blob(
+        [
+          JSON.stringify({
+            translationProvider: 'm2m100',
+            voiceChoice: 'backend_dmitry',
+            subtitlesMode: 'bilingual_sequential',
+            sourceType: 'audio',
+          }),
+        ],
+        { type: 'application/json' },
+      ),
+    )
+
+    const payload = await api.submitMedia({
+      mediaPath,
+      durationSec: 1,
+      sizeBytes: 4,
+      projectId,
+      mediaFileId: file.id,
+      translationProvider: 'm2m100',
+      subtitlesMode: 'bilingual_sequential',
+      voiceChoice: 'backend_dmitry',
+    })
+
+    expect(payload.ui_feedback.message).toMatch(/already been analyzed/i)
+    const history = await LocalWorkspace.listAnalysisHistory(projectId)
+    const recovered = history.find((row) => row.document_id === variantDocId)
+    expect(recovered).toBeTruthy()
+    expect(recovered?.media_file_id).toBe(file.id)
   })
 
   it('routes DeepL provider translation through browser API (not backend /api/translate)', async () => {

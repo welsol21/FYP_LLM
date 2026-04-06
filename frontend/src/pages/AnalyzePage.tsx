@@ -210,10 +210,26 @@ export function AnalyzePage() {
           const rowFileId = String(row.media_file_id || '').trim()
           const rowFileName = String(row.file_name || '').trim().toLowerCase()
           const rowFilePath = String(row.file_path || '').trim()
-          const matchId = currentMediaFileId ? rowFileId === currentMediaFileId : true
-          const matchName = currentMediaFileName ? rowFileName === currentMediaFileName : true
-          const matchPath = currentMediaPath ? rowFilePath === currentMediaPath : true
-          return matchId && matchName && matchPath
+          const sameId = Boolean(currentMediaFileId && rowFileId && rowFileId === currentMediaFileId)
+          const samePath = Boolean(currentMediaPath && rowFilePath && rowFilePath === currentMediaPath)
+          const sameName = Boolean(currentMediaFileName && rowFileName && rowFileName === currentMediaFileName)
+          // Files are often re-registered and receive a new media_file_id.
+          // History linkage must still work by stable path/name when id changed.
+          return sameId || samePath || sameName
+        })
+        recordRuntimeDiagnostic('ui.analyze', 'history.filter', {
+          projectId: selectedProject.project_id || null,
+          currentMediaFileId,
+          currentMediaPath,
+          currentMediaFileName,
+          totalRows: historyRows.length,
+          matchedRows: fileRows.length,
+          sample: fileRows.slice(0, 3).map((row) => ({
+            documentId: row.document_id,
+            mediaFileId: row.media_file_id || null,
+            fileName: row.file_name,
+            filePath: row.file_path || null,
+          })),
         })
         const resolved = await Promise.all(
           fileRows.map(async (row) => {

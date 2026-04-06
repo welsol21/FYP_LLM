@@ -133,6 +133,37 @@ describe('AnalyzePage', () => {
     })
   })
 
+  it('shows history for re-registered file when media_file_id changed but path/name match', async () => {
+    const api = new MockRuntimeApi()
+    const originalList = api.listAnalysisHistory.bind(api)
+    vi.spyOn(api, 'listAnalysisHistory').mockImplementation(async (projectId?: string) => {
+      const rows = await originalList(projectId)
+      return rows.map((row, idx) => (idx === 0 ? { ...row, media_file_id: 'file-old-id' } : row))
+    })
+
+    render(
+      <ApiContext.Provider value={api}>
+        <MemoryRouter initialEntries={[{ pathname: '/analyze' }]}>
+          <AnalyzePage />
+        </MemoryRouter>
+      </ApiContext.Provider>,
+    )
+
+    const historyCard = await screen.findByLabelText('analyze-history')
+    const directSelect = await screen.findByLabelText('analyze-direct-select')
+    fireEvent.click(within(directSelect).getByRole('button', { name: 'Demo Project' }))
+    await waitFor(() => expect(within(directSelect).getByRole('button', { name: 'sample.mp4' })).toBeInTheDocument())
+    fireEvent.click(within(directSelect).getByRole('button', { name: 'sample.mp4' }))
+    const useBtn = within(directSelect).getByRole('button', { name: 'Use selected file' }) as HTMLButtonElement
+    await waitFor(() => expect(useBtn.disabled).toBe(false))
+    fireEvent.click(useBtn)
+
+    await waitFor(() => {
+      expect(within(historyCard).getByText('sample.mp4')).toBeInTheDocument()
+      expect(within(historyCard).getByRole('link', { name: /contract_sentences\.json/i })).toBeInTheDocument()
+    })
+  })
+
   it('deletes analysis artifacts from history entry', async () => {
     const api = new MockRuntimeApi()
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
