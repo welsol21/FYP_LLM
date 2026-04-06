@@ -17,6 +17,10 @@ function requestToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
 async function withKvStore(mode: IDBTransactionMode, fn: (store: IDBObjectStore) => Promise<void>): Promise<void> {
   const db = await new Promise<IDBDatabase>((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION)
+    req.onupgradeneeded = () => {
+      const next = req.result
+      if (!next.objectStoreNames.contains(STORE)) next.createObjectStore(STORE)
+    }
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error || new Error('Failed to open IndexedDB'))
   })
@@ -55,6 +59,7 @@ describe('LocalWorkspace IndexedDB translation config', () => {
     vi.resetModules()
     const { LocalWorkspace } = await import('./localWorkspace')
     await LocalWorkspace.__resetForTests()
+    await LocalWorkspace.listProjects()
 
     await LocalWorkspace.createProject('np1')
     const cfg = sampleConfig()
@@ -83,4 +88,5 @@ describe('LocalWorkspace IndexedDB translation config', () => {
     expect(loaded?.providers.find((provider) => provider.id === 'gpt')?.enabled).toBe(true)
     expect(loaded?.providers.find((provider) => provider.id === 'gpt')?.credentials.api_key).toBe('secret')
   })
+
 })

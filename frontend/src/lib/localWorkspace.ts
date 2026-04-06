@@ -419,6 +419,8 @@ let idbPromise: Promise<IDBDatabase | null> | null = null
 let memoryState: WorkspaceState = emptyWorkspaceState()
 let memoryBlobs = new Map<string, BlobRecord>()
 let stateStoreWriteQueue: Promise<void> = Promise.resolve()
+let dbReadyPromise: Promise<void> | null = null
+let dbReady = false
 
 function hasIndexedDb(): boolean {
   return typeof indexedDB !== 'undefined'
@@ -475,27 +477,45 @@ async function withStore<T>(
       return await new Promise<T>((resolve, reject) => {
         const tx = db.transaction(storeName, mode)
         const store = tx.objectStore(storeName)
-        Promise.resolve(fn(store)).then((value) => {
-          tx.oncomplete = () => resolve(value as T)
-          tx.onerror = () => {
-            recordRuntimeDiagnostic(
-              'workspace.idb',
-              'tx.error',
-              { storeName, mode, ...idbErrorDetails(tx.error) },
-              'error',
-            )
-            reject(tx.error || new Error('IndexedDB transaction failed'))
-          }
-          tx.onabort = () => {
-            recordRuntimeDiagnostic(
-              'workspace.idb',
-              'tx.abort',
-              { storeName, mode, ...idbErrorDetails(tx.error) },
-              'error',
-            )
-            reject(tx.error || new Error('IndexedDB transaction aborted'))
-          }
-        }).catch(reject)
+        let fnResult: T | undefined
+        let fnFailed = false
+
+        tx.oncomplete = () => {
+          if (fnFailed) return
+          resolve(fnResult as T)
+        }
+        tx.onerror = () => {
+          recordRuntimeDiagnostic(
+            'workspace.idb',
+            'tx.error',
+            { storeName, mode, ...idbErrorDetails(tx.error) },
+            'error',
+          )
+          reject(tx.error || new Error('IndexedDB transaction failed'))
+        }
+        tx.onabort = () => {
+          recordRuntimeDiagnostic(
+            'workspace.idb',
+            'tx.abort',
+            { storeName, mode, ...idbErrorDetails(tx.error) },
+            'error',
+          )
+          reject(tx.error || new Error('IndexedDB transaction aborted'))
+        }
+
+        Promise.resolve(fn(store))
+          .then((value) => {
+            fnResult = value as T | undefined
+          })
+          .catch((error) => {
+            fnFailed = true
+            try {
+              tx.abort()
+            } catch {
+              // ignore abort errors and reject with original error
+            }
+            reject(error)
+          })
       })
     } catch (error) {
       if (attempt === 0 && error instanceof DOMException && error.name === 'NotFoundError') {
@@ -692,6 +712,8 @@ async function resetIndexedDb(): Promise<void> {
   }
   idbPromise = null
   stateStoreWriteQueue = Promise.resolve()
+  dbReadyPromise = null
+  dbReady = false
   if (!hasIndexedDb()) return
   await new Promise<void>((resolve, reject) => {
     const req = indexedDB.deleteDatabase(IDB_DB_NAME)
@@ -706,48 +728,58 @@ function analysisArtifactKey(documentId: string, artifactName: string): string {
 }
 
 async function ensureDbReady(): Promise<void> {
-  if (idbPromise) {
-    await idbPromise
+  if (dbReady) return
+  if (dbReadyPromise) {
+    await dbReadyPromise
     return
   }
-  const legacyRaw = String(window.localStorage.getItem(LEGACY_STORAGE_KEY) || '')
-  if (!hasIndexedDb()) {
-    if (legacyRaw) {
-      try {
-        memoryState = coerceWorkspaceState(JSON.parse(legacyRaw) as Partial<WorkspaceState>)
-      } catch {
-        memoryState = emptyWorkspaceState()
-      }
-      window.localStorage.removeItem(LEGACY_STORAGE_KEY)
-    }
-    return
-  }
-  await openIndexedDb()
-  const state = await idbGetState()
-  const isEmpty =
-    state.projects.length === 0 &&
-    state.files.length === 0 &&
-    state.analyses.length === 0 &&
-    !state.translation_config &&
-    !state.selected_project_id
-  if (isEmpty && legacyRaw) {
-    try {
-      const migrated = coerceWorkspaceState(JSON.parse(legacyRaw) as Partial<WorkspaceState>)
-      await idbPutState(migrated)
-      if (migrated.translation_config) {
+  dbReadyPromise = (async () => {
+    const legacyRaw = String(window.localStorage.getItem(LEGACY_STORAGE_KEY) || '')
+    if (!hasIndexedDb()) {
+      if (legacyRaw) {
         try {
-          await idbPutTranslationConfig(migrated.translation_config)
-        } catch (err) {
-          recordRuntimeDiagnostic('workspace.translation_config', 'legacy_migration_persist_failed', err, 'error')
+          memoryState = coerceWorkspaceState(JSON.parse(legacyRaw) as Partial<WorkspaceState>)
+        } catch {
+          memoryState = emptyWorkspaceState()
         }
+        window.localStorage.removeItem(LEGACY_STORAGE_KEY)
       }
-      memoryState = clone(migrated)
-      window.localStorage.removeItem(LEGACY_STORAGE_KEY)
-    } catch {
+      dbReady = true
+      return
+    }
+    await openIndexedDb()
+    const state = await idbGetState()
+    const isEmpty =
+      state.projects.length === 0 &&
+      state.files.length === 0 &&
+      state.analyses.length === 0 &&
+      !state.translation_config &&
+      !state.selected_project_id
+    if (isEmpty && legacyRaw) {
+      try {
+        const migrated = coerceWorkspaceState(JSON.parse(legacyRaw) as Partial<WorkspaceState>)
+        await idbPutState(migrated)
+        if (migrated.translation_config) {
+          try {
+            await idbPutTranslationConfig(migrated.translation_config)
+          } catch (err) {
+            recordRuntimeDiagnostic('workspace.translation_config', 'legacy_migration_persist_failed', err, 'error')
+          }
+        }
+        memoryState = clone(migrated)
+        window.localStorage.removeItem(LEGACY_STORAGE_KEY)
+      } catch {
+        memoryState = state
+      }
+    } else {
       memoryState = state
     }
-  } else {
-    memoryState = state
+    dbReady = true
+  })()
+  try {
+    await dbReadyPromise
+  } finally {
+    dbReadyPromise = null
   }
 }
 
