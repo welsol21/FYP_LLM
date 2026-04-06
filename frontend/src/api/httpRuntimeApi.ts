@@ -114,6 +114,13 @@ async function sleepMs(ms: number): Promise<void> {
   await new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 }
 
+function formatElapsed(seconds: number): string {
+  const sec = Math.max(0, Math.round(seconds))
+  const mm = Math.floor(sec / 60)
+  const ss = sec % 60
+  return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+}
+
 async function fetchWithRetry(
   input: string,
   init: RequestInit,
@@ -877,7 +884,13 @@ export class HttpRuntimeApi implements RuntimeApi {
             await new Promise<void>((resolve) => setTimeout(resolve, 2000))
             ensureNotAborted()
             tPoll += 2
-            log(1, `Transcribing on server… (${tPoll}s)`, 5 + Math.min(tPoll * 2, 88))
+            const transcribePhase =
+              tPoll < 20
+                ? 'Server Whisper is preparing model/queue'
+                : tPoll < 120
+                  ? 'Server Whisper is decoding audio and extracting sentences/timings'
+                  : 'Server Whisper is still processing a long CPU transcription'
+            log(1, `${transcribePhase} · elapsed ${formatElapsed(tPoll)}`, 5 + Math.min(tPoll * 2, 88))
             const tStatus = await fetch(apiUrl(`/api/transcribe-status/${transcribeJobId}`), { signal: input.signal })
             const tJson = await tStatus.json() as { status: string; sentences?: Array<{ text: string; start_sec: number | null; end_sec: number | null }>; source_type?: string; error?: string }
             if (tStatus.status === 404 || tJson.status === 'not_found') {
@@ -1345,12 +1358,19 @@ export class HttpRuntimeApi implements RuntimeApi {
             // Poll /api/render-status/<job_id> until done
             let zipBuf: ArrayBuffer | null = null
             let pollAttempt = 0
+            const renderScope = needVideo
+              ? 'Server render: TTS + subtitles + video muxing'
+              : 'Server render: TTS + subtitles'
             while (zipBuf === null) {
               ensureNotAborted()
               await new Promise<void>((resolve) => setTimeout(resolve, 2000))
               ensureNotAborted()
               pollAttempt++
-              log(3, `Rendering… (${pollAttempt * 2}s)`, Math.min(5 + pollAttempt * 2, 48))
+              const renderElapsed = pollAttempt * 2
+              const renderHint = renderElapsed >= 90
+                ? `${renderScope} (heavy stage, please wait)`
+                : renderScope
+              log(3, `${renderHint} · elapsed ${formatElapsed(renderElapsed)}`, Math.min(5 + pollAttempt * 2, 48))
               const statusRes = await fetch(apiUrl(`/api/render-status/${jobId}`), { signal: input.signal })
               if (statusRes.headers.get('content-type')?.includes('application/zip')) {
                 zipBuf = await statusRes.arrayBuffer()
