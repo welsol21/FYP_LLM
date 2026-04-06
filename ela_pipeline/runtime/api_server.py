@@ -1300,11 +1300,16 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
 
         if path == "/api/translate":
             # Async batch translation via worker process (avoids GIL blocking HTTP server).
-            # Body: {sentences: string[], provider, credentials?}
+            # Body: {sentences: string[], provider}
             # Returns {job_id} immediately; poll /api/translate-status/<job_id>.
             sentences_raw = body.get("sentences") or []
             provider = str(body.get("provider") or "m2m100").strip().lower()
-            credentials = body.get("credentials") or {}
+            if provider != "m2m100":
+                self._send_json(
+                    {"error": "Only m2m100 is allowed on backend translate endpoint."},
+                    status=400,
+                )
+                return
             if not isinstance(sentences_raw, list):
                 self._send_json({"error": "sentences must be an array"}, status=400)
                 return
@@ -1329,7 +1334,7 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
                 "job_id": job_id,
                 "sentences": list(sentences_raw),
                 "provider": provider,
-                "credentials": credentials,
+                "credentials": {},
             })
             self._send_json({"job_id": job_id, "status": "running"})
             return

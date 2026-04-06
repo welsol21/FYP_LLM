@@ -253,6 +253,96 @@ function _translateErrorMessage(raw: string): string {
   return `Translation failed: ${raw}`
 }
 
+function normalizeProviderId(provider: string | undefined): string {
+  return String(provider || '').trim().toLowerCase()
+}
+
+function splitIntoChunksBySize(texts: string[], maxItems: number, maxBytes: number): string[][] {
+  const out: string[][] = []
+  let chunk: string[] = []
+  let chunkBytes = 0
+  for (const text of texts) {
+    const trimmed = String(text || '').trim()
+    if (!trimmed) continue
+    const itemBytes = bytesOfText(trimmed)
+    const wouldOverflow = chunk.length >= maxItems || (chunk.length > 0 && chunkBytes + itemBytes > maxBytes)
+    if (wouldOverflow) {
+      out.push(chunk)
+      chunk = []
+      chunkBytes = 0
+    }
+    chunk.push(trimmed)
+    chunkBytes += itemBytes
+  }
+  if (chunk.length > 0) out.push(chunk)
+  return out
+}
+
+function parseJsonLoose(raw: string): unknown | null {
+  const text = String(raw || '').trim()
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    // continue
+  }
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
+  if (fenced?.[1]) {
+    try {
+      return JSON.parse(fenced[1])
+    } catch {
+      // continue
+    }
+  }
+  const objectStart = text.indexOf('{')
+  const objectEnd = text.lastIndexOf('}')
+  if (objectStart >= 0 && objectEnd > objectStart) {
+    try {
+      return JSON.parse(text.slice(objectStart, objectEnd + 1))
+    } catch {
+      // continue
+    }
+  }
+  const arrayStart = text.indexOf('[')
+  const arrayEnd = text.lastIndexOf(']')
+  if (arrayStart >= 0 && arrayEnd > arrayStart) {
+    try {
+      return JSON.parse(text.slice(arrayStart, arrayEnd + 1))
+    } catch {
+      // continue
+    }
+  }
+  return null
+}
+
+function toBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const slice = bytes.subarray(i, i + chunkSize)
+    binary += String.fromCharCode(...slice)
+  }
+  return btoa(binary)
+}
+
+function laraLocale(lang: string): string {
+  const value = String(lang || '').trim().toLowerCase()
+  if (!value) return 'en-US'
+  const mapping: Record<string, string> = {
+    en: 'en-US',
+    ru: 'ru-RU',
+    uk: 'uk-UA',
+    de: 'de-DE',
+    fr: 'fr-FR',
+    es: 'es-ES',
+    it: 'it-IT',
+    pt: 'pt-PT',
+    pl: 'pl-PL',
+    tr: 'tr-TR',
+  }
+  return mapping[value] || `${value}-${value.toUpperCase()}`
+}
+
 function contractHasProviderTranslations(contract: VisualizerPayload | null | undefined, provider: string): boolean {
   if (!contract || typeof contract !== 'object') return false
   const wanted = String(provider || '').trim()
@@ -1067,7 +1157,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       // Client-side opus-mt inference only runs in Tauri (offline desktop).
       // Browser PWA (desktop or Android) always routes m2m100 to the server.
       const isTauriRuntime = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
-      const BACKEND_PROVIDERS = new Set(['gpt', 'deepl', 'lara', ...(!isTauriRuntime || isAndroidDevice ? ['m2m100'] : [])])
+      const BACKEND_PROVIDERS = new Set([...(isAndroidDevice || !isTauriRuntime ? ['m2m100'] : [])])
       const providerIsOriginal = provider === 'original'
 
       // Collect all node texts recursively (skipping punctuation and already-translated nodes)
@@ -1116,12 +1206,17 @@ export class HttpRuntimeApi implements RuntimeApi {
         const tgt = String(candidate || '').trim().toLowerCase()
         return !!tgt && src !== tgt
       }
-      const enabledProvider = input.translatorOptions?.find((p: { id: string }) => p.id === provider)
-      const backendCredentials = (enabledProvider as any)?.credentials || {}
+      const enabledProvider = input.translatorOptions?.find(
+        (p: { id: string }) => normalizeProviderId(p.id) === provider,
+      )
+      const providerCredentials = (enabledProvider as { credentials?: Record<string, string> } | undefined)?.credentials || {}
       const runBackendTranslateBatch = async (
         texts: string[],
         phase: 'sentences' | 'nodes' = 'nodes',
       ): Promise<Record<string, string>> => {
+        if (provider !== 'm2m100') {
+          throw new Error(`Backend translate route is reserved for m2m100 (got "${provider || 'unknown'}").`)
+        }
         const payloadTexts = Array.from(new Set(texts.map((text) => text.trim()).filter(Boolean)))
         if (payloadTexts.length === 0) return {}
         const submitTranslateJob = async (): Promise<string> => {
@@ -1130,7 +1225,7 @@ export class HttpRuntimeApi implements RuntimeApi {
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sentences: payloadTexts, provider, credentials: backendCredentials }),
+              body: JSON.stringify({ sentences: payloadTexts, provider: 'm2m100' }),
               signal: input.signal,
             },
           )
@@ -1231,79 +1326,66 @@ export class HttpRuntimeApi implements RuntimeApi {
           for (const node of Object.values(contract)) markActiveProvider(node, provider)
           try {
             if (BACKEND_PROVIDERS.has(provider)) {
-              if (provider === 'm2m100') {
-                const sentenceEntries = Object.entries(contract)
-                const sentenceTexts = sentenceEntries
-                  .map(([sentenceText, node]) => {
-                    const sourceText = sentenceText.trim()
-                    if (!sourceText) return ''
-                    const existing = getNodeProviderTranslation(node, provider)
-                    return hasUsefulTranslation(sourceText, existing) ? '' : sourceText
-                  })
-                  .filter(Boolean)
-                if (sentenceTexts.length > 0) {
-                  log(2, `Translating ${sentenceTexts.length} sentences...`, 50)
-                  Object.assign(translations, await runBackendTranslateBatch(sentenceTexts, 'sentences'))
-                } else {
-                  log(2, 'All sentence translations already cached', 75)
-                }
-
-                const missingNodeTexts = new Set<string>()
-                let alignedNodes = 0
-                for (const [sentenceText, rootNode] of sentenceEntries) {
-                  const sourceSentence = sentenceText.trim()
-                  if (!sourceSentence) continue
-                  const translatedSentence = String(
-                    translations[sourceSentence]
-                    || translations[sentenceText]
-                    || getNodeProviderTranslation(rootNode, provider),
-                  ).trim()
-                  if (!translatedSentence) continue
-                  translations[sentenceText] = translatedSentence
-                  translations[sourceSentence] = translatedSentence
-                  const aligned = alignNodeTranslationsFromSentence({
-                    root: rootNode,
-                    sentenceSourceText: sourceSentence,
-                    sentenceTranslatedText: translatedSentence,
-                    provider,
-                  })
-                  alignedNodes += aligned.alignedCount
-                  for (const text of aligned.missingNodeTexts) missingNodeTexts.add(text)
-                }
-
-                if (missingNodeTexts.size > 0) {
-                  log(2, `Resolving ${missingNodeTexts.size} node fragments...`, 92)
-                  const fallbackTranslations = await runBackendTranslateBatch(Array.from(missingNodeTexts), 'nodes')
-                  Object.assign(translations, fallbackTranslations)
-                  for (const rootNode of Object.values(contract)) {
-                    fillMissingNodeTranslations({
-                      root: rootNode,
-                      provider,
-                      translationMap: fallbackTranslations,
-                    })
-                  }
-                }
-                recordRuntimeDiagnostic('api.media.backend', 'translate.alignment', {
-                  provider,
-                  sentences: Object.keys(contract).length,
-                  alignedNodes,
-                  fallbackNodes: missingNodeTexts.size,
+              if (provider !== 'm2m100') {
+                throw new Error(`Provider "${provider}" is not allowed on backend translate route.`)
+              }
+              const sentenceEntries = Object.entries(contract)
+              const sentenceTexts = sentenceEntries
+                .map(([sentenceText, node]) => {
+                  const sourceText = sentenceText.trim()
+                  if (!sourceText) return ''
+                  const existing = getNodeProviderTranslation(node, provider)
+                  return hasUsefulTranslation(sourceText, existing) ? '' : sourceText
                 })
+                .filter(Boolean)
+              if (sentenceTexts.length > 0) {
+                log(2, `Translating ${sentenceTexts.length} sentences...`, 50)
+                Object.assign(translations, await runBackendTranslateBatch(sentenceTexts, 'sentences'))
               } else {
-                // Non-M2M100 providers already handle context well enough with direct node translations.
-                const allTexts = new Set<string>()
-                for (const [sentenceText, node] of Object.entries(contract)) {
-                  if (!getNodeProviderTranslation(node, provider)) allTexts.add(sentenceText.trim())
-                  collectNodeTexts(node, allTexts, provider)
-                }
-                const allTextsList = Array.from(allTexts)
-                if (allTextsList.length > 0) {
-                  log(2, `Translating ${allTextsList.length} texts...`, 50)
-                  Object.assign(translations, await runBackendTranslateBatch(allTextsList, 'nodes'))
-                } else {
-                  log(2, 'All nodes already translated — skipping API call', 100)
+                log(2, 'All sentence translations already cached', 75)
+              }
+
+              const missingNodeTexts = new Set<string>()
+              let alignedNodes = 0
+              for (const [sentenceText, rootNode] of sentenceEntries) {
+                const sourceSentence = sentenceText.trim()
+                if (!sourceSentence) continue
+                const translatedSentence = String(
+                  translations[sourceSentence]
+                  || translations[sentenceText]
+                  || getNodeProviderTranslation(rootNode, provider),
+                ).trim()
+                if (!translatedSentence) continue
+                translations[sentenceText] = translatedSentence
+                translations[sourceSentence] = translatedSentence
+                const aligned = alignNodeTranslationsFromSentence({
+                  root: rootNode,
+                  sentenceSourceText: sourceSentence,
+                  sentenceTranslatedText: translatedSentence,
+                  provider,
+                })
+                alignedNodes += aligned.alignedCount
+                for (const text of aligned.missingNodeTexts) missingNodeTexts.add(text)
+              }
+
+              if (missingNodeTexts.size > 0) {
+                log(2, `Resolving ${missingNodeTexts.size} node fragments...`, 92)
+                const fallbackTranslations = await runBackendTranslateBatch(Array.from(missingNodeTexts), 'nodes')
+                Object.assign(translations, fallbackTranslations)
+                for (const rootNode of Object.values(contract)) {
+                  fillMissingNodeTranslations({
+                    root: rootNode,
+                    provider,
+                    translationMap: fallbackTranslations,
+                  })
                 }
               }
+              recordRuntimeDiagnostic('api.media.backend', 'translate.alignment', {
+                provider,
+                sentences: Object.keys(contract).length,
+                alignedNodes,
+                fallbackNodes: missingNodeTexts.size,
+              })
             } else {
               const allTexts = new Set<string>()
               for (const [sentenceText, node] of Object.entries(contract)) {
@@ -1312,9 +1394,11 @@ export class HttpRuntimeApi implements RuntimeApi {
               }
               const allTextsList = Array.from(allTexts)
               if (allTextsList.length > 0) {
-                // Use local opus-mt-en-ru WASM worker — translate all collected texts (sentences + phrases)
-                translations = await this._clientTranslateTexts(
+                // Client-side provider translation path (paid providers + local m2m100 in Tauri runtime).
+                translations = await this._clientTranslateTextsWithProvider(
+                  provider,
                   allTextsList,
+                  providerCredentials,
                   (done, ttl) => log(2, `Translating (${done}/${ttl})`, 50 + Math.round((done / Math.max(ttl, 1)) * 48)),
                   input.signal,
                 )
@@ -1642,6 +1726,305 @@ export class HttpRuntimeApi implements RuntimeApi {
       }
       worker.postMessage({ type: 'translate', id, sentences })
     })
+  }
+
+  private async _clientTranslateTextsWithProvider(
+    provider: string,
+    texts: string[],
+    credentials: Record<string, string>,
+    onProgress: (done: number, total: number) => void,
+    signal?: AbortSignal,
+  ): Promise<Record<string, string>> {
+    const normalized = normalizeProviderId(provider)
+    if (normalized === 'gpt') {
+      return await this._clientTranslateTextsWithOpenAI(texts, credentials, onProgress, signal)
+    }
+    if (normalized === 'deepl') {
+      return await this._clientTranslateTextsWithDeepL(texts, credentials, onProgress, signal)
+    }
+    if (normalized === 'lara') {
+      return await this._clientTranslateTextsWithLara(texts, credentials, onProgress, signal)
+    }
+    return await this._clientTranslateTexts(texts, onProgress, signal)
+  }
+
+  private _extractTranslationsArray(payload: unknown, expectedCount: number): string[] | null {
+    const normalizeItem = (value: unknown): string => {
+      if (typeof value === 'string') return value.trim()
+      if (value && typeof value === 'object' && 'text' in (value as Record<string, unknown>)) {
+        return String((value as { text?: unknown }).text || '').trim()
+      }
+      return String(value ?? '').trim()
+    }
+    if (Array.isArray(payload)) {
+      if (payload.length !== expectedCount) return null
+      return payload.map(normalizeItem)
+    }
+    if (typeof payload === 'string' && expectedCount === 1) return [payload.trim()]
+    if (!payload || typeof payload !== 'object') return null
+    const row = payload as Record<string, unknown>
+    const direct = row.translations ?? row.translation
+    if (Array.isArray(direct)) {
+      if (direct.length !== expectedCount) return null
+      return direct.map(normalizeItem)
+    }
+    if (typeof direct === 'string' && expectedCount === 1) {
+      return [direct.trim()]
+    }
+    const indexed = Array.from({ length: expectedCount }, (_, idx) => row[String(idx)] ?? row[idx])
+    if (indexed.some((value) => value == null)) return null
+    return indexed.map(normalizeItem)
+  }
+
+  private async _clientTranslateTextsWithOpenAI(
+    texts: string[],
+    credentials: Record<string, string>,
+    onProgress: (done: number, total: number) => void,
+    signal?: AbortSignal,
+  ): Promise<Record<string, string>> {
+    const apiKey = String(credentials.api_key || '').trim()
+    if (!apiKey) throw new Error('OpenAI provider selected but API key is missing.')
+    const model = String(credentials.model || 'gpt-4o-mini').trim() || 'gpt-4o-mini'
+    const baseUrl = String(credentials.base_url || 'https://api.openai.com/v1').trim().replace(/\/+$/, '')
+    const endpoint = `${baseUrl}/chat/completions`
+
+    const uniqueTexts = Array.from(new Set(texts.map((value) => String(value || '').trim()).filter(Boolean)))
+    if (uniqueTexts.length === 0) return {}
+
+    const chunks = splitIntoChunksBySize(uniqueTexts, 24, 32000)
+    const out: Record<string, string> = {}
+    let done = 0
+    onProgress(0, uniqueTexts.length)
+
+    for (const chunk of chunks) {
+      if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
+      const body = {
+        model,
+        temperature: 0,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Translate each input text from English to Russian. Return JSON only: {"translations":[...]} with exactly the same number and order.',
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({ translations: chunk }),
+          },
+        ],
+      }
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal,
+      })
+      const raw = await res.text().catch(() => '')
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${raw}`)
+      }
+      const payload = parseJsonLoose(raw) as
+        | { choices?: Array<{ message?: { content?: string } }> }
+        | null
+      const content = String(payload?.choices?.[0]?.message?.content || '').trim()
+      const parsedContent = parseJsonLoose(content)
+      const translated = this._extractTranslationsArray(parsedContent, chunk.length)
+      if (!translated) {
+        throw new Error('OpenAI response format is invalid for batch translation.')
+      }
+      chunk.forEach((source, idx) => { out[source] = String(translated[idx] || '').trim() })
+      done += chunk.length
+      onProgress(done, uniqueTexts.length)
+    }
+    return out
+  }
+
+  private async _clientTranslateTextsWithDeepL(
+    texts: string[],
+    credentials: Record<string, string>,
+    onProgress: (done: number, total: number) => void,
+    signal?: AbortSignal,
+  ): Promise<Record<string, string>> {
+    const authKey = String(credentials.auth_key || '').trim()
+    if (!authKey) throw new Error('DeepL provider selected but auth key is missing.')
+    const baseUrl = String(
+      credentials.base_url
+      || (authKey.toLowerCase().endsWith(':fx') ? 'https://api-free.deepl.com/v2' : 'https://api.deepl.com/v2'),
+    ).trim().replace(/\/+$/, '')
+    const endpoint = `${baseUrl}/translate`
+    const sourceLang = String(credentials.source_lang || 'EN').trim().toUpperCase()
+    const targetLang = String(credentials.target_lang || 'RU').trim().toUpperCase()
+
+    const uniqueTexts = Array.from(new Set(texts.map((value) => String(value || '').trim()).filter(Boolean)))
+    if (uniqueTexts.length === 0) return {}
+
+    const chunks = splitIntoChunksBySize(uniqueTexts, 50, 110000)
+    const out: Record<string, string> = {}
+    let done = 0
+    onProgress(0, uniqueTexts.length)
+
+    for (const chunk of chunks) {
+      if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
+      const params = new URLSearchParams()
+      params.set('source_lang', sourceLang)
+      params.set('target_lang', targetLang)
+      params.set('preserve_formatting', '1')
+      for (const text of chunk) params.append('text', text)
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `DeepL-Auth-Key ${authKey}`,
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        },
+        body: params.toString(),
+        signal,
+      })
+      const raw = await res.text().catch(() => '')
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${raw}`)
+      }
+      const payload = parseJsonLoose(raw) as { translations?: Array<{ text?: string }> } | null
+      const translated = Array.isArray(payload?.translations)
+        ? payload?.translations.map((row) => String(row?.text || '').trim())
+        : null
+      if (!translated || translated.length !== chunk.length) {
+        throw new Error('DeepL response format is invalid for batch translation.')
+      }
+      chunk.forEach((source, idx) => { out[source] = translated[idx] })
+      done += chunk.length
+      onProgress(done, uniqueTexts.length)
+    }
+    return out
+  }
+
+  private async _laraDigestBase64(data: string): Promise<string> {
+    const subtle = globalThis.crypto?.subtle
+    if (!subtle) throw new Error('Lara provider requires WebCrypto support in this browser.')
+    const digest = await subtle.digest('SHA-256', new TextEncoder().encode(data))
+    return toBase64(new Uint8Array(digest).slice(0, 16))
+  }
+
+  private async _hmacSha256Base64(secret: string, data: string): Promise<string> {
+    const subtle = globalThis.crypto?.subtle
+    if (!subtle) throw new Error('Lara provider requires WebCrypto support in this browser.')
+    const key = await subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: { name: 'SHA-256' } },
+      false,
+      ['sign'],
+    )
+    const signature = await subtle.sign('HMAC', key, new TextEncoder().encode(data))
+    return toBase64(new Uint8Array(signature))
+  }
+
+  private async _clientLaraAuthToken(
+    baseUrl: string,
+    apiId: string,
+    apiSecret: string,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const path = '/v2/auth'
+    const body = JSON.stringify({ id: apiId })
+    const date = new Date().toUTCString()
+    const contentType = 'application/json'
+    const contentMd5 = await this._laraDigestBase64(body)
+    const challenge = `POST\n${path}\n${contentMd5}\n${contentType}\n${date}`
+    const signature = await this._hmacSha256Base64(apiSecret, challenge)
+    const res = await fetch(`${baseUrl}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': contentType,
+        'X-Lara-Date': date,
+        'Content-MD5': contentMd5,
+        Authorization: `Lara:${signature}`,
+      },
+      body,
+      signal,
+    })
+    const raw = await res.text().catch(() => '')
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${raw}`)
+    const parsed = parseJsonLoose(raw) as { token?: string } | null
+    const token = String(parsed?.token || '').trim()
+    if (!token) throw new Error('Lara authentication failed: token is missing.')
+    return token
+  }
+
+  private _extractLaraTranslationArray(raw: string, expectedCount: number): string[] | null {
+    const candidates: unknown[] = []
+    const full = parseJsonLoose(raw)
+    if (full != null) candidates.push(full)
+    const lines = String(raw || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+    for (const line of lines) {
+      const parsed = parseJsonLoose(line)
+      if (parsed != null) candidates.push(parsed)
+    }
+    for (let i = candidates.length - 1; i >= 0; i -= 1) {
+      const row = candidates[i] as Record<string, unknown>
+      const payload = (row?.data as Record<string, unknown> | undefined)?.content
+        ?? row?.data
+        ?? row
+      const translated = this._extractTranslationsArray(payload, expectedCount)
+      if (translated) return translated
+    }
+    return null
+  }
+
+  private async _clientTranslateTextsWithLara(
+    texts: string[],
+    credentials: Record<string, string>,
+    onProgress: (done: number, total: number) => void,
+    signal?: AbortSignal,
+  ): Promise<Record<string, string>> {
+    const apiId = String(credentials.api_id || '').trim()
+    const apiSecret = String(credentials.api_secret || '').trim()
+    if (!apiId || !apiSecret) throw new Error('Lara provider selected but API credentials are missing.')
+    const baseUrl = String(credentials.base_url || 'https://api.laratranslate.com').trim().replace(/\/+$/, '')
+    const source = laraLocale(String(credentials.source_lang || 'en'))
+    const target = laraLocale(String(credentials.target_lang || 'ru'))
+
+    const uniqueTexts = Array.from(new Set(texts.map((value) => String(value || '').trim()).filter(Boolean)))
+    if (uniqueTexts.length === 0) return {}
+
+    const token = await this._clientLaraAuthToken(baseUrl, apiId, apiSecret, signal)
+    const chunks = splitIntoChunksBySize(uniqueTexts, 32, 64000)
+    const out: Record<string, string> = {}
+    let done = 0
+    onProgress(0, uniqueTexts.length)
+
+    for (const chunk of chunks) {
+      if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
+      const res = await fetch(`${baseUrl}/translate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Lara-Date': new Date().toUTCString(),
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          q: chunk,
+          source,
+          target,
+          multiline: true,
+        }),
+        signal,
+      })
+      const raw = await res.text().catch(() => '')
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${raw}`)
+      }
+      const translated = this._extractLaraTranslationArray(raw, chunk.length)
+      if (!translated) throw new Error('Lara response format is invalid for batch translation.')
+      chunk.forEach((sourceText, idx) => { out[sourceText] = String(translated[idx] || '').trim() })
+      done += chunk.length
+      onProgress(done, uniqueTexts.length)
+    }
+    return out
   }
 
   private _clientTranslateTexts(

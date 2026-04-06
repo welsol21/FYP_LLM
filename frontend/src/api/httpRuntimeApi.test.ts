@@ -380,4 +380,67 @@ describe('HttpRuntimeApi', () => {
     expect(Number(translatedVideo?.size_bytes || 0)).toBeGreaterThan(0)
     expect(String(translatedVideo?.download_url || '')).not.toBe('')
   })
+
+  it('routes DeepL provider translation through browser API (not backend /api/translate)', async () => {
+    const api = new HttpRuntimeApi()
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ translations: [{ text: 'Привет' }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    const out = await (api as unknown as {
+      _clientTranslateTextsWithProvider: (
+        provider: string,
+        texts: string[],
+        credentials: Record<string, string>,
+        onProgress: (done: number, total: number) => void,
+      ) => Promise<Record<string, string>>
+    })._clientTranslateTextsWithProvider(
+      'deepl',
+      ['Hello'],
+      { auth_key: 'test-auth-key:fx' },
+      () => {},
+    )
+
+    expect(out.Hello).toBe('Привет')
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('api-free.deepl.com')
+    expect(String(fetchSpy.mock.calls[0][0])).not.toContain('/api/translate')
+  })
+
+  it('routes OpenAI provider translation through browser API (not backend /api/translate)', async () => {
+    const api = new HttpRuntimeApi()
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: JSON.stringify({ translations: ['Здравствуйте'] }) } }],
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    )
+
+    const out = await (api as unknown as {
+      _clientTranslateTextsWithProvider: (
+        provider: string,
+        texts: string[],
+        credentials: Record<string, string>,
+        onProgress: (done: number, total: number) => void,
+      ) => Promise<Record<string, string>>
+    })._clientTranslateTextsWithProvider(
+      'gpt',
+      ['Hello'],
+      { api_key: 'test-openai-key' },
+      () => {},
+    )
+
+    expect(out.Hello).toBe('Здравствуйте')
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(String(fetchSpy.mock.calls[0][0])).toContain('api.openai.com/v1/chat/completions')
+    expect(String(fetchSpy.mock.calls[0][0])).not.toContain('/api/translate')
+  })
 })
