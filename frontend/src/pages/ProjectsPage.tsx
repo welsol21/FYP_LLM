@@ -17,17 +17,75 @@ export function ProjectsPage() {
   const tapRef = useRef<{ rowId: string; ts: number } | null>(null)
 
   async function refresh() {
-    const [projects, selected, allFiles] = await Promise.all([
+    const [projects, selected, allFiles, allAnalyses] = await Promise.all([
       api.listProjects(),
       api.getSelectedProject(),
       api.listFiles(),
+      api.listAnalysisHistory(),
     ])
     setRows(projects)
     setSelectedId(selected.project_id ?? null)
     const statsMap: Record<string, ProjectStat> = {}
+    const projectIds = new Set(projects.map((project) => project.id))
+    const projectIdByName = new Map(
+      projects.map((project) => [String(project.name || '').trim().toLowerCase(), project.id] as const),
+    )
+    const singletonProjectId = projects.length === 1 ? projects[0].id : ''
+    const resolveProjectId = (rawProjectId: string, rawProjectName: string): string => {
+      const byId = String(rawProjectId || '').trim()
+      if (byId && projectIds.has(byId)) return byId
+      const byName = projectIdByName.get(String(rawProjectName || '').trim().toLowerCase())
+      if (byName) return byName
+      return singletonProjectId
+    }
+    const fileProjectByKey = new Map<string, string>()
+    for (const file of allFiles) {
+      const projectId = resolveProjectId(
+        String((file.project_id || (file as { projectId?: string }).projectId || '')).trim(),
+        '',
+      )
+      if (!projectId) continue
+      const fileId = String(file.id || '').trim()
+      const filePath = String((file.path || (file as { file_path?: string }).file_path || '')).trim()
+      const fileName = String(file.name || '').trim().toLowerCase()
+      if (fileId) fileProjectByKey.set(`id:${fileId}`, projectId)
+      if (filePath) fileProjectByKey.set(`path:${filePath}`, projectId)
+      if (fileName) fileProjectByKey.set(`name:${fileName}`, projectId)
+    }
+    const analyzedByProject = new Map<string, Set<string>>()
+    for (const row of allAnalyses) {
+      let projectId = resolveProjectId(
+        String((row.project_id || (row as { projectId?: string }).projectId || '')).trim(),
+        String((row.project_name || (row as { projectName?: string }).projectName || '')).trim(),
+      )
+      if (!projectId) {
+        const fileId = String(row.media_file_id || '').trim()
+        const filePath = String(row.file_path || '').trim()
+        const fileName = String(row.file_name || '').trim().toLowerCase()
+        projectId = fileProjectByKey.get(`id:${fileId}`)
+          || fileProjectByKey.get(`path:${filePath}`)
+          || fileProjectByKey.get(`name:${fileName}`)
+          || ''
+      }
+      if (!projectId) continue
+      const key = String(row.media_file_id || row.file_path || row.file_name || row.document_id || row.analysis_id || '').trim()
+      if (!key) continue
+      if (!analyzedByProject.has(projectId)) analyzedByProject.set(projectId, new Set())
+      analyzedByProject.get(projectId)?.add(key)
+    }
     for (const p of projects) {
-      const pFiles = allFiles.filter((f) => f.project_id === p.id)
-      statsMap[p.id] = { analyzed: pFiles.filter((f) => f.analyzed).length, total: pFiles.length }
+      const pFiles = allFiles.filter((f) => {
+        const projectId = resolveProjectId(
+          String((f.project_id || (f as { projectId?: string }).projectId || '')).trim(),
+          '',
+        )
+        return projectId === p.id
+      })
+      const total = pFiles.length
+      const analyzedFromFiles = pFiles.filter((f) => Boolean(f.analyzed)).length
+      const analyzedFromHistory = analyzedByProject.get(p.id)?.size || 0
+      const analyzed = Math.max(analyzedFromFiles, analyzedFromHistory)
+      statsMap[p.id] = { analyzed, total: total > 0 ? total : analyzedFromHistory }
     }
     setStats(statsMap)
   }

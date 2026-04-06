@@ -286,6 +286,90 @@ describe('HttpRuntimeApi', () => {
 
   // 'fails with clear error when backend upload returns 404' removed — /api/upload no longer exists.
 
+  it('migrates legacy camelCase workspace fields on reload without losing providers or file links', async () => {
+    await LocalWorkspace.__resetForTests()
+    const legacyState = {
+      projects: [
+        {
+          id: 'proj-legacy',
+          name: 'Legacy Project',
+          createdAt: '2026-04-01T10:00:00.000Z',
+          updatedAt: '2026-04-01T10:05:00.000Z',
+        },
+      ],
+      selectedProjectId: 'proj-legacy',
+      files: [
+        {
+          id: 'file-legacy-1',
+          projectId: 'proj-legacy',
+          name: 'legacy.mp3',
+          mediaPath: '/client-media/legacy/legacy.mp3',
+          sizeBytes: 1234,
+          durationSec: 5,
+          settings: 'Transl: deepl / Subs: bilingual_sequential / Voice: male / Proc: incremental',
+          updatedAt: '2026-04-01T10:05:00.000Z',
+          createdAt: '2026-04-01T10:00:00.000Z',
+          analyzed: true,
+          documentId: 'doc-legacy-1',
+        },
+      ],
+      analyses: [
+        {
+          analysisId: 'doc-legacy-1',
+          documentId: 'doc-legacy-1',
+          projectId: 'proj-legacy',
+          projectName: 'Legacy Project',
+          mediaFileId: 'file-legacy-1',
+          fileName: 'legacy.mp3',
+          filePath: '/client-media/legacy/legacy.mp3',
+          settings: 'Transl: deepl / Subs: bilingual_sequential / Voice: male / Proc: incremental',
+          itemsCount: 1,
+          contractCurrent: true,
+          updatedAt: '2026-04-01T10:05:00.000Z',
+          createdAt: '2026-04-01T10:00:00.000Z',
+          contract: {
+            'Legacy sentence.': {
+              node_id: 'n-1',
+              type: 'sentence',
+              content: 'Legacy sentence.',
+              tense: '',
+              linguistic_notes: { elementary: '', intermediate: '', advanced: '' },
+              part_of_speech: 'sentence',
+              linguistic_elements: [],
+              translations: { deepl: { text: 'Легаси предложение.' } },
+            },
+          },
+          artifacts: [],
+        },
+      ],
+      translationConfig: {
+        defaultProvider: 'deepl',
+        providers: [
+          { id: 'm2m100', label: 'M2M100', kind: 'builtin', enabled: true, credentialFields: [], credentials: {} },
+          { id: 'deepl', label: 'DeepL', kind: 'builtin', enabled: true, credentialFields: ['auth_key'], credentials: { auth_key: 'k' } },
+          { id: 'gpt', label: 'OpenAI GPT', kind: 'builtin', enabled: true, credentialFields: ['api_key'], credentials: { api_key: 'g' } },
+        ],
+      },
+    }
+    window.localStorage.setItem('ela_frontend_workspace_v1', JSON.stringify(legacyState))
+
+    const projects = await LocalWorkspace.listProjects()
+    expect(projects.some((row) => row.id === 'proj-legacy')).toBe(true)
+
+    const files = await LocalWorkspace.listFiles('proj-legacy')
+    expect(files.length).toBe(1)
+    expect(files[0].project_id).toBe('proj-legacy')
+    expect(files[0].analyzed).toBe(true)
+    expect(files[0].document_id).toBe('doc-legacy-1')
+
+    const cfg = await LocalWorkspace.getTranslationConfig()
+    expect(cfg).not.toBeNull()
+    const resolvedCfg = cfg as NonNullable<typeof cfg>
+    expect(resolvedCfg.default_provider).toBe('deepl')
+    expect(resolvedCfg.providers.find((provider) => provider.id === 'deepl')?.enabled).toBe(true)
+    expect(resolvedCfg.providers.find((provider) => provider.id === 'gpt')?.enabled).toBe(true)
+  })
+
   it('exposes cached translated media artifacts for audio analyses', async () => {
     const selected = await LocalWorkspace.getSelectedProject()
     const projectId = String(selected.project_id || '')
@@ -408,6 +492,39 @@ describe('HttpRuntimeApi', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     expect(String(fetchSpy.mock.calls[0][0])).toContain('api-free.deepl.com')
     expect(String(fetchSpy.mock.calls[0][0])).not.toContain('/api/translate')
+  })
+
+  it('falls back to backend relay when DeepL direct browser fetch is blocked', async () => {
+    const api = new HttpRuntimeApi()
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ translations: { Hello: 'Привет' } }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
+      )
+
+    const out = await (api as unknown as {
+      _clientTranslateTextsWithProvider: (
+        provider: string,
+        texts: string[],
+        credentials: Record<string, string>,
+        onProgress: (done: number, total: number) => void,
+      ) => Promise<Record<string, string>>
+    })._clientTranslateTextsWithProvider(
+      'deepl',
+      ['Hello'],
+      { auth_key: 'test-auth-key:fx' },
+      () => {},
+    )
+
+    expect(out.Hello).toBe('Привет')
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    expect(String(fetchSpy.mock.calls[1][0])).toContain('/api/provider-translate')
   })
 
   it('routes OpenAI provider translation through browser API (not backend /api/translate)', async () => {

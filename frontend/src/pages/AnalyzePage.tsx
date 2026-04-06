@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useApi } from '../api/apiContext'
 import { buildAnalysisFeatureBadges, buildExportFileName } from '../lib/analysisSettings'
+import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics'
 import type {
   DocumentArtifact,
   MediaFileRow,
@@ -39,6 +40,24 @@ type AnalysisHistoryGroup = {
   items: AnalysisHistoryItem[]
 }
 
+const FALLBACK_TRANSLATION_CONFIG: TranslationConfig = {
+  default_provider: 'm2m100',
+  providers: [
+    { id: 'm2m100', label: 'M2M100', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} },
+    { id: 'gpt', label: 'OpenAI GPT', kind: 'builtin', enabled: false, credential_fields: ['api_key'], credentials: { api_key: '' } },
+    { id: 'deepl', label: 'DeepL', kind: 'builtin', enabled: false, credential_fields: ['auth_key'], credentials: { auth_key: '' } },
+    {
+      id: 'lara',
+      label: 'Lara',
+      kind: 'builtin',
+      enabled: false,
+      credential_fields: ['api_id', 'api_secret'],
+      credentials: { api_id: '', api_secret: '' },
+    },
+    { id: 'original', label: 'Original only (no translation)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} },
+  ],
+}
+
 function parseTimestamp(value: string): number {
   const parsed = Date.parse(value)
   return Number.isFinite(parsed) ? parsed : 0
@@ -54,6 +73,25 @@ function formatHistoryTime(value: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+async function sleepMs(ms: number): Promise<void> {
+  await new Promise((resolve) => window.setTimeout(resolve, ms))
+}
+
+async function withRetry<T>(fn: () => Promise<T>, attempts: number, baseDelayMs: number): Promise<T> {
+  let lastErr: unknown = null
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastErr = err
+      if (i < attempts - 1) {
+        await sleepMs(baseDelayMs * (i + 1))
+      }
+    }
+  }
+  throw lastErr
 }
 
 export function AnalyzePage() {
@@ -86,22 +124,66 @@ export function AnalyzePage() {
 
   useEffect(() => {
     let stopped = false
-    Promise.all([api.getSelectedProject(), api.getTranslationConfig(), api.listProjects()]).then(([selected, cfg, allProjects]) => {
-      if (stopped) return
-      const fallbackProject = allProjects[0]
-      setSelectedProject(
-        selected.project_id
-          ? selected
-          : {
-              project_id: fallbackProject?.id || null,
-              project_name: fallbackProject?.name,
-            },
-      )
-      setTranslationConfig(cfg)
-      setProjects(allProjects)
-      // For direct Analyze entry, keep selector empty until user chooses project/file explicitly.
-      setDirectProjectId((prev) => (analyzeEntry === 'direct' ? prev : (prev || selected.project_id || allProjects[0]?.id || '')))
-    })
+    void Promise.allSettled([api.getSelectedProject(), api.listProjects()])
+      .then((results) => {
+        if (stopped) return
+        const selectedResult = results[0]
+        const projectsResult = results[1]
+        const selected = selectedResult.status === 'fulfilled'
+          ? selectedResult.value
+          : { project_id: null, project_name: undefined }
+        const allProjects = projectsResult.status === 'fulfilled' ? projectsResult.value : []
+        const fallbackProject = allProjects[0]
+        setSelectedProject(
+          selected.project_id
+            ? selected
+            : {
+                project_id: fallbackProject?.id || null,
+                project_name: fallbackProject?.name,
+              },
+        )
+        setProjects(allProjects)
+        // For direct Analyze entry, keep selector empty until user chooses project/file explicitly.
+        setDirectProjectId((prev) => (analyzeEntry === 'direct' ? prev : (prev || selected.project_id || allProjects[0]?.id || '')))
+      })
+    const loadTranslationConfig = async (): Promise<void> => {
+      try {
+        const cfg = await withRetry(() => api.getTranslationConfig(), 4, 250)
+        if (stopped) return
+        setTranslationConfig(cfg || FALLBACK_TRANSLATION_CONFIG)
+        recordRuntimeDiagnostic('ui.analyze', 'translation_config.loaded', {
+          providers: (cfg?.providers || []).map((provider) => ({
+            id: provider.id,
+            enabled: provider.enabled,
+          })),
+          defaultProvider: cfg?.default_provider || 'm2m100',
+        })
+      } catch (err) {
+        recordRuntimeDiagnostic('ui.analyze', 'translation_config.load_error', err, 'error')
+        if (stopped) return
+        // Keep "Loading…" instead of an incorrect fallback, then do one delayed retry.
+        setTranslationConfig(null)
+        window.setTimeout(async () => {
+          if (stopped) return
+          try {
+            const retryCfg = await withRetry(() => api.getTranslationConfig(), 3, 400)
+            if (stopped) return
+            setTranslationConfig(retryCfg || FALLBACK_TRANSLATION_CONFIG)
+            recordRuntimeDiagnostic('ui.analyze', 'translation_config.retry_loaded', {
+              providers: (retryCfg?.providers || []).map((provider) => ({
+                id: provider.id,
+                enabled: provider.enabled,
+              })),
+              defaultProvider: retryCfg?.default_provider || 'm2m100',
+            })
+          } catch (retryErr) {
+            recordRuntimeDiagnostic('ui.analyze', 'translation_config.retry_failed', retryErr, 'error')
+            if (!stopped) setTranslationConfig(FALLBACK_TRANSLATION_CONFIG)
+          }
+        }, 900)
+      }
+    }
+    void loadTranslationConfig()
     return () => {
       stopped = true
     }

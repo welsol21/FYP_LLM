@@ -24,11 +24,6 @@ type Props = {
 
 const STAGES = ['Loading file', 'Transcribing audio', 'Linguistic parsing', 'Generating media', 'Exporting files']
 
-function hasRequiredCredentials(provider: TranslationProviderConfig): boolean {
-  if (!provider.credential_fields.length) return true
-  return provider.credential_fields.every((field) => String(provider.credentials[field] || '').trim().length > 0)
-}
-
 export function MediaSubmitForm({
   onSubmitted,
   onProgress,
@@ -61,7 +56,7 @@ export function MediaSubmitForm({
       currentControllerRef.current = null
     }
   }, [])
-  const enabledProviders = translatorOptions.filter((p) => p.enabled && hasRequiredCredentials(p))
+  const enabledProviders = translatorOptions.filter((p) => p.enabled)
   const subtitleOptions: Array<{ label: string; value: string }> = [
     { label: 'Bilingual (sequential)', value: 'bilingual_sequential' },
     { label: 'Bilingual (simultaneous)', value: 'bilingual_simultaneous' },

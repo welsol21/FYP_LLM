@@ -253,6 +253,16 @@ function _translateErrorMessage(raw: string): string {
   return `Translation failed: ${raw}`
 }
 
+function isLikelyNetworkFetchError(err: unknown): boolean {
+  const text = String(err instanceof Error ? err.message : err || '').trim().toLowerCase()
+  return (
+    text.includes('failed to fetch') ||
+    text.includes('networkerror') ||
+    text.includes('load failed') ||
+    text.includes('fetch failed')
+  )
+}
+
 function normalizeProviderId(provider: string | undefined): string {
   return String(provider || '').trim().toLowerCase()
 }
@@ -1979,34 +1989,69 @@ export class HttpRuntimeApi implements RuntimeApi {
     let done = 0
     onProgress(0, uniqueTexts.length)
 
+    const relayChunkViaBackend = async (chunk: string[]): Promise<string[]> => {
+      const relay = await requestJson<{ translations?: Record<string, string> }>(
+        apiUrl('/api/provider-translate'),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider: 'deepl',
+            texts: chunk,
+            credentials: { auth_key: authKey },
+            source_lang: sourceLang,
+            target_lang: targetLang,
+          }),
+          signal,
+        },
+      )
+      const mapped = relay?.translations || {}
+      const translated = chunk.map((text) => String(mapped[text] || '').trim())
+      if (translated.some((text) => !text)) {
+        throw new Error('DeepL relay response is invalid for batch translation.')
+      }
+      return translated
+    }
+
     for (const chunk of chunks) {
       if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
-      const params = new URLSearchParams()
-      params.set('source_lang', sourceLang)
-      params.set('target_lang', targetLang)
-      params.set('preserve_formatting', '1')
-      for (const text of chunk) params.append('text', text)
+      let translated: string[] | null = null
+      try {
+        const params = new URLSearchParams()
+        params.set('source_lang', sourceLang)
+        params.set('target_lang', targetLang)
+        params.set('preserve_formatting', '1')
+        for (const text of chunk) params.append('text', text)
 
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          Authorization: `DeepL-Auth-Key ${authKey}`,
-          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-        },
-        body: params.toString(),
-        signal,
-      })
-      const raw = await res.text().catch(() => '')
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${raw}`)
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            Authorization: `DeepL-Auth-Key ${authKey}`,
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          },
+          body: params.toString(),
+          signal,
+        })
+        const raw = await res.text().catch(() => '')
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${raw}`)
+        }
+        const payload = parseJsonLoose(raw) as { translations?: Array<{ text?: string }> } | null
+        translated = Array.isArray(payload?.translations)
+          ? payload?.translations.map((row) => String(row?.text || '').trim())
+          : null
+        if (!translated || translated.length !== chunk.length) {
+          throw new Error('DeepL response format is invalid for batch translation.')
+        }
+      } catch (err) {
+        if (!isLikelyNetworkFetchError(err)) throw err
+        recordRuntimeDiagnostic('api.media.backend', 'translate.deepl.relay_fallback', {
+          chunkSize: chunk.length,
+          reason: String(err instanceof Error ? err.message : err),
+        }, 'error')
+        translated = await relayChunkViaBackend(chunk)
       }
-      const payload = parseJsonLoose(raw) as { translations?: Array<{ text?: string }> } | null
-      const translated = Array.isArray(payload?.translations)
-        ? payload?.translations.map((row) => String(row?.text || '').trim())
-        : null
-      if (!translated || translated.length !== chunk.length) {
-        throw new Error('DeepL response format is invalid for batch translation.')
-      }
+
       chunk.forEach((source, idx) => { out[source] = translated[idx] })
       done += chunk.length
       onProgress(done, uniqueTexts.length)

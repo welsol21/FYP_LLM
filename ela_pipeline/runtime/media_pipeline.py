@@ -501,12 +501,15 @@ class _DeepLTranslator:
     def __init__(self, auth_key: str) -> None:
         self.auth_key = auth_key
 
-    def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
+    def _client(self):
         try:
             import deepl  # type: ignore[import-not-found]
         except Exception as exc:
             raise RuntimeError("DeepL provider requires `deepl` package.") from exc
-        tr = deepl.Translator(self.auth_key)
+        return deepl.Translator(self.auth_key)
+
+    def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
+        tr = self._client()
         return str(
             tr.translate_text(
                 text,
@@ -514,6 +517,22 @@ class _DeepLTranslator:
                 target_lang=target_lang.upper(),
             ).text
         ).strip()
+
+    def translate_texts_batch(self, texts: list[str], source_lang: str, target_lang: str) -> dict[str, str]:
+        tr = self._client()
+        if not texts:
+            return {}
+        response = tr.translate_text(
+            texts,
+            source_lang=source_lang.upper(),
+            target_lang=target_lang.upper(),
+            preserve_formatting=True,
+        )
+        rows = response if isinstance(response, list) else [response]
+        out: dict[str, str] = {}
+        for source_text, row in zip(texts, rows):
+            out[source_text] = str(getattr(row, "text", "") or "").strip()
+        return out
 
 
 def _lara_locale(lang: str) -> str:
@@ -817,6 +836,11 @@ def translate_texts_with_provider(
         )
         return translated_by_casefold
     if isinstance(translator, _LaraTranslator):
+        out = translator.translate_texts_batch(unique_exact, source_lang=source_lang_resolved, target_lang=target_lang_resolved)
+        if progress_callback is not None:
+            progress_callback(len(unique_exact), len(unique_exact))
+        return out
+    if hasattr(translator, "translate_texts_batch"):
         out = translator.translate_texts_batch(unique_exact, source_lang=source_lang_resolved, target_lang=target_lang_resolved)
         if progress_callback is not None:
             progress_callback(len(unique_exact), len(unique_exact))

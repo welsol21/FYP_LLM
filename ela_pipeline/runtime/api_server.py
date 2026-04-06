@@ -1298,6 +1298,40 @@ class RuntimeApiHandler(BaseHTTPRequestHandler):
 
         body = self._read_json_body()
 
+        if path == "/api/provider-translate":
+            # Browser-safe relay for paid providers that may block CORS (e.g. DeepL).
+            # Credentials are accepted per-request and never persisted server-side.
+            provider = str(body.get("provider") or "").strip().lower()
+            if provider != "deepl":
+                self._send_json({"error": "Only deepl is allowed on provider relay endpoint."}, status=400)
+                return
+            texts_raw = body.get("texts")
+            if not isinstance(texts_raw, list):
+                self._send_json({"error": "texts must be an array"}, status=400)
+                return
+            credentials_raw = body.get("credentials") or {}
+            credentials = credentials_raw if isinstance(credentials_raw, dict) else {}
+            auth_key = str(credentials.get("auth_key") or "").strip()
+            if not auth_key:
+                self._send_json({"error": "DeepL auth_key is required."}, status=400)
+                return
+            source_lang = str(body.get("source_lang") or body.get("sourceLang") or "EN").strip()
+            target_lang = str(body.get("target_lang") or body.get("targetLang") or "RU").strip()
+            try:
+                from ela_pipeline.runtime.media_pipeline import translate_texts_with_provider as _translate_texts_with_provider
+                translated = _translate_texts_with_provider(
+                    list(texts_raw),
+                    translation_provider="deepl",
+                    provider_credentials={"auth_key": auth_key},
+                    source_lang=source_lang,
+                    target_lang=target_lang,
+                )
+            except Exception as exc:
+                self._send_json({"error": str(exc)}, status=502)
+                return
+            self._send_json({"translations": translated})
+            return
+
         if path == "/api/translate":
             # Async batch translation via worker process (avoids GIL blocking HTTP server).
             # Body: {sentences: string[], provider}

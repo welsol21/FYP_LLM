@@ -5,6 +5,7 @@ import type {
   ProjectRow,
   SelectedProject,
   TranslationConfig,
+  TranslationProviderConfig,
   VisualizerNode,
   VisualizerPayload,
 } from '../api/runtimeApi'
@@ -65,14 +66,343 @@ function emptyWorkspaceState(): WorkspaceState {
   }
 }
 
-function coerceWorkspaceState(parsed: Partial<WorkspaceState> | null | undefined): WorkspaceState {
-  const state: WorkspaceState = {
-    projects: Array.isArray(parsed?.projects) ? parsed?.projects : [],
-    selected_project_id: typeof parsed?.selected_project_id === 'string' ? parsed.selected_project_id : null,
-    files: Array.isArray(parsed?.files) ? parsed?.files : [],
-    analyses: Array.isArray(parsed?.analyses) ? parsed?.analyses : [],
-    translation_config: parsed?.translation_config ?? null,
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : null
+}
+
+function readString(row: Record<string, unknown> | null, keys: string[], fallback = ''): string {
+  if (!row) return fallback
+  for (const key of keys) {
+    const value = row[key]
+    if (typeof value === 'string' && value.trim()) return value
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value)
   }
+  return fallback
+}
+
+function readNumber(row: Record<string, unknown> | null, keys: string[]): number | undefined {
+  if (!row) return undefined
+  for (const key of keys) {
+    const value = row[key]
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number(value)
+      if (Number.isFinite(parsed)) return parsed
+    }
+  }
+  return undefined
+}
+
+function readBoolean(row: Record<string, unknown> | null, keys: string[], fallback = false): boolean {
+  if (!row) return fallback
+  for (const key of keys) {
+    const value = row[key]
+    if (typeof value === 'boolean') return value
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase()
+      if (normalized === 'true') return true
+      if (normalized === 'false') return false
+    }
+    if (typeof value === 'number') {
+      if (value === 1) return true
+      if (value === 0) return false
+    }
+  }
+  return fallback
+}
+
+function normalizeProjectRow(raw: unknown): ProjectRow | null {
+  const row = asRecord(raw)
+  if (!row) return null
+  const id = readString(row, ['id', 'project_id', 'projectId']).trim()
+  const name = readString(row, ['name', 'project_name', 'projectName']).trim()
+  if (!id || !name) return null
+  const createdAt = readString(row, ['created_at', 'createdAt', 'updated_at', 'updatedAt'], nowIso())
+  const updatedAt = readString(row, ['updated_at', 'updatedAt', 'created_at', 'createdAt'], createdAt)
+  return {
+    id,
+    name,
+    created_at: createdAt,
+    updated_at: updatedAt,
+  }
+}
+
+function normalizeFileRow(raw: unknown): WorkspaceFile | null {
+  const row = asRecord(raw)
+  if (!row) return null
+  const id = readString(row, ['id', 'file_id', 'fileId']).trim()
+  const name = readString(row, ['name', 'file_name', 'fileName']).trim()
+  const mediaPath = readString(row, ['media_path', 'mediaPath', 'path', 'file_path', 'filePath']).trim()
+  if (!id || !name || !mediaPath) return null
+  const updated = readString(row, ['updated', 'updated_at', 'updatedAt', 'created_at', 'createdAt'], nowIso())
+  const createdAt = readString(row, ['created_at', 'createdAt', 'updated', 'updated_at', 'updatedAt'], updated)
+  const documentId = readString(row, ['document_id', 'documentId']).trim()
+  const settings = readString(row, ['settings'], normalizeSettings(undefined))
+  const projectId = readString(row, ['project_id', 'projectId']).trim()
+  const analyzed = readBoolean(row, ['analyzed'], Boolean(documentId))
+  return {
+    id,
+    project_id: projectId,
+    name,
+    path: mediaPath,
+    media_path: mediaPath,
+    size_bytes: readNumber(row, ['size_bytes', 'sizeBytes']),
+    duration_seconds: readNumber(row, ['duration_seconds', 'durationSec', 'durationSeconds']),
+    settings: normalizeSettings(settings),
+    updated,
+    created_at: createdAt,
+    analyzed,
+    document_id: documentId || undefined,
+  }
+}
+
+function normalizeAnalysisRow(raw: unknown): WorkspaceAnalysis | null {
+  const row = asRecord(raw)
+  if (!row) return null
+  const documentId = readString(row, ['document_id', 'documentId', 'analysis_id', 'analysisId']).trim()
+  const analysisId = readString(row, ['analysis_id', 'analysisId', 'document_id', 'documentId'], documentId).trim()
+  const fileName = readString(row, ['file_name', 'fileName', 'name']).trim()
+  if (!documentId || !analysisId || !fileName) return null
+  const rawContract = row.contract ?? row.visualizer_payload ?? row.visualizerPayload ?? row.analysis_contract ?? row.analysisContract
+  const contract = asRecord(rawContract) ? (clone(rawContract) as VisualizerPayload) : {}
+  const contractCurrent = readBoolean(row, ['contract_current', 'contractCurrent'], true)
+  const updatedAt = readString(row, ['updated_at', 'updatedAt', 'created_at', 'createdAt'], nowIso())
+  const createdAt = readString(row, ['created_at', 'createdAt', 'updated_at', 'updatedAt'], updatedAt)
+  const itemsCount = readNumber(row, ['items_count', 'itemsCount'])
+  const rawArtifacts = row.artifacts ?? row.document_artifacts ?? row.documentArtifacts
+  const artifacts = Array.isArray(rawArtifacts) ? clone(rawArtifacts as DocumentArtifact[]) : []
+  return {
+    analysis_id: analysisId,
+    document_id: documentId,
+    project_id: readString(row, ['project_id', 'projectId']).trim(),
+    project_name: readString(row, ['project_name', 'projectName']).trim(),
+    media_file_id: readString(row, ['media_file_id', 'mediaFileId', 'file_id', 'fileId']).trim() || null,
+    file_name: fileName,
+    file_path: readString(row, ['file_path', 'filePath', 'path']).trim(),
+    size_bytes: readNumber(row, ['size_bytes', 'sizeBytes']),
+    duration_seconds: readNumber(row, ['duration_seconds', 'durationSeconds', 'durationSec']),
+    settings: normalizeSettings(readString(row, ['settings'], normalizeSettings(undefined))),
+    items_count: typeof itemsCount === 'number' ? itemsCount : (contractCurrent ? countContractNodes(contract) : 0),
+    updated_at: updatedAt,
+    created_at: createdAt,
+    contract_current: contractCurrent,
+    contract,
+    artifacts,
+  }
+}
+
+function normalizeTranslationConfig(raw: unknown): TranslationConfig | null {
+  const row = asRecord(raw)
+  if (!row) return null
+  const rawProviders = Array.isArray(row.providers) ? row.providers : []
+  const customProviders: TranslationProviderConfig[] = rawProviders
+    .map((item) => {
+      const p = asRecord(item)
+      if (!p) return null
+      const id = readString(p, ['id']).trim()
+      if (!id) return null
+      const credentialFields = Array.isArray(p.credential_fields)
+        ? p.credential_fields
+        : (Array.isArray(p.credentialFields) ? p.credentialFields : [])
+      const normalizedCredentialFields = credentialFields
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+      const credentialsRow = asRecord(p.credentials) || {}
+      const credentials: Record<string, string> = {}
+      for (const field of normalizedCredentialFields) {
+        credentials[field] = String(credentialsRow[field] || '')
+      }
+      return {
+        id,
+        label: readString(p, ['label'], id),
+        kind: readString(p, ['kind'], 'custom'),
+        enabled: readBoolean(p, ['enabled'], true),
+        credential_fields: normalizedCredentialFields,
+        credentials,
+      } satisfies TranslationProviderConfig
+    })
+    .filter((value): value is TranslationProviderConfig => Boolean(value))
+
+  const byId = new Map(customProviders.map((provider) => [provider.id, provider]))
+  const mergedProviders: TranslationProviderConfig[] = DEFAULT_TRANSLATION_CONFIG.providers.map((builtin) => {
+    const next = byId.get(builtin.id)
+    if (!next) return clone(builtin)
+    const credentials: Record<string, string> = { ...builtin.credentials, ...(next.credentials || {}) }
+    return {
+      ...builtin,
+      label: next.label || builtin.label,
+      kind: next.kind || builtin.kind,
+      enabled: Boolean(next.enabled),
+      credential_fields: next.credential_fields.length > 0 ? next.credential_fields : builtin.credential_fields,
+      credentials,
+    }
+  })
+  for (const provider of customProviders) {
+    if (DEFAULT_TRANSLATION_CONFIG.providers.some((builtin) => builtin.id === provider.id)) continue
+    mergedProviders.push(provider)
+  }
+  const requestedDefault = readString(row, ['default_provider', 'defaultProvider'], 'm2m100').trim()
+  const fallbackDefault = mergedProviders.find((provider) => provider.enabled)?.id || 'm2m100'
+  const defaultProvider = mergedProviders.some((provider) => provider.id === requestedDefault)
+    ? requestedDefault
+    : fallbackDefault
+  return {
+    default_provider: defaultProvider,
+    providers: mergedProviders,
+  }
+}
+
+function sanitizeTranslationConfig(config: TranslationConfig | null | undefined): TranslationConfig {
+  return normalizeTranslationConfig(config) || clone(DEFAULT_TRANSLATION_CONFIG)
+}
+
+function repairProjectLinks(state: WorkspaceState): boolean {
+  const projectsById = new Map(state.projects.map((project) => [project.id, project]))
+  const projectIdByName = new Map(
+    state.projects
+      .map((project) => [normalizeProjectName(project.name), project.id] as const)
+      .filter(([name]) => Boolean(name)),
+  )
+  const singleProjectId = state.projects.length === 1 ? state.projects[0].id : ''
+  let changed = false
+
+  for (const analysis of state.analyses) {
+    let nextProjectId = String(analysis.project_id || '').trim()
+    if (!nextProjectId || !projectsById.has(nextProjectId)) {
+      const byName = projectIdByName.get(normalizeProjectName(String(analysis.project_name || '')))
+      if (byName) nextProjectId = byName
+    }
+    if ((!nextProjectId || !projectsById.has(nextProjectId)) && analysis.media_file_id) {
+      const byFileId = state.files.find((file) => String(file.id || '').trim() === String(analysis.media_file_id || '').trim())
+      const candidate = String(byFileId?.project_id || '').trim()
+      if (candidate && projectsById.has(candidate)) nextProjectId = candidate
+    }
+    if ((!nextProjectId || !projectsById.has(nextProjectId)) && (analysis.file_path || analysis.file_name)) {
+      const byFile = state.files.find((file) => matchAnalysisToFile(file, analysis))
+      const candidate = String(byFile?.project_id || '').trim()
+      if (candidate && projectsById.has(candidate)) nextProjectId = candidate
+    }
+    if ((!nextProjectId || !projectsById.has(nextProjectId)) && state.selected_project_id && projectsById.has(state.selected_project_id)) {
+      nextProjectId = state.selected_project_id
+    }
+    if ((!nextProjectId || !projectsById.has(nextProjectId)) && singleProjectId) {
+      nextProjectId = singleProjectId
+    }
+    if (nextProjectId && nextProjectId !== analysis.project_id) {
+      analysis.project_id = nextProjectId
+      changed = true
+    }
+    const expectedName = projectsById.get(nextProjectId)?.name || ''
+    if (expectedName && expectedName !== analysis.project_name) {
+      analysis.project_name = expectedName
+      changed = true
+    }
+  }
+
+  for (const file of state.files) {
+    let nextProjectId = String(file.project_id || '').trim()
+    if (!nextProjectId || !projectsById.has(nextProjectId)) {
+      const byAnalysis = state.analyses.find((analysis) => matchAnalysisToFile(file, analysis))
+      const candidate = String(byAnalysis?.project_id || '').trim()
+      if (candidate && projectsById.has(candidate)) nextProjectId = candidate
+    }
+    if ((!nextProjectId || !projectsById.has(nextProjectId)) && state.selected_project_id && projectsById.has(state.selected_project_id)) {
+      nextProjectId = state.selected_project_id
+    }
+    if ((!nextProjectId || !projectsById.has(nextProjectId)) && singleProjectId) {
+      nextProjectId = singleProjectId
+    }
+    if (nextProjectId && nextProjectId !== file.project_id) {
+      file.project_id = nextProjectId
+      changed = true
+    }
+  }
+
+  const sanitizedConfig = sanitizeTranslationConfig(state.translation_config)
+  const prevConfig = JSON.stringify(state.translation_config || null)
+  const nextConfig = JSON.stringify(sanitizedConfig)
+  if (prevConfig !== nextConfig) {
+    state.translation_config = sanitizedConfig
+    changed = true
+  }
+
+  return changed
+}
+
+function coerceWorkspaceState(parsed: Partial<WorkspaceState> | null | undefined): WorkspaceState {
+  const root = asRecord(parsed)
+  const selectedProjectId = readString(root, ['selected_project_id', 'selectedProjectId']).trim() || null
+  const rawProjects = Array.isArray(root?.projects) ? root.projects : []
+  const projects = rawProjects
+    .map((item) => normalizeProjectRow(item))
+    .filter((item): item is ProjectRow => Boolean(item))
+  const projectsById = new Map(projects.map((project) => [project.id, project]))
+  const firstProjectId = projects[0]?.id || ''
+  const rawFiles = Array.isArray(root?.files) ? root.files : []
+  const files = rawFiles
+    .map((item) => normalizeFileRow(item))
+    .filter((item): item is WorkspaceFile => Boolean(item))
+  const rawAnalyses = Array.isArray(root?.analyses)
+    ? root.analyses
+    : (Array.isArray(root?.analysis_history) ? root.analysis_history : [])
+  const analyses = rawAnalyses
+    .map((item) => normalizeAnalysisRow(item))
+    .filter((item): item is WorkspaceAnalysis => Boolean(item))
+
+  // Recover missing project links from related rows or singleton project setups.
+  for (const analysis of analyses) {
+    if (!analysis.project_id) {
+      const linkedFile = files.find((file) => {
+        const fileId = String(file.id || '').trim()
+        const filePath = String(file.path || '').trim()
+        const fileName = String(file.name || '').trim().toLowerCase()
+        const analysisFileId = String(analysis.media_file_id || '').trim()
+        const analysisFilePath = String(analysis.file_path || '').trim()
+        const analysisFileName = String(analysis.file_name || '').trim().toLowerCase()
+        if (analysisFileId && fileId && analysisFileId === fileId) return true
+        if (analysisFilePath && filePath && analysisFilePath === filePath) return true
+        return Boolean(analysisFileName && fileName && analysisFileName === fileName)
+      })
+      analysis.project_id = String(linkedFile?.project_id || '').trim()
+    }
+    if (!analysis.project_id && selectedProjectId) analysis.project_id = selectedProjectId
+    if (!analysis.project_id && firstProjectId) analysis.project_id = firstProjectId
+    if (!analysis.project_name) {
+      analysis.project_name = projectsById.get(analysis.project_id)?.name || ''
+    }
+  }
+
+  for (const file of files) {
+    if (!file.project_id) {
+      const linked = analyses.find((analysis) => {
+        const fileId = String(file.id || '').trim()
+        const filePath = String(file.path || '').trim()
+        const fileName = String(file.name || '').trim().toLowerCase()
+        const analysisFileId = String(analysis.media_file_id || '').trim()
+        const analysisFilePath = String(analysis.file_path || '').trim()
+        const analysisFileName = String(analysis.file_name || '').trim().toLowerCase()
+        if (analysisFileId && fileId && analysisFileId === fileId) return true
+        if (analysisFilePath && filePath && analysisFilePath === filePath) return true
+        return Boolean(analysisFileName && fileName && analysisFileName === fileName)
+      })
+      file.project_id = String(linked?.project_id || '').trim()
+    }
+    if (!file.project_id && selectedProjectId) file.project_id = selectedProjectId
+    if (!file.project_id && firstProjectId) file.project_id = firstProjectId
+  }
+
+  const normalizedSelected = selectedProjectId && projects.some((project) => project.id === selectedProjectId)
+    ? selectedProjectId
+    : (projects[0]?.id || null)
+
+  const state: WorkspaceState = {
+    projects,
+    selected_project_id: normalizedSelected,
+    files,
+    analyses,
+    translation_config: normalizeTranslationConfig(root?.translation_config ?? root?.translationConfig),
+  }
+  repairProjectLinks(state)
   return state
 }
 
@@ -404,7 +734,8 @@ async function ensureState(): Promise<WorkspaceState> {
     .join('||')
   const hasSelected = Boolean(state.selected_project_id && state.projects.some((p) => p.id === state.selected_project_id))
   const nextSelected = hasSelected ? state.selected_project_id : (state.projects[0]?.id || null)
-  if (state.selected_project_id !== nextSelected || fileFlagsBefore !== fileFlagsAfter) {
+  const linksFixed = repairProjectLinks(state)
+  if (state.selected_project_id !== nextSelected || fileFlagsBefore !== fileFlagsAfter || linksFixed) {
     state.selected_project_id = nextSelected
     await saveRawState(state)
   }
@@ -1218,11 +1549,15 @@ export const LocalWorkspace = {
 
   async getTranslationConfig(): Promise<TranslationConfig | null> {
     const state = await ensureState()
-    const cfg = state.translation_config ? clone(state.translation_config) : clone(DEFAULT_TRANSLATION_CONFIG)
+    const cfg = sanitizeTranslationConfig(state.translation_config)
     // One-time migration: remove the 'hf' provider that was dropped in favour of 'm2m100'.
     if (cfg.providers.some((p) => p.id === 'hf')) {
       cfg.providers = cfg.providers.filter((p) => p.id !== 'hf')
       if (cfg.default_provider === 'hf') cfg.default_provider = 'm2m100'
+      state.translation_config = clone(cfg)
+      await saveRawState(state)
+    }
+    if (JSON.stringify(state.translation_config || null) !== JSON.stringify(cfg)) {
       state.translation_config = clone(cfg)
       await saveRawState(state)
     }
@@ -1231,8 +1566,8 @@ export const LocalWorkspace = {
 
   async saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig> {
     const state = await ensureState()
-    state.translation_config = clone(config)
+    state.translation_config = sanitizeTranslationConfig(config)
     await saveRawState(state)
-    return clone(config)
+    return clone(state.translation_config)
   },
 }
