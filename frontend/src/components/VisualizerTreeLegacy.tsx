@@ -252,9 +252,9 @@ export function VisualizerTreeLegacy({
         <div className="lv-detail-row"><strong>Tense:</strong><span>{tenseText}</span></div>
         {noteLevel === 'all' ? (
           <>
-            {notes.elementary ? <div className="lv-detail-row"><strong>Linguistic Notes:</strong><span>{notes.elementary}</span></div> : null}
-            <div className="lv-detail-row"><strong>Linguistic Notes:</strong><span>{intermediateText}</span></div>
-            {notes.advanced ? <div className="lv-detail-row"><strong>Linguistic Notes:</strong><span>{notes.advanced}</span></div> : null}
+            {notes.elementary ? <div className="lv-detail-row"><strong>Elementary Notes:</strong><span>{notes.elementary}</span></div> : null}
+            <div className="lv-detail-row"><strong>Intermediate Notes:</strong><span>{intermediateText}</span></div>
+            {notes.advanced ? <div className="lv-detail-row"><strong>Advanced Notes:</strong><span>{notes.advanced}</span></div> : null}
           </>
         ) : (
           <div className="lv-detail-row"><strong>Linguistic Notes:</strong><span>{
