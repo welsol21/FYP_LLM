@@ -443,4 +443,84 @@ describe('HttpRuntimeApi', () => {
     expect(String(fetchSpy.mock.calls[0][0])).toContain('api.openai.com/v1/chat/completions')
     expect(String(fetchSpy.mock.calls[0][0])).not.toContain('/api/translate')
   })
+
+  it('parses Lara batch translation when payload is nested as JSON string in data.content', async () => {
+    const api = new HttpRuntimeApi()
+    vi.spyOn(api as unknown as { _clientLaraAuthToken: (...args: unknown[]) => Promise<string> }, '_clientLaraAuthToken')
+      .mockResolvedValue('test-token')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            content: JSON.stringify({ translations: ['Привет', 'Пока'] }),
+          },
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    )
+
+    const out = await (api as unknown as {
+      _clientTranslateTextsWithProvider: (
+        provider: string,
+        texts: string[],
+        credentials: Record<string, string>,
+        onProgress: (done: number, total: number) => void,
+      ) => Promise<Record<string, string>>
+    })._clientTranslateTextsWithProvider(
+      'lara',
+      ['Hello', 'Bye'],
+      { api_id: 'test-id', api_secret: 'test-secret' },
+      () => {},
+    )
+
+    expect(out.Hello).toBe('Привет')
+    expect(out.Bye).toBe('Пока')
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back to Lara single translations when batch response shape is invalid', async () => {
+    const api = new HttpRuntimeApi()
+    vi.spyOn(api as unknown as { _clientLaraAuthToken: (...args: unknown[]) => Promise<string> }, '_clientLaraAuthToken')
+      .mockResolvedValue('test-token')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: { unexpected: true } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ translation: 'Привет' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ translation: 'Пока' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+
+    const out = await (api as unknown as {
+      _clientTranslateTextsWithProvider: (
+        provider: string,
+        texts: string[],
+        credentials: Record<string, string>,
+        onProgress: (done: number, total: number) => void,
+      ) => Promise<Record<string, string>>
+    })._clientTranslateTextsWithProvider(
+      'lara',
+      ['Hello', 'Bye'],
+      { api_id: 'test-id', api_secret: 'test-secret' },
+      () => {},
+    )
+
+    expect(out.Hello).toBe('Привет')
+    expect(out.Bye).toBe('Пока')
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+  })
 })

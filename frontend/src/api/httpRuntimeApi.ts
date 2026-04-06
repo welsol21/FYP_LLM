@@ -1751,8 +1751,14 @@ export class HttpRuntimeApi implements RuntimeApi {
   private _extractTranslationsArray(payload: unknown, expectedCount: number): string[] | null {
     const normalizeItem = (value: unknown): string => {
       if (typeof value === 'string') return value.trim()
-      if (value && typeof value === 'object' && 'text' in (value as Record<string, unknown>)) {
-        return String((value as { text?: unknown }).text || '').trim()
+      if (value && typeof value === 'object') {
+        const row = value as Record<string, unknown>
+        if ('text' in row) return String(row.text || '').trim()
+        if ('translation' in row) return String(row.translation || '').trim()
+        if ('translated_text' in row) return String(row.translated_text || '').trim()
+        if ('target' in row) return String(row.target || '').trim()
+        if ('value' in row) return String(row.value || '').trim()
+        if ('content' in row) return String(row.content || '').trim()
       }
       return String(value ?? '').trim()
     }
@@ -1776,6 +1782,66 @@ export class HttpRuntimeApi implements RuntimeApi {
     return indexed.map(normalizeItem)
   }
 
+  private _extractTranslationsBySource(payload: unknown, sources: string[]): string[] | null {
+    if (!payload || typeof payload !== 'object' || !Array.isArray(sources) || sources.length === 0) return null
+    const row = payload as Record<string, unknown>
+    const candidate = (row.translations ?? row.translation ?? row.result ?? row.data ?? row) as unknown
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return null
+    const map = candidate as Record<string, unknown>
+    const direct = new Map<string, string>()
+    const folded = new Map<string, string>()
+    for (const [key, value] of Object.entries(map)) {
+      const text = String(value ?? '').trim()
+      if (!text) continue
+      const normalized = String(key || '').trim()
+      if (!normalized) continue
+      direct.set(normalized, text)
+      folded.set(normalized.toLowerCase(), text)
+    }
+    const out: string[] = []
+    for (const source of sources) {
+      const raw = String(source || '').trim()
+      if (!raw) return null
+      const picked = direct.get(raw) ?? folded.get(raw.toLowerCase())
+      if (!picked) return null
+      out.push(picked)
+    }
+    return out
+  }
+
+  private _extractTranslationsArrayDeep(
+    payload: unknown,
+    expectedCount: number,
+    sources?: string[],
+  ): string[] | null {
+    if (payload == null) return null
+    const queue: unknown[] = [payload]
+    const visited = new Set<unknown>()
+    while (queue.length > 0) {
+      const current = queue.shift()
+      if (current == null) continue
+      if (typeof current === 'object') {
+        if (visited.has(current)) continue
+        visited.add(current)
+      }
+      const exact = this._extractTranslationsArray(current, expectedCount)
+      if (exact) return exact
+      if (sources && sources.length === expectedCount) {
+        const bySource = this._extractTranslationsBySource(current, sources)
+        if (bySource) return bySource
+      }
+      if (typeof current === 'string') {
+        const nested = parseJsonLoose(current)
+        if (nested != null) queue.push(nested)
+      } else if (Array.isArray(current)) {
+        for (const item of current) queue.push(item)
+      } else if (typeof current === 'object') {
+        for (const value of Object.values(current as Record<string, unknown>)) queue.push(value)
+      }
+    }
+    return null
+  }
+
   private async _clientTranslateTextsWithOpenAI(
     texts: string[],
     credentials: Record<string, string>,
@@ -1795,6 +1861,45 @@ export class HttpRuntimeApi implements RuntimeApi {
     const out: Record<string, string> = {}
     let done = 0
     onProgress(0, uniqueTexts.length)
+
+    const translateSingle = async (sourceText: string): Promise<string> => {
+      const body = {
+        model,
+        temperature: 0,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: 'Translate from English to Russian. Return JSON only: {"translation":"..."}',
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({ text: sourceText }),
+          },
+        ],
+      }
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal,
+      })
+      const raw = await res.text().catch(() => '')
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${raw}`)
+      const payload = parseJsonLoose(raw) as
+        | { choices?: Array<{ message?: { content?: string } }> }
+        | null
+      const content = String(payload?.choices?.[0]?.message?.content || '').trim()
+      const parsedContent = parseJsonLoose(content)
+      const asArray = this._extractTranslationsArray(parsedContent, 1)
+      if (asArray?.[0]) return asArray[0]
+      const bySource = this._extractTranslationsBySource(parsedContent, [sourceText])
+      if (bySource?.[0]) return bySource[0]
+      throw new Error('OpenAI single translation response format is invalid.')
+    }
 
     for (const chunk of chunks) {
       if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
@@ -1832,9 +1937,16 @@ export class HttpRuntimeApi implements RuntimeApi {
         | null
       const content = String(payload?.choices?.[0]?.message?.content || '').trim()
       const parsedContent = parseJsonLoose(content)
-      const translated = this._extractTranslationsArray(parsedContent, chunk.length)
+      let translated = this._extractTranslationsArrayDeep(parsedContent, chunk.length, chunk)
       if (!translated) {
-        throw new Error('OpenAI response format is invalid for batch translation.')
+        recordRuntimeDiagnostic('api.media.backend', 'translate.openai.batch_parse_fallback', {
+          chunkSize: chunk.length,
+          sample: content.slice(0, 240),
+        }, 'error')
+        translated = []
+        for (const sourceText of chunk) {
+          translated.push(await translateSingle(sourceText))
+        }
       }
       chunk.forEach((source, idx) => { out[source] = String(translated[idx] || '').trim() })
       done += chunk.length
@@ -1904,23 +2016,44 @@ export class HttpRuntimeApi implements RuntimeApi {
 
   private async _laraDigestBase64(data: string): Promise<string> {
     const subtle = globalThis.crypto?.subtle
-    if (!subtle) throw new Error('Lara provider requires WebCrypto support in this browser.')
-    const digest = await subtle.digest('SHA-256', new TextEncoder().encode(data))
-    return toBase64(new Uint8Array(digest).slice(0, 16))
+    if (subtle) {
+      const digest = await subtle.digest('SHA-256', new TextEncoder().encode(data))
+      return toBase64(new Uint8Array(digest).slice(0, 16))
+    }
+    const cryptoJsModule = await import('crypto-js')
+    const CryptoJS = ((cryptoJsModule as unknown as { default?: unknown }).default || cryptoJsModule) as {
+      SHA256: (value: string) => { toString: (encoder: unknown) => string }
+      enc: {
+        Hex: { parse: (value: string) => unknown }
+        Base64: { stringify: (value: unknown) => string }
+      }
+    }
+    const fullHex = CryptoJS.SHA256(String(data || '')).toString(CryptoJS.enc.Hex)
+    const first16Hex = fullHex.slice(0, 32)
+    return CryptoJS.enc.Base64.stringify(CryptoJS.enc.Hex.parse(first16Hex))
   }
 
   private async _hmacSha256Base64(secret: string, data: string): Promise<string> {
     const subtle = globalThis.crypto?.subtle
-    if (!subtle) throw new Error('Lara provider requires WebCrypto support in this browser.')
-    const key = await subtle.importKey(
-      'raw',
-      new TextEncoder().encode(secret),
-      { name: 'HMAC', hash: { name: 'SHA-256' } },
-      false,
-      ['sign'],
-    )
-    const signature = await subtle.sign('HMAC', key, new TextEncoder().encode(data))
-    return toBase64(new Uint8Array(signature))
+    if (subtle) {
+      const key = await subtle.importKey(
+        'raw',
+        new TextEncoder().encode(secret),
+        { name: 'HMAC', hash: { name: 'SHA-256' } },
+        false,
+        ['sign'],
+      )
+      const signature = await subtle.sign('HMAC', key, new TextEncoder().encode(data))
+      return toBase64(new Uint8Array(signature))
+    }
+    const cryptoJsModule = await import('crypto-js')
+    const CryptoJS = ((cryptoJsModule as unknown as { default?: unknown }).default || cryptoJsModule) as {
+      HmacSHA256: (value: string, secretValue: string) => { toString: (encoder: unknown) => string }
+      enc: {
+        Base64: unknown
+      }
+    }
+    return CryptoJS.HmacSHA256(String(data || ''), String(secret || '')).toString(CryptoJS.enc.Base64)
   }
 
   private async _clientLaraAuthToken(
@@ -1966,10 +2099,11 @@ export class HttpRuntimeApi implements RuntimeApi {
     }
     for (let i = candidates.length - 1; i >= 0; i -= 1) {
       const row = candidates[i] as Record<string, unknown>
-      const payload = (row?.data as Record<string, unknown> | undefined)?.content
+      const payloadRaw = (row?.data as Record<string, unknown> | undefined)?.content
         ?? row?.data
         ?? row
-      const translated = this._extractTranslationsArray(payload, expectedCount)
+      const payload = typeof payloadRaw === 'string' ? (parseJsonLoose(payloadRaw) ?? payloadRaw) : payloadRaw
+      const translated = this._extractTranslationsArrayDeep(payload, expectedCount)
       if (translated) return translated
     }
     return null
@@ -1997,6 +2131,32 @@ export class HttpRuntimeApi implements RuntimeApi {
     let done = 0
     onProgress(0, uniqueTexts.length)
 
+    const translateSingle = async (sourceText: string): Promise<string> => {
+      const res = await fetch(`${baseUrl}/translate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Lara-Date': new Date().toUTCString(),
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          q: sourceText,
+          source,
+          target,
+          multiline: false,
+        }),
+        signal,
+      })
+      const raw = await res.text().catch(() => '')
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${raw}`)
+      const translatedSingle = this._extractLaraTranslationArray(raw, 1)
+      if (translatedSingle?.[0]) return translatedSingle[0]
+      const parsed = parseJsonLoose(raw)
+      const deep = this._extractTranslationsArrayDeep(parsed, 1, [sourceText])
+      if (deep?.[0]) return deep[0]
+      throw new Error('Lara single translation response format is invalid.')
+    }
+
     for (const chunk of chunks) {
       if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
       const res = await fetch(`${baseUrl}/translate`, {
@@ -2018,8 +2178,21 @@ export class HttpRuntimeApi implements RuntimeApi {
       if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${raw}`)
       }
-      const translated = this._extractLaraTranslationArray(raw, chunk.length)
-      if (!translated) throw new Error('Lara response format is invalid for batch translation.')
+      let translated = this._extractLaraTranslationArray(raw, chunk.length)
+      if (!translated) {
+        const parsed = parseJsonLoose(raw)
+        translated = this._extractTranslationsArrayDeep(parsed, chunk.length, chunk)
+      }
+      if (!translated) {
+        recordRuntimeDiagnostic('api.media.backend', 'translate.lara.batch_parse_fallback', {
+          chunkSize: chunk.length,
+          sample: raw.slice(0, 240),
+        }, 'error')
+        translated = []
+        for (const sourceText of chunk) {
+          translated.push(await translateSingle(sourceText))
+        }
+      }
       chunk.forEach((sourceText, idx) => { out[sourceText] = String(translated[idx] || '').trim() })
       done += chunk.length
       onProgress(done, uniqueTexts.length)
