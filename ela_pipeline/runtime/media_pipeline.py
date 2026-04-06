@@ -124,6 +124,118 @@ def _estimate_sentence_duration_seconds(text: str) -> float:
     return float(max(1.0, min(8.0, 0.35 * words + 0.8)))
 
 
+_SENTENCE_END_RE = re.compile(r"""[.!?]["')\]»]*\s*$""")
+_SENTENCE_END_WORD_RE = re.compile(r"""([A-Za-z]+)[.!?]["')\]»]*\s*$""")
+_SENTENCE_END_ABBREVS = {
+    "mr",
+    "mrs",
+    "dr",
+    "ms",
+    "prof",
+    "sr",
+    "jr",
+    "st",
+    "vs",
+    "no",
+}
+
+
+def _safe_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _append_sentence_token(text: str, token: str) -> str:
+    if not text:
+        return token
+    if re.match(r"^[,.;:!?%)\]»]+$", token):
+        return f"{text}{token}"
+    if token.startswith(("'", "’")):
+        return f"{text}{token}"
+    return f"{text} {token}"
+
+
+def _looks_like_sentence_boundary(text: str) -> bool:
+    if not _SENTENCE_END_RE.search(text):
+        return False
+    match = _SENTENCE_END_WORD_RE.search(text)
+    tail_word = (match.group(1) if match else "").strip().casefold()
+    return tail_word not in _SENTENCE_END_ABBREVS
+
+
+def _group_whisper_word_chunks(result: dict[str, Any]) -> tuple[str, list[dict[str, Any]]] | None:
+    segments_raw = result.get("segments") or []
+    if not isinstance(segments_raw, list) or not segments_raw:
+        return None
+
+    sentence_chunks: list[dict[str, Any]] = []
+    sentence_texts: list[str] = []
+    current_text = ""
+    current_start: float | None = None
+    current_end = 0.0
+    saw_words = False
+    fallback_cursor = 0.0
+
+    def _flush() -> None:
+        nonlocal current_text, current_start, current_end
+        text = " ".join(current_text.split()).strip()
+        if not text or current_start is None:
+            current_text = ""
+            current_start = None
+            current_end = 0.0
+            return
+        end_sec = max(current_end, current_start + 0.2)
+        sentence_chunks.append(
+            {
+                "sentence_text": text,
+                "start_sec": current_start,
+                "end_sec": end_sec,
+            }
+        )
+        sentence_texts.append(text)
+        current_text = ""
+        current_start = None
+        current_end = 0.0
+
+    for segment in segments_raw:
+        if not isinstance(segment, dict):
+            continue
+        segment_start = _safe_float(segment.get("start"), fallback_cursor)
+        segment_end = _safe_float(segment.get("end"), segment_start)
+        words = segment.get("words")
+        if not isinstance(words, list):
+            continue
+        for word in words:
+            if not isinstance(word, dict):
+                continue
+            token = str(word.get("word") or word.get("text") or "").strip()
+            if not token:
+                continue
+            saw_words = True
+            word_start = _safe_float(word.get("start"), segment_start)
+            word_end = _safe_float(word.get("end"), max(word_start, segment_end))
+            if current_start is None:
+                current_start = word_start
+            current_end = max(current_end, word_end, word_start)
+            current_text = _append_sentence_token(current_text, token)
+            fallback_cursor = max(fallback_cursor, word_end, segment_end)
+            if _looks_like_sentence_boundary(current_text):
+                _flush()
+
+    if not saw_words:
+        return None
+    _flush()
+    if not sentence_chunks:
+        return None
+
+    full_text = str(result.get("text") or "").strip()
+    if not full_text:
+        full_text = " ".join(sentence_texts).strip()
+    return full_text, sentence_chunks
+
+
 def _tokenize_semantic_units(text: str, *, start_sec: float, end_sec: float) -> list[dict[str, Any]]:
     tokens = re.findall(r"\d+|[A-Za-zА-Яа-яЁё]+|[^\w\s]", text or "", flags=re.UNICODE)
     if not tokens:
@@ -346,7 +458,7 @@ def _extract_text_and_sentence_chunks(
                 result_holder["result"] = model.transcribe(
                     _raw,
                     language=source_lang,
-                    word_timestamps=False,
+                    word_timestamps=True,
                     verbose=False,
                     fp16=False,
                 )
@@ -372,6 +484,9 @@ def _extract_text_and_sentence_chunks(
         result = result_holder.get("result") or {}
         if progress_callback is not None:
             progress_callback("transcribing_audio", 1.0, "ASR completed.")
+        grouped = _group_whisper_word_chunks(result if isinstance(result, dict) else {})
+        if grouped is not None:
+            return grouped
         segments: list[dict[str, Any]] = []
         texts: list[str] = []
         for seg in result.get("segments", []) or []:

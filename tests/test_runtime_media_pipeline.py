@@ -3,6 +3,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import numpy as np
+
 from ela_pipeline.runtime.media_pipeline import _extract_text_and_sentence_chunks, run_media_pipeline
 
 
@@ -221,6 +223,48 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
             ):
                 with self.assertRaises(RuntimeError):
                     _extract_text_and_sentence_chunks(media, "audio")
+
+    def test_audio_extraction_groups_word_timestamps_into_sentence_windows(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media = Path(tmpdir) / "sample.mp3"
+            media.write_bytes(b"fake-audio")
+            mock_result = {
+                "text": "Mr. Holmes spoke. Then paused.",
+                "segments": [
+                    {
+                        "start": 0.0,
+                        "end": 2.0,
+                        "words": [
+                            {"word": "Mr.", "start": 0.00, "end": 0.18},
+                            {"word": "Holmes", "start": 0.20, "end": 0.58},
+                            {"word": "spoke.", "start": 0.60, "end": 0.95},
+                            {"word": "Then", "start": 1.05, "end": 1.35},
+                            {"word": "paused.", "start": 1.36, "end": 1.86},
+                        ],
+                    },
+                ],
+            }
+            with (
+                patch("ela_pipeline.runtime.media_pipeline._get_whisper_model_cached") as mock_model_factory,
+                patch("whisper.load_audio", return_value=np.zeros(32_000, dtype=np.float32)),
+                patch("ela_pipeline.runtime.media_pipeline._probe_media_duration_seconds", return_value=2.0),
+            ):
+                mock_model = mock_model_factory.return_value
+                mock_model.transcribe.return_value = mock_result
+                full_text, chunks = _extract_text_and_sentence_chunks(media, "audio")
+
+            self.assertEqual(full_text, "Mr. Holmes spoke. Then paused.")
+            self.assertEqual(len(chunks), 2)
+            self.assertEqual(chunks[0]["sentence_text"], "Mr. Holmes spoke.")
+            self.assertEqual(chunks[1]["sentence_text"], "Then paused.")
+            self.assertAlmostEqual(float(chunks[0]["start_sec"]), 0.0, places=3)
+            self.assertAlmostEqual(float(chunks[0]["end_sec"]), 0.95, places=3)
+            self.assertAlmostEqual(float(chunks[1]["start_sec"]), 1.05, places=3)
+            self.assertAlmostEqual(float(chunks[1]["end_sec"]), 1.86, places=3)
+            self.assertGreaterEqual(float(chunks[1]["start_sec"]), float(chunks[0]["end_sec"]))
+
+            kwargs = mock_model.transcribe.call_args.kwargs
+            self.assertTrue(bool(kwargs.get("word_timestamps")))
 
 
 if __name__ == "__main__":
