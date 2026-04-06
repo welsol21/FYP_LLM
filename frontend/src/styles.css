@@ -974,7 +974,7 @@ button {
 }
 
 .translation-view-options {
-  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .translation-provider-options {
@@ -1005,17 +1005,19 @@ button {
 .quick-edit-title-btn,
 .translation-control-btn {
   width: 100%;
+  min-width: 0;
   min-height: var(--touch-min);
   border: 1px solid var(--line);
   background: linear-gradient(180deg, #151b28 0%, #101521 100%);
   color: var(--text);
   border-radius: 10px;
-  padding: 10px 14px;
+  padding: 10px 10px;
   font-family: "Trebuchet MS", "Segoe UI", Tahoma, sans-serif;
   font-weight: 800;
-  font-size: clamp(20px, 1.8vw, 24px);
-  line-height: 1;
-  white-space: nowrap;
+  font-size: clamp(17px, 1.5vw, 20px);
+  line-height: 1.1;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .quick-edit-section {
@@ -1174,6 +1176,18 @@ button {
 }
 
 @media (max-width: 860px) {
+  .quick-edit-title-btn,
+  .translation-control-btn {
+    font-size: 16px;
+    padding: 8px;
+    line-height: 1.1;
+  }
+
+  .translation-view-options,
+  .translation-provider-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .touch-choice-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

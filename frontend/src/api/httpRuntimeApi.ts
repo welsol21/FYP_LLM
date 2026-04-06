@@ -14,6 +14,7 @@ import type {
 } from './runtimeApi'
 import { LocalWorkspace } from '../lib/localWorkspace'
 import { recordRuntimeDiagnostic } from '../lib/runtimeDiagnostics'
+import { alignNodeTranslationsFromSentence, fillMissingNodeTranslations } from '../lib/translationAlignment'
 
 /** Parse a ZIP file (STORED entries only) into a filename→Uint8Array map. */
 function parseStoredZip(buf: ArrayBuffer): Map<string, Uint8Array<ArrayBuffer>> {
@@ -121,6 +122,13 @@ function shouldRetryBackendRequest(status: number): boolean {
 
 async function sleepMs(ms: number): Promise<void> {
   await new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+}
+
+function formatElapsed(seconds: number): string {
+  const sec = Math.max(0, Math.round(seconds))
+  const mm = Math.floor(sec / 60)
+  const ss = sec % 60
+  return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
 }
 
 async function fetchWithRetry(
@@ -903,7 +911,13 @@ export class HttpRuntimeApi implements RuntimeApi {
             await new Promise<void>((resolve) => setTimeout(resolve, 2000))
             ensureNotAborted()
             tPoll += 2
-            log(1, transcribeStatusText, 5 + Math.min(tPoll * 2, 88))
+            const transcribePhase =
+              tPoll < 20
+                ? 'Server Whisper is preparing model/queue'
+                : tPoll < 120
+                  ? 'Server Whisper is decoding audio and extracting sentences/timings'
+                  : 'Server Whisper is still processing a long CPU transcription'
+            log(1, `${transcribePhase} · elapsed ${formatElapsed(tPoll)}`, 5 + Math.min(tPoll * 2, 88))
             const tStatus = await fetch(apiUrl(`/api/transcribe-status/${transcribeJobId}`), { signal: input.signal })
             const parsed = await readJsonResponse<{ status: string; sentences?: Array<{ text: string; start_sec: number | null; end_sec: number | null }>; source_type?: string; error?: string }>(tStatus)
             const tJson = parsed.json
@@ -1094,6 +1108,113 @@ export class HttpRuntimeApi implements RuntimeApi {
         }
         for (const child of node.linguistic_elements || []) writeTranslationsToTree(child, translationMap, prov)
       }
+      function getNodeProviderTranslation(node: import('./runtimeApi').VisualizerNode, prov: string): string {
+        return String((node.translations as any)?.[prov]?.text || '').trim()
+      }
+      function hasUsefulTranslation(source: string, candidate: string): boolean {
+        const src = String(source || '').trim().toLowerCase()
+        const tgt = String(candidate || '').trim().toLowerCase()
+        return !!tgt && src !== tgt
+      }
+      const enabledProvider = input.translatorOptions?.find((p: { id: string }) => p.id === provider)
+      const backendCredentials = (enabledProvider as any)?.credentials || {}
+      const runBackendTranslateBatch = async (
+        texts: string[],
+        phase: 'sentences' | 'nodes' = 'nodes',
+      ): Promise<Record<string, string>> => {
+        const payloadTexts = Array.from(new Set(texts.map((text) => text.trim()).filter(Boolean)))
+        if (payloadTexts.length === 0) return {}
+        const submitTranslateJob = async (): Promise<string> => {
+          const res = await requestJson<{ job_id: string }>(
+            apiUrl('/api/translate'),
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sentences: payloadTexts, provider, credentials: backendCredentials }),
+              signal: input.signal,
+            },
+          )
+          return res.job_id
+        }
+
+        let translateJobId = await submitTranslateJob()
+        let translateResubmitCount = 0
+        let translateStatusDecodeFailures = 0
+        let pollCount = 0
+
+        while (true) {
+          ensureNotAborted()
+          await sleepMs(1500)
+          ensureNotAborted()
+          pollCount++
+          const statusRes = await fetch(apiUrl(`/api/translate-status/${translateJobId}`), { signal: input.signal })
+          const raw = await statusRes.text().catch(() => '')
+          let statusJson: {
+            status?: string
+            translations?: Record<string, string>
+            error?: string
+            done?: number
+            total?: number
+          } | null = null
+          try {
+            statusJson = raw ? JSON.parse(raw) as {
+              status?: string
+              translations?: Record<string, string>
+              error?: string
+              done?: number
+              total?: number
+            } : null
+          } catch {
+            statusJson = null
+          }
+          if (statusRes.status === 404 || statusJson?.status === 'not_found') {
+            if (translateResubmitCount >= MAX_LOST_JOB_RESUBMITS) {
+              throw new Error('Translation job was lost after a server restart.')
+            }
+            translateResubmitCount += 1
+            recordRuntimeDiagnostic('api.media.backend', 'translate.resubmit', translateJobId)
+            translateJobId = await submitTranslateJob()
+            pollCount = 0
+            continue
+          }
+          if (!statusJson) {
+            translateStatusDecodeFailures += 1
+            if (translateStatusDecodeFailures <= 3) {
+              recordRuntimeDiagnostic('api.media.backend', 'translate.status.non_json', {
+                phase,
+                status: statusRes.status,
+                sample: raw.slice(0, 120),
+              }, 'error')
+              if (shouldRetryBackendRequest(statusRes.status)) continue
+              continue
+            }
+            throw new Error(`Translate-status returned non-JSON payload (HTTP ${statusRes.status}).`)
+          }
+          translateStatusDecodeFailures = 0
+          if (!statusRes.ok || statusJson.status === 'error') {
+            if (shouldRetryBackendRequest(statusRes.status)) continue
+            throw new Error(statusJson.error ?? `HTTP ${statusRes.status}`)
+          }
+          if (statusJson.status === 'done' || statusJson.translations) {
+            const result = statusJson.translations || {}
+            recordRuntimeDiagnostic('api.media.backend', 'translate.result', {
+              phase,
+              keys: Object.keys(result).length,
+              sample: Object.entries(result).slice(0, 2).map(([k, v]) => ({ k: k.slice(0, 40), v: String(v).slice(0, 40) })),
+            })
+            return result
+          }
+
+          const done = Number(statusJson.done ?? 0)
+          const total = Number(statusJson.total ?? 0)
+          if (Number.isFinite(done) && Number.isFinite(total) && total > 0) {
+            const pct = Math.max(0, Math.min(45, Math.round((done / total) * 45)))
+            log(2, `Translating (${Math.max(0, Math.round(done))}/${Math.round(total)})`, 50 + pct)
+          } else {
+            log(2, `Translating… (${pollCount * 1.5 | 0}s)`, 50 + Math.min(pollCount * 2, 45))
+          }
+        }
+      }
 
       let translations: Record<string, string> = {}
       let translateError: string | null = null
@@ -1106,129 +1227,113 @@ export class HttpRuntimeApi implements RuntimeApi {
       } else {
         const sentenceKeys = Object.keys(contract)
         if (sentenceKeys.length > 0) {
-          // Collect only texts that don't already have a translation from this provider
-          const allTexts = new Set<string>()
-          for (const [sentenceText, node] of Object.entries(contract)) {
-            if (!(node.translations as any)?.[provider]?.text) allTexts.add(sentenceText.trim())
-            collectNodeTexts(node, allTexts, provider)
-          }
           // Nodes that already have this provider's translation just need active_translation_provider set
           for (const node of Object.values(contract)) markActiveProvider(node, provider)
-          const allTextsList = Array.from(allTexts)
-          if (allTextsList.length === 0) {
-            // Everything already translated — just update active provider
-            log(2, 'All nodes already translated — skipping API call', 100)
-          }
-          log(2, `Translating ${allTextsList.length} texts...`, 50)
-          if (BACKEND_PROVIDERS.has(provider) && allTextsList.length > 0) {
-            // Submit only untranslated texts in one async batch job — server uses native batch APIs
-            // (M2M100 single generate call, Lara single HTTP call).
-            const enabledProvider = input.translatorOptions?.find((p: { id: string }) => p.id === provider)
-            const credentials = (enabledProvider as any)?.credentials || {}
-            const submitTranslateJob = async (): Promise<string> => {
-              const res = await requestJson<{ job_id: string }>(
-                apiUrl('/api/translate'),
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ sentences: allTextsList, provider, credentials }),
-                  signal: input.signal,
-                },
-              )
-              return res.job_id
-            }
-            let translateJobId = await submitTranslateJob()
-            let translateResubmitCount = 0
-            let translateStatusDecodeFailures = 0
-            let pollCount = 0
-            while (true) {
-              ensureNotAborted()
-              await new Promise<void>((resolve) => setTimeout(resolve, 1500))
-              ensureNotAborted()
-              pollCount++
-              const statusRes = await fetch(apiUrl(`/api/translate-status/${translateJobId}`), { signal: input.signal })
-              const parsed = await readJsonResponse<{
-                status: string
-                translations?: Record<string, string>
-                error?: string
-                done?: number
-                total?: number
-              }>(statusRes)
-              const statusJson = parsed.json
-              if (statusRes.status === 404) {
-                if (translateResubmitCount >= MAX_LOST_JOB_RESUBMITS) {
-                  const raw = 'Translation job was lost after a server restart.'
-                  recordRuntimeDiagnostic('api.media.backend', 'translate.error', raw, 'error')
-                  translateError = _translateErrorMessage(raw)
-                  break
+          try {
+            if (BACKEND_PROVIDERS.has(provider)) {
+              if (provider === 'm2m100') {
+                const sentenceEntries = Object.entries(contract)
+                const sentenceTexts = sentenceEntries
+                  .map(([sentenceText, node]) => {
+                    const sourceText = sentenceText.trim()
+                    if (!sourceText) return ''
+                    const existing = getNodeProviderTranslation(node, provider)
+                    return hasUsefulTranslation(sourceText, existing) ? '' : sourceText
+                  })
+                  .filter(Boolean)
+                if (sentenceTexts.length > 0) {
+                  log(2, `Translating ${sentenceTexts.length} sentences...`, 50)
+                  Object.assign(translations, await runBackendTranslateBatch(sentenceTexts, 'sentences'))
+                } else {
+                  log(2, 'All sentence translations already cached', 75)
                 }
-                // Job lost (server restarted) — resubmit once and keep polling
-                translateResubmitCount += 1
-                recordRuntimeDiagnostic('api.media.backend', 'translate.resubmit', translateJobId)
-                translateJobId = await submitTranslateJob()
-                pollCount = 0
-                continue
-              }
-              if (!statusJson) {
-                translateStatusDecodeFailures += 1
-                if (translateStatusDecodeFailures <= 3) {
-                  recordRuntimeDiagnostic('api.media.backend', 'translate.status.non_json', {
-                    status: statusRes.status,
-                    sample: parsed.raw.slice(0, 120),
-                  }, 'error')
-                  if (shouldRetryBackendRequest(statusRes.status)) continue
-                  continue
+
+                const missingNodeTexts = new Set<string>()
+                let alignedNodes = 0
+                for (const [sentenceText, rootNode] of sentenceEntries) {
+                  const sourceSentence = sentenceText.trim()
+                  if (!sourceSentence) continue
+                  const translatedSentence = String(
+                    translations[sourceSentence]
+                    || translations[sentenceText]
+                    || getNodeProviderTranslation(rootNode, provider),
+                  ).trim()
+                  if (!translatedSentence) continue
+                  translations[sentenceText] = translatedSentence
+                  translations[sourceSentence] = translatedSentence
+                  const aligned = alignNodeTranslationsFromSentence({
+                    root: rootNode,
+                    sentenceSourceText: sourceSentence,
+                    sentenceTranslatedText: translatedSentence,
+                    provider,
+                  })
+                  alignedNodes += aligned.alignedCount
+                  for (const text of aligned.missingNodeTexts) missingNodeTexts.add(text)
                 }
-                const raw = `Translate-status returned non-JSON payload (HTTP ${statusRes.status})`
-                recordRuntimeDiagnostic('api.media.backend', 'translate.error', raw, 'error')
-                translateError = _translateErrorMessage(raw)
-                break
-              }
-              translateStatusDecodeFailures = 0
-              if (!statusRes.ok || statusJson.status === 'error') {
-                if (shouldRetryBackendRequest(statusRes.status)) continue
-                const raw = statusJson.error ?? `HTTP ${statusRes.status}`
-                recordRuntimeDiagnostic('api.media.backend', 'translate.error', raw, 'error')
-                translateError = _translateErrorMessage(raw)
-                break
-              }
-              if (statusJson.status === 'done' || statusJson.translations) {
-                Object.assign(translations, statusJson.translations || {})
-                recordRuntimeDiagnostic('api.media.backend', 'translate.result', {
-                  keys: Object.keys(statusJson.translations || {}).length,
-                  sample: Object.entries(statusJson.translations || {}).slice(0, 2).map(([k, v]) => ({ k: k.slice(0, 40), v: String(v).slice(0, 40) })),
+
+                if (missingNodeTexts.size > 0) {
+                  log(2, `Resolving ${missingNodeTexts.size} node fragments...`, 92)
+                  const fallbackTranslations = await runBackendTranslateBatch(Array.from(missingNodeTexts), 'nodes')
+                  Object.assign(translations, fallbackTranslations)
+                  for (const rootNode of Object.values(contract)) {
+                    fillMissingNodeTranslations({
+                      root: rootNode,
+                      provider,
+                      translationMap: fallbackTranslations,
+                    })
+                  }
+                }
+                recordRuntimeDiagnostic('api.media.backend', 'translate.alignment', {
+                  provider,
+                  sentences: Object.keys(contract).length,
+                  alignedNodes,
+                  fallbackNodes: missingNodeTexts.size,
                 })
-                break
-              }
-              // still running — keep polling (prefer backend progress when available)
-              const done = Number(statusJson.done ?? 0)
-              const total = Number(statusJson.total ?? 0)
-              if (Number.isFinite(done) && Number.isFinite(total) && total > 0) {
-                const pct = Math.max(0, Math.min(45, Math.round((done / total) * 45)))
-                log(2, `Translating (${Math.max(0, Math.round(done))}/${Math.round(total)})`, 50 + pct)
               } else {
-                log(2, `Translating… (${pollCount * 1.5 | 0}s)`, 50 + Math.min(pollCount * 2, 45))
+                // Non-M2M100 providers already handle context well enough with direct node translations.
+                const allTexts = new Set<string>()
+                for (const [sentenceText, node] of Object.entries(contract)) {
+                  if (!getNodeProviderTranslation(node, provider)) allTexts.add(sentenceText.trim())
+                  collectNodeTexts(node, allTexts, provider)
+                }
+                const allTextsList = Array.from(allTexts)
+                if (allTextsList.length > 0) {
+                  log(2, `Translating ${allTextsList.length} texts...`, 50)
+                  Object.assign(translations, await runBackendTranslateBatch(allTextsList, 'nodes'))
+                } else {
+                  log(2, 'All nodes already translated — skipping API call', 100)
+                }
+              }
+            } else {
+              const allTexts = new Set<string>()
+              for (const [sentenceText, node] of Object.entries(contract)) {
+                if (!(node.translations as any)?.[provider]?.text) allTexts.add(sentenceText.trim())
+                collectNodeTexts(node, allTexts, provider)
+              }
+              const allTextsList = Array.from(allTexts)
+              if (allTextsList.length > 0) {
+                // Use local opus-mt-en-ru WASM worker — translate all collected texts (sentences + phrases)
+                translations = await this._clientTranslateTexts(
+                  allTextsList,
+                  (done, ttl) => log(2, `Translating (${done}/${ttl})`, 50 + Math.round((done / Math.max(ttl, 1)) * 48)),
+                  input.signal,
+                )
+              } else {
+                log(2, 'All nodes already translated — skipping API call', 100)
               }
             }
-            log(2, `Translated ${Object.keys(translations).length}/${allTextsList.length} texts`, 98)
-          } else if (allTextsList.length > 0) {
-            // Use local opus-mt-en-ru WASM worker — translate all collected texts (sentences + phrases)
-            translations = await this._clientTranslateTexts(
-              allTextsList,
-              (done, ttl) => log(2, `Translating (${done}/${ttl})`, 50 + Math.round((done / Math.max(ttl, 1)) * 48)),
-              input.signal,
-            ).catch((err: unknown) => {
-              if (err instanceof DOMException && err.name === 'AbortError') throw err
-              recordRuntimeDiagnostic('api.media.backend', 'translate.error', String(err instanceof Error ? err.message : err), 'error')
-              log(2, `Translation error: ${err instanceof Error ? err.message : String(err)}`, 50)
-              return {}
-            })
+          } catch (err: unknown) {
+            if (err instanceof DOMException && err.name === 'AbortError') throw err
+            const raw = String(err instanceof Error ? err.message : err)
+            recordRuntimeDiagnostic('api.media.backend', 'translate.error', raw, 'error')
+            translateError = _translateErrorMessage(raw)
+            log(2, `Translation error: ${raw}`, 50)
           }
         }
         log(2, 'Translation complete', 100)
         // Write translations back into all contract nodes (sentence + children).
-        // (clientTranslateAnalysis does sentence nodes internally; backend providers do all here.)
-        if (Object.keys(translations).length > 0 && !providerIsOriginal) {
+        // M2M100 already wrote aligned/fallback node translations directly.
+        if (Object.keys(translations).length > 0 && !providerIsOriginal && provider !== 'm2m100') {
           for (const rootNode of Object.values(contract)) {
             writeTranslationsToTree(rootNode, translations, provider)
           }
@@ -1305,14 +1410,19 @@ export class HttpRuntimeApi implements RuntimeApi {
             // Poll /api/render-status/<job_id> until done
             let zipBuf: ArrayBuffer | null = null
             let pollAttempt = 0
-            const renderTarget = needVideo ? 'audio + video' : 'audio'
-            const renderStatusText = `Server is rendering ${renderTarget} for ${timedSentences.length} sentence(s)…`
+            const renderScope = needVideo
+              ? 'Server render: TTS + subtitles + video muxing'
+              : 'Server render: TTS + subtitles'
             while (zipBuf === null) {
               ensureNotAborted()
               await new Promise<void>((resolve) => setTimeout(resolve, 2000))
               ensureNotAborted()
               pollAttempt++
-              log(3, renderStatusText, Math.min(5 + pollAttempt * 2, 48))
+              const renderElapsed = pollAttempt * 2
+              const renderHint = renderElapsed >= 90
+                ? `${renderScope} (heavy stage, please wait)`
+                : renderScope
+              log(3, `${renderHint} · elapsed ${formatElapsed(renderElapsed)}`, Math.min(5 + pollAttempt * 2, 48))
               const statusRes = await fetch(apiUrl(`/api/render-status/${jobId}`), { signal: input.signal })
               if (statusRes.headers.get('content-type')?.includes('application/zip')) {
                 zipBuf = await statusRes.arrayBuffer()
