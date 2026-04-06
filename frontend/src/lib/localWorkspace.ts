@@ -17,6 +17,7 @@ const IDB_DB_VERSION = 2
 const IDB_STATE_STORE = 'kv_store'
 const IDB_BLOB_STORE = 'blob_store'
 const SQLITE_STATE_KEY = 'workspace_state_v1'
+const SQLITE_TRANSLATION_CONFIG_KEY = 'translation_config_v1'
 const LEGACY_STORAGE_KEY = 'ela_frontend_workspace_v1'
 
 type WorkspaceFile = MediaFileRow & {
@@ -318,14 +319,6 @@ function repairProjectLinks(state: WorkspaceState): boolean {
     }
   }
 
-  const sanitizedConfig = sanitizeTranslationConfig(state.translation_config)
-  const prevConfig = JSON.stringify(state.translation_config || null)
-  const nextConfig = JSON.stringify(sanitizedConfig)
-  if (prevConfig !== nextConfig) {
-    state.translation_config = sanitizedConfig
-    changed = true
-  }
-
   return changed
 }
 
@@ -425,9 +418,17 @@ type BlobRecord = {
 let idbPromise: Promise<IDBDatabase | null> | null = null
 let memoryState: WorkspaceState = emptyWorkspaceState()
 let memoryBlobs = new Map<string, BlobRecord>()
+let stateStoreWriteQueue: Promise<void> = Promise.resolve()
 
 function hasIndexedDb(): boolean {
   return typeof indexedDB !== 'undefined'
+}
+
+function idbErrorDetails(error: unknown): { name: string; message: string } {
+  if (error instanceof DOMException || error instanceof Error) {
+    return { name: String(error.name || 'Error'), message: String(error.message || 'Unknown IndexedDB error') }
+  }
+  return { name: 'UnknownError', message: String(error || 'Unknown IndexedDB error') }
 }
 
 function openIndexedDb(): Promise<IDBDatabase | null> {
@@ -447,7 +448,7 @@ function openIndexedDb(): Promise<IDBDatabase | null> {
         resolve(req.result)
       }
       req.onerror = () => {
-        recordRuntimeDiagnostic('workspace.idb', 'open.error', req.error || 'Failed to open IndexedDB', 'error')
+        recordRuntimeDiagnostic('workspace.idb', 'open.error', idbErrorDetails(req.error), 'error')
         reject(req.error || new Error('Failed to open IndexedDB'))
       }
     })
@@ -477,11 +478,21 @@ async function withStore<T>(
         Promise.resolve(fn(store)).then((value) => {
           tx.oncomplete = () => resolve(value as T)
           tx.onerror = () => {
-            recordRuntimeDiagnostic('workspace.idb', 'tx.error', { storeName, mode, error: tx.error || 'IndexedDB transaction failed' }, 'error')
+            recordRuntimeDiagnostic(
+              'workspace.idb',
+              'tx.error',
+              { storeName, mode, ...idbErrorDetails(tx.error) },
+              'error',
+            )
             reject(tx.error || new Error('IndexedDB transaction failed'))
           }
           tx.onabort = () => {
-            recordRuntimeDiagnostic('workspace.idb', 'tx.abort', { storeName, mode, error: tx.error || 'IndexedDB transaction aborted' }, 'error')
+            recordRuntimeDiagnostic(
+              'workspace.idb',
+              'tx.abort',
+              { storeName, mode, ...idbErrorDetails(tx.error) },
+              'error',
+            )
             reject(tx.error || new Error('IndexedDB transaction aborted'))
           }
         }).catch(reject)
@@ -499,11 +510,17 @@ async function withStore<T>(
   return undefined
 }
 
+function queueStateStoreWrite<T>(task: () => Promise<T>): Promise<T> {
+  const run = stateStoreWriteQueue.then(task, task)
+  stateStoreWriteQueue = run.then(() => undefined, () => undefined)
+  return run
+}
+
 function requestToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => {
-      recordRuntimeDiagnostic('workspace.idb', 'request.error', request.error || 'IndexedDB request failed', 'error')
+      recordRuntimeDiagnostic('workspace.idb', 'request.error', idbErrorDetails(request.error), 'error')
       reject(request.error || new Error('IndexedDB request failed'))
     }
   })
@@ -513,18 +530,65 @@ async function idbGetState(): Promise<WorkspaceState> {
   const value = await withStore<string | undefined>(IDB_STATE_STORE, 'readonly', async (store) => {
     return await requestToPromise(store.get(SQLITE_STATE_KEY))
   })
-  if (typeof value !== 'string' || !value) return clone(memoryState)
+  if (typeof value !== 'string' || !value) {
+    const cfgOnly = await idbGetTranslationConfig()
+    if (cfgOnly) {
+      const fallback = clone(memoryState)
+      fallback.translation_config = clone(cfgOnly)
+      return fallback
+    }
+    return clone(memoryState)
+  }
   try {
-    return coerceWorkspaceState(JSON.parse(value) as Partial<WorkspaceState>)
+    const coerced = coerceWorkspaceState(JSON.parse(value) as Partial<WorkspaceState>)
+    const configFromKey = await idbGetTranslationConfig()
+    if (configFromKey) {
+      coerced.translation_config = clone(configFromKey)
+      return coerced
+    }
+    if (coerced.translation_config) {
+      // One-time migration from legacy embedded state payload to dedicated key.
+      try {
+        await idbPutTranslationConfig(coerced.translation_config)
+      } catch (err) {
+        recordRuntimeDiagnostic('workspace.translation_config', 'migrate_to_dedicated_key_failed', err, 'error')
+      }
+    }
+    return coerced
   } catch {
     return emptyWorkspaceState()
   }
 }
 
 async function idbPutState(state: WorkspaceState): Promise<void> {
-  memoryState = clone(state)
-  await withStore(IDB_STATE_STORE, 'readwrite', async (store) => {
-    await requestToPromise(store.put(JSON.stringify(state), SQLITE_STATE_KEY))
+  const snapshot = clone(state)
+  const persisted = { ...snapshot, translation_config: null }
+  await queueStateStoreWrite(async () => {
+    await withStore(IDB_STATE_STORE, 'readwrite', async (store) => {
+      await requestToPromise(store.put(JSON.stringify(persisted), SQLITE_STATE_KEY))
+    })
+  })
+  memoryState = snapshot
+}
+
+async function idbGetTranslationConfig(): Promise<TranslationConfig | null> {
+  const value = await withStore<string | undefined>(IDB_STATE_STORE, 'readonly', async (store) => {
+    return await requestToPromise(store.get(SQLITE_TRANSLATION_CONFIG_KEY))
+  })
+  if (typeof value !== 'string' || !value) return null
+  try {
+    return sanitizeTranslationConfig(JSON.parse(value) as TranslationConfig)
+  } catch {
+    return null
+  }
+}
+
+async function idbPutTranslationConfig(config: TranslationConfig): Promise<void> {
+  const snapshot = sanitizeTranslationConfig(config)
+  await queueStateStoreWrite(async () => {
+    await withStore(IDB_STATE_STORE, 'readwrite', async (store) => {
+      await requestToPromise(store.put(JSON.stringify(snapshot), SQLITE_TRANSLATION_CONFIG_KEY))
+    })
   })
 }
 
@@ -627,6 +691,7 @@ async function resetIndexedDb(): Promise<void> {
     openDb.close()
   }
   idbPromise = null
+  stateStoreWriteQueue = Promise.resolve()
   if (!hasIndexedDb()) return
   await new Promise<void>((resolve, reject) => {
     const req = indexedDB.deleteDatabase(IDB_DB_NAME)
@@ -669,6 +734,13 @@ async function ensureDbReady(): Promise<void> {
     try {
       const migrated = coerceWorkspaceState(JSON.parse(legacyRaw) as Partial<WorkspaceState>)
       await idbPutState(migrated)
+      if (migrated.translation_config) {
+        try {
+          await idbPutTranslationConfig(migrated.translation_config)
+        } catch (err) {
+          recordRuntimeDiagnostic('workspace.translation_config', 'legacy_migration_persist_failed', err, 'error')
+        }
+      }
       memoryState = clone(migrated)
       window.localStorage.removeItem(LEGACY_STORAGE_KEY)
     } catch {
@@ -716,11 +788,14 @@ async function loadRawState(): Promise<WorkspaceState> {
 }
 
 async function saveRawState(state: WorkspaceState): Promise<void> {
-  memoryState = clone(state)
+  const snapshot = clone(state)
   await ensureDbReady()
   await ensureDbFresh()
-  if (!hasIndexedDb()) return
-  await idbPutState(state)
+  if (!hasIndexedDb()) {
+    memoryState = snapshot
+    return
+  }
+  await idbPutState(snapshot)
 }
 
 async function ensureState(): Promise<WorkspaceState> {
@@ -1548,26 +1623,39 @@ export const LocalWorkspace = {
   },
 
   async getTranslationConfig(): Promise<TranslationConfig | null> {
-    const state = await ensureState()
-    const cfg = sanitizeTranslationConfig(state.translation_config)
+    await ensureDbReady()
+    await ensureDbFresh()
+    const cfgFromIdb = hasIndexedDb() ? await idbGetTranslationConfig() : null
+    let cfg = cfgFromIdb
+    if (!cfg) cfg = sanitizeTranslationConfig(memoryState.translation_config)
     // One-time migration: remove the 'hf' provider that was dropped in favour of 'm2m100'.
     if (cfg.providers.some((p) => p.id === 'hf')) {
       cfg.providers = cfg.providers.filter((p) => p.id !== 'hf')
       if (cfg.default_provider === 'hf') cfg.default_provider = 'm2m100'
-      state.translation_config = clone(cfg)
-      await saveRawState(state)
     }
-    if (JSON.stringify(state.translation_config || null) !== JSON.stringify(cfg)) {
-      state.translation_config = clone(cfg)
-      await saveRawState(state)
+    const currentMemory = sanitizeTranslationConfig(memoryState.translation_config)
+    const changed = JSON.stringify(currentMemory) !== JSON.stringify(cfg)
+    if (changed) {
+      memoryState.translation_config = clone(cfg)
     }
-    return cfg
+    if (hasIndexedDb() && (changed || !cfgFromIdb)) {
+      try {
+        await idbPutTranslationConfig(cfg)
+      } catch (err) {
+        recordRuntimeDiagnostic('workspace.translation_config', 'persist_dedicated_key_failed', err, 'error')
+      }
+    }
+    return clone(cfg)
   },
 
   async saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig> {
-    const state = await ensureState()
-    state.translation_config = sanitizeTranslationConfig(config)
-    await saveRawState(state)
-    return clone(state.translation_config)
+    await ensureDbReady()
+    await ensureDbFresh()
+    const cfg = sanitizeTranslationConfig(config)
+    if (hasIndexedDb()) {
+      await idbPutTranslationConfig(cfg)
+    }
+    memoryState.translation_config = clone(cfg)
+    return clone(cfg)
   },
 }

@@ -74,6 +74,75 @@ type TimedSentenceRow = {
   end_ms: number
 }
 
+const TRANSLATION_CONFIG_CACHE_KEY = 'ela_translation_config_cache_v1'
+const DEFAULT_TRANSLATION_CONFIG: TranslationConfig = {
+  default_provider: 'm2m100',
+  providers: [
+    { id: 'm2m100', label: 'M2M100', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} },
+    { id: 'gpt', label: 'OpenAI GPT', kind: 'builtin', enabled: false, credential_fields: ['api_key'], credentials: { api_key: '' } },
+    { id: 'deepl', label: 'DeepL', kind: 'builtin', enabled: false, credential_fields: ['auth_key'], credentials: { auth_key: '' } },
+    { id: 'lara', label: 'Lara', kind: 'builtin', enabled: false, credential_fields: ['api_id', 'api_secret'], credentials: { api_id: '', api_secret: '' } },
+    { id: 'original', label: 'Original only (no translation)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} },
+  ],
+}
+
+function normalizeTranslationConfigShape(raw: unknown): TranslationConfig | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Record<string, unknown>
+  const providersRaw = Array.isArray(row.providers) ? row.providers : []
+  const providers = providersRaw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const provider = item as Record<string, unknown>
+      const id = String(provider.id || '').trim()
+      if (!id) return null
+      const fieldsRaw = Array.isArray(provider.credential_fields)
+        ? provider.credential_fields
+        : (Array.isArray(provider.credentialFields) ? provider.credentialFields : [])
+      const credentialFields = fieldsRaw.map((value) => String(value || '').trim()).filter(Boolean)
+      const credentialsRaw = provider.credentials && typeof provider.credentials === 'object'
+        ? (provider.credentials as Record<string, unknown>)
+        : {}
+      const credentials: Record<string, string> = {}
+      for (const field of credentialFields) credentials[field] = String(credentialsRaw[field] || '')
+      return {
+        id,
+        label: String(provider.label || id),
+        kind: String(provider.kind || 'builtin'),
+        enabled: provider.enabled === true,
+        credential_fields: credentialFields,
+        credentials,
+      }
+    })
+    .filter((item): item is TranslationConfig['providers'][number] => Boolean(item))
+  if (providers.length === 0) return null
+  const defaultProvider = String(row.default_provider || row.defaultProvider || '').trim()
+  return {
+    default_provider: providers.some((provider) => provider.id === defaultProvider)
+      ? defaultProvider
+      : (providers.find((provider) => provider.enabled)?.id || 'm2m100'),
+    providers,
+  }
+}
+
+function readCachedTranslationConfig(): TranslationConfig | null {
+  try {
+    const raw = String(window.localStorage.getItem(TRANSLATION_CONFIG_CACHE_KEY) || '')
+    if (!raw) return null
+    return normalizeTranslationConfigShape(JSON.parse(raw))
+  } catch {
+    return null
+  }
+}
+
+function writeCachedTranslationConfig(config: TranslationConfig): void {
+  try {
+    window.localStorage.setItem(TRANSLATION_CONFIG_CACHE_KEY, JSON.stringify(config))
+  } catch {
+    // ignore cache write errors
+  }
+}
+
 
 function normalizedApiBaseUrl(): string {
   const raw = String(import.meta.env?.VITE_API_BASE_URL || '').trim()
@@ -2283,11 +2352,33 @@ export class HttpRuntimeApi implements RuntimeApi {
   }
 
   async getTranslationConfig(): Promise<TranslationConfig> {
-    return (await LocalWorkspace.getTranslationConfig()) as TranslationConfig
+    try {
+      const cfg = normalizeTranslationConfigShape(await LocalWorkspace.getTranslationConfig())
+      if (cfg) {
+        writeCachedTranslationConfig(cfg)
+        return cfg
+      }
+    } catch (err) {
+      recordRuntimeDiagnostic('api.translation_config', 'load.error', err, 'error')
+    }
+    const cached = readCachedTranslationConfig()
+    if (cached) {
+      recordRuntimeDiagnostic('api.translation_config', 'load.cached', {
+        defaultProvider: cached.default_provider,
+        providers: cached.providers.map((provider) => ({ id: provider.id, enabled: provider.enabled })),
+      })
+      return cached
+    }
+    recordRuntimeDiagnostic('api.translation_config', 'load.fallback_default')
+    return DEFAULT_TRANSLATION_CONFIG
   }
 
   async saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig> {
-    return await LocalWorkspace.saveTranslationConfig(config)
+    const normalized = normalizeTranslationConfigShape(config) || DEFAULT_TRANSLATION_CONFIG
+    const saved = await LocalWorkspace.saveTranslationConfig(normalized)
+    const resolved = normalizeTranslationConfigShape(saved) || normalized
+    writeCachedTranslationConfig(resolved)
+    return resolved
   }
 
   async listFiles(projectId?: string): Promise<MediaFileRow[]> {

@@ -527,6 +527,26 @@ describe('HttpRuntimeApi', () => {
     expect(String(fetchSpy.mock.calls[1][0])).toContain('/api/provider-translate')
   })
 
+  it('returns cached translation config when workspace read fails', async () => {
+    const api = new HttpRuntimeApi()
+    window.localStorage.setItem(
+      'ela_translation_config_cache_v1',
+      JSON.stringify({
+        default_provider: 'gpt',
+        providers: [
+          { id: 'm2m100', label: 'M2M100', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} },
+          { id: 'gpt', label: 'OpenAI GPT', kind: 'builtin', enabled: true, credential_fields: ['api_key'], credentials: { api_key: 'x' } },
+          { id: 'original', label: 'Original only (no translation)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} },
+        ],
+      }),
+    )
+    vi.spyOn(LocalWorkspace, 'getTranslationConfig').mockRejectedValue(new Error('IDB read failed'))
+
+    const cfg = await api.getTranslationConfig()
+    expect(cfg.default_provider).toBe('gpt')
+    expect(cfg.providers.find((provider) => provider.id === 'gpt')?.enabled).toBe(true)
+  })
+
   it('routes OpenAI provider translation through browser API (not backend /api/translate)', async () => {
     const api = new HttpRuntimeApi()
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
