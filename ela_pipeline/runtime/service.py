@@ -42,7 +42,7 @@ TRANSLATION_CONFIG_STATE_KEY = "translation_config"
 MEDIA_FILE_SETTINGS_PREFIX = "media_file_settings:"
 BACKEND_TRANSLATION_PROVIDER_KEY = "m2m100"
 MEDIA_STAGE_MANIFEST_PREFIX = "media_stage_manifest:"
-CONTRACT_BUILD_VERSION = "2026-04-07-whisper-word-timing-v1"
+CONTRACT_BUILD_VERSION = "2026-03-04-rulesfirst-v1"
 FRONTEND_INTERNAL_PROJECT_ID = "_frontend_internal_project"
 FRONTEND_INTERNAL_PROJECT_NAME = "Frontend Internal Project"
 
@@ -1562,7 +1562,6 @@ class RuntimeMediaService:
             "full_text": extraction.full_text,
             "sentence_stream": extraction.sentence_stream,
             "sentence_timeline": extraction.sentence_timeline,
-            "sentence_units": extraction.sentence_units,
         }
         checkpoint_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -1580,7 +1579,6 @@ class RuntimeMediaService:
         full_text = str(data.get("full_text") or "").strip()
         sentence_stream = data.get("sentence_stream")
         sentence_timeline = data.get("sentence_timeline")
-        sentence_units = data.get("sentence_units")
         if not source_type or not full_text or not isinstance(sentence_stream, list):
             return None
         return MediaExtractionResult(
@@ -1588,7 +1586,6 @@ class RuntimeMediaService:
             full_text=full_text,
             sentence_stream=sentence_stream,
             sentence_timeline=sentence_timeline if isinstance(sentence_timeline, list) else [],
-            sentence_units=sentence_units if isinstance(sentence_units, list) else [],
         )
 
     def _persist_stage_manifest_artifact(self, *, document_id: str, manifest: dict[str, Any]) -> None:

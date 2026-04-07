@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 import hashlib
 import os
@@ -102,7 +102,6 @@ class MediaExtractionResult:
     full_text: str
     sentence_stream: list[str]
     sentence_timeline: list[dict[str, float] | None]
-    sentence_units: list[list[dict[str, Any]] | None] = field(default_factory=list)
 
 
 def _detect_source_type(path: Path) -> str:
@@ -123,132 +122,6 @@ def _detect_source_type(path: Path) -> str:
 def _estimate_sentence_duration_seconds(text: str) -> float:
     words = len(re.findall(r"\w+", text or "", flags=re.UNICODE))
     return float(max(1.0, min(8.0, 0.35 * words + 0.8)))
-
-
-_SENTENCE_END_RE = re.compile(r"""[.!?]["')\]»]*\s*$""")
-_SENTENCE_END_WORD_RE = re.compile(r"""([A-Za-z]+)[.!?]["')\]»]*\s*$""")
-_SENTENCE_END_ABBREVS = {
-    "mr",
-    "mrs",
-    "dr",
-    "ms",
-    "prof",
-    "sr",
-    "jr",
-    "st",
-    "vs",
-    "no",
-}
-
-
-def _safe_float(value: Any, default: float) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def _append_sentence_token(text: str, token: str) -> str:
-    if not text:
-        return token
-    if re.match(r"^[,.;:!?%)\]»]+$", token):
-        return f"{text}{token}"
-    if token.startswith(("'", "’")):
-        return f"{text}{token}"
-    return f"{text} {token}"
-
-
-def _looks_like_sentence_boundary(text: str) -> bool:
-    if not _SENTENCE_END_RE.search(text):
-        return False
-    match = _SENTENCE_END_WORD_RE.search(text)
-    tail_word = (match.group(1) if match else "").strip().casefold()
-    return tail_word not in _SENTENCE_END_ABBREVS
-
-
-def _build_sentence_units_from_whisper(result: dict[str, Any]) -> tuple[str, list[dict[str, Any]]] | None:
-    """Reference approach (transcribe_and_translate_windows.py).
-
-    Step 1 — build_semantic_units: iterate segments→words, sub-tokenise each
-    Whisper word into semantic units that share the word's exact timestamps.
-
-    Step 2 — group_units_by_sentence: buffer units until a '.', '?', or '!'
-    symbol is encountered, then flush as one sentence chunk that carries its
-    pre-built units directly (no lossy word_timings indirection).
-    """
-    segments_raw = result.get("segments") or []
-    if not isinstance(segments_raw, list) or not segments_raw:
-        return None
-
-    # ── Steps 1+2 combined: build units and group into sentences ──────────
-    # Process segment by segment so that a segment boundary also acts as a
-    # flush point.  This prevents chapter titles like "The Voice of Reason 3"
-    # (which Whisper emits without terminal punctuation) from merging with the
-    # following sentence.
-    sentence_chunks: list[dict[str, Any]] = []
-    buffer: list[dict[str, Any]] = []
-    uid = 1
-    saw_words = False
-
-    def _flush_buffer() -> None:
-        if not buffer:
-            return
-        text = "".join(
-            (u["text"] if u["type"] == "symbol" else " " + u["text"]) for u in buffer
-        ).strip()
-        if text:
-            sentence_chunks.append(
-                {
-                    "sentence_text": text,
-                    "start_sec": buffer[0]["audio"]["origin_start"],
-                    "end_sec": buffer[-1]["audio"]["origin_end"],
-                    "units": [dict(u) for u in buffer],
-                }
-            )
-        buffer.clear()
-
-    for segment in segments_raw:
-        if not isinstance(segment, dict):
-            continue
-        seg_start = _safe_float(segment.get("start"), 0.0)
-        seg_end = _safe_float(segment.get("end"), seg_start)
-        words = segment.get("words")
-        if not isinstance(words, list):
-            continue
-        for word in words:
-            if not isinstance(word, dict):
-                continue
-            raw = str(word.get("word") or word.get("text") or "").strip()
-            if not raw:
-                continue
-            saw_words = True
-            w_start = _safe_float(word.get("start"), seg_start)
-            w_end = _safe_float(word.get("end"), max(w_start, seg_end))
-            for tok in re.findall(r"\d+|[A-Za-zА-Яа-яЁё]+|[^\w\s]", raw, flags=re.UNICODE):
-                buffer.append(
-                    {
-                        "id": uid,
-                        "type": "number" if tok.isdigit() else ("word" if tok.isalpha() else "symbol"),
-                        "text": tok,
-                        "audio": {
-                            "origin_start": round(w_start, 3),
-                            "origin_end": round(w_end, 3),
-                        },
-                    }
-                )
-                uid += 1
-                if buffer[-1]["type"] == "symbol" and buffer[-1]["text"] in ".?!":
-                    _flush_buffer()
-        # Flush at segment boundary — prevents unpunctuated titles from merging
-        _flush_buffer()
-
-    if not saw_words or not sentence_chunks:
-        return None
-
-    full_text = str(result.get("text") or "").strip()
-    if not full_text:
-        full_text = " ".join(c["sentence_text"] for c in sentence_chunks)
-    return full_text, sentence_chunks
 
 
 def _tokenize_semantic_units(text: str, *, start_sec: float, end_sec: float) -> list[dict[str, Any]]:
@@ -274,7 +147,6 @@ def _tokenize_semantic_units(text: str, *, start_sec: float, end_sec: float) -> 
             }
         )
     return out
-
 
 
 def _extract_translation_text(sentence_node: dict[str, Any]) -> str:
@@ -474,7 +346,7 @@ def _extract_text_and_sentence_chunks(
                 result_holder["result"] = model.transcribe(
                     _raw,
                     language=source_lang,
-                    word_timestamps=True,
+                    word_timestamps=False,
                     verbose=False,
                     fp16=False,
                 )
@@ -500,9 +372,6 @@ def _extract_text_and_sentence_chunks(
         result = result_holder.get("result") or {}
         if progress_callback is not None:
             progress_callback("transcribing_audio", 1.0, "ASR completed.")
-        grouped = _build_sentence_units_from_whisper(result if isinstance(result, dict) else {})
-        if grouped is not None:
-            return grouped
         segments: list[dict[str, Any]] = []
         texts: list[str] = []
         for seg in result.get("segments", []) or []:
@@ -1038,41 +907,23 @@ def extract_media_text_and_sentences(
         progress_callback("translating_text", 0.04, "Splitting transcript into sentences")
     sentence_stream: list[str] = []
     sentence_timeline: list[dict[str, float] | None] = []
-    sentence_units: list[list[dict[str, Any]] | None] = []
     if extracted_sentence_chunks:
-        # Reference approach (transcribe_and_translate_windows.py):
-        # chunks already carry pre-built units with exact Whisper timestamps.
-        # Apply only the metadata filter — no re-segmentation.
-        for chunk in extracted_sentence_chunks:
-            text = str(chunk.get("sentence_text") or "").strip()
+        # Keep ASR chunk timing intact for media pipeline.
+        # The 2026-02-24 backend path used Whisper segments directly here,
+        # and later subtitle/audio assembly relied on those original windows.
+        # Re-sentenceizing via spaCy shifts sentence boundaries and breaks
+        # subtitle timing in generated video.
+        for row in extracted_sentence_chunks:
+            text = str(row.get("sentence_text") or "").strip()
             if not text:
                 continue
-            doc = nlp(text)
-            if _is_metadata_like_sentence(text, doc):
-                continue
-            start_sec = float(chunk.get("start_sec") or 0.0)
-            end_sec = float(chunk.get("end_sec") or start_sec + 0.2)
-            if end_sec <= start_sec:
-                end_sec = start_sec + _estimate_sentence_duration_seconds(text)
             sentence_stream.append(text)
-            sentence_timeline.append({"start_sec": start_sec, "end_sec": end_sec})
-            u = chunk.get("units")
-            sentence_units.append(u if isinstance(u, list) and u else None)
-
-        if not sentence_stream:
-            # Fallback: metadata filter removed everything — use chunks as-is.
-            for chunk in extracted_sentence_chunks:
-                text = str(chunk.get("sentence_text") or "").strip()
-                if not text:
-                    continue
-                start_sec = float(chunk.get("start_sec") or 0.0)
-                end_sec = float(chunk.get("end_sec") or start_sec + 0.2)
-                if end_sec <= start_sec:
-                    end_sec = start_sec + _estimate_sentence_duration_seconds(text)
-                sentence_stream.append(text)
-                sentence_timeline.append({"start_sec": start_sec, "end_sec": end_sec})
-                u = chunk.get("units")
-                sentence_units.append(u if isinstance(u, list) and u else None)
+            sentence_timeline.append(
+                {
+                    "start_sec": float(row.get("start_sec") or 0.0),
+                    "end_sec": float(row.get("end_sec") or 0.0),
+                }
+            )
     else:
         skeleton = build_skeleton(full_text, nlp)
         fallback_stream = [str(text or "").strip() for text in skeleton.keys() if str(text or "").strip()]
@@ -1085,34 +936,22 @@ def extract_media_text_and_sentences(
                 continue
             sentence_stream.append(text_resolved)
             sentence_timeline.append(None)
-            sentence_units.append(None)
         if not sentence_stream:
             if fallback_stream:
                 sentence_stream = fallback_stream
                 sentence_timeline = [None for _ in fallback_stream]
-                sentence_units = [None for _ in fallback_stream]
             elif full_text:
                 sentence_stream = [full_text]
                 sentence_timeline = [None]
-                sentence_units = [None]
 
     if progress_callback is not None:
         progress_callback("translating_text", 0.08, f"Prepared {len(sentence_stream)} sentences")
-
-    # --- TEMPORARY DIAGNOSTIC LOG ---
-    print(f"[pipeline-debug] total_sentences={len(sentence_stream)}", flush=True)
-    for _i, (_txt, _tl) in enumerate(zip(sentence_stream[:10], sentence_timeline[:10])):
-        _s = round(_tl["start_sec"], 2) if _tl else None
-        _e = round(_tl["end_sec"], 2) if _tl else None
-        print(f"[pipeline-debug] [{_i}] {_s}s-{_e}s | {_txt[:80]}", flush=True)
-    # --------------------------------
 
     return MediaExtractionResult(
         source_type=source_type,
         full_text=full_text,
         sentence_stream=sentence_stream,
         sentence_timeline=sentence_timeline,
-        sentence_units=sentence_units,
     )
 
 
@@ -1127,7 +966,6 @@ def build_media_contracts(
     full_text = extraction.full_text
     sentence_stream = extraction.sentence_stream
     sentence_timeline = extraction.sentence_timeline
-    sentence_units_list = extraction.sentence_units or []
 
     media_sentences: list[dict[str, Any]] = []
     contract_sentences: list[dict[str, Any]] = []
@@ -1162,16 +1000,6 @@ def build_media_contracts(
             end_sec = start_sec + _estimate_sentence_duration_seconds(sentence_text_resolved)
             time_cursor_sec = end_sec + 0.2
 
-        prebuilt_units = sentence_units_list[idx] if idx < len(sentence_units_list) else None
-        if prebuilt_units:
-            eng_units = list(prebuilt_units)
-        else:
-            eng_units = _tokenize_semantic_units(
-                sentence_text_resolved,
-                start_sec=start_sec,
-                end_sec=end_sec,
-            )
-
         ru_text = _extract_translation_text(sentence_node)
         media_sentences.append(
             {
@@ -1182,7 +1010,11 @@ def build_media_contracts(
                 "end_ms": int(round(end_sec * 1000)),
                 "id": idx + 1,
                 "text_eng": sentence_text_resolved,
-                "units": eng_units,
+                "units": _tokenize_semantic_units(
+                    sentence_text_resolved,
+                    start_sec=start_sec,
+                    end_sec=end_sec,
+                ),
                 "start": round(start_sec, 3),
                 "end": round(end_sec, 3),
                 "text_ru": ru_text,
