@@ -74,6 +74,75 @@ type TimedSentenceRow = {
   end_ms: number
 }
 
+const TRANSLATION_CONFIG_CACHE_KEY = 'ela_translation_config_cache_v1'
+const DEFAULT_TRANSLATION_CONFIG: TranslationConfig = {
+  default_provider: 'm2m100',
+  providers: [
+    { id: 'm2m100', label: 'M2M100', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} },
+    { id: 'gpt', label: 'OpenAI GPT', kind: 'builtin', enabled: false, credential_fields: ['api_key'], credentials: { api_key: '' } },
+    { id: 'deepl', label: 'DeepL', kind: 'builtin', enabled: false, credential_fields: ['auth_key'], credentials: { auth_key: '' } },
+    { id: 'lara', label: 'Lara', kind: 'builtin', enabled: false, credential_fields: ['api_id', 'api_secret'], credentials: { api_id: '', api_secret: '' } },
+    { id: 'original', label: 'Original only (no translation)', kind: 'builtin', enabled: true, credential_fields: [], credentials: {} },
+  ],
+}
+
+function normalizeTranslationConfigShape(raw: unknown): TranslationConfig | null {
+  if (!raw || typeof raw !== 'object') return null
+  const row = raw as Record<string, unknown>
+  const providersRaw = Array.isArray(row.providers) ? row.providers : []
+  const providers = providersRaw
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const provider = item as Record<string, unknown>
+      const id = String(provider.id || '').trim()
+      if (!id) return null
+      const fieldsRaw = Array.isArray(provider.credential_fields)
+        ? provider.credential_fields
+        : (Array.isArray(provider.credentialFields) ? provider.credentialFields : [])
+      const credentialFields = fieldsRaw.map((value) => String(value || '').trim()).filter(Boolean)
+      const credentialsRaw = provider.credentials && typeof provider.credentials === 'object'
+        ? (provider.credentials as Record<string, unknown>)
+        : {}
+      const credentials: Record<string, string> = {}
+      for (const field of credentialFields) credentials[field] = String(credentialsRaw[field] || '')
+      return {
+        id,
+        label: String(provider.label || id),
+        kind: String(provider.kind || 'builtin'),
+        enabled: provider.enabled === true,
+        credential_fields: credentialFields,
+        credentials,
+      }
+    })
+    .filter((item): item is TranslationConfig['providers'][number] => Boolean(item))
+  if (providers.length === 0) return null
+  const defaultProvider = String(row.default_provider || row.defaultProvider || '').trim()
+  return {
+    default_provider: providers.some((provider) => provider.id === defaultProvider)
+      ? defaultProvider
+      : (providers.find((provider) => provider.enabled)?.id || 'm2m100'),
+    providers,
+  }
+}
+
+function readCachedTranslationConfig(): TranslationConfig | null {
+  try {
+    const raw = String(window.localStorage.getItem(TRANSLATION_CONFIG_CACHE_KEY) || '')
+    if (!raw) return null
+    return normalizeTranslationConfigShape(JSON.parse(raw))
+  } catch {
+    return null
+  }
+}
+
+function writeCachedTranslationConfig(config: TranslationConfig): void {
+  try {
+    window.localStorage.setItem(TRANSLATION_CONFIG_CACHE_KEY, JSON.stringify(config))
+  } catch {
+    // ignore cache write errors
+  }
+}
+
 
 function normalizedApiBaseUrl(): string {
   const raw = String(import.meta.env?.VITE_API_BASE_URL || '').trim()
@@ -253,6 +322,106 @@ function _translateErrorMessage(raw: string): string {
   return `Translation failed: ${raw}`
 }
 
+function isLikelyNetworkFetchError(err: unknown): boolean {
+  const text = String(err instanceof Error ? err.message : err || '').trim().toLowerCase()
+  return (
+    text.includes('failed to fetch') ||
+    text.includes('networkerror') ||
+    text.includes('load failed') ||
+    text.includes('fetch failed')
+  )
+}
+
+function normalizeProviderId(provider: string | undefined): string {
+  return String(provider || '').trim().toLowerCase()
+}
+
+function splitIntoChunksBySize(texts: string[], maxItems: number, maxBytes: number): string[][] {
+  const out: string[][] = []
+  let chunk: string[] = []
+  let chunkBytes = 0
+  for (const text of texts) {
+    const trimmed = String(text || '').trim()
+    if (!trimmed) continue
+    const itemBytes = bytesOfText(trimmed)
+    const wouldOverflow = chunk.length >= maxItems || (chunk.length > 0 && chunkBytes + itemBytes > maxBytes)
+    if (wouldOverflow) {
+      out.push(chunk)
+      chunk = []
+      chunkBytes = 0
+    }
+    chunk.push(trimmed)
+    chunkBytes += itemBytes
+  }
+  if (chunk.length > 0) out.push(chunk)
+  return out
+}
+
+function parseJsonLoose(raw: string): unknown | null {
+  const text = String(raw || '').trim()
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    // continue
+  }
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i)
+  if (fenced?.[1]) {
+    try {
+      return JSON.parse(fenced[1])
+    } catch {
+      // continue
+    }
+  }
+  const objectStart = text.indexOf('{')
+  const objectEnd = text.lastIndexOf('}')
+  if (objectStart >= 0 && objectEnd > objectStart) {
+    try {
+      return JSON.parse(text.slice(objectStart, objectEnd + 1))
+    } catch {
+      // continue
+    }
+  }
+  const arrayStart = text.indexOf('[')
+  const arrayEnd = text.lastIndexOf(']')
+  if (arrayStart >= 0 && arrayEnd > arrayStart) {
+    try {
+      return JSON.parse(text.slice(arrayStart, arrayEnd + 1))
+    } catch {
+      // continue
+    }
+  }
+  return null
+}
+
+function toBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const slice = bytes.subarray(i, i + chunkSize)
+    binary += String.fromCharCode(...slice)
+  }
+  return btoa(binary)
+}
+
+function laraLocale(lang: string): string {
+  const value = String(lang || '').trim().toLowerCase()
+  if (!value) return 'en-US'
+  const mapping: Record<string, string> = {
+    en: 'en-US',
+    ru: 'ru-RU',
+    uk: 'uk-UA',
+    de: 'de-DE',
+    fr: 'fr-FR',
+    es: 'es-ES',
+    it: 'it-IT',
+    pt: 'pt-PT',
+    pl: 'pl-PL',
+    tr: 'tr-TR',
+  }
+  return mapping[value] || `${value}-${value.toUpperCase()}`
+}
+
 function contractHasProviderTranslations(contract: VisualizerPayload | null | undefined, provider: string): boolean {
   if (!contract || typeof contract !== 'object') return false
   const wanted = String(provider || '').trim()
@@ -271,9 +440,18 @@ function contractHasProviderTranslations(contract: VisualizerPayload | null | un
 // Stage-scoped document IDs so that caching at each pipeline stage
 // is invalidated only by the parameters that stage actually depends on.
 //
-//  immutableDocId  = hash(fileName)                          — Whisper output
-//  contractDocId   = hash(fileName | translationProvider)    — contracts + translations
+//  immutableDocId  = hash(fileName | mediaPath | asrSchema)  — Whisper output
+//  contractDocId   = hash(fileName | pipelineSchema)          — contracts + all provider translations
 //  variantDocId    = hash(fileName | provider | voice | subs)— TTS audio + video + done-marker
+const SENTENCE_CACHE_SCHEMA = 'asr-word-ts-v2'
+const PIPELINE_CACHE_SCHEMA = 'media-pipeline-v2'
+
+type StoredSentence = { text: string; start_sec: number | null; end_sec: number | null }
+type CachedSentencesPayloadV2 = {
+  schema: string
+  media_path: string
+  sentences: StoredSentence[]
+}
 function fallbackHashHex64(input: string): string {
   // Deterministic non-crypto fallback for environments where SubtleCrypto
   // is unavailable (e.g. insecure HTTP context on some mobile browsers).
@@ -312,12 +490,38 @@ async function computeHashHex(input: string): Promise<string> {
   return fallbackHashHex64(input)
 }
 
-async function computeImmutableDocId(fileName: string): Promise<string> {
-  return await computeHashHex(fileName)
+async function computeImmutableDocId(fileName: string, mediaPath: string): Promise<string> {
+  return await computeHashHex(`${fileName}|${mediaPath}|${SENTENCE_CACHE_SCHEMA}`)
 }
 
-async function computeContractDocId(fileName: string, translationProvider: string): Promise<string> {
-  const input = `${fileName}|${translationProvider}`
+function parseCachedSentencesPayload(raw: string, currentMediaPath: string): StoredSentence[] | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (Array.isArray(parsed)) {
+      // Legacy format (pre schema+path pinning) is intentionally ignored to avoid
+      // reusing stale sentence timings after ASR algorithm changes.
+      return null
+    }
+    if (!parsed || typeof parsed !== 'object') return null
+    const row = parsed as Partial<CachedSentencesPayloadV2>
+    if (String(row.schema || '') !== SENTENCE_CACHE_SCHEMA) return null
+    if (String(row.media_path || '') !== String(currentMediaPath || '')) return null
+    if (!Array.isArray(row.sentences)) return null
+    return row.sentences
+      .map((item) => ({
+        text: String((item as StoredSentence).text || '').trim(),
+        start_sec: typeof (item as StoredSentence).start_sec === 'number' ? (item as StoredSentence).start_sec : null,
+        end_sec: typeof (item as StoredSentence).end_sec === 'number' ? (item as StoredSentence).end_sec : null,
+      }))
+      .filter((item) => item.text.length > 0)
+  } catch {
+    return null
+  }
+}
+
+async function computeContractDocId(fileName: string): Promise<string> {
+  const input = `${fileName}|${PIPELINE_CACHE_SCHEMA}`
   return await computeHashHex(input)
 }
 
@@ -325,7 +529,7 @@ async function computeVariantDocId(
   fileName: string,
   settings: { translationProvider: string; voiceChoice: string; subtitlesMode: string },
 ): Promise<string> {
-  const input = `${fileName}|${settings.translationProvider}|${settings.voiceChoice}|${settings.subtitlesMode}`
+  const input = `${fileName}|${settings.translationProvider}|${settings.voiceChoice}|${settings.subtitlesMode}|${PIPELINE_CACHE_SCHEMA}`
   return await computeHashHex(input)
 }
 
@@ -731,7 +935,6 @@ export class HttpRuntimeApi implements RuntimeApi {
       if (input.signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
     }
 
-    type StoredSentence = { text: string; start_sec: number | null; end_sec: number | null }
     type PipelineSettings = { translationProvider: string; voiceChoice: string; subtitlesMode: string; sourceType: string }
 
     const runConcurrent = (tasks: Array<() => Promise<void>>, concurrency: number): Promise<void> => {
@@ -753,11 +956,13 @@ export class HttpRuntimeApi implements RuntimeApi {
     try {
       recordRuntimeDiagnostic('api.media.backend', 'submit.start', { mediaPath: input.mediaPath, fileName: input.fileName })
       const MAX_LOST_JOB_RESUBMITS = 1
+      const MAX_TRANSLATE_STATUS_NETWORK_ERRORS = 8
+      const MAX_RENDER_STATUS_NETWORK_ERRORS = 8
 
       // ── Resume detection ──────────────────────────────────────────
       // Three stage-scoped IDs so each stage is invalidated only by what it depends on:
-      //   immutableDocId  — Whisper output (sentences.json): only file name
-      //   contractDocId   — contracts + translations: file + provider
+      //   immutableDocId  — Whisper output (sentences.json): file + mediaPath + ASR schema
+      //   contractDocId   — contracts + translations cache: file-scoped (shared across providers)
       //   documentId      — TTS audio/video + done-marker: all settings (variant)
       // resumePoint: 'full' = run everything; 'translation' = reuse transcription+contracts;
       //              'tts' = reuse transcription+contracts+translations; 'done' = early exit
@@ -767,8 +972,8 @@ export class HttpRuntimeApi implements RuntimeApi {
         voiceChoice: String(input.voiceChoice || 'backend_dmitry').trim().toLowerCase(),
         subtitlesMode: input.subtitlesMode || 'bilingual',
       }
-      const immutableDocId = await computeImmutableDocId(input.fileName)
-      const contractDocId = await computeContractDocId(input.fileName, provider)
+      const immutableDocId = await computeImmutableDocId(input.fileName, input.mediaPath)
+      const contractDocId = await computeContractDocId(input.fileName)
       const documentId = await computeVariantDocId(input.fileName, docIdSettings)
       recordRuntimeDiagnostic('api.media.resume', 'docids', {
         fileName: input.fileName,
@@ -798,10 +1003,46 @@ export class HttpRuntimeApi implements RuntimeApi {
         })
 
         if (settBlob) {
-          // pipeline_settings.json only exists after a fully successful run for this variant
-          resumePoint = 'done'
-        } else if (sentBlob) {
-          const prevSentences = JSON.parse(await sentBlob.text()) as StoredSentence[]
+          // done-marker alone is not enough: stale blobs may survive while analysis rows were deleted.
+          const variantCurrent = await LocalWorkspace.getRawAnalysis(documentId).catch(() => null)
+          const variantVisible = Boolean(
+            variantCurrent &&
+            variantCurrent.contract_current !== false &&
+            Object.keys(variantCurrent.contract || {}).length > 0,
+          )
+          if (variantVisible) {
+            resumePoint = 'done'
+          } else {
+            const recovered = await LocalWorkspace.getRawAnalysis(contractDocId).catch(() => null)
+            if (recovered && Object.keys(recovered.contract || {}).length > 0) {
+              await LocalWorkspace.upsertAnalysis({
+                documentId,
+                projectId: input.projectId,
+                mediaFileId: input.mediaFileId,
+                fileName: input.fileName,
+                filePath: input.mediaPath,
+                sizeBytes: input.sizeBytes,
+                durationSeconds: input.durationSec,
+                settings: input.settings,
+                contract: recovered.contract,
+                artifacts: LocalWorkspace.buildDocumentArtifacts(documentId, recovered.contract),
+                contractCurrent: true,
+              })
+              resumePoint = 'done'
+              recordRuntimeDiagnostic('api.media.resume', 'history.recovered_from_contract_cache', {
+                documentId,
+                contractDocId,
+              })
+            } else {
+              recordRuntimeDiagnostic('api.media.resume', 'history.missing_on_done_marker', {
+                documentId,
+                contractDocId,
+              }, 'error')
+            }
+          }
+        }
+        if (resumePoint !== 'done' && sentBlob) {
+          const prevSentences = parseCachedSentencesPayload(await sentBlob.text(), input.mediaPath) || []
           if (prevSentences.length > 0) {
             const rawAnalysis = await LocalWorkspace.getRawAnalysis(contractDocId)
             if (rawAnalysis && Object.keys(rawAnalysis.contract).length > 0) {
@@ -809,16 +1050,24 @@ export class HttpRuntimeApi implements RuntimeApi {
               resumeContract = rawAnalysis.contract
               resumeSourceType = (rawAnalysis as any).sourceType ?? null
 
-              // Extract stored translations from contract nodes
+              // Reuse translation stage only if current provider already has
+              // complete sentence-level translations in cached contract.
               const translations: Record<string, string> = {}
-              for (const [key, node] of Object.entries(rawAnalysis.contract)) {
-                const active = String(node.active_translation_provider || '')
-                const t = active
-                  ? (node.translations as Record<string, { text?: string }> | undefined)?.[active]?.text
-                  : undefined
-                if (t) translations[key] = t
+              const sentenceEntries = Object.entries(rawAnalysis.contract || {})
+              let translatedSentenceCount = 0
+              for (const [key, node] of sentenceEntries) {
+                const sourceKey = String(key || '').trim()
+                if (!sourceKey) continue
+                const candidate = String(
+                  (node.translations as Record<string, { text?: string }> | undefined)?.[provider]?.text || '',
+                ).trim()
+                if (candidate && candidate.toLowerCase() !== sourceKey.toLowerCase()) {
+                  translations[key] = candidate
+                  translations[sourceKey] = candidate
+                  translatedSentenceCount += 1
+                }
               }
-              if (Object.keys(translations).length > 0) {
+              if (sentenceEntries.length > 0 && translatedSentenceCount === sentenceEntries.length) {
                 resumeTranslations = translations
                 resumePoint = 'tts'
               } else {
@@ -888,9 +1137,10 @@ export class HttpRuntimeApi implements RuntimeApi {
           log(1, `Extracted ${sentences.length} sentences from document`, 100)
           ensureNotAborted()
         } else {
-        const isAndroid = /android/i.test(navigator.userAgent)
-        if (isAndroid && input.mediaBlob) {
-          // Android ONNX WASM crashes with raw exception numbers — use server-side Whisper instead
+        const isTauriRuntime = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+        if (!isTauriRuntime && input.mediaBlob) {
+          // Browser PWA (desktop or Android) — always use server-side Whisper.
+          // Client-side ONNX Whisper produces unreliable word timestamps in the browser.
           log(1, 'Uploading audio for server-side transcription…', 5)
           const submitTranscribeJob = async (): Promise<string> => {
             const transcribeForm = new FormData()
@@ -973,10 +1223,15 @@ export class HttpRuntimeApi implements RuntimeApi {
         }
 
         // Persist sentences under immutableDocId — independent of voice/subs/provider
+        const sentenceCachePayload: CachedSentencesPayloadV2 = {
+          schema: SENTENCE_CACHE_SCHEMA,
+          media_path: input.mediaPath,
+          sentences,
+        }
         await LocalWorkspace.cacheAnalysisArtifactBlob(
           immutableDocId,
           'sentences.json',
-          new Blob([JSON.stringify(sentences)], { type: 'application/json' }),
+          new Blob([JSON.stringify(sentenceCachePayload)], { type: 'application/json' }),
         )
         recordRuntimeDiagnostic('api.media.resume', 'sentences-saved', { immutableDocId, count: sentences.length })
       } else {
@@ -1067,7 +1322,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       // Client-side opus-mt inference only runs in Tauri (offline desktop).
       // Browser PWA (desktop or Android) always routes m2m100 to the server.
       const isTauriRuntime = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
-      const BACKEND_PROVIDERS = new Set(['gpt', 'deepl', 'lara', ...(!isTauriRuntime || isAndroidDevice ? ['m2m100'] : [])])
+      const BACKEND_PROVIDERS = new Set([...(isAndroidDevice || !isTauriRuntime ? ['m2m100'] : [])])
       const providerIsOriginal = provider === 'original'
 
       // Collect all node texts recursively (skipping punctuation and already-translated nodes)
@@ -1116,30 +1371,46 @@ export class HttpRuntimeApi implements RuntimeApi {
         const tgt = String(candidate || '').trim().toLowerCase()
         return !!tgt && src !== tgt
       }
-      const enabledProvider = input.translatorOptions?.find((p: { id: string }) => p.id === provider)
-      const backendCredentials = (enabledProvider as any)?.credentials || {}
+      const enabledProvider = input.translatorOptions?.find(
+        (p: { id: string }) => normalizeProviderId(p.id) === provider,
+      )
+      const providerCredentials = (enabledProvider as { credentials?: Record<string, string> } | undefined)?.credentials || {}
       const runBackendTranslateBatch = async (
         texts: string[],
         phase: 'sentences' | 'nodes' = 'nodes',
       ): Promise<Record<string, string>> => {
+        if (provider !== 'm2m100') {
+          throw new Error(`Backend translate route is reserved for m2m100 (got "${provider || 'unknown'}").`)
+        }
         const payloadTexts = Array.from(new Set(texts.map((text) => text.trim()).filter(Boolean)))
         if (payloadTexts.length === 0) return {}
         const submitTranslateJob = async (): Promise<string> => {
-          const res = await requestJson<{ job_id: string }>(
-            apiUrl('/api/translate'),
+          const submitRes = await fetchWithRetry(
+            '/api/translate',
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sentences: payloadTexts, provider, credentials: backendCredentials }),
+              body: JSON.stringify({ sentences: payloadTexts, provider: 'm2m100' }),
               signal: input.signal,
             },
+            { retries: 2, retryDelayMs: 1200 },
           )
-          return res.job_id
+          const parsed = await readJsonResponse<{ job_id?: string }>(submitRes)
+          const jobId = String(parsed.json?.job_id || '').trim()
+          if (!submitRes.ok || !jobId) {
+            throw new Error(
+              parsed.json && typeof parsed.json === 'object' && 'error' in parsed.json
+                ? String((parsed.json as { error?: unknown }).error || `HTTP ${submitRes.status}`)
+                : (parsed.raw || `HTTP ${submitRes.status}`),
+            )
+          }
+          return jobId
         }
 
         let translateJobId = await submitTranslateJob()
         let translateResubmitCount = 0
         let translateStatusDecodeFailures = 0
+        let translateStatusNetworkFailures = 0
         let pollCount = 0
 
         while (true) {
@@ -1147,7 +1418,28 @@ export class HttpRuntimeApi implements RuntimeApi {
           await sleepMs(1500)
           ensureNotAborted()
           pollCount++
-          const statusRes = await fetch(apiUrl(`/api/translate-status/${translateJobId}`), { signal: input.signal })
+          let statusRes: Response
+          try {
+            statusRes = await fetchWithRetry(
+              `/api/translate-status/${translateJobId}`,
+              { signal: input.signal },
+              { retries: 2, retryDelayMs: 900 },
+            )
+            translateStatusNetworkFailures = 0
+          } catch (statusErr) {
+            if (statusErr instanceof DOMException && statusErr.name === 'AbortError') throw statusErr
+            if (isLikelyNetworkFetchError(statusErr) && translateStatusNetworkFailures < MAX_TRANSLATE_STATUS_NETWORK_ERRORS) {
+              translateStatusNetworkFailures += 1
+              recordRuntimeDiagnostic('api.media.backend', 'translate.status.fetch_retry', {
+                phase,
+                failureCount: translateStatusNetworkFailures,
+                reason: String(statusErr instanceof Error ? statusErr.message : statusErr),
+              }, 'error')
+              log(2, 'Translation service reconnecting…', 50)
+              continue
+            }
+            throw statusErr
+          }
           const raw = await statusRes.text().catch(() => '')
           let statusJson: {
             status?: string
@@ -1217,9 +1509,9 @@ export class HttpRuntimeApi implements RuntimeApi {
       }
 
       let translations: Record<string, string> = {}
-      let translateError: string | null = null
       if (resumePoint === 'tts' && resumeTranslations) {
         translations = resumeTranslations
+        for (const node of Object.values(contract)) markActiveProvider(node, provider)
         log(2, 'Reusing existing translations', 100)
       } else if (providerIsOriginal) {
         // "Original only" — no translation; Russian text stays empty
@@ -1231,79 +1523,66 @@ export class HttpRuntimeApi implements RuntimeApi {
           for (const node of Object.values(contract)) markActiveProvider(node, provider)
           try {
             if (BACKEND_PROVIDERS.has(provider)) {
-              if (provider === 'm2m100') {
-                const sentenceEntries = Object.entries(contract)
-                const sentenceTexts = sentenceEntries
-                  .map(([sentenceText, node]) => {
-                    const sourceText = sentenceText.trim()
-                    if (!sourceText) return ''
-                    const existing = getNodeProviderTranslation(node, provider)
-                    return hasUsefulTranslation(sourceText, existing) ? '' : sourceText
-                  })
-                  .filter(Boolean)
-                if (sentenceTexts.length > 0) {
-                  log(2, `Translating ${sentenceTexts.length} sentences...`, 50)
-                  Object.assign(translations, await runBackendTranslateBatch(sentenceTexts, 'sentences'))
-                } else {
-                  log(2, 'All sentence translations already cached', 75)
-                }
-
-                const missingNodeTexts = new Set<string>()
-                let alignedNodes = 0
-                for (const [sentenceText, rootNode] of sentenceEntries) {
-                  const sourceSentence = sentenceText.trim()
-                  if (!sourceSentence) continue
-                  const translatedSentence = String(
-                    translations[sourceSentence]
-                    || translations[sentenceText]
-                    || getNodeProviderTranslation(rootNode, provider),
-                  ).trim()
-                  if (!translatedSentence) continue
-                  translations[sentenceText] = translatedSentence
-                  translations[sourceSentence] = translatedSentence
-                  const aligned = alignNodeTranslationsFromSentence({
-                    root: rootNode,
-                    sentenceSourceText: sourceSentence,
-                    sentenceTranslatedText: translatedSentence,
-                    provider,
-                  })
-                  alignedNodes += aligned.alignedCount
-                  for (const text of aligned.missingNodeTexts) missingNodeTexts.add(text)
-                }
-
-                if (missingNodeTexts.size > 0) {
-                  log(2, `Resolving ${missingNodeTexts.size} node fragments...`, 92)
-                  const fallbackTranslations = await runBackendTranslateBatch(Array.from(missingNodeTexts), 'nodes')
-                  Object.assign(translations, fallbackTranslations)
-                  for (const rootNode of Object.values(contract)) {
-                    fillMissingNodeTranslations({
-                      root: rootNode,
-                      provider,
-                      translationMap: fallbackTranslations,
-                    })
-                  }
-                }
-                recordRuntimeDiagnostic('api.media.backend', 'translate.alignment', {
-                  provider,
-                  sentences: Object.keys(contract).length,
-                  alignedNodes,
-                  fallbackNodes: missingNodeTexts.size,
+              if (provider !== 'm2m100') {
+                throw new Error(`Provider "${provider}" is not allowed on backend translate route.`)
+              }
+              const sentenceEntries = Object.entries(contract)
+              const sentenceTexts = sentenceEntries
+                .map(([sentenceText, node]) => {
+                  const sourceText = sentenceText.trim()
+                  if (!sourceText) return ''
+                  const existing = getNodeProviderTranslation(node, provider)
+                  return hasUsefulTranslation(sourceText, existing) ? '' : sourceText
                 })
+                .filter(Boolean)
+              if (sentenceTexts.length > 0) {
+                log(2, `Translating ${sentenceTexts.length} sentences...`, 50)
+                Object.assign(translations, await runBackendTranslateBatch(sentenceTexts, 'sentences'))
               } else {
-                // Non-M2M100 providers already handle context well enough with direct node translations.
-                const allTexts = new Set<string>()
-                for (const [sentenceText, node] of Object.entries(contract)) {
-                  if (!getNodeProviderTranslation(node, provider)) allTexts.add(sentenceText.trim())
-                  collectNodeTexts(node, allTexts, provider)
-                }
-                const allTextsList = Array.from(allTexts)
-                if (allTextsList.length > 0) {
-                  log(2, `Translating ${allTextsList.length} texts...`, 50)
-                  Object.assign(translations, await runBackendTranslateBatch(allTextsList, 'nodes'))
-                } else {
-                  log(2, 'All nodes already translated — skipping API call', 100)
+                log(2, 'All sentence translations already cached', 75)
+              }
+
+              const missingNodeTexts = new Set<string>()
+              let alignedNodes = 0
+              for (const [sentenceText, rootNode] of sentenceEntries) {
+                const sourceSentence = sentenceText.trim()
+                if (!sourceSentence) continue
+                const translatedSentence = String(
+                  translations[sourceSentence]
+                  || translations[sentenceText]
+                  || getNodeProviderTranslation(rootNode, provider),
+                ).trim()
+                if (!translatedSentence) continue
+                translations[sentenceText] = translatedSentence
+                translations[sourceSentence] = translatedSentence
+                const aligned = alignNodeTranslationsFromSentence({
+                  root: rootNode,
+                  sentenceSourceText: sourceSentence,
+                  sentenceTranslatedText: translatedSentence,
+                  provider,
+                })
+                alignedNodes += aligned.alignedCount
+                for (const text of aligned.missingNodeTexts) missingNodeTexts.add(text)
+              }
+
+              if (missingNodeTexts.size > 0) {
+                log(2, `Resolving ${missingNodeTexts.size} node fragments...`, 92)
+                const fallbackTranslations = await runBackendTranslateBatch(Array.from(missingNodeTexts), 'nodes')
+                Object.assign(translations, fallbackTranslations)
+                for (const rootNode of Object.values(contract)) {
+                  fillMissingNodeTranslations({
+                    root: rootNode,
+                    provider,
+                    translationMap: fallbackTranslations,
+                  })
                 }
               }
+              recordRuntimeDiagnostic('api.media.backend', 'translate.alignment', {
+                provider,
+                sentences: Object.keys(contract).length,
+                alignedNodes,
+                fallbackNodes: missingNodeTexts.size,
+              })
             } else {
               const allTexts = new Set<string>()
               for (const [sentenceText, node] of Object.entries(contract)) {
@@ -1312,9 +1591,11 @@ export class HttpRuntimeApi implements RuntimeApi {
               }
               const allTextsList = Array.from(allTexts)
               if (allTextsList.length > 0) {
-                // Use local opus-mt-en-ru WASM worker — translate all collected texts (sentences + phrases)
-                translations = await this._clientTranslateTexts(
+                // Client-side provider translation path (paid providers + local m2m100 in Tauri runtime).
+                translations = await this._clientTranslateTextsWithProvider(
+                  provider,
                   allTextsList,
+                  providerCredentials,
                   (done, ttl) => log(2, `Translating (${done}/${ttl})`, 50 + Math.round((done / Math.max(ttl, 1)) * 48)),
                   input.signal,
                 )
@@ -1322,15 +1603,16 @@ export class HttpRuntimeApi implements RuntimeApi {
                 log(2, 'All nodes already translated — skipping API call', 100)
               }
             }
+            log(2, 'Translation complete', 100)
           } catch (err: unknown) {
             if (err instanceof DOMException && err.name === 'AbortError') throw err
             const raw = String(err instanceof Error ? err.message : err)
             recordRuntimeDiagnostic('api.media.backend', 'translate.error', raw, 'error')
-            translateError = _translateErrorMessage(raw)
+            const translateError = _translateErrorMessage(raw)
             log(2, `Translation error: ${raw}`, 50)
+            throw new Error(translateError)
           }
         }
-        log(2, 'Translation complete', 100)
         // Write translations back into all contract nodes (sentence + children).
         // M2M100 already wrote aligned/fallback node translations directly.
         if (Object.keys(translations).length > 0 && !providerIsOriginal && provider !== 'm2m100') {
@@ -1397,9 +1679,9 @@ export class HttpRuntimeApi implements RuntimeApi {
             } catch { /* non-fatal — backend falls back to TTS-only */ }
             // Submit render job — returns {job_id} immediately (no timeout risk)
             const submitRes = await fetchWithRetry(
-              apiUrl('/api/render-media'),
+              '/api/render-media',
               { method: 'POST', body: form, signal: input.signal },
-              { retries: 0 },
+              { retries: 2, retryDelayMs: 1200 },
             )
             if (!submitRes.ok) {
               const txt = await submitRes.text().catch(() => '')
@@ -1410,28 +1692,84 @@ export class HttpRuntimeApi implements RuntimeApi {
             // Poll /api/render-status/<job_id> until done
             let zipBuf: ArrayBuffer | null = null
             let pollAttempt = 0
+            let renderStatusNetworkFailures = 0
             const renderScope = needVideo
               ? 'Server render: TTS + subtitles + video muxing'
               : 'Server render: TTS + subtitles'
+            const renderStageLabel = (stage: string): string => {
+              const key = String(stage || '').trim().toLowerCase()
+              if (key === 'queued') return 'queued'
+              if (key === 'preparing') return 'preparing'
+              if (key === 'decoding_source') return 'decoding source audio'
+              if (key === 'tts_synth') return 'tts synthesis'
+              if (key === 'assembling_audio') return 'assembling audio'
+              if (key === 'encoding_mp3') return 'encoding mp3'
+              if (key === 'muxing_video') return 'muxing video'
+              if (key === 'packaging') return 'packaging artifacts'
+              return 'rendering'
+            }
             while (zipBuf === null) {
               ensureNotAborted()
               await new Promise<void>((resolve) => setTimeout(resolve, 2000))
               ensureNotAborted()
               pollAttempt++
-              const renderElapsed = pollAttempt * 2
-              const renderHint = renderElapsed >= 90
-                ? `${renderScope} (heavy stage, please wait)`
-                : renderScope
-              log(3, `${renderHint} · elapsed ${formatElapsed(renderElapsed)}`, Math.min(5 + pollAttempt * 2, 48))
-              const statusRes = await fetch(apiUrl(`/api/render-status/${jobId}`), { signal: input.signal })
+              let statusRes: Response
+              try {
+                statusRes = await fetchWithRetry(
+                  `/api/render-status/${jobId}`,
+                  { signal: input.signal },
+                  { retries: 2, retryDelayMs: 900 },
+                )
+                renderStatusNetworkFailures = 0
+              } catch (statusErr) {
+                if (statusErr instanceof DOMException && statusErr.name === 'AbortError') throw statusErr
+                if (isLikelyNetworkFetchError(statusErr) && renderStatusNetworkFailures < MAX_RENDER_STATUS_NETWORK_ERRORS) {
+                  renderStatusNetworkFailures += 1
+                  recordRuntimeDiagnostic('api.media.backend', 'render.status.fetch_retry', {
+                    failureCount: renderStatusNetworkFailures,
+                    reason: String(statusErr instanceof Error ? statusErr.message : statusErr),
+                  }, 'error')
+                  log(3, `${renderScope}: reconnecting…`, 10)
+                  continue
+                }
+                throw statusErr
+              }
               if (statusRes.headers.get('content-type')?.includes('application/zip')) {
                 zipBuf = await statusRes.arrayBuffer()
                 break
               }
-              const statusJson = await statusRes.json().catch(() => ({ status: 'error', error: `HTTP ${statusRes.status}` })) as { status: string; error?: string }
+              const statusJson = await statusRes.json().catch(() => ({ status: 'error', error: `HTTP ${statusRes.status}` })) as {
+                status: string
+                error?: string
+                done?: number
+                total?: number
+                stage?: string
+                message?: string
+              }
               if (statusJson.status === 'error') {
                 throw new Error(`Backend render failed: ${statusJson.error ?? 'unknown error'}`)
               }
+              const done = Math.max(0, Number(statusJson.done ?? 0))
+              const total = Math.max(0, Number(statusJson.total ?? 0))
+              const stage = renderStageLabel(String(statusJson.stage || ''))
+              const counter = total > 0 ? ` (${Math.min(done, total)}/${total})` : ''
+              const stageHint = statusJson.message ? ` · ${String(statusJson.message).trim()}` : ''
+              const renderHint = `${renderScope}: ${stage}${counter}${stageHint}...`
+              const renderRatio = total > 0 ? Math.min(Math.max(done / total, 0), 1) : 0
+              const baseProgress = stage === 'tts synthesis' ? 5
+                : stage === 'assembling audio' ? 28
+                : stage === 'encoding mp3' ? 40
+                : stage === 'muxing video' ? 44
+                : stage === 'packaging artifacts' ? 47
+                : 5
+              const dynamicProgress = stage === 'tts synthesis' ? 23
+                : stage === 'assembling audio' ? 12
+                : stage === 'encoding mp3' ? 3
+                : stage === 'muxing video' ? 3
+                : stage === 'packaging artifacts' ? 1
+                : 18
+              const renderProgress = Math.min(48, Math.round(baseProgress + dynamicProgress * renderRatio))
+              log(3, renderHint, renderProgress)
               // status === 'running' — keep polling
             }
 
@@ -1445,11 +1783,13 @@ export class HttpRuntimeApi implements RuntimeApi {
             if (needVideo) videoBlob = new Blob([getFileBytes('translated_video_ru.mp4')], { type: 'video/mp4' })
             const srtEn = new TextDecoder().decode(getFileBytes('subtitles_en.srt'))
             const srtBilingual = new TextDecoder().decode(getFileBytes('subtitles_bilingual.srt'))
+            const assBilingual = new TextDecoder().decode(getFileBytes('subtitles_bilingual.ass'))
             const srtTarget = new TextDecoder().decode(getFileBytes('subtitles_target.srt'))
             ensureNotAborted()
 
             artifactMapSrt.set('subtitles_en.srt', { name: 'subtitles_en.srt', size_bytes: srtEn.length, download_url: encodeTextArtifact('text/plain', srtEn) })
             artifactMapSrt.set('subtitles_bilingual.srt', { name: 'subtitles_bilingual.srt', size_bytes: srtBilingual.length, download_url: encodeTextArtifact('text/plain', srtBilingual) })
+            if (assBilingual.trim()) artifactMapSrt.set('subtitles_bilingual.ass', { name: 'subtitles_bilingual.ass', size_bytes: assBilingual.length, download_url: encodeTextArtifact('text/plain', assBilingual) })
             artifactMapSrt.set('subtitles_target.srt', { name: 'subtitles_target.srt', size_bytes: srtTarget.length, download_url: encodeTextArtifact('text/plain', srtTarget) })
           }
 
@@ -1512,18 +1852,17 @@ export class HttpRuntimeApi implements RuntimeApi {
       recordRuntimeDiagnostic('api.media.backend', 'submit.success', { documentId, sentences: Object.keys(contract).length })
       return finish({
         result: { route: 'local', status: 'completed_local', document_id: documentId, message: 'Analysis completed.', stage_name: 'completed' },
-        ui_feedback: translateError
-          ? { severity: 'warning', title: 'Analysis completed (translation failed)', message: translateError }
-          : { severity: 'info', title: 'Analysis completed', message: 'Media analysis completed and saved locally.' },
+        ui_feedback: { severity: 'info', title: 'Analysis completed', message: 'Media analysis completed and saved locally.' },
       })
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') throw err
       const rawMessage = err instanceof Error ? err.message : String(err)
-      const message = isPwaModelMissingError(err) ? PWA_INSTALL_MESSAGE : rawMessage
+      const modelMissing = isPwaModelMissingError(err)
+      const message = modelMissing ? PWA_INSTALL_MESSAGE : rawMessage
       recordRuntimeDiagnostic('api.media.backend', 'submit.error', rawMessage, 'error')
       return finish({
         result: { route: 'reject', status: 'rejected', message, stage_name: 'loading_file' },
-        ui_feedback: { severity: 'error', title: 'AI models not installed', message },
+        ui_feedback: { severity: 'error', title: modelMissing ? 'AI models not installed' : 'Analysis failed', message },
       })
     }
   }
@@ -1644,6 +1983,513 @@ export class HttpRuntimeApi implements RuntimeApi {
     })
   }
 
+  private async _clientTranslateTextsWithProvider(
+    provider: string,
+    texts: string[],
+    credentials: Record<string, string>,
+    onProgress: (done: number, total: number) => void,
+    signal?: AbortSignal,
+  ): Promise<Record<string, string>> {
+    const normalized = normalizeProviderId(provider)
+    if (normalized === 'gpt') {
+      return await this._clientTranslateTextsWithOpenAI(texts, credentials, onProgress, signal)
+    }
+    if (normalized === 'deepl') {
+      return await this._clientTranslateTextsWithDeepL(texts, credentials, onProgress, signal)
+    }
+    if (normalized === 'lara') {
+      return await this._clientTranslateTextsWithLara(texts, credentials, onProgress, signal)
+    }
+    return await this._clientTranslateTexts(texts, onProgress, signal)
+  }
+
+  private _extractTranslationsArray(payload: unknown, expectedCount: number): string[] | null {
+    const normalizeItem = (value: unknown): string => {
+      if (typeof value === 'string') return value.trim()
+      if (value && typeof value === 'object') {
+        const row = value as Record<string, unknown>
+        if ('text' in row) return String(row.text || '').trim()
+        if ('translation' in row) return String(row.translation || '').trim()
+        if ('translated_text' in row) return String(row.translated_text || '').trim()
+        if ('target' in row) return String(row.target || '').trim()
+        if ('value' in row) return String(row.value || '').trim()
+        if ('content' in row) return String(row.content || '').trim()
+      }
+      return String(value ?? '').trim()
+    }
+    if (Array.isArray(payload)) {
+      if (payload.length !== expectedCount) return null
+      return payload.map(normalizeItem)
+    }
+    if (typeof payload === 'string' && expectedCount === 1) return [payload.trim()]
+    if (!payload || typeof payload !== 'object') return null
+    const row = payload as Record<string, unknown>
+    const direct = row.translations ?? row.translation
+    if (Array.isArray(direct)) {
+      if (direct.length !== expectedCount) return null
+      return direct.map(normalizeItem)
+    }
+    if (typeof direct === 'string' && expectedCount === 1) {
+      return [direct.trim()]
+    }
+    const indexed = Array.from({ length: expectedCount }, (_, idx) => row[String(idx)] ?? row[idx])
+    if (indexed.some((value) => value == null)) return null
+    return indexed.map(normalizeItem)
+  }
+
+  private _extractTranslationsBySource(payload: unknown, sources: string[]): string[] | null {
+    if (!payload || typeof payload !== 'object' || !Array.isArray(sources) || sources.length === 0) return null
+    const row = payload as Record<string, unknown>
+    const candidate = (row.translations ?? row.translation ?? row.result ?? row.data ?? row) as unknown
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return null
+    const map = candidate as Record<string, unknown>
+    const direct = new Map<string, string>()
+    const folded = new Map<string, string>()
+    for (const [key, value] of Object.entries(map)) {
+      const text = String(value ?? '').trim()
+      if (!text) continue
+      const normalized = String(key || '').trim()
+      if (!normalized) continue
+      direct.set(normalized, text)
+      folded.set(normalized.toLowerCase(), text)
+    }
+    const out: string[] = []
+    for (const source of sources) {
+      const raw = String(source || '').trim()
+      if (!raw) return null
+      const picked = direct.get(raw) ?? folded.get(raw.toLowerCase())
+      if (!picked) return null
+      out.push(picked)
+    }
+    return out
+  }
+
+  private _extractTranslationsArrayDeep(
+    payload: unknown,
+    expectedCount: number,
+    sources?: string[],
+  ): string[] | null {
+    if (payload == null) return null
+    const queue: unknown[] = [payload]
+    const visited = new Set<unknown>()
+    while (queue.length > 0) {
+      const current = queue.shift()
+      if (current == null) continue
+      if (typeof current === 'object') {
+        if (visited.has(current)) continue
+        visited.add(current)
+      }
+      const exact = this._extractTranslationsArray(current, expectedCount)
+      if (exact) return exact
+      if (sources && sources.length === expectedCount) {
+        const bySource = this._extractTranslationsBySource(current, sources)
+        if (bySource) return bySource
+      }
+      if (typeof current === 'string') {
+        const nested = parseJsonLoose(current)
+        if (nested != null) queue.push(nested)
+      } else if (Array.isArray(current)) {
+        for (const item of current) queue.push(item)
+      } else if (typeof current === 'object') {
+        for (const value of Object.values(current as Record<string, unknown>)) queue.push(value)
+      }
+    }
+    return null
+  }
+
+  private async _clientTranslateTextsWithOpenAI(
+    texts: string[],
+    credentials: Record<string, string>,
+    onProgress: (done: number, total: number) => void,
+    signal?: AbortSignal,
+  ): Promise<Record<string, string>> {
+    const apiKey = String(credentials.api_key || '').trim()
+    if (!apiKey) throw new Error('OpenAI provider selected but API key is missing.')
+    const model = String(credentials.model || 'gpt-4o-mini').trim() || 'gpt-4o-mini'
+    const baseUrl = String(credentials.base_url || 'https://api.openai.com/v1').trim().replace(/\/+$/, '')
+    const endpoint = `${baseUrl}/chat/completions`
+
+    const uniqueTexts = Array.from(new Set(texts.map((value) => String(value || '').trim()).filter(Boolean)))
+    if (uniqueTexts.length === 0) return {}
+
+    const chunks = splitIntoChunksBySize(uniqueTexts, 24, 32000)
+    const out: Record<string, string> = {}
+    let done = 0
+    onProgress(0, uniqueTexts.length)
+
+    const translateSingle = async (sourceText: string): Promise<string> => {
+      const body = {
+        model,
+        temperature: 0,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: 'Translate from English to Russian. Return JSON only: {"translation":"..."}',
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({ text: sourceText }),
+          },
+        ],
+      }
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal,
+      })
+      const raw = await res.text().catch(() => '')
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${raw}`)
+      const payload = parseJsonLoose(raw) as
+        | { choices?: Array<{ message?: { content?: string } }> }
+        | null
+      const content = String(payload?.choices?.[0]?.message?.content || '').trim()
+      const parsedContent = parseJsonLoose(content)
+      const asArray = this._extractTranslationsArray(parsedContent, 1)
+      if (asArray?.[0]) return asArray[0]
+      const bySource = this._extractTranslationsBySource(parsedContent, [sourceText])
+      if (bySource?.[0]) return bySource[0]
+      throw new Error('OpenAI single translation response format is invalid.')
+    }
+
+    for (const chunk of chunks) {
+      if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
+      const body = {
+        model,
+        temperature: 0,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'Translate each input text from English to Russian. Return JSON only: {"translations":[...]} with exactly the same number and order.',
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({ translations: chunk }),
+          },
+        ],
+      }
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal,
+      })
+      const raw = await res.text().catch(() => '')
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${raw}`)
+      }
+      const payload = parseJsonLoose(raw) as
+        | { choices?: Array<{ message?: { content?: string } }> }
+        | null
+      const content = String(payload?.choices?.[0]?.message?.content || '').trim()
+      const parsedContent = parseJsonLoose(content)
+      let translated = this._extractTranslationsArrayDeep(parsedContent, chunk.length, chunk)
+      if (!translated) {
+        recordRuntimeDiagnostic('api.media.backend', 'translate.openai.batch_parse_fallback', {
+          chunkSize: chunk.length,
+          sample: content.slice(0, 240),
+        }, 'error')
+        translated = []
+        for (const sourceText of chunk) {
+          translated.push(await translateSingle(sourceText))
+        }
+      }
+      chunk.forEach((source, idx) => { out[source] = String(translated[idx] || '').trim() })
+      done += chunk.length
+      onProgress(done, uniqueTexts.length)
+    }
+    return out
+  }
+
+  private async _clientTranslateTextsWithDeepL(
+    texts: string[],
+    credentials: Record<string, string>,
+    onProgress: (done: number, total: number) => void,
+    signal?: AbortSignal,
+  ): Promise<Record<string, string>> {
+    const authKey = String(credentials.auth_key || '').trim()
+    if (!authKey) throw new Error('DeepL provider selected but auth key is missing.')
+    const baseUrl = String(
+      credentials.base_url
+      || (authKey.toLowerCase().endsWith(':fx') ? 'https://api-free.deepl.com/v2' : 'https://api.deepl.com/v2'),
+    ).trim().replace(/\/+$/, '')
+    const endpoint = `${baseUrl}/translate`
+    const sourceLang = String(credentials.source_lang || 'EN').trim().toUpperCase()
+    const targetLang = String(credentials.target_lang || 'RU').trim().toUpperCase()
+
+    const uniqueTexts = Array.from(new Set(texts.map((value) => String(value || '').trim()).filter(Boolean)))
+    if (uniqueTexts.length === 0) return {}
+
+    const chunks = splitIntoChunksBySize(uniqueTexts, 50, 110000)
+    const out: Record<string, string> = {}
+    let done = 0
+    onProgress(0, uniqueTexts.length)
+
+    const relayChunkViaBackend = async (chunk: string[]): Promise<string[]> => {
+      const relay = await requestJson<{ translations?: Record<string, string> }>(
+        apiUrl('/api/provider-translate'),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider: 'deepl',
+            texts: chunk,
+            credentials: { auth_key: authKey },
+            source_lang: sourceLang,
+            target_lang: targetLang,
+          }),
+          signal,
+        },
+      )
+      const mapped = relay?.translations || {}
+      const translated = chunk.map((text) => String(mapped[text] || '').trim())
+      if (translated.some((text) => !text)) {
+        throw new Error('DeepL relay response is invalid for batch translation.')
+      }
+      return translated
+    }
+
+    for (const chunk of chunks) {
+      if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
+      let translated: string[] | null = null
+      try {
+        const params = new URLSearchParams()
+        params.set('source_lang', sourceLang)
+        params.set('target_lang', targetLang)
+        params.set('preserve_formatting', '1')
+        for (const text of chunk) params.append('text', text)
+
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            Authorization: `DeepL-Auth-Key ${authKey}`,
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          },
+          body: params.toString(),
+          signal,
+        })
+        const raw = await res.text().catch(() => '')
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${raw}`)
+        }
+        const payload = parseJsonLoose(raw) as { translations?: Array<{ text?: string }> } | null
+        translated = Array.isArray(payload?.translations)
+          ? payload?.translations.map((row) => String(row?.text || '').trim())
+          : null
+        if (!translated || translated.length !== chunk.length) {
+          throw new Error('DeepL response format is invalid for batch translation.')
+        }
+      } catch (err) {
+        if (!isLikelyNetworkFetchError(err)) throw err
+        recordRuntimeDiagnostic('api.media.backend', 'translate.deepl.relay_fallback', {
+          chunkSize: chunk.length,
+          reason: String(err instanceof Error ? err.message : err),
+        }, 'error')
+        translated = await relayChunkViaBackend(chunk)
+      }
+
+      chunk.forEach((source, idx) => { out[source] = translated[idx] })
+      done += chunk.length
+      onProgress(done, uniqueTexts.length)
+    }
+    return out
+  }
+
+  private async _laraDigestBase64(data: string): Promise<string> {
+    const subtle = globalThis.crypto?.subtle
+    if (subtle) {
+      const digest = await subtle.digest('SHA-256', new TextEncoder().encode(data))
+      return toBase64(new Uint8Array(digest).slice(0, 16))
+    }
+    const cryptoJsModule = await import('crypto-js')
+    const CryptoJS = ((cryptoJsModule as unknown as { default?: unknown }).default || cryptoJsModule) as {
+      SHA256: (value: string) => { toString: (encoder: unknown) => string }
+      enc: {
+        Hex: { parse: (value: string) => unknown }
+        Base64: { stringify: (value: unknown) => string }
+      }
+    }
+    const fullHex = CryptoJS.SHA256(String(data || '')).toString(CryptoJS.enc.Hex)
+    const first16Hex = fullHex.slice(0, 32)
+    return CryptoJS.enc.Base64.stringify(CryptoJS.enc.Hex.parse(first16Hex))
+  }
+
+  private async _hmacSha256Base64(secret: string, data: string): Promise<string> {
+    const subtle = globalThis.crypto?.subtle
+    if (subtle) {
+      const key = await subtle.importKey(
+        'raw',
+        new TextEncoder().encode(secret),
+        { name: 'HMAC', hash: { name: 'SHA-256' } },
+        false,
+        ['sign'],
+      )
+      const signature = await subtle.sign('HMAC', key, new TextEncoder().encode(data))
+      return toBase64(new Uint8Array(signature))
+    }
+    const cryptoJsModule = await import('crypto-js')
+    const CryptoJS = ((cryptoJsModule as unknown as { default?: unknown }).default || cryptoJsModule) as {
+      HmacSHA256: (value: string, secretValue: string) => { toString: (encoder: unknown) => string }
+      enc: {
+        Base64: unknown
+      }
+    }
+    return CryptoJS.HmacSHA256(String(data || ''), String(secret || '')).toString(CryptoJS.enc.Base64)
+  }
+
+  private async _clientLaraAuthToken(
+    baseUrl: string,
+    apiId: string,
+    apiSecret: string,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const path = '/v2/auth'
+    const body = JSON.stringify({ id: apiId })
+    const date = new Date().toUTCString()
+    const contentType = 'application/json'
+    const contentMd5 = await this._laraDigestBase64(body)
+    const challenge = `POST\n${path}\n${contentMd5}\n${contentType}\n${date}`
+    const signature = await this._hmacSha256Base64(apiSecret, challenge)
+    const res = await fetch(`${baseUrl}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': contentType,
+        'X-Lara-Date': date,
+        'Content-MD5': contentMd5,
+        Authorization: `Lara:${signature}`,
+      },
+      body,
+      signal,
+    })
+    const raw = await res.text().catch(() => '')
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${raw}`)
+    const parsed = parseJsonLoose(raw) as { token?: string } | null
+    const token = String(parsed?.token || '').trim()
+    if (!token) throw new Error('Lara authentication failed: token is missing.')
+    return token
+  }
+
+  private _extractLaraTranslationArray(raw: string, expectedCount: number): string[] | null {
+    const candidates: unknown[] = []
+    const full = parseJsonLoose(raw)
+    if (full != null) candidates.push(full)
+    const lines = String(raw || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+    for (const line of lines) {
+      const parsed = parseJsonLoose(line)
+      if (parsed != null) candidates.push(parsed)
+    }
+    for (let i = candidates.length - 1; i >= 0; i -= 1) {
+      const row = candidates[i] as Record<string, unknown>
+      const payloadRaw = (row?.data as Record<string, unknown> | undefined)?.content
+        ?? row?.data
+        ?? row
+      const payload = typeof payloadRaw === 'string' ? (parseJsonLoose(payloadRaw) ?? payloadRaw) : payloadRaw
+      const translated = this._extractTranslationsArrayDeep(payload, expectedCount)
+      if (translated) return translated
+    }
+    return null
+  }
+
+  private async _clientTranslateTextsWithLara(
+    texts: string[],
+    credentials: Record<string, string>,
+    onProgress: (done: number, total: number) => void,
+    signal?: AbortSignal,
+  ): Promise<Record<string, string>> {
+    const apiId = String(credentials.api_id || '').trim()
+    const apiSecret = String(credentials.api_secret || '').trim()
+    if (!apiId || !apiSecret) throw new Error('Lara provider selected but API credentials are missing.')
+    const baseUrl = String(credentials.base_url || 'https://api.laratranslate.com').trim().replace(/\/+$/, '')
+    const source = laraLocale(String(credentials.source_lang || 'en'))
+    const target = laraLocale(String(credentials.target_lang || 'ru'))
+
+    const uniqueTexts = Array.from(new Set(texts.map((value) => String(value || '').trim()).filter(Boolean)))
+    if (uniqueTexts.length === 0) return {}
+
+    const token = await this._clientLaraAuthToken(baseUrl, apiId, apiSecret, signal)
+    const chunks = splitIntoChunksBySize(uniqueTexts, 32, 64000)
+    const out: Record<string, string> = {}
+    let done = 0
+    onProgress(0, uniqueTexts.length)
+
+    const translateSingle = async (sourceText: string): Promise<string> => {
+      const res = await fetch(`${baseUrl}/translate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Lara-Date': new Date().toUTCString(),
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          q: sourceText,
+          source,
+          target,
+          multiline: false,
+        }),
+        signal,
+      })
+      const raw = await res.text().catch(() => '')
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${raw}`)
+      const translatedSingle = this._extractLaraTranslationArray(raw, 1)
+      if (translatedSingle?.[0]) return translatedSingle[0]
+      const parsed = parseJsonLoose(raw)
+      const deep = this._extractTranslationsArrayDeep(parsed, 1, [sourceText])
+      if (deep?.[0]) return deep[0]
+      throw new Error('Lara single translation response format is invalid.')
+    }
+
+    for (const chunk of chunks) {
+      if (signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
+      const res = await fetch(`${baseUrl}/translate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Lara-Date': new Date().toUTCString(),
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          q: chunk,
+          source,
+          target,
+          multiline: true,
+        }),
+        signal,
+      })
+      const raw = await res.text().catch(() => '')
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${raw}`)
+      }
+      let translated = this._extractLaraTranslationArray(raw, chunk.length)
+      if (!translated) {
+        const parsed = parseJsonLoose(raw)
+        translated = this._extractTranslationsArrayDeep(parsed, chunk.length, chunk)
+      }
+      if (!translated) {
+        recordRuntimeDiagnostic('api.media.backend', 'translate.lara.batch_parse_fallback', {
+          chunkSize: chunk.length,
+          sample: raw.slice(0, 240),
+        }, 'error')
+        translated = []
+        for (const sourceText of chunk) {
+          translated.push(await translateSingle(sourceText))
+        }
+      }
+      chunk.forEach((sourceText, idx) => { out[sourceText] = String(translated[idx] || '').trim() })
+      done += chunk.length
+      onProgress(done, uniqueTexts.length)
+    }
+    return out
+  }
+
   private _clientTranslateTexts(
     texts: string[],
     onProgress: (done: number, total: number) => void,
@@ -1682,11 +2528,33 @@ export class HttpRuntimeApi implements RuntimeApi {
   }
 
   async getTranslationConfig(): Promise<TranslationConfig> {
-    return (await LocalWorkspace.getTranslationConfig()) as TranslationConfig
+    try {
+      const cfg = normalizeTranslationConfigShape(await LocalWorkspace.getTranslationConfig())
+      if (cfg) {
+        writeCachedTranslationConfig(cfg)
+        return cfg
+      }
+    } catch (err) {
+      recordRuntimeDiagnostic('api.translation_config', 'load.error', err, 'error')
+    }
+    const cached = readCachedTranslationConfig()
+    if (cached) {
+      recordRuntimeDiagnostic('api.translation_config', 'load.cached', {
+        defaultProvider: cached.default_provider,
+        providers: cached.providers.map((provider) => ({ id: provider.id, enabled: provider.enabled })),
+      })
+      return cached
+    }
+    recordRuntimeDiagnostic('api.translation_config', 'load.fallback_default')
+    return DEFAULT_TRANSLATION_CONFIG
   }
 
   async saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig> {
-    return await LocalWorkspace.saveTranslationConfig(config)
+    const normalized = normalizeTranslationConfigShape(config) || DEFAULT_TRANSLATION_CONFIG
+    const saved = await LocalWorkspace.saveTranslationConfig(normalized)
+    const resolved = normalizeTranslationConfigShape(saved) || normalized
+    writeCachedTranslationConfig(resolved)
+    return resolved
   }
 
   async listFiles(projectId?: string): Promise<MediaFileRow[]> {

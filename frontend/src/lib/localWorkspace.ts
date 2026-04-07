@@ -5,6 +5,7 @@ import type {
   ProjectRow,
   SelectedProject,
   TranslationConfig,
+  TranslationProviderConfig,
   VisualizerNode,
   VisualizerPayload,
 } from '../api/runtimeApi'
@@ -16,6 +17,7 @@ const IDB_DB_VERSION = 2
 const IDB_STATE_STORE = 'kv_store'
 const IDB_BLOB_STORE = 'blob_store'
 const SQLITE_STATE_KEY = 'workspace_state_v1'
+const SQLITE_TRANSLATION_CONFIG_KEY = 'translation_config_v1'
 const LEGACY_STORAGE_KEY = 'ela_frontend_workspace_v1'
 
 type WorkspaceFile = MediaFileRow & {
@@ -65,14 +67,335 @@ function emptyWorkspaceState(): WorkspaceState {
   }
 }
 
-function coerceWorkspaceState(parsed: Partial<WorkspaceState> | null | undefined): WorkspaceState {
-  const state: WorkspaceState = {
-    projects: Array.isArray(parsed?.projects) ? parsed?.projects : [],
-    selected_project_id: typeof parsed?.selected_project_id === 'string' ? parsed.selected_project_id : null,
-    files: Array.isArray(parsed?.files) ? parsed?.files : [],
-    analyses: Array.isArray(parsed?.analyses) ? parsed?.analyses : [],
-    translation_config: parsed?.translation_config ?? null,
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : null
+}
+
+function readString(row: Record<string, unknown> | null, keys: string[], fallback = ''): string {
+  if (!row) return fallback
+  for (const key of keys) {
+    const value = row[key]
+    if (typeof value === 'string' && value.trim()) return value
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value)
   }
+  return fallback
+}
+
+function readNumber(row: Record<string, unknown> | null, keys: string[]): number | undefined {
+  if (!row) return undefined
+  for (const key of keys) {
+    const value = row[key]
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number(value)
+      if (Number.isFinite(parsed)) return parsed
+    }
+  }
+  return undefined
+}
+
+function readBoolean(row: Record<string, unknown> | null, keys: string[], fallback = false): boolean {
+  if (!row) return fallback
+  for (const key of keys) {
+    const value = row[key]
+    if (typeof value === 'boolean') return value
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase()
+      if (normalized === 'true') return true
+      if (normalized === 'false') return false
+    }
+    if (typeof value === 'number') {
+      if (value === 1) return true
+      if (value === 0) return false
+    }
+  }
+  return fallback
+}
+
+function normalizeProjectRow(raw: unknown): ProjectRow | null {
+  const row = asRecord(raw)
+  if (!row) return null
+  const id = readString(row, ['id', 'project_id', 'projectId']).trim()
+  const name = readString(row, ['name', 'project_name', 'projectName']).trim()
+  if (!id || !name) return null
+  const createdAt = readString(row, ['created_at', 'createdAt', 'updated_at', 'updatedAt'], nowIso())
+  const updatedAt = readString(row, ['updated_at', 'updatedAt', 'created_at', 'createdAt'], createdAt)
+  return {
+    id,
+    name,
+    created_at: createdAt,
+    updated_at: updatedAt,
+  }
+}
+
+function normalizeFileRow(raw: unknown): WorkspaceFile | null {
+  const row = asRecord(raw)
+  if (!row) return null
+  const id = readString(row, ['id', 'file_id', 'fileId']).trim()
+  const name = readString(row, ['name', 'file_name', 'fileName']).trim()
+  const mediaPath = readString(row, ['media_path', 'mediaPath', 'path', 'file_path', 'filePath']).trim()
+  if (!id || !name || !mediaPath) return null
+  const updated = readString(row, ['updated', 'updated_at', 'updatedAt', 'created_at', 'createdAt'], nowIso())
+  const createdAt = readString(row, ['created_at', 'createdAt', 'updated', 'updated_at', 'updatedAt'], updated)
+  const documentId = readString(row, ['document_id', 'documentId']).trim()
+  const settings = readString(row, ['settings'], normalizeSettings(undefined))
+  const projectId = readString(row, ['project_id', 'projectId']).trim()
+  const analyzed = readBoolean(row, ['analyzed'], Boolean(documentId))
+  return {
+    id,
+    project_id: projectId,
+    name,
+    path: mediaPath,
+    media_path: mediaPath,
+    size_bytes: readNumber(row, ['size_bytes', 'sizeBytes']),
+    duration_seconds: readNumber(row, ['duration_seconds', 'durationSec', 'durationSeconds']),
+    settings: normalizeSettings(settings),
+    updated,
+    created_at: createdAt,
+    analyzed,
+    document_id: documentId || undefined,
+  }
+}
+
+function normalizeAnalysisRow(raw: unknown): WorkspaceAnalysis | null {
+  const row = asRecord(raw)
+  if (!row) return null
+  const documentId = readString(row, ['document_id', 'documentId', 'analysis_id', 'analysisId']).trim()
+  const analysisId = readString(row, ['analysis_id', 'analysisId', 'document_id', 'documentId'], documentId).trim()
+  const fileName = readString(row, ['file_name', 'fileName', 'name']).trim()
+  if (!documentId || !analysisId || !fileName) return null
+  const rawContract = row.contract ?? row.visualizer_payload ?? row.visualizerPayload ?? row.analysis_contract ?? row.analysisContract
+  const contract = asRecord(rawContract) ? (clone(rawContract) as VisualizerPayload) : {}
+  const contractCurrent = readBoolean(row, ['contract_current', 'contractCurrent'], true)
+  const updatedAt = readString(row, ['updated_at', 'updatedAt', 'created_at', 'createdAt'], nowIso())
+  const createdAt = readString(row, ['created_at', 'createdAt', 'updated_at', 'updatedAt'], updatedAt)
+  const itemsCount = readNumber(row, ['items_count', 'itemsCount'])
+  const rawArtifacts = row.artifacts ?? row.document_artifacts ?? row.documentArtifacts
+  const artifacts = Array.isArray(rawArtifacts) ? clone(rawArtifacts as DocumentArtifact[]) : []
+  return {
+    analysis_id: analysisId,
+    document_id: documentId,
+    project_id: readString(row, ['project_id', 'projectId']).trim(),
+    project_name: readString(row, ['project_name', 'projectName']).trim(),
+    media_file_id: readString(row, ['media_file_id', 'mediaFileId', 'file_id', 'fileId']).trim() || null,
+    file_name: fileName,
+    file_path: readString(row, ['file_path', 'filePath', 'path']).trim(),
+    size_bytes: readNumber(row, ['size_bytes', 'sizeBytes']),
+    duration_seconds: readNumber(row, ['duration_seconds', 'durationSeconds', 'durationSec']),
+    settings: normalizeSettings(readString(row, ['settings'], normalizeSettings(undefined))),
+    items_count: typeof itemsCount === 'number' ? itemsCount : (contractCurrent ? countContractNodes(contract) : 0),
+    updated_at: updatedAt,
+    created_at: createdAt,
+    contract_current: contractCurrent,
+    contract,
+    artifacts,
+  }
+}
+
+function normalizeTranslationConfig(raw: unknown): TranslationConfig | null {
+  const row = asRecord(raw)
+  if (!row) return null
+  const rawProviders = Array.isArray(row.providers) ? row.providers : []
+  const customProviders: TranslationProviderConfig[] = rawProviders
+    .map((item) => {
+      const p = asRecord(item)
+      if (!p) return null
+      const id = readString(p, ['id']).trim()
+      if (!id) return null
+      const credentialFields = Array.isArray(p.credential_fields)
+        ? p.credential_fields
+        : (Array.isArray(p.credentialFields) ? p.credentialFields : [])
+      const normalizedCredentialFields = credentialFields
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+      const credentialsRow = asRecord(p.credentials) || {}
+      const credentials: Record<string, string> = {}
+      for (const field of normalizedCredentialFields) {
+        credentials[field] = String(credentialsRow[field] || '')
+      }
+      return {
+        id,
+        label: readString(p, ['label'], id),
+        kind: readString(p, ['kind'], 'custom'),
+        enabled: readBoolean(p, ['enabled'], true),
+        credential_fields: normalizedCredentialFields,
+        credentials,
+      } satisfies TranslationProviderConfig
+    })
+    .filter((value): value is TranslationProviderConfig => Boolean(value))
+
+  const byId = new Map(customProviders.map((provider) => [provider.id, provider]))
+  const mergedProviders: TranslationProviderConfig[] = DEFAULT_TRANSLATION_CONFIG.providers.map((builtin) => {
+    const next = byId.get(builtin.id)
+    if (!next) return clone(builtin)
+    const credentials: Record<string, string> = { ...builtin.credentials, ...(next.credentials || {}) }
+    return {
+      ...builtin,
+      label: next.label || builtin.label,
+      kind: next.kind || builtin.kind,
+      enabled: Boolean(next.enabled),
+      credential_fields: next.credential_fields.length > 0 ? next.credential_fields : builtin.credential_fields,
+      credentials,
+    }
+  })
+  for (const provider of customProviders) {
+    if (DEFAULT_TRANSLATION_CONFIG.providers.some((builtin) => builtin.id === provider.id)) continue
+    mergedProviders.push(provider)
+  }
+  const requestedDefault = readString(row, ['default_provider', 'defaultProvider'], 'm2m100').trim()
+  const fallbackDefault = mergedProviders.find((provider) => provider.enabled)?.id || 'm2m100'
+  const defaultProvider = mergedProviders.some((provider) => provider.id === requestedDefault)
+    ? requestedDefault
+    : fallbackDefault
+  return {
+    default_provider: defaultProvider,
+    providers: mergedProviders,
+  }
+}
+
+function sanitizeTranslationConfig(config: TranslationConfig | null | undefined): TranslationConfig {
+  return normalizeTranslationConfig(config) || clone(DEFAULT_TRANSLATION_CONFIG)
+}
+
+function repairProjectLinks(state: WorkspaceState): boolean {
+  const projectsById = new Map(state.projects.map((project) => [project.id, project]))
+  const projectIdByName = new Map(
+    state.projects
+      .map((project) => [normalizeProjectName(project.name), project.id] as const)
+      .filter(([name]) => Boolean(name)),
+  )
+  const singleProjectId = state.projects.length === 1 ? state.projects[0].id : ''
+  let changed = false
+
+  for (const analysis of state.analyses) {
+    let nextProjectId = String(analysis.project_id || '').trim()
+    if (!nextProjectId || !projectsById.has(nextProjectId)) {
+      const byName = projectIdByName.get(normalizeProjectName(String(analysis.project_name || '')))
+      if (byName) nextProjectId = byName
+    }
+    if ((!nextProjectId || !projectsById.has(nextProjectId)) && analysis.media_file_id) {
+      const byFileId = state.files.find((file) => String(file.id || '').trim() === String(analysis.media_file_id || '').trim())
+      const candidate = String(byFileId?.project_id || '').trim()
+      if (candidate && projectsById.has(candidate)) nextProjectId = candidate
+    }
+    if ((!nextProjectId || !projectsById.has(nextProjectId)) && (analysis.file_path || analysis.file_name)) {
+      const byFile = state.files.find((file) => matchAnalysisToFile(file, analysis))
+      const candidate = String(byFile?.project_id || '').trim()
+      if (candidate && projectsById.has(candidate)) nextProjectId = candidate
+    }
+    if ((!nextProjectId || !projectsById.has(nextProjectId)) && state.selected_project_id && projectsById.has(state.selected_project_id)) {
+      nextProjectId = state.selected_project_id
+    }
+    if ((!nextProjectId || !projectsById.has(nextProjectId)) && singleProjectId) {
+      nextProjectId = singleProjectId
+    }
+    if (nextProjectId && nextProjectId !== analysis.project_id) {
+      analysis.project_id = nextProjectId
+      changed = true
+    }
+    const expectedName = projectsById.get(nextProjectId)?.name || ''
+    if (expectedName && expectedName !== analysis.project_name) {
+      analysis.project_name = expectedName
+      changed = true
+    }
+  }
+
+  for (const file of state.files) {
+    let nextProjectId = String(file.project_id || '').trim()
+    if (!nextProjectId || !projectsById.has(nextProjectId)) {
+      const byAnalysis = state.analyses.find((analysis) => matchAnalysisToFile(file, analysis))
+      const candidate = String(byAnalysis?.project_id || '').trim()
+      if (candidate && projectsById.has(candidate)) nextProjectId = candidate
+    }
+    if ((!nextProjectId || !projectsById.has(nextProjectId)) && state.selected_project_id && projectsById.has(state.selected_project_id)) {
+      nextProjectId = state.selected_project_id
+    }
+    if ((!nextProjectId || !projectsById.has(nextProjectId)) && singleProjectId) {
+      nextProjectId = singleProjectId
+    }
+    if (nextProjectId && nextProjectId !== file.project_id) {
+      file.project_id = nextProjectId
+      changed = true
+    }
+  }
+
+  return changed
+}
+
+function coerceWorkspaceState(parsed: Partial<WorkspaceState> | null | undefined): WorkspaceState {
+  const root = asRecord(parsed)
+  const selectedProjectId = readString(root, ['selected_project_id', 'selectedProjectId']).trim() || null
+  const rawProjects = Array.isArray(root?.projects) ? root.projects : []
+  const projects = rawProjects
+    .map((item) => normalizeProjectRow(item))
+    .filter((item): item is ProjectRow => Boolean(item))
+  const projectsById = new Map(projects.map((project) => [project.id, project]))
+  const firstProjectId = projects[0]?.id || ''
+  const rawFiles = Array.isArray(root?.files) ? root.files : []
+  const files = rawFiles
+    .map((item) => normalizeFileRow(item))
+    .filter((item): item is WorkspaceFile => Boolean(item))
+  const rawAnalyses = Array.isArray(root?.analyses)
+    ? root.analyses
+    : (Array.isArray(root?.analysis_history) ? root.analysis_history : [])
+  const analyses = rawAnalyses
+    .map((item) => normalizeAnalysisRow(item))
+    .filter((item): item is WorkspaceAnalysis => Boolean(item))
+
+  // Recover missing project links from related rows or singleton project setups.
+  for (const analysis of analyses) {
+    if (!analysis.project_id) {
+      const linkedFile = files.find((file) => {
+        const fileId = String(file.id || '').trim()
+        const filePath = String(file.path || '').trim()
+        const fileName = String(file.name || '').trim().toLowerCase()
+        const analysisFileId = String(analysis.media_file_id || '').trim()
+        const analysisFilePath = String(analysis.file_path || '').trim()
+        const analysisFileName = String(analysis.file_name || '').trim().toLowerCase()
+        if (analysisFileId && fileId && analysisFileId === fileId) return true
+        if (analysisFilePath && filePath && analysisFilePath === filePath) return true
+        return Boolean(analysisFileName && fileName && analysisFileName === fileName)
+      })
+      analysis.project_id = String(linkedFile?.project_id || '').trim()
+    }
+    if (!analysis.project_id && selectedProjectId) analysis.project_id = selectedProjectId
+    if (!analysis.project_id && firstProjectId) analysis.project_id = firstProjectId
+    if (!analysis.project_name) {
+      analysis.project_name = projectsById.get(analysis.project_id)?.name || ''
+    }
+  }
+
+  for (const file of files) {
+    if (!file.project_id) {
+      const linked = analyses.find((analysis) => {
+        const fileId = String(file.id || '').trim()
+        const filePath = String(file.path || '').trim()
+        const fileName = String(file.name || '').trim().toLowerCase()
+        const analysisFileId = String(analysis.media_file_id || '').trim()
+        const analysisFilePath = String(analysis.file_path || '').trim()
+        const analysisFileName = String(analysis.file_name || '').trim().toLowerCase()
+        if (analysisFileId && fileId && analysisFileId === fileId) return true
+        if (analysisFilePath && filePath && analysisFilePath === filePath) return true
+        return Boolean(analysisFileName && fileName && analysisFileName === fileName)
+      })
+      file.project_id = String(linked?.project_id || '').trim()
+    }
+    if (!file.project_id && selectedProjectId) file.project_id = selectedProjectId
+    if (!file.project_id && firstProjectId) file.project_id = firstProjectId
+  }
+
+  const normalizedSelected = selectedProjectId && projects.some((project) => project.id === selectedProjectId)
+    ? selectedProjectId
+    : (projects[0]?.id || null)
+
+  const state: WorkspaceState = {
+    projects,
+    selected_project_id: normalizedSelected,
+    files,
+    analyses,
+    translation_config: normalizeTranslationConfig(root?.translation_config ?? root?.translationConfig),
+  }
+  repairProjectLinks(state)
   return state
 }
 
@@ -95,9 +418,19 @@ type BlobRecord = {
 let idbPromise: Promise<IDBDatabase | null> | null = null
 let memoryState: WorkspaceState = emptyWorkspaceState()
 let memoryBlobs = new Map<string, BlobRecord>()
+let stateStoreWriteQueue: Promise<void> = Promise.resolve()
+let dbReadyPromise: Promise<void> | null = null
+let dbReady = false
 
 function hasIndexedDb(): boolean {
   return typeof indexedDB !== 'undefined'
+}
+
+function idbErrorDetails(error: unknown): { name: string; message: string } {
+  if (error instanceof DOMException || error instanceof Error) {
+    return { name: String(error.name || 'Error'), message: String(error.message || 'Unknown IndexedDB error') }
+  }
+  return { name: 'UnknownError', message: String(error || 'Unknown IndexedDB error') }
 }
 
 function openIndexedDb(): Promise<IDBDatabase | null> {
@@ -117,7 +450,7 @@ function openIndexedDb(): Promise<IDBDatabase | null> {
         resolve(req.result)
       }
       req.onerror = () => {
-        recordRuntimeDiagnostic('workspace.idb', 'open.error', req.error || 'Failed to open IndexedDB', 'error')
+        recordRuntimeDiagnostic('workspace.idb', 'open.error', idbErrorDetails(req.error), 'error')
         reject(req.error || new Error('Failed to open IndexedDB'))
       }
     })
@@ -144,17 +477,45 @@ async function withStore<T>(
       return await new Promise<T>((resolve, reject) => {
         const tx = db.transaction(storeName, mode)
         const store = tx.objectStore(storeName)
-        Promise.resolve(fn(store)).then((value) => {
-          tx.oncomplete = () => resolve(value as T)
-          tx.onerror = () => {
-            recordRuntimeDiagnostic('workspace.idb', 'tx.error', { storeName, mode, error: tx.error || 'IndexedDB transaction failed' }, 'error')
-            reject(tx.error || new Error('IndexedDB transaction failed'))
-          }
-          tx.onabort = () => {
-            recordRuntimeDiagnostic('workspace.idb', 'tx.abort', { storeName, mode, error: tx.error || 'IndexedDB transaction aborted' }, 'error')
-            reject(tx.error || new Error('IndexedDB transaction aborted'))
-          }
-        }).catch(reject)
+        let fnResult: T | undefined
+        let fnFailed = false
+
+        tx.oncomplete = () => {
+          if (fnFailed) return
+          resolve(fnResult as T)
+        }
+        tx.onerror = () => {
+          recordRuntimeDiagnostic(
+            'workspace.idb',
+            'tx.error',
+            { storeName, mode, ...idbErrorDetails(tx.error) },
+            'error',
+          )
+          reject(tx.error || new Error('IndexedDB transaction failed'))
+        }
+        tx.onabort = () => {
+          recordRuntimeDiagnostic(
+            'workspace.idb',
+            'tx.abort',
+            { storeName, mode, ...idbErrorDetails(tx.error) },
+            'error',
+          )
+          reject(tx.error || new Error('IndexedDB transaction aborted'))
+        }
+
+        Promise.resolve(fn(store))
+          .then((value) => {
+            fnResult = value as T | undefined
+          })
+          .catch((error) => {
+            fnFailed = true
+            try {
+              tx.abort()
+            } catch {
+              // ignore abort errors and reject with original error
+            }
+            reject(error)
+          })
       })
     } catch (error) {
       if (attempt === 0 && error instanceof DOMException && error.name === 'NotFoundError') {
@@ -169,11 +530,17 @@ async function withStore<T>(
   return undefined
 }
 
+function queueStateStoreWrite<T>(task: () => Promise<T>): Promise<T> {
+  const run = stateStoreWriteQueue.then(task, task)
+  stateStoreWriteQueue = run.then(() => undefined, () => undefined)
+  return run
+}
+
 function requestToPromise<T = unknown>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => {
-      recordRuntimeDiagnostic('workspace.idb', 'request.error', request.error || 'IndexedDB request failed', 'error')
+      recordRuntimeDiagnostic('workspace.idb', 'request.error', idbErrorDetails(request.error), 'error')
       reject(request.error || new Error('IndexedDB request failed'))
     }
   })
@@ -183,18 +550,65 @@ async function idbGetState(): Promise<WorkspaceState> {
   const value = await withStore<string | undefined>(IDB_STATE_STORE, 'readonly', async (store) => {
     return await requestToPromise(store.get(SQLITE_STATE_KEY))
   })
-  if (typeof value !== 'string' || !value) return clone(memoryState)
+  if (typeof value !== 'string' || !value) {
+    const cfgOnly = await idbGetTranslationConfig()
+    if (cfgOnly) {
+      const fallback = clone(memoryState)
+      fallback.translation_config = clone(cfgOnly)
+      return fallback
+    }
+    return clone(memoryState)
+  }
   try {
-    return coerceWorkspaceState(JSON.parse(value) as Partial<WorkspaceState>)
+    const coerced = coerceWorkspaceState(JSON.parse(value) as Partial<WorkspaceState>)
+    const configFromKey = await idbGetTranslationConfig()
+    if (configFromKey) {
+      coerced.translation_config = clone(configFromKey)
+      return coerced
+    }
+    if (coerced.translation_config) {
+      // One-time migration from legacy embedded state payload to dedicated key.
+      try {
+        await idbPutTranslationConfig(coerced.translation_config)
+      } catch (err) {
+        recordRuntimeDiagnostic('workspace.translation_config', 'migrate_to_dedicated_key_failed', err, 'error')
+      }
+    }
+    return coerced
   } catch {
     return emptyWorkspaceState()
   }
 }
 
 async function idbPutState(state: WorkspaceState): Promise<void> {
-  memoryState = clone(state)
-  await withStore(IDB_STATE_STORE, 'readwrite', async (store) => {
-    await requestToPromise(store.put(JSON.stringify(state), SQLITE_STATE_KEY))
+  const snapshot = clone(state)
+  const persisted = { ...snapshot, translation_config: null }
+  await queueStateStoreWrite(async () => {
+    await withStore(IDB_STATE_STORE, 'readwrite', async (store) => {
+      await requestToPromise(store.put(JSON.stringify(persisted), SQLITE_STATE_KEY))
+    })
+  })
+  memoryState = snapshot
+}
+
+async function idbGetTranslationConfig(): Promise<TranslationConfig | null> {
+  const value = await withStore<string | undefined>(IDB_STATE_STORE, 'readonly', async (store) => {
+    return await requestToPromise(store.get(SQLITE_TRANSLATION_CONFIG_KEY))
+  })
+  if (typeof value !== 'string' || !value) return null
+  try {
+    return sanitizeTranslationConfig(JSON.parse(value) as TranslationConfig)
+  } catch {
+    return null
+  }
+}
+
+async function idbPutTranslationConfig(config: TranslationConfig): Promise<void> {
+  const snapshot = sanitizeTranslationConfig(config)
+  await queueStateStoreWrite(async () => {
+    await withStore(IDB_STATE_STORE, 'readwrite', async (store) => {
+      await requestToPromise(store.put(JSON.stringify(snapshot), SQLITE_TRANSLATION_CONFIG_KEY))
+    })
   })
 }
 
@@ -297,6 +711,9 @@ async function resetIndexedDb(): Promise<void> {
     openDb.close()
   }
   idbPromise = null
+  stateStoreWriteQueue = Promise.resolve()
+  dbReadyPromise = null
+  dbReady = false
   if (!hasIndexedDb()) return
   await new Promise<void>((resolve, reject) => {
     const req = indexedDB.deleteDatabase(IDB_DB_NAME)
@@ -311,41 +728,58 @@ function analysisArtifactKey(documentId: string, artifactName: string): string {
 }
 
 async function ensureDbReady(): Promise<void> {
-  if (idbPromise) {
-    await idbPromise
+  if (dbReady) return
+  if (dbReadyPromise) {
+    await dbReadyPromise
     return
   }
-  const legacyRaw = String(window.localStorage.getItem(LEGACY_STORAGE_KEY) || '')
-  if (!hasIndexedDb()) {
-    if (legacyRaw) {
-      try {
-        memoryState = coerceWorkspaceState(JSON.parse(legacyRaw) as Partial<WorkspaceState>)
-      } catch {
-        memoryState = emptyWorkspaceState()
+  dbReadyPromise = (async () => {
+    const legacyRaw = String(window.localStorage.getItem(LEGACY_STORAGE_KEY) || '')
+    if (!hasIndexedDb()) {
+      if (legacyRaw) {
+        try {
+          memoryState = coerceWorkspaceState(JSON.parse(legacyRaw) as Partial<WorkspaceState>)
+        } catch {
+          memoryState = emptyWorkspaceState()
+        }
+        window.localStorage.removeItem(LEGACY_STORAGE_KEY)
       }
-      window.localStorage.removeItem(LEGACY_STORAGE_KEY)
+      dbReady = true
+      return
     }
-    return
-  }
-  await openIndexedDb()
-  const state = await idbGetState()
-  const isEmpty =
-    state.projects.length === 0 &&
-    state.files.length === 0 &&
-    state.analyses.length === 0 &&
-    !state.translation_config &&
-    !state.selected_project_id
-  if (isEmpty && legacyRaw) {
-    try {
-      const migrated = coerceWorkspaceState(JSON.parse(legacyRaw) as Partial<WorkspaceState>)
-      await idbPutState(migrated)
-      memoryState = clone(migrated)
-      window.localStorage.removeItem(LEGACY_STORAGE_KEY)
-    } catch {
+    await openIndexedDb()
+    const state = await idbGetState()
+    const isEmpty =
+      state.projects.length === 0 &&
+      state.files.length === 0 &&
+      state.analyses.length === 0 &&
+      !state.translation_config &&
+      !state.selected_project_id
+    if (isEmpty && legacyRaw) {
+      try {
+        const migrated = coerceWorkspaceState(JSON.parse(legacyRaw) as Partial<WorkspaceState>)
+        await idbPutState(migrated)
+        if (migrated.translation_config) {
+          try {
+            await idbPutTranslationConfig(migrated.translation_config)
+          } catch (err) {
+            recordRuntimeDiagnostic('workspace.translation_config', 'legacy_migration_persist_failed', err, 'error')
+          }
+        }
+        memoryState = clone(migrated)
+        window.localStorage.removeItem(LEGACY_STORAGE_KEY)
+      } catch {
+        memoryState = state
+      }
+    } else {
       memoryState = state
     }
-  } else {
-    memoryState = state
+    dbReady = true
+  })()
+  try {
+    await dbReadyPromise
+  } finally {
+    dbReadyPromise = null
   }
 }
 
@@ -386,11 +820,14 @@ async function loadRawState(): Promise<WorkspaceState> {
 }
 
 async function saveRawState(state: WorkspaceState): Promise<void> {
-  memoryState = clone(state)
+  const snapshot = clone(state)
   await ensureDbReady()
   await ensureDbFresh()
-  if (!hasIndexedDb()) return
-  await idbPutState(state)
+  if (!hasIndexedDb()) {
+    memoryState = snapshot
+    return
+  }
+  await idbPutState(snapshot)
 }
 
 async function ensureState(): Promise<WorkspaceState> {
@@ -404,7 +841,8 @@ async function ensureState(): Promise<WorkspaceState> {
     .join('||')
   const hasSelected = Boolean(state.selected_project_id && state.projects.some((p) => p.id === state.selected_project_id))
   const nextSelected = hasSelected ? state.selected_project_id : (state.projects[0]?.id || null)
-  if (state.selected_project_id !== nextSelected || fileFlagsBefore !== fileFlagsAfter) {
+  const linksFixed = repairProjectLinks(state)
+  if (state.selected_project_id !== nextSelected || fileFlagsBefore !== fileFlagsAfter || linksFixed) {
     state.selected_project_id = nextSelected
     await saveRawState(state)
   }
@@ -1217,22 +1655,39 @@ export const LocalWorkspace = {
   },
 
   async getTranslationConfig(): Promise<TranslationConfig | null> {
-    const state = await ensureState()
-    const cfg = state.translation_config ? clone(state.translation_config) : clone(DEFAULT_TRANSLATION_CONFIG)
+    await ensureDbReady()
+    await ensureDbFresh()
+    const cfgFromIdb = hasIndexedDb() ? await idbGetTranslationConfig() : null
+    let cfg = cfgFromIdb
+    if (!cfg) cfg = sanitizeTranslationConfig(memoryState.translation_config)
     // One-time migration: remove the 'hf' provider that was dropped in favour of 'm2m100'.
     if (cfg.providers.some((p) => p.id === 'hf')) {
       cfg.providers = cfg.providers.filter((p) => p.id !== 'hf')
       if (cfg.default_provider === 'hf') cfg.default_provider = 'm2m100'
-      state.translation_config = clone(cfg)
-      await saveRawState(state)
     }
-    return cfg
+    const currentMemory = sanitizeTranslationConfig(memoryState.translation_config)
+    const changed = JSON.stringify(currentMemory) !== JSON.stringify(cfg)
+    if (changed) {
+      memoryState.translation_config = clone(cfg)
+    }
+    if (hasIndexedDb() && (changed || !cfgFromIdb)) {
+      try {
+        await idbPutTranslationConfig(cfg)
+      } catch (err) {
+        recordRuntimeDiagnostic('workspace.translation_config', 'persist_dedicated_key_failed', err, 'error')
+      }
+    }
+    return clone(cfg)
   },
 
   async saveTranslationConfig(config: TranslationConfig): Promise<TranslationConfig> {
-    const state = await ensureState()
-    state.translation_config = clone(config)
-    await saveRawState(state)
-    return clone(config)
+    await ensureDbReady()
+    await ensureDbFresh()
+    const cfg = sanitizeTranslationConfig(config)
+    if (hasIndexedDb()) {
+      await idbPutTranslationConfig(cfg)
+    }
+    memoryState.translation_config = clone(cfg)
+    return clone(cfg)
   },
 }

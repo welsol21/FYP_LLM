@@ -338,6 +338,59 @@ def _build_srt(segments: list[dict[str, Any]], *, bilingual: bool) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
+def _ass_ts(total_ms: int) -> str:
+    """ASS subtitle timestamp: H:MM:SS.cc (centiseconds)."""
+    ms = max(0, int(total_ms))
+    hours = ms // 3_600_000
+    ms %= 3_600_000
+    minutes = ms // 60_000
+    ms %= 60_000
+    seconds = ms // 1_000
+    centis = (ms % 1_000) // 10
+    return f"{hours}:{minutes:02d}:{seconds:02d}.{centis:02d}"
+
+
+def _build_bilingual_ass(segments: list[dict[str, Any]]) -> str:
+    """Build ASS subtitle file: English Top-Center, Russian Bottom-Center."""
+    header = (
+        "[Script Info]\n"
+        "ScriptType: v4.00+\n"
+        "Collisions: Normal\n"
+        "PlayResX: 640\n"
+        "PlayResY: 360\n"
+        "\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour,"
+        " OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut,"
+        " ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow,"
+        " Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        "Style: Top,DejaVu Sans,22,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,"
+        "-1,0,0,0,100,100,0,0,1,2,0,8,10,10,20,1\n"
+        "Style: Bottom,DejaVu Sans,22,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,"
+        "-1,0,0,0,100,100,0,0,1,2,0,2,10,10,20,1\n"
+        "\n"
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+    )
+    events: list[str] = []
+    for seg in segments:
+        start_ms = int(seg.get("start_ms") or 0)
+        end_ms = int(seg.get("end_ms") or 0)
+        if end_ms <= start_ms:
+            end_ms = start_ms + 1000
+        text_en = str(seg.get("text_eng") or "").strip()
+        text_ru = str(seg.get("text_ru") or "").strip()
+        if text_en:
+            events.append(
+                f"Dialogue: 0,{_ass_ts(start_ms)},{_ass_ts(end_ms)},Top,,0,0,0,,{text_en}"
+            )
+        if text_ru:
+            events.append(
+                f"Dialogue: 0,{_ass_ts(start_ms)},{_ass_ts(end_ms)},Bottom,,0,0,0,,{text_ru}"
+            )
+    return header + "\n".join(events) + "\n"
+
+
 def _translated_text_for_tts(media_sentences: list[dict[str, Any]]) -> str:
     parts: list[str] = []
     for row in media_sentences:
@@ -432,6 +485,13 @@ def _extract_audio_segment_wav(*, source: Path, start_ms: int, end_ms: int, out_
         return False
     start_sec = max(0.0, float(start_ms) / 1000.0)
     end_sec = max(start_sec + 0.01, float(end_ms) / 1000.0)
+    duration_sec = end_sec - start_sec
+    # 30 ms fade-in/fade-out to eliminate click artifacts at clip boundaries.
+    fade_sec = min(0.030, duration_sec / 4)
+    fade_filter = (
+        f"afade=t=in:st=0:d={fade_sec:.3f},"
+        f"afade=t=out:st={max(0.0, duration_sec - fade_sec):.3f}:d={fade_sec:.3f}"
+    )
     try:
         subprocess.run(
             [
@@ -444,6 +504,8 @@ def _extract_audio_segment_wav(*, source: Path, start_ms: int, end_ms: int, out_
                 "-i",
                 str(source),
                 "-vn",
+                "-af",
+                fade_filter,
                 "-acodec",
                 "pcm_s16le",
                 "-ar",
@@ -2168,6 +2230,31 @@ class RuntimeMediaService:
                         )
                     asyncio.run(_batch_tts())
 
+                # Normalize source clip boundaries: eliminate overlaps between
+                # adjacent sentences and trim a small margin from each edge to
+                # prevent bleeding of neighbouring words (Whisper segment
+                # timestamps can span multiple sentences, causing overlap).
+                _CLIP_TRIM_MS = 80  # trim from each edge before fade
+                _normalized_boundaries: list[tuple[int, int]] = []
+                for _i, _row in enumerate(media_sentences):
+                    _s = int(_row.get("start_ms") or 0)
+                    _e = int(_row.get("end_ms") or 0)
+                    # Clamp start so it doesn't overlap the previous clip's end.
+                    if _normalized_boundaries:
+                        _prev_end = _normalized_boundaries[-1][1]
+                        if _s < _prev_end:
+                            _s = _prev_end
+                    # Clamp end so it doesn't overlap the next clip's start.
+                    if _i + 1 < len(media_sentences):
+                        _next_start = int(media_sentences[_i + 1].get("start_ms") or 0)
+                        if _e > _next_start:
+                            _e = _next_start
+                    # Trim small margin from each edge.
+                    _trim = min(_CLIP_TRIM_MS, max(0, (_e - _s) // 4))
+                    _s = _s + _trim
+                    _e = _e - _trim
+                    _normalized_boundaries.append((_s, _e))
+
                 for idx, row in enumerate(media_sentences, start=1):
                     total_segments = max(1, len(media_sentences))
                     if stage_callback is not None:
@@ -2188,8 +2275,7 @@ class RuntimeMediaService:
                     }
 
                     if include_source:
-                        start_ms_raw = int(row.get("start_ms") or 0)
-                        end_ms_raw = int(row.get("end_ms") or 0)
+                        start_ms_raw, end_ms_raw = _normalized_boundaries[idx - 1]
                         source_seg = tmp / f"src_{idx:04d}.wav"
                         if (
                             source.exists()
@@ -2351,6 +2437,11 @@ class RuntimeMediaService:
                 _build_srt(bilingual_subtitle_segments, bilingual=True),
                 encoding="utf-8",
             )
+            if bilingual_simultaneous:
+                (doc_dir / "subtitles_bilingual.ass").write_text(
+                    _build_bilingual_ass(bilingual_subtitle_segments),
+                    encoding="utf-8",
+                )
             target_rows = target_subtitle_segments if target_subtitle_segments else [{**row, "text_eng": ""} for row in timeline_segments]
             (doc_dir / "subtitles_target.srt").write_text(
                 _build_srt(target_rows, bilingual=True),
@@ -2408,12 +2499,15 @@ class RuntimeMediaService:
             voice_choice=voice_choice,
             stage_callback=stage_callback,
         )
+        _sim_modes = {"bilingual_simultaneous", "bilingual simultaneous", "simultaneous"}
         artifact_names = [
             "translated_audio_ru.mp3",
             "subtitles_bilingual.srt",
             "subtitles_en.srt",
             "subtitles_target.srt",
         ]
+        if str(subtitles_mode or "").strip().lower() in _sim_modes:
+            artifact_names.insert(1, "subtitles_bilingual.ass")
         artifacts: list[dict[str, Any]] = []
         for name in artifact_names:
             path = doc_dir / name
