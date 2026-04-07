@@ -440,9 +440,17 @@ function contractHasProviderTranslations(contract: VisualizerPayload | null | un
 // Stage-scoped document IDs so that caching at each pipeline stage
 // is invalidated only by the parameters that stage actually depends on.
 //
-//  immutableDocId  = hash(fileName)                          — Whisper output
+//  immutableDocId  = hash(fileName | mediaPath | asrSchema)  — Whisper output
 //  contractDocId   = hash(fileName | translationProvider)    — contracts + translations
 //  variantDocId    = hash(fileName | provider | voice | subs)— TTS audio + video + done-marker
+const SENTENCE_CACHE_SCHEMA = 'asr-word-ts-v2'
+
+type StoredSentence = { text: string; start_sec: number | null; end_sec: number | null }
+type CachedSentencesPayloadV2 = {
+  schema: string
+  media_path: string
+  sentences: StoredSentence[]
+}
 function fallbackHashHex64(input: string): string {
   // Deterministic non-crypto fallback for environments where SubtleCrypto
   // is unavailable (e.g. insecure HTTP context on some mobile browsers).
@@ -481,8 +489,34 @@ async function computeHashHex(input: string): Promise<string> {
   return fallbackHashHex64(input)
 }
 
-async function computeImmutableDocId(fileName: string): Promise<string> {
-  return await computeHashHex(fileName)
+async function computeImmutableDocId(fileName: string, mediaPath: string): Promise<string> {
+  return await computeHashHex(`${fileName}|${mediaPath}|${SENTENCE_CACHE_SCHEMA}`)
+}
+
+function parseCachedSentencesPayload(raw: string, currentMediaPath: string): StoredSentence[] | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (Array.isArray(parsed)) {
+      // Legacy format (pre schema+path pinning) is intentionally ignored to avoid
+      // reusing stale sentence timings after ASR algorithm changes.
+      return null
+    }
+    if (!parsed || typeof parsed !== 'object') return null
+    const row = parsed as Partial<CachedSentencesPayloadV2>
+    if (String(row.schema || '') !== SENTENCE_CACHE_SCHEMA) return null
+    if (String(row.media_path || '') !== String(currentMediaPath || '')) return null
+    if (!Array.isArray(row.sentences)) return null
+    return row.sentences
+      .map((item) => ({
+        text: String((item as StoredSentence).text || '').trim(),
+        start_sec: typeof (item as StoredSentence).start_sec === 'number' ? (item as StoredSentence).start_sec : null,
+        end_sec: typeof (item as StoredSentence).end_sec === 'number' ? (item as StoredSentence).end_sec : null,
+      }))
+      .filter((item) => item.text.length > 0)
+  } catch {
+    return null
+  }
 }
 
 async function computeContractDocId(fileName: string, translationProvider: string): Promise<string> {
@@ -900,7 +934,6 @@ export class HttpRuntimeApi implements RuntimeApi {
       if (input.signal?.aborted) throw new DOMException('Analysis cancelled.', 'AbortError')
     }
 
-    type StoredSentence = { text: string; start_sec: number | null; end_sec: number | null }
     type PipelineSettings = { translationProvider: string; voiceChoice: string; subtitlesMode: string; sourceType: string }
 
     const runConcurrent = (tasks: Array<() => Promise<void>>, concurrency: number): Promise<void> => {
@@ -925,7 +958,7 @@ export class HttpRuntimeApi implements RuntimeApi {
 
       // ── Resume detection ──────────────────────────────────────────
       // Three stage-scoped IDs so each stage is invalidated only by what it depends on:
-      //   immutableDocId  — Whisper output (sentences.json): only file name
+      //   immutableDocId  — Whisper output (sentences.json): file + mediaPath + ASR schema
       //   contractDocId   — contracts + translations: file + provider
       //   documentId      — TTS audio/video + done-marker: all settings (variant)
       // resumePoint: 'full' = run everything; 'translation' = reuse transcription+contracts;
@@ -936,7 +969,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         voiceChoice: String(input.voiceChoice || 'backend_dmitry').trim().toLowerCase(),
         subtitlesMode: input.subtitlesMode || 'bilingual',
       }
-      const immutableDocId = await computeImmutableDocId(input.fileName)
+      const immutableDocId = await computeImmutableDocId(input.fileName, input.mediaPath)
       const contractDocId = await computeContractDocId(input.fileName, provider)
       const documentId = await computeVariantDocId(input.fileName, docIdSettings)
       recordRuntimeDiagnostic('api.media.resume', 'docids', {
@@ -1006,7 +1039,7 @@ export class HttpRuntimeApi implements RuntimeApi {
           }
         }
         if (resumePoint !== 'done' && sentBlob) {
-          const prevSentences = JSON.parse(await sentBlob.text()) as StoredSentence[]
+          const prevSentences = parseCachedSentencesPayload(await sentBlob.text(), input.mediaPath) || []
           if (prevSentences.length > 0) {
             const rawAnalysis = await LocalWorkspace.getRawAnalysis(contractDocId)
             if (rawAnalysis && Object.keys(rawAnalysis.contract).length > 0) {
@@ -1178,10 +1211,15 @@ export class HttpRuntimeApi implements RuntimeApi {
         }
 
         // Persist sentences under immutableDocId — independent of voice/subs/provider
+        const sentenceCachePayload: CachedSentencesPayloadV2 = {
+          schema: SENTENCE_CACHE_SCHEMA,
+          media_path: input.mediaPath,
+          sentences,
+        }
         await LocalWorkspace.cacheAnalysisArtifactBlob(
           immutableDocId,
           'sentences.json',
-          new Blob([JSON.stringify(sentences)], { type: 'application/json' }),
+          new Blob([JSON.stringify(sentenceCachePayload)], { type: 'application/json' }),
         )
         recordRuntimeDiagnostic('api.media.resume', 'sentences-saved', { immutableDocId, count: sentences.length })
       } else {
@@ -1629,7 +1667,6 @@ export class HttpRuntimeApi implements RuntimeApi {
               await new Promise<void>((resolve) => setTimeout(resolve, 2000))
               ensureNotAborted()
               pollAttempt++
-              const renderElapsed = pollAttempt * 2
               const statusRes = await fetch(apiUrl(`/api/render-status/${jobId}`), { signal: input.signal })
               if (statusRes.headers.get('content-type')?.includes('application/zip')) {
                 zipBuf = await statusRes.arrayBuffer()
@@ -1651,9 +1688,7 @@ export class HttpRuntimeApi implements RuntimeApi {
               const stage = renderStageLabel(String(statusJson.stage || ''))
               const counter = total > 0 ? ` (${Math.min(done, total)}/${total})` : ''
               const stageHint = statusJson.message ? ` · ${String(statusJson.message).trim()}` : ''
-              const renderHint = renderElapsed >= 90
-                ? `${renderScope}: ${stage}${counter}${stageHint} (heavy stage, please wait)`
-                : `${renderScope}: ${stage}${counter}${stageHint}`
+              const renderHint = `${renderScope}: ${stage}${counter}${stageHint}...`
               const renderRatio = total > 0 ? Math.min(Math.max(done / total, 0), 1) : 0
               const baseProgress = stage === 'tts synthesis' ? 5
                 : stage === 'assembling audio' ? 28
@@ -1668,7 +1703,7 @@ export class HttpRuntimeApi implements RuntimeApi {
                 : stage === 'packaging artifacts' ? 1
                 : 18
               const renderProgress = Math.min(48, Math.round(baseProgress + dynamicProgress * renderRatio))
-              log(3, `${renderHint} · elapsed ${formatElapsed(renderElapsed)}`, renderProgress)
+              log(3, renderHint, renderProgress)
               // status === 'running' — keep polling
             }
 
