@@ -216,14 +216,19 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
                 full_text, chunks = _extract_text_and_sentence_chunks(media, "audio")
 
             self.assertEqual(full_text, "Mr. Holmes spoke. Then paused.")
-            self.assertEqual(len(chunks), 2)
-            self.assertEqual(chunks[0]["sentence_text"], "Mr. Holmes spoke.")
-            self.assertEqual(chunks[1]["sentence_text"], "Then paused.")
-            self.assertAlmostEqual(float(chunks[0]["start_sec"]), 0.0, places=3)
-            self.assertAlmostEqual(float(chunks[0]["end_sec"]), 0.95, places=3)
-            self.assertAlmostEqual(float(chunks[1]["start_sec"]), 1.05, places=3)
-            self.assertAlmostEqual(float(chunks[1]["end_sec"]), 1.86, places=3)
-            self.assertGreaterEqual(float(chunks[1]["start_sec"]), float(chunks[0]["end_sec"]))
+            # Reference approach: split at every .?! — "Mr." is its own chunk
+            self.assertEqual(len(chunks), 3)
+            self.assertEqual(chunks[0]["sentence_text"], "Mr.")
+            self.assertEqual(chunks[1]["sentence_text"], "Holmes spoke.")
+            self.assertEqual(chunks[2]["sentence_text"], "Then paused.")
+            self.assertAlmostEqual(float(chunks[1]["start_sec"]), 0.20, places=2)
+            self.assertAlmostEqual(float(chunks[1]["end_sec"]), 0.95, places=2)
+            self.assertAlmostEqual(float(chunks[2]["start_sec"]), 1.05, places=2)
+            self.assertAlmostEqual(float(chunks[2]["end_sec"]), 1.86, places=2)
+            self.assertGreaterEqual(float(chunks[2]["start_sec"]), float(chunks[1]["end_sec"]))
+            # Chunks must carry pre-built units
+            self.assertIn("units", chunks[1])
+            self.assertTrue(len(chunks[1]["units"]) > 0)
 
             kwargs = mock_model.transcribe.call_args.kwargs
             self.assertTrue(bool(kwargs.get("word_timestamps")))

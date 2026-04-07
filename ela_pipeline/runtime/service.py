@@ -1562,7 +1562,7 @@ class RuntimeMediaService:
             "full_text": extraction.full_text,
             "sentence_stream": extraction.sentence_stream,
             "sentence_timeline": extraction.sentence_timeline,
-            "sentence_word_timings": extraction.sentence_word_timings,
+            "sentence_units": extraction.sentence_units,
         }
         checkpoint_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -1580,7 +1580,7 @@ class RuntimeMediaService:
         full_text = str(data.get("full_text") or "").strip()
         sentence_stream = data.get("sentence_stream")
         sentence_timeline = data.get("sentence_timeline")
-        sentence_word_timings = data.get("sentence_word_timings")
+        sentence_units = data.get("sentence_units")
         if not source_type or not full_text or not isinstance(sentence_stream, list):
             return None
         return MediaExtractionResult(
@@ -1588,7 +1588,7 @@ class RuntimeMediaService:
             full_text=full_text,
             sentence_stream=sentence_stream,
             sentence_timeline=sentence_timeline if isinstance(sentence_timeline, list) else [],
-            sentence_word_timings=sentence_word_timings if isinstance(sentence_word_timings, list) else [],
+            sentence_units=sentence_units if isinstance(sentence_units, list) else [],
         )
 
     def _persist_stage_manifest_artifact(self, *, document_id: str, manifest: dict[str, Any]) -> None:
