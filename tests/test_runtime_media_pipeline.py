@@ -141,44 +141,6 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
             self.assertEqual(result.media_sentences[0]["start_ms"], 0)
             self.assertEqual(result.media_sentences[1]["start_ms"], 1300)
 
-    def test_audio_pipeline_resegments_fragmented_asr_chunks_into_full_sentences(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            media = Path(tmpdir) / "sample.mp3"
-            media.write_bytes(b"fake-audio")
-            with patch(
-                "ela_pipeline.runtime.media_pipeline._extract_text_and_sentence_chunks",
-                return_value=(
-                    (
-                        "Or, maybe it only tore him from the half-slamber in which he rocked monotonously, "
-                        "as though traveling through fathomless depths, suspended between the seabed at its calm surface "
-                        "amidst gently undulating strands of seaweed."
-                    ),
-                    [
-                        {
-                            "sentence_text": "Or, maybe it only tore him from the half-slamber in which he rocked monotonously,",
-                            "start_sec": 0.0,
-                            "end_sec": 3.0,
-                        },
-                        {
-                            "sentence_text": "as though traveling through fathomless depths, suspended between the seabed at its calm surface",
-                            "start_sec": 3.0,
-                            "end_sec": 6.0,
-                        },
-                        {
-                            "sentence_text": "amidst gently undulating strands of seaweed.",
-                            "start_sec": 6.0,
-                            "end_sec": 8.0,
-                        },
-                    ],
-                ),
-            ):
-                result = run_media_pipeline(source_path=str(media), sentence_contract_builder=self._builder)
-            self.assertEqual(len(result.media_sentences), 1)
-            self.assertIn("monotonously", result.media_sentences[0]["sentence_text"])
-            self.assertIn("amidst", result.media_sentences[0]["sentence_text"])
-            self.assertEqual(result.media_sentences[0]["start_ms"], 0)
-            self.assertEqual(result.media_sentences[0]["end_ms"], 8000)
-
     def test_pipeline_uses_external_sentence_contract_builder(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             source = Path(tmpdir) / "sample.txt"

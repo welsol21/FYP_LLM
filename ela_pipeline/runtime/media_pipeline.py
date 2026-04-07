@@ -1062,61 +1062,41 @@ def extract_media_text_and_sentences(
     sentence_timeline: list[dict[str, float] | None] = []
     sentence_word_timings: list[list[dict[str, Any]] | None] = []
     if extracted_sentence_chunks:
-        # Re-segment ASR chunks through spaCy to merge sentence fragments and
-        # apply metadata filtering (same logic as the text path).  Timing is
-        # interpolated back from the original chunk windows so subtitle/audio
-        # assembly still works.  Where a re-segmented sentence maps 1-to-1 with
-        # an original chunk we also carry forward the Whisper word-level timings.
-        raw_stream, raw_timeline = _sentenceize_timed_chunks(
-            chunks=extracted_sentence_chunks, nlp=nlp
-        )
-        if not raw_stream:
-            # Degenerate: spaCy produced nothing — fall back to raw chunks.
-            raw_stream = [str(c.get("sentence_text") or "").strip() for c in extracted_sentence_chunks]
-            raw_timeline = [
-                {"start_sec": float(c.get("start_sec") or 0.0), "end_sec": float(c.get("end_sec") or 0.0)}
-                for c in extracted_sentence_chunks
-            ]
-
-        # Build a list of (c_start, c_end, word_timings) for overlap lookups.
-        chunk_lookup = [
-            (
-                float(c.get("start_sec") or 0.0),
-                float(c.get("end_sec") or 0.0),
-                c.get("word_timings") if isinstance(c.get("word_timings"), list) and c.get("word_timings") else None,
-            )
-            for c in extracted_sentence_chunks
-        ]
-
-        fallback_stream = list(raw_stream)
-        fallback_timeline = list(raw_timeline)
-
-        for text, timing in zip(raw_stream, raw_timeline):
+        # Follow the reference approach (transcribe_and_translate_windows.py):
+        # use each ASR chunk directly — no spaCy re-segmentation.  _group_whisper_word_chunks
+        # already handles sentence boundary detection at the word level, so re-segmenting
+        # breaks the 1-to-1 correspondence between chunks and word_timings (wrong timing +
+        # wrong sentence order).  Apply only the metadata filter here.
+        for chunk in extracted_sentence_chunks:
+            text = str(chunk.get("sentence_text") or "").strip()
             if not text:
                 continue
             doc = nlp(text)
             if _is_metadata_like_sentence(text, doc):
                 continue
+            start_sec = float(chunk.get("start_sec") or 0.0)
+            end_sec = float(chunk.get("end_sec") or start_sec + 0.2)
+            if end_sec <= start_sec:
+                end_sec = start_sec + _estimate_sentence_duration_seconds(text)
             sentence_stream.append(text)
-            sentence_timeline.append(timing)
-            # Map word timings from the first original chunk that overlaps this sentence.
-            wt: list[dict[str, Any]] | None = None
-            if timing is not None:
-                s_start = float(timing.get("start_sec") or 0.0)
-                s_end = float(timing.get("end_sec") or 0.0)
-                for c_start, c_end, c_wt in chunk_lookup:
-                    if c_end > s_start and c_start < s_end and c_wt:
-                        wt = c_wt
-                        break
-            sentence_word_timings.append(wt)
+            sentence_timeline.append({"start_sec": start_sec, "end_sec": end_sec})
+            wt = chunk.get("word_timings")
+            sentence_word_timings.append(wt if isinstance(wt, list) and wt else None)
 
         if not sentence_stream:
-            for text, timing in zip(fallback_stream, fallback_timeline):
+            # Fallback: metadata filter removed everything — use chunks as-is.
+            for chunk in extracted_sentence_chunks:
+                text = str(chunk.get("sentence_text") or "").strip()
                 if not text:
                     continue
+                start_sec = float(chunk.get("start_sec") or 0.0)
+                end_sec = float(chunk.get("end_sec") or start_sec + 0.2)
+                if end_sec <= start_sec:
+                    end_sec = start_sec + _estimate_sentence_duration_seconds(text)
                 sentence_stream.append(text)
-                sentence_timeline.append(timing)
-                sentence_word_timings.append(None)
+                sentence_timeline.append({"start_sec": start_sec, "end_sec": end_sec})
+                wt = chunk.get("word_timings")
+                sentence_word_timings.append(wt if isinstance(wt, list) and wt else None)
     else:
         skeleton = build_skeleton(full_text, nlp)
         fallback_stream = [str(text or "").strip() for text in skeleton.keys() if str(text or "").strip()]
