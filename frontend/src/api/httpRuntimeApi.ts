@@ -956,6 +956,8 @@ export class HttpRuntimeApi implements RuntimeApi {
     try {
       recordRuntimeDiagnostic('api.media.backend', 'submit.start', { mediaPath: input.mediaPath, fileName: input.fileName })
       const MAX_LOST_JOB_RESUBMITS = 1
+      const MAX_TRANSLATE_STATUS_NETWORK_ERRORS = 8
+      const MAX_RENDER_STATUS_NETWORK_ERRORS = 8
 
       // ── Resume detection ──────────────────────────────────────────
       // Three stage-scoped IDs so each stage is invalidated only by what it depends on:
@@ -1382,21 +1384,32 @@ export class HttpRuntimeApi implements RuntimeApi {
         const payloadTexts = Array.from(new Set(texts.map((text) => text.trim()).filter(Boolean)))
         if (payloadTexts.length === 0) return {}
         const submitTranslateJob = async (): Promise<string> => {
-          const res = await requestJson<{ job_id: string }>(
-            apiUrl('/api/translate'),
+          const submitRes = await fetchWithRetry(
+            '/api/translate',
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ sentences: payloadTexts, provider: 'm2m100' }),
               signal: input.signal,
             },
+            { retries: 2, retryDelayMs: 1200 },
           )
-          return res.job_id
+          const parsed = await readJsonResponse<{ job_id?: string }>(submitRes)
+          const jobId = String(parsed.json?.job_id || '').trim()
+          if (!submitRes.ok || !jobId) {
+            throw new Error(
+              parsed.json && typeof parsed.json === 'object' && 'error' in parsed.json
+                ? String((parsed.json as { error?: unknown }).error || `HTTP ${submitRes.status}`)
+                : (parsed.raw || `HTTP ${submitRes.status}`),
+            )
+          }
+          return jobId
         }
 
         let translateJobId = await submitTranslateJob()
         let translateResubmitCount = 0
         let translateStatusDecodeFailures = 0
+        let translateStatusNetworkFailures = 0
         let pollCount = 0
 
         while (true) {
@@ -1404,7 +1417,28 @@ export class HttpRuntimeApi implements RuntimeApi {
           await sleepMs(1500)
           ensureNotAborted()
           pollCount++
-          const statusRes = await fetch(apiUrl(`/api/translate-status/${translateJobId}`), { signal: input.signal })
+          let statusRes: Response
+          try {
+            statusRes = await fetchWithRetry(
+              `/api/translate-status/${translateJobId}`,
+              { signal: input.signal },
+              { retries: 2, retryDelayMs: 900 },
+            )
+            translateStatusNetworkFailures = 0
+          } catch (statusErr) {
+            if (statusErr instanceof DOMException && statusErr.name === 'AbortError') throw statusErr
+            if (isLikelyNetworkFetchError(statusErr) && translateStatusNetworkFailures < MAX_TRANSLATE_STATUS_NETWORK_ERRORS) {
+              translateStatusNetworkFailures += 1
+              recordRuntimeDiagnostic('api.media.backend', 'translate.status.fetch_retry', {
+                phase,
+                failureCount: translateStatusNetworkFailures,
+                reason: String(statusErr instanceof Error ? statusErr.message : statusErr),
+              }, 'error')
+              log(2, 'Translation service reconnecting…', 50)
+              continue
+            }
+            throw statusErr
+          }
           const raw = await statusRes.text().catch(() => '')
           let statusJson: {
             status?: string
@@ -1474,7 +1508,6 @@ export class HttpRuntimeApi implements RuntimeApi {
       }
 
       let translations: Record<string, string> = {}
-      let translateError: string | null = null
       if (resumePoint === 'tts' && resumeTranslations) {
         translations = resumeTranslations
         for (const node of Object.values(contract)) markActiveProvider(node, provider)
@@ -1569,15 +1602,16 @@ export class HttpRuntimeApi implements RuntimeApi {
                 log(2, 'All nodes already translated — skipping API call', 100)
               }
             }
+            log(2, 'Translation complete', 100)
           } catch (err: unknown) {
             if (err instanceof DOMException && err.name === 'AbortError') throw err
             const raw = String(err instanceof Error ? err.message : err)
             recordRuntimeDiagnostic('api.media.backend', 'translate.error', raw, 'error')
-            translateError = _translateErrorMessage(raw)
+            const translateError = _translateErrorMessage(raw)
             log(2, `Translation error: ${raw}`, 50)
+            throw new Error(translateError)
           }
         }
-        log(2, 'Translation complete', 100)
         // Write translations back into all contract nodes (sentence + children).
         // M2M100 already wrote aligned/fallback node translations directly.
         if (Object.keys(translations).length > 0 && !providerIsOriginal && provider !== 'm2m100') {
@@ -1644,9 +1678,9 @@ export class HttpRuntimeApi implements RuntimeApi {
             } catch { /* non-fatal — backend falls back to TTS-only */ }
             // Submit render job — returns {job_id} immediately (no timeout risk)
             const submitRes = await fetchWithRetry(
-              apiUrl('/api/render-media'),
+              '/api/render-media',
               { method: 'POST', body: form, signal: input.signal },
-              { retries: 0 },
+              { retries: 2, retryDelayMs: 1200 },
             )
             if (!submitRes.ok) {
               const txt = await submitRes.text().catch(() => '')
@@ -1657,6 +1691,7 @@ export class HttpRuntimeApi implements RuntimeApi {
             // Poll /api/render-status/<job_id> until done
             let zipBuf: ArrayBuffer | null = null
             let pollAttempt = 0
+            let renderStatusNetworkFailures = 0
             const renderScope = needVideo
               ? 'Server render: TTS + subtitles + video muxing'
               : 'Server render: TTS + subtitles'
@@ -1677,7 +1712,27 @@ export class HttpRuntimeApi implements RuntimeApi {
               await new Promise<void>((resolve) => setTimeout(resolve, 2000))
               ensureNotAborted()
               pollAttempt++
-              const statusRes = await fetch(apiUrl(`/api/render-status/${jobId}`), { signal: input.signal })
+              let statusRes: Response
+              try {
+                statusRes = await fetchWithRetry(
+                  `/api/render-status/${jobId}`,
+                  { signal: input.signal },
+                  { retries: 2, retryDelayMs: 900 },
+                )
+                renderStatusNetworkFailures = 0
+              } catch (statusErr) {
+                if (statusErr instanceof DOMException && statusErr.name === 'AbortError') throw statusErr
+                if (isLikelyNetworkFetchError(statusErr) && renderStatusNetworkFailures < MAX_RENDER_STATUS_NETWORK_ERRORS) {
+                  renderStatusNetworkFailures += 1
+                  recordRuntimeDiagnostic('api.media.backend', 'render.status.fetch_retry', {
+                    failureCount: renderStatusNetworkFailures,
+                    reason: String(statusErr instanceof Error ? statusErr.message : statusErr),
+                  }, 'error')
+                  log(3, `${renderScope}: reconnecting…`, 10)
+                  continue
+                }
+                throw statusErr
+              }
               if (statusRes.headers.get('content-type')?.includes('application/zip')) {
                 zipBuf = await statusRes.arrayBuffer()
                 break
@@ -1794,18 +1849,17 @@ export class HttpRuntimeApi implements RuntimeApi {
       recordRuntimeDiagnostic('api.media.backend', 'submit.success', { documentId, sentences: Object.keys(contract).length })
       return finish({
         result: { route: 'local', status: 'completed_local', document_id: documentId, message: 'Analysis completed.', stage_name: 'completed' },
-        ui_feedback: translateError
-          ? { severity: 'warning', title: 'Analysis completed (translation failed)', message: translateError }
-          : { severity: 'info', title: 'Analysis completed', message: 'Media analysis completed and saved locally.' },
+        ui_feedback: { severity: 'info', title: 'Analysis completed', message: 'Media analysis completed and saved locally.' },
       })
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') throw err
       const rawMessage = err instanceof Error ? err.message : String(err)
-      const message = isPwaModelMissingError(err) ? PWA_INSTALL_MESSAGE : rawMessage
+      const modelMissing = isPwaModelMissingError(err)
+      const message = modelMissing ? PWA_INSTALL_MESSAGE : rawMessage
       recordRuntimeDiagnostic('api.media.backend', 'submit.error', rawMessage, 'error')
       return finish({
         result: { route: 'reject', status: 'rejected', message, stage_name: 'loading_file' },
-        ui_feedback: { severity: 'error', title: 'AI models not installed', message },
+        ui_feedback: { severity: 'error', title: modelMissing ? 'AI models not installed' : 'Analysis failed', message },
       })
     }
   }
