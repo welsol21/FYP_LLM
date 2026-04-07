@@ -51,6 +51,56 @@ async function getTranscriber(onProgress: (msg: string) => void): Promise<any> {
 // Known title abbreviations that should NOT trigger a sentence flush.
 const ABBREVS = new Set(['Mr', 'Mrs', 'Dr', 'Ms', 'Prof', 'Sr', 'Jr', 'St', 'vs', 'No'])
 
+// Bibliographic credit markers — mirror of server-side _BIBLIOGRAPHIC_MARKERS.
+const BIBLIOGRAPHIC_MARKERS = [
+  'written by', 'translated by', 'translated from', 'read by',
+  'narrated by', 'performed by', 'adapted by', 'illustrated by',
+  'edited by', 'published by', 'produced by',
+]
+
+// Common English finite-verb forms.  If any of these appear as a standalone
+// word the text is likely a real sentence, not a heading.
+const FINITE_VERB_RE = /\b(is|are|was|were|has|have|had|do|does|did|will|would|could|should|can|may|might|must|shall|'s|'re|'ve|'ll|'d)\b/i
+
+// Ordinal/cardinal words that commonly end chapter titles.
+const ORDINAL_WORD_RE = /^(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|I{1,3}|IV|VI{0,3}|VIII|IX|X)$/i
+
+/**
+ * Returns true when `buf` looks like a chapter-heading fragment that ended
+ * with a numeral or ordinal word, e.g. "The Voice of Reason 3" or
+ * "Part One".  Used to force-flush even without terminal punctuation.
+ */
+function looksLikeHeadingEnd(buf: string): boolean {
+  const words = buf.trim().split(/\s+/)
+  if (words.length < 2 || words.length > 8) return false
+  const last = words[words.length - 1]
+  if (!/^\d+$/.test(last) && !ORDINAL_WORD_RE.test(last)) return false
+  // All alpha words must be title-cased (heading convention).
+  const alphaWords = words.filter((w) => /^[a-zA-Z]/.test(w))
+  if (!alphaWords.every((w) => /^[A-Z]/.test(w))) return false
+  if (FINITE_VERB_RE.test(buf)) return false
+  return true
+}
+
+/**
+ * Returns true when `text` is a chapter heading or bibliographic credit line
+ * that should be excluded from the subtitle track.
+ * Mirrors the server-side _is_metadata_like_sentence heuristic.
+ */
+function isMetadataLike(text: string): boolean {
+  const lower = text.trim().toLowerCase()
+  if (!lower) return true
+  if (BIBLIOGRAPHIC_MARKERS.some((m) => lower.includes(m))) return true
+  // Heading-like: ≤6 alpha words, title case, no finite verb.
+  const alphaWords = text.match(/\b[a-zA-Z]+\b/g) ?? []
+  if (
+    alphaWords.length <= 6 &&
+    alphaWords.every((w) => /^[A-Z]/.test(w)) &&
+    !FINITE_VERB_RE.test(text)
+  ) return true
+  return false
+}
+
 /**
  * Groups word-level Whisper chunks into sentences.
  *
@@ -62,6 +112,11 @@ const ABBREVS = new Set(['Mr', 'Mrs', 'Dr', 'Ms', 'Prof', 'Sr', 'Jr', 'St', 'vs'
  * end_sec   = timestamp of the last word in the sentence
  * These per-sentence timestamps are non-overlapping and accurate, so the
  * backend can extract the correct source-audio slice for each sentence.
+ *
+ * Additionally:
+ * - "The Voice of Reason 3" (no period) is flushed via looksLikeHeadingEnd.
+ * - Chapter headings and bibliographic credits are filtered out afterwards.
+ * - If the filter would remove every sentence, it falls back to the unfiltered list.
  */
 function groupChunksToSentences(
   chunks: Array<{ text: string; timestamp: [number | null, number | null] }>,
@@ -70,6 +125,15 @@ function groupChunksToSentences(
   let buf = ''
   let start: number | null = null
   let end = 0
+
+  const flushBuf = (): void => {
+    const text = buf.trim()
+    if (text && start !== null) {
+      sentences.push({ text, start_sec: start, end_sec: end })
+    }
+    buf = ''
+    start = null
+  }
 
   for (const chunk of chunks) {
     const word = String(chunk.text || '').trim()
@@ -82,22 +146,28 @@ function groupChunksToSentences(
     end = chunkEnd
     buf += (buf ? ' ' : '') + word
 
-    // Flush when buf ends with sentence-terminating punctuation,
-    // but NOT when the last word is a known abbreviation (Mr., Dr., etc.)
+    // Flush on sentence-terminal punctuation (skip known abbreviations).
     if (/[.!?]["'»]?\s*$/.test(buf)) {
       const lastWord = (buf.match(/([A-Za-z]+)[.!?]["'»]?\s*$/) ?? [])[1] ?? ''
       if (!ABBREVS.has(lastWord)) {
-        sentences.push({ text: buf.trim(), start_sec: start, end_sec: end })
-        buf = ''
-        start = null
+        flushBuf()
+        continue
       }
+    }
+
+    // Force-flush when the buffer looks like a heading ending with a numeral
+    // or ordinal, e.g. "The Voice of Reason 3" (Whisper omits the period).
+    if (looksLikeHeadingEnd(buf)) {
+      flushBuf()
     }
   }
 
-  if (buf.trim() && start !== null) {
-    sentences.push({ text: buf.trim(), start_sec: start, end_sec: end })
-  }
-  return sentences
+  flushBuf()
+
+  // Remove chapter headings and bibliographic credits from the subtitle list.
+  const filtered = sentences.filter((s) => !isMetadataLike(s.text))
+  // Fallback: if the filter removed everything, keep the original list.
+  return filtered.length > 0 ? filtered : sentences
 }
 
 self.addEventListener('message', async (event: MessageEvent) => {
