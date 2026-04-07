@@ -77,6 +77,7 @@ const ARTIFACT_SUFFIX: Record<string, string> = {
   'translated_audio_ru.mp3': '.mp3',
   'subtitles_en.srt': '_en.srt',
   'subtitles_bilingual.srt': '_bilingual.srt',
+  'subtitles_bilingual.ass': '_bilingual.ass',
   'subtitles_target.srt': '_target.srt',
   'media_contract.json': '_contract.json',
 }

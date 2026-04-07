@@ -52,6 +52,12 @@ body {
   gap: 10px;
 }
 
+.install-link {
+  min-width: 76px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
 .top-actions-spacer {
   width: 72px;
 }
@@ -1196,6 +1202,18 @@ button {
   .top-actions {
     width: auto;
     justify-content: flex-end;
+    gap: 6px;
+  }
+
+  .top-link {
+    padding: 8px 10px;
+    min-height: 40px;
+    font-size: 14px;
+  }
+
+  .install-link {
+    min-width: 0;
+    white-space: nowrap;
   }
 
   .top-title {

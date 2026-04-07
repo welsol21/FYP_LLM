@@ -119,6 +119,44 @@ function pushCue(blocks: string[], idx: number, startMs: number, endMs: number, 
   )
 }
 
+function assTs(ms: number): string {
+  const safe = Math.max(0, Math.floor(ms))
+  const hours = Math.floor(safe / 3600000)
+  const minutes = Math.floor((safe % 3600000) / 60000)
+  const seconds = Math.floor((safe % 60000) / 1000)
+  const centis = Math.floor((safe % 1000) / 10)
+  const p = (v: number) => String(v).padStart(2, '0')
+  return `${hours}:${p(minutes)}:${p(seconds)}.${p(centis)}`
+}
+
+function buildBilingualAss(sentences: TimedSentence[]): string {
+  const header = [
+    '[Script Info]',
+    'ScriptType: v4.00+',
+    'Collisions: Normal',
+    'PlayResX: 640',
+    'PlayResY: 360',
+    '',
+    '[V4+ Styles]',
+    'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
+    'Style: Top,DejaVu Sans,22,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,0,8,10,10,20,1',
+    'Style: Bottom,DejaVu Sans,22,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,2,0,2,10,10,20,1',
+    '',
+    '[Events]',
+    'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+  ]
+  const events: string[] = []
+  for (const row of sentences) {
+    const startMs = Math.max(0, Number(row.start_ms || 0))
+    const endMs = Math.max(startMs + 300, Number(row.end_ms || 0))
+    const textEn = String(row.text_eng || '').trim()
+    const textRu = String(row.text_ru || '').trim()
+    if (textEn) events.push(`Dialogue: 0,${assTs(startMs)},${assTs(endMs)},Top,,0,0,0,,${textEn}`)
+    if (textRu) events.push(`Dialogue: 0,${assTs(startMs)},${assTs(endMs)},Bottom,,0,0,0,,${textRu}`)
+  }
+  return [...header, ...events, ''].join('\n')
+}
+
 function buildSubtitleSrt(sentences: TimedSentence[], mode: string | undefined): string {
   const resolved = toSubtitleMode(mode)
   const blocks: string[] = []
@@ -741,7 +779,7 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
     const flags = resolveModeFlags(mode)
     const sourceExt = extensionForBlob(input.sourceBlob, input.sourceKind === 'video' ? 'mp4' : 'mp3')
     const sourceFile = `source.${sourceExt}`
-    const subtitleFile = 'subs_current.srt'
+    const subtitleFile = flags.bilingualSimultaneous ? 'subs_current.ass' : 'subs_current.srt'
     const audioFile = 'translated_audio_ru.mp3'
     const videoFile = 'translated_video_ru.mp4'
     const TARGET_RATE = 24000
@@ -908,10 +946,9 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
         : bilingualSequentialSegments.map((row) => ({ ...row, text_eng: '' }))
 
       const subtitlesEn = buildSubtitleSrt(subtitlesEnRows, 'source')
-      const subtitlesBilingual = buildSubtitleSrt(
-        subtitlesBilingualRows,
-        flags.bilingualSimultaneous ? 'bilingual_simultaneous' : 'bilingual_sequential',
-      )
+      const subtitlesBilingual = flags.bilingualSimultaneous
+        ? buildBilingualAss(subtitlesBilingualRows)
+        : buildSubtitleSrt(subtitlesBilingualRows, 'bilingual_sequential')
       const subtitlesTarget = buildSubtitleSrt(subtitlesTargetRows, 'target')
       const selectedSubtitleRows = mode === 'source'
         ? subtitlesEnRows
@@ -937,10 +974,12 @@ export async function renderTranslatedMediaArtifacts(input: RenderInput): Promis
 
       progress(input.onProgress, 'Composing video track', 74)
       await yieldToBrowser()
-      // subtitles filter (libass) uses a single filter instance reading the SRT file — avoids
-      // the ~360MB heap cost of 700+ drawtext instances each loading the font independently.
+      // subtitles filter (libass) reads the subtitle file; ASS files carry their own styles
+      // (Top/Bottom positioning) so no force_style override is needed for them.
       const vfArgs = ffmpegFontLoaded
-        ? ['-vf', `subtitles=${subtitleFile}:fontsdir=/:force_style='FontName=DejaVu Sans,FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=2,Shadow=0,MarginV=30'`]
+        ? ['-vf', flags.bilingualSimultaneous
+            ? `subtitles=${subtitleFile}:fontsdir=/`
+            : `subtitles=${subtitleFile}:fontsdir=/:force_style='FontName=DejaVu Sans,FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=2,Shadow=0,MarginV=30'`]
         : []
       console.log('[Render] subtitle filter:', vfArgs.length ? 'enabled (libass)' : 'disabled (no font)')
       const videoArgs = input.sourceKind === 'video'

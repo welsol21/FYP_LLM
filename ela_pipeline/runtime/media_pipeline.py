@@ -346,7 +346,7 @@ def _extract_text_and_sentence_chunks(
                 result_holder["result"] = model.transcribe(
                     _raw,
                     language=source_lang,
-                    word_timestamps=False,
+                    word_timestamps=True,
                     verbose=False,
                     fp16=False,
                 )
@@ -372,26 +372,52 @@ def _extract_text_and_sentence_chunks(
         result = result_holder.get("result") or {}
         if progress_callback is not None:
             progress_callback("transcribing_audio", 1.0, "ASR completed.")
-        segments: list[dict[str, Any]] = []
-        texts: list[str] = []
-        for seg in result.get("segments", []) or []:
-            text = str(seg.get("text") or "").strip()
-            if not text:
-                continue
-            start_sec = float(seg.get("start") or 0.0)
-            end_sec = float(seg.get("end") or start_sec + _estimate_sentence_duration_seconds(text))
-            segments.append(
-                {
-                    "sentence_text": text,
-                    "start_sec": start_sec,
-                    "end_sec": max(end_sec, start_sec + 0.2),
-                }
-            )
-            texts.append(text)
 
-        if not segments:
+        # Build sentence chunks using word-level timestamps (mirrors reference
+        # build_semantic_units + group_units_by_sentence).  Each sentence gets
+        # start = first-word.start, end = last-word.end so adjacent sentences
+        # never overlap and there is no bleed from neighbouring clips.
+        word_buf: list[dict[str, Any]] = []
+        sentence_chunks: list[dict[str, Any]] = []
+
+        def _flush_word_buf() -> None:
+            if not word_buf:
+                return
+            text = "".join(
+                (w["text"] if w["type"] == "symbol" else " " + w["text"])
+                for w in word_buf
+            ).strip()
+            if text:
+                sentence_chunks.append({
+                    "sentence_text": text,
+                    "start_sec": word_buf[0]["start"],
+                    "end_sec": word_buf[-1]["end"],
+                })
+            word_buf.clear()
+
+        for seg in result.get("segments", []) or []:
+            words = seg.get("words") or []
+            for w in words:
+                raw = str(w.get("word") or "").strip()
+                if not raw:
+                    continue
+                w_start = float(w.get("start") or 0.0)
+                w_end = float(w.get("end") or w_start + 0.05)
+                for tok in re.findall(r"\d+|[A-Za-zА-Яа-яЁё]+(?:'[A-Za-z]+)*|[^\w\s]", raw):
+                    tok_type = "number" if tok.isdigit() else ("word" if tok.isalpha() else "symbol")
+                    word_buf.append({"type": tok_type, "text": tok, "start": w_start, "end": w_end})
+                    if tok_type == "symbol" and tok in ".?!":
+                        _flush_word_buf()
+            # Flush at segment boundary to prevent chapter-title lines without
+            # terminal punctuation from merging with the next segment's text.
+            _flush_word_buf()
+
+        if not sentence_chunks:
             raise RuntimeError("ASR produced no transcript segments for media file.")
-        return " ".join(texts).strip(), segments
+        full_text = str(result.get("text") or "").strip() or " ".join(
+            c["sentence_text"] for c in sentence_chunks
+        )
+        return full_text, sentence_chunks
 
     return _read_text_file(source_path).strip(), []
 
@@ -501,12 +527,15 @@ class _DeepLTranslator:
     def __init__(self, auth_key: str) -> None:
         self.auth_key = auth_key
 
-    def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
+    def _client(self):
         try:
             import deepl  # type: ignore[import-not-found]
         except Exception as exc:
             raise RuntimeError("DeepL provider requires `deepl` package.") from exc
-        tr = deepl.Translator(self.auth_key)
+        return deepl.Translator(self.auth_key)
+
+    def translate_text(self, text: str, source_lang: str, target_lang: str) -> str:
+        tr = self._client()
         return str(
             tr.translate_text(
                 text,
@@ -514,6 +543,22 @@ class _DeepLTranslator:
                 target_lang=target_lang.upper(),
             ).text
         ).strip()
+
+    def translate_texts_batch(self, texts: list[str], source_lang: str, target_lang: str) -> dict[str, str]:
+        tr = self._client()
+        if not texts:
+            return {}
+        response = tr.translate_text(
+            texts,
+            source_lang=source_lang.upper(),
+            target_lang=target_lang.upper(),
+            preserve_formatting=True,
+        )
+        rows = response if isinstance(response, list) else [response]
+        out: dict[str, str] = {}
+        for source_text, row in zip(texts, rows):
+            out[source_text] = str(getattr(row, "text", "") or "").strip()
+        return out
 
 
 def _lara_locale(lang: str) -> str:
@@ -817,6 +862,11 @@ def translate_texts_with_provider(
         )
         return translated_by_casefold
     if isinstance(translator, _LaraTranslator):
+        out = translator.translate_texts_batch(unique_exact, source_lang=source_lang_resolved, target_lang=target_lang_resolved)
+        if progress_callback is not None:
+            progress_callback(len(unique_exact), len(unique_exact))
+        return out
+    if hasattr(translator, "translate_texts_batch"):
         out = translator.translate_texts_batch(unique_exact, source_lang=source_lang_resolved, target_lang=target_lang_resolved)
         if progress_callback is not None:
             progress_callback(len(unique_exact), len(unique_exact))
