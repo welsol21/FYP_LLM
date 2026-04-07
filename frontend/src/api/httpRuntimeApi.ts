@@ -441,7 +441,7 @@ function contractHasProviderTranslations(contract: VisualizerPayload | null | un
 // is invalidated only by the parameters that stage actually depends on.
 //
 //  immutableDocId  = hash(fileName | mediaPath | asrSchema)  — Whisper output
-//  contractDocId   = hash(fileName | translationProvider)    — contracts + translations
+//  contractDocId   = hash(fileName | pipelineSchema)          — contracts + all provider translations
 //  variantDocId    = hash(fileName | provider | voice | subs)— TTS audio + video + done-marker
 const SENTENCE_CACHE_SCHEMA = 'asr-word-ts-v2'
 const PIPELINE_CACHE_SCHEMA = 'media-pipeline-v2'
@@ -520,8 +520,8 @@ function parseCachedSentencesPayload(raw: string, currentMediaPath: string): Sto
   }
 }
 
-async function computeContractDocId(fileName: string, translationProvider: string): Promise<string> {
-  const input = `${fileName}|${translationProvider}|${PIPELINE_CACHE_SCHEMA}`
+async function computeContractDocId(fileName: string): Promise<string> {
+  const input = `${fileName}|${PIPELINE_CACHE_SCHEMA}`
   return await computeHashHex(input)
 }
 
@@ -960,7 +960,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       // ── Resume detection ──────────────────────────────────────────
       // Three stage-scoped IDs so each stage is invalidated only by what it depends on:
       //   immutableDocId  — Whisper output (sentences.json): file + mediaPath + ASR schema
-      //   contractDocId   — contracts + translations: file + provider
+      //   contractDocId   — contracts + translations cache: file-scoped (shared across providers)
       //   documentId      — TTS audio/video + done-marker: all settings (variant)
       // resumePoint: 'full' = run everything; 'translation' = reuse transcription+contracts;
       //              'tts' = reuse transcription+contracts+translations; 'done' = early exit
@@ -971,7 +971,7 @@ export class HttpRuntimeApi implements RuntimeApi {
         subtitlesMode: input.subtitlesMode || 'bilingual',
       }
       const immutableDocId = await computeImmutableDocId(input.fileName, input.mediaPath)
-      const contractDocId = await computeContractDocId(input.fileName, provider)
+      const contractDocId = await computeContractDocId(input.fileName)
       const documentId = await computeVariantDocId(input.fileName, docIdSettings)
       recordRuntimeDiagnostic('api.media.resume', 'docids', {
         fileName: input.fileName,
@@ -1048,16 +1048,24 @@ export class HttpRuntimeApi implements RuntimeApi {
               resumeContract = rawAnalysis.contract
               resumeSourceType = (rawAnalysis as any).sourceType ?? null
 
-              // Extract stored translations from contract nodes
+              // Reuse translation stage only if current provider already has
+              // complete sentence-level translations in cached contract.
               const translations: Record<string, string> = {}
-              for (const [key, node] of Object.entries(rawAnalysis.contract)) {
-                const active = String(node.active_translation_provider || '')
-                const t = active
-                  ? (node.translations as Record<string, { text?: string }> | undefined)?.[active]?.text
-                  : undefined
-                if (t) translations[key] = t
+              const sentenceEntries = Object.entries(rawAnalysis.contract || {})
+              let translatedSentenceCount = 0
+              for (const [key, node] of sentenceEntries) {
+                const sourceKey = String(key || '').trim()
+                if (!sourceKey) continue
+                const candidate = String(
+                  (node.translations as Record<string, { text?: string }> | undefined)?.[provider]?.text || '',
+                ).trim()
+                if (candidate && candidate.toLowerCase() !== sourceKey.toLowerCase()) {
+                  translations[key] = candidate
+                  translations[sourceKey] = candidate
+                  translatedSentenceCount += 1
+                }
               }
-              if (Object.keys(translations).length > 0) {
+              if (sentenceEntries.length > 0 && translatedSentenceCount === sentenceEntries.length) {
                 resumeTranslations = translations
                 resumePoint = 'tts'
               } else {
@@ -1469,6 +1477,7 @@ export class HttpRuntimeApi implements RuntimeApi {
       let translateError: string | null = null
       if (resumePoint === 'tts' && resumeTranslations) {
         translations = resumeTranslations
+        for (const node of Object.values(contract)) markActiveProvider(node, provider)
         log(2, 'Reusing existing translations', 100)
       } else if (providerIsOriginal) {
         // "Original only" — no translation; Russian text stays empty
