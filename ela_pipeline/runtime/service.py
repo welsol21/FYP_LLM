@@ -338,6 +338,59 @@ def _build_srt(segments: list[dict[str, Any]], *, bilingual: bool) -> str:
     return "\n".join(lines).strip() + "\n"
 
 
+def _ass_ts(total_ms: int) -> str:
+    """ASS subtitle timestamp: H:MM:SS.cc (centiseconds)."""
+    ms = max(0, int(total_ms))
+    hours = ms // 3_600_000
+    ms %= 3_600_000
+    minutes = ms // 60_000
+    ms %= 60_000
+    seconds = ms // 1_000
+    centis = (ms % 1_000) // 10
+    return f"{hours}:{minutes:02d}:{seconds:02d}.{centis:02d}"
+
+
+def _build_bilingual_ass(segments: list[dict[str, Any]]) -> str:
+    """Build ASS subtitle file: English Top-Center, Russian Bottom-Center."""
+    header = (
+        "[Script Info]\n"
+        "ScriptType: v4.00+\n"
+        "Collisions: Normal\n"
+        "PlayResX: 640\n"
+        "PlayResY: 360\n"
+        "\n"
+        "[V4+ Styles]\n"
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour,"
+        " OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut,"
+        " ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow,"
+        " Alignment, MarginL, MarginR, MarginV, Encoding\n"
+        "Style: Top,DejaVu Sans,22,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,"
+        "-1,0,0,0,100,100,0,0,1,2,0,8,10,10,20,1\n"
+        "Style: Bottom,DejaVu Sans,22,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,"
+        "-1,0,0,0,100,100,0,0,1,2,0,2,10,10,20,1\n"
+        "\n"
+        "[Events]\n"
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+    )
+    events: list[str] = []
+    for seg in segments:
+        start_ms = int(seg.get("start_ms") or 0)
+        end_ms = int(seg.get("end_ms") or 0)
+        if end_ms <= start_ms:
+            end_ms = start_ms + 1000
+        text_en = str(seg.get("text_eng") or "").strip()
+        text_ru = str(seg.get("text_ru") or "").strip()
+        if text_en:
+            events.append(
+                f"Dialogue: 0,{_ass_ts(start_ms)},{_ass_ts(end_ms)},Top,,0,0,0,,{text_en}"
+            )
+        if text_ru:
+            events.append(
+                f"Dialogue: 0,{_ass_ts(start_ms)},{_ass_ts(end_ms)},Bottom,,0,0,0,,{text_ru}"
+            )
+    return header + "\n".join(events) + "\n"
+
+
 def _translated_text_for_tts(media_sentences: list[dict[str, Any]]) -> str:
     parts: list[str] = []
     for row in media_sentences:
@@ -2384,6 +2437,11 @@ class RuntimeMediaService:
                 _build_srt(bilingual_subtitle_segments, bilingual=True),
                 encoding="utf-8",
             )
+            if bilingual_simultaneous:
+                (doc_dir / "subtitles_bilingual.ass").write_text(
+                    _build_bilingual_ass(bilingual_subtitle_segments),
+                    encoding="utf-8",
+                )
             target_rows = target_subtitle_segments if target_subtitle_segments else [{**row, "text_eng": ""} for row in timeline_segments]
             (doc_dir / "subtitles_target.srt").write_text(
                 _build_srt(target_rows, bilingual=True),
@@ -2441,12 +2499,15 @@ class RuntimeMediaService:
             voice_choice=voice_choice,
             stage_callback=stage_callback,
         )
+        _sim_modes = {"bilingual_simultaneous", "bilingual simultaneous", "simultaneous"}
         artifact_names = [
             "translated_audio_ru.mp3",
             "subtitles_bilingual.srt",
             "subtitles_en.srt",
             "subtitles_target.srt",
         ]
+        if str(subtitles_mode or "").strip().lower() in _sim_modes:
+            artifact_names.insert(1, "subtitles_bilingual.ass")
         artifacts: list[dict[str, Any]] = []
         for name in artifact_names:
             path = doc_dir / name

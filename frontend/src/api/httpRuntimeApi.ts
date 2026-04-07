@@ -1783,11 +1783,13 @@ export class HttpRuntimeApi implements RuntimeApi {
             if (needVideo) videoBlob = new Blob([getFileBytes('translated_video_ru.mp4')], { type: 'video/mp4' })
             const srtEn = new TextDecoder().decode(getFileBytes('subtitles_en.srt'))
             const srtBilingual = new TextDecoder().decode(getFileBytes('subtitles_bilingual.srt'))
+            const assBilingual = new TextDecoder().decode(getFileBytes('subtitles_bilingual.ass'))
             const srtTarget = new TextDecoder().decode(getFileBytes('subtitles_target.srt'))
             ensureNotAborted()
 
             artifactMapSrt.set('subtitles_en.srt', { name: 'subtitles_en.srt', size_bytes: srtEn.length, download_url: encodeTextArtifact('text/plain', srtEn) })
             artifactMapSrt.set('subtitles_bilingual.srt', { name: 'subtitles_bilingual.srt', size_bytes: srtBilingual.length, download_url: encodeTextArtifact('text/plain', srtBilingual) })
+            if (assBilingual.trim()) artifactMapSrt.set('subtitles_bilingual.ass', { name: 'subtitles_bilingual.ass', size_bytes: assBilingual.length, download_url: encodeTextArtifact('text/plain', assBilingual) })
             artifactMapSrt.set('subtitles_target.srt', { name: 'subtitles_target.srt', size_bytes: srtTarget.length, download_url: encodeTextArtifact('text/plain', srtTarget) })
           }
 
