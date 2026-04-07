@@ -229,6 +229,10 @@ def _group_whisper_word_chunks(result: dict[str, Any]) -> tuple[str, list[dict[s
             fallback_cursor = max(fallback_cursor, word_end, segment_end)
             if _looks_like_sentence_boundary(current_text):
                 _flush()
+        # Flush at every Whisper segment boundary so that chapter titles
+        # ("The Voice of Reason 3") — which have no terminal punctuation —
+        # become their own chunks and are correctly filtered as heading-like.
+        _flush()
 
     if not saw_words:
         return None
