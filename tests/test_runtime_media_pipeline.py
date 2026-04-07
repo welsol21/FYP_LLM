@@ -266,6 +266,56 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
             kwargs = mock_model.transcribe.call_args.kwargs
             self.assertTrue(bool(kwargs.get("word_timestamps")))
 
+    def test_audio_pipeline_units_use_whisper_word_level_timestamps(self):
+        """Units for each sentence should use actual Whisper word timestamps,
+        not evenly-distributed estimates (reference: transcribe_and_translate_windows.py)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media = Path(tmpdir) / "sample.mp3"
+            media.write_bytes(b"fake-audio")
+            mock_result = {
+                "text": "Holmes spoke. Then paused.",
+                "segments": [
+                    {
+                        "start": 0.0,
+                        "end": 2.0,
+                        "words": [
+                            {"word": "Holmes", "start": 0.10, "end": 0.50},
+                            {"word": "spoke.", "start": 0.60, "end": 0.90},
+                            {"word": "Then", "start": 1.10, "end": 1.40},
+                            {"word": "paused.", "start": 1.50, "end": 1.80},
+                        ],
+                    },
+                ],
+            }
+            with (
+                patch("ela_pipeline.runtime.media_pipeline._get_whisper_model_cached") as mock_model_factory,
+                patch("whisper.load_audio", return_value=np.zeros(32_000, dtype=np.float32)),
+                patch("ela_pipeline.runtime.media_pipeline._probe_media_duration_seconds", return_value=2.0),
+            ):
+                mock_model = mock_model_factory.return_value
+                mock_model.transcribe.return_value = mock_result
+                result = run_media_pipeline(source_path=str(media), sentence_contract_builder=self._builder)
+
+            self.assertEqual(len(result.media_sentences), 2)
+            s0_units = result.media_sentences[0]["units"]
+            s1_units = result.media_sentences[1]["units"]
+
+            # Sentence 0: "Holmes spoke." — unit timestamps must come from Whisper words
+            holmes_unit = next((u for u in s0_units if u["text"] == "Holmes"), None)
+            spoke_unit = next((u for u in s0_units if u["text"] == "spoke"), None)
+            self.assertIsNotNone(holmes_unit)
+            self.assertIsNotNone(spoke_unit)
+            self.assertAlmostEqual(holmes_unit["audio"]["origin_start"], 0.10, places=2)
+            self.assertAlmostEqual(holmes_unit["audio"]["origin_end"], 0.50, places=2)
+            self.assertAlmostEqual(spoke_unit["audio"]["origin_start"], 0.60, places=2)
+            self.assertAlmostEqual(spoke_unit["audio"]["origin_end"], 0.90, places=2)
+
+            # Sentence 1: "Then paused." — word timestamps must not bleed from sentence 0
+            then_unit = next((u for u in s1_units if u["text"] == "Then"), None)
+            self.assertIsNotNone(then_unit)
+            self.assertAlmostEqual(then_unit["audio"]["origin_start"], 1.10, places=2)
+            self.assertGreaterEqual(then_unit["audio"]["origin_start"], 1.0)
+
 
 if __name__ == "__main__":
     unittest.main()

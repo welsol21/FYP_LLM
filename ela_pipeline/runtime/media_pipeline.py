@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 import hashlib
 import os
@@ -102,6 +102,7 @@ class MediaExtractionResult:
     full_text: str
     sentence_stream: list[str]
     sentence_timeline: list[dict[str, float] | None]
+    sentence_word_timings: list[list[dict[str, Any]] | None] = field(default_factory=list)
 
 
 def _detect_source_type(path: Path) -> str:
@@ -175,16 +176,18 @@ def _group_whisper_word_chunks(result: dict[str, Any]) -> tuple[str, list[dict[s
     current_text = ""
     current_start: float | None = None
     current_end = 0.0
+    current_word_timings: list[dict[str, Any]] = []
     saw_words = False
     fallback_cursor = 0.0
 
     def _flush() -> None:
-        nonlocal current_text, current_start, current_end
+        nonlocal current_text, current_start, current_end, current_word_timings
         text = " ".join(current_text.split()).strip()
         if not text or current_start is None:
             current_text = ""
             current_start = None
             current_end = 0.0
+            current_word_timings = []
             return
         end_sec = max(current_end, current_start + 0.2)
         sentence_chunks.append(
@@ -192,12 +195,14 @@ def _group_whisper_word_chunks(result: dict[str, Any]) -> tuple[str, list[dict[s
                 "sentence_text": text,
                 "start_sec": current_start,
                 "end_sec": end_sec,
+                "word_timings": current_word_timings.copy(),
             }
         )
         sentence_texts.append(text)
         current_text = ""
         current_start = None
         current_end = 0.0
+        current_word_timings = []
 
     for segment in segments_raw:
         if not isinstance(segment, dict):
@@ -220,6 +225,7 @@ def _group_whisper_word_chunks(result: dict[str, Any]) -> tuple[str, list[dict[s
                 current_start = word_start
             current_end = max(current_end, word_end, word_start)
             current_text = _append_sentence_token(current_text, token)
+            current_word_timings.append({"text": token, "start_sec": word_start, "end_sec": word_end})
             fallback_cursor = max(fallback_cursor, word_end, segment_end)
             if _looks_like_sentence_boundary(current_text):
                 _flush()
@@ -258,6 +264,38 @@ def _tokenize_semantic_units(text: str, *, start_sec: float, end_sec: float) -> 
                 },
             }
         )
+    return out
+
+
+def _build_units_from_word_timings(
+    word_timings: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Build semantic units using actual Whisper word-level timestamps.
+
+    Follows the reference approach: each Whisper word is sub-tokenised, and all
+    sub-tokens from the same word share that word's real start/end timestamps.
+    """
+    out: list[dict[str, Any]] = []
+    uid = 1
+    for word in word_timings:
+        raw = str(word.get("text") or "").strip()
+        if not raw:
+            continue
+        w_start = float(word.get("start_sec") or 0.0)
+        w_end = float(word.get("end_sec") or w_start)
+        for tok in re.findall(r"\d+|[A-Za-zА-Яа-яЁё]+|[^\w\s]", raw, flags=re.UNICODE):
+            out.append(
+                {
+                    "id": uid,
+                    "type": "number" if tok.isdigit() else ("word" if tok.isalpha() else "symbol"),
+                    "text": tok,
+                    "audio": {
+                        "origin_start": round(w_start, 3),
+                        "origin_end": round(w_end, 3),
+                    },
+                }
+            )
+            uid += 1
     return out
 
 
@@ -1022,23 +1060,63 @@ def extract_media_text_and_sentences(
         progress_callback("translating_text", 0.04, "Splitting transcript into sentences")
     sentence_stream: list[str] = []
     sentence_timeline: list[dict[str, float] | None] = []
+    sentence_word_timings: list[list[dict[str, Any]] | None] = []
     if extracted_sentence_chunks:
-        # Keep ASR chunk timing intact for media pipeline.
-        # The 2026-02-24 backend path used Whisper segments directly here,
-        # and later subtitle/audio assembly relied on those original windows.
-        # Re-sentenceizing via spaCy shifts sentence boundaries and breaks
-        # subtitle timing in generated video.
-        for row in extracted_sentence_chunks:
-            text = str(row.get("sentence_text") or "").strip()
+        # Re-segment ASR chunks through spaCy to merge sentence fragments and
+        # apply metadata filtering (same logic as the text path).  Timing is
+        # interpolated back from the original chunk windows so subtitle/audio
+        # assembly still works.  Where a re-segmented sentence maps 1-to-1 with
+        # an original chunk we also carry forward the Whisper word-level timings.
+        raw_stream, raw_timeline = _sentenceize_timed_chunks(
+            chunks=extracted_sentence_chunks, nlp=nlp
+        )
+        if not raw_stream:
+            # Degenerate: spaCy produced nothing — fall back to raw chunks.
+            raw_stream = [str(c.get("sentence_text") or "").strip() for c in extracted_sentence_chunks]
+            raw_timeline = [
+                {"start_sec": float(c.get("start_sec") or 0.0), "end_sec": float(c.get("end_sec") or 0.0)}
+                for c in extracted_sentence_chunks
+            ]
+
+        # Build a list of (c_start, c_end, word_timings) for overlap lookups.
+        chunk_lookup = [
+            (
+                float(c.get("start_sec") or 0.0),
+                float(c.get("end_sec") or 0.0),
+                c.get("word_timings") if isinstance(c.get("word_timings"), list) and c.get("word_timings") else None,
+            )
+            for c in extracted_sentence_chunks
+        ]
+
+        fallback_stream = list(raw_stream)
+        fallback_timeline = list(raw_timeline)
+
+        for text, timing in zip(raw_stream, raw_timeline):
             if not text:
                 continue
+            doc = nlp(text)
+            if _is_metadata_like_sentence(text, doc):
+                continue
             sentence_stream.append(text)
-            sentence_timeline.append(
-                {
-                    "start_sec": float(row.get("start_sec") or 0.0),
-                    "end_sec": float(row.get("end_sec") or 0.0),
-                }
-            )
+            sentence_timeline.append(timing)
+            # Map word timings from the first original chunk that overlaps this sentence.
+            wt: list[dict[str, Any]] | None = None
+            if timing is not None:
+                s_start = float(timing.get("start_sec") or 0.0)
+                s_end = float(timing.get("end_sec") or 0.0)
+                for c_start, c_end, c_wt in chunk_lookup:
+                    if c_end > s_start and c_start < s_end and c_wt:
+                        wt = c_wt
+                        break
+            sentence_word_timings.append(wt)
+
+        if not sentence_stream:
+            for text, timing in zip(fallback_stream, fallback_timeline):
+                if not text:
+                    continue
+                sentence_stream.append(text)
+                sentence_timeline.append(timing)
+                sentence_word_timings.append(None)
     else:
         skeleton = build_skeleton(full_text, nlp)
         fallback_stream = [str(text or "").strip() for text in skeleton.keys() if str(text or "").strip()]
@@ -1051,13 +1129,16 @@ def extract_media_text_and_sentences(
                 continue
             sentence_stream.append(text_resolved)
             sentence_timeline.append(None)
+            sentence_word_timings.append(None)
         if not sentence_stream:
             if fallback_stream:
                 sentence_stream = fallback_stream
                 sentence_timeline = [None for _ in fallback_stream]
+                sentence_word_timings = [None for _ in fallback_stream]
             elif full_text:
                 sentence_stream = [full_text]
                 sentence_timeline = [None]
+                sentence_word_timings = [None]
 
     if progress_callback is not None:
         progress_callback("translating_text", 0.08, f"Prepared {len(sentence_stream)} sentences")
@@ -1067,6 +1148,7 @@ def extract_media_text_and_sentences(
         full_text=full_text,
         sentence_stream=sentence_stream,
         sentence_timeline=sentence_timeline,
+        sentence_word_timings=sentence_word_timings,
     )
 
 
@@ -1081,6 +1163,7 @@ def build_media_contracts(
     full_text = extraction.full_text
     sentence_stream = extraction.sentence_stream
     sentence_timeline = extraction.sentence_timeline
+    sentence_word_timings = extraction.sentence_word_timings or []
 
     media_sentences: list[dict[str, Any]] = []
     contract_sentences: list[dict[str, Any]] = []
@@ -1115,6 +1198,16 @@ def build_media_contracts(
             end_sec = start_sec + _estimate_sentence_duration_seconds(sentence_text_resolved)
             time_cursor_sec = end_sec + 0.2
 
+        word_timings = sentence_word_timings[idx] if idx < len(sentence_word_timings) else None
+        if word_timings:
+            eng_units = _build_units_from_word_timings(word_timings)
+        else:
+            eng_units = _tokenize_semantic_units(
+                sentence_text_resolved,
+                start_sec=start_sec,
+                end_sec=end_sec,
+            )
+
         ru_text = _extract_translation_text(sentence_node)
         media_sentences.append(
             {
@@ -1125,11 +1218,7 @@ def build_media_contracts(
                 "end_ms": int(round(end_sec * 1000)),
                 "id": idx + 1,
                 "text_eng": sentence_text_resolved,
-                "units": _tokenize_semantic_units(
-                    sentence_text_resolved,
-                    start_sec=start_sec,
-                    end_sec=end_sec,
-                ),
+                "units": eng_units,
                 "start": round(start_sec, 3),
                 "end": round(end_sec, 3),
                 "text_ru": ru_text,
