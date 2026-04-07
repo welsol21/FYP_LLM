@@ -432,6 +432,13 @@ def _extract_audio_segment_wav(*, source: Path, start_ms: int, end_ms: int, out_
         return False
     start_sec = max(0.0, float(start_ms) / 1000.0)
     end_sec = max(start_sec + 0.01, float(end_ms) / 1000.0)
+    duration_sec = end_sec - start_sec
+    # 30 ms fade-in/fade-out to eliminate click artifacts at clip boundaries.
+    fade_sec = min(0.030, duration_sec / 4)
+    fade_filter = (
+        f"afade=t=in:st=0:d={fade_sec:.3f},"
+        f"afade=t=out:st={max(0.0, duration_sec - fade_sec):.3f}:d={fade_sec:.3f}"
+    )
     try:
         subprocess.run(
             [
@@ -444,6 +451,8 @@ def _extract_audio_segment_wav(*, source: Path, start_ms: int, end_ms: int, out_
                 "-i",
                 str(source),
                 "-vn",
+                "-af",
+                fade_filter,
                 "-acodec",
                 "pcm_s16le",
                 "-ar",
