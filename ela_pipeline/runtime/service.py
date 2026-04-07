@@ -2381,7 +2381,12 @@ class RuntimeMediaService:
                 encoding="utf-8",
             )
             (doc_dir / "subtitles_bilingual.srt").write_text(
-                _build_srt(bilingual_subtitle_segments, bilingual=True),
+                # bilingual_sim: English is already in subtitles_en.srt (top position).
+                # Put only Russian here to avoid duplicating English in the bottom track.
+                _build_srt(
+                    [{**s, "text_eng": ""} for s in bilingual_subtitle_segments] if bilingual_simultaneous else bilingual_subtitle_segments,
+                    bilingual=True,
+                ),
                 encoding="utf-8",
             )
             target_rows = target_subtitle_segments if target_subtitle_segments else [{**row, "text_eng": ""} for row in timeline_segments]

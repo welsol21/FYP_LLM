@@ -403,7 +403,7 @@ def _extract_text_and_sentence_chunks(
                     continue
                 w_start = float(w.get("start") or 0.0)
                 w_end = float(w.get("end") or w_start + 0.05)
-                for tok in re.findall(r"\d+|[A-Za-zА-Яа-яЁё]+|[^\w\s]", raw):
+                for tok in re.findall(r"\d+|[A-Za-zА-Яа-яЁё]+(?:'[A-Za-z]+)*|[^\w\s]", raw):
                     tok_type = "number" if tok.isdigit() else ("word" if tok.isalpha() else "symbol")
                     word_buf.append({"type": tok_type, "text": tok, "start": w_start, "end": w_end})
                     if tok_type == "symbol" and tok in ".?!":
