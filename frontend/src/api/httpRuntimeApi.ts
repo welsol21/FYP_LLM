@@ -444,6 +444,7 @@ function contractHasProviderTranslations(contract: VisualizerPayload | null | un
 //  contractDocId   = hash(fileName | translationProvider)    — contracts + translations
 //  variantDocId    = hash(fileName | provider | voice | subs)— TTS audio + video + done-marker
 const SENTENCE_CACHE_SCHEMA = 'asr-word-ts-v2'
+const PIPELINE_CACHE_SCHEMA = 'media-pipeline-v2'
 
 type StoredSentence = { text: string; start_sec: number | null; end_sec: number | null }
 type CachedSentencesPayloadV2 = {
@@ -520,7 +521,7 @@ function parseCachedSentencesPayload(raw: string, currentMediaPath: string): Sto
 }
 
 async function computeContractDocId(fileName: string, translationProvider: string): Promise<string> {
-  const input = `${fileName}|${translationProvider}`
+  const input = `${fileName}|${translationProvider}|${PIPELINE_CACHE_SCHEMA}`
   return await computeHashHex(input)
 }
 
@@ -528,7 +529,7 @@ async function computeVariantDocId(
   fileName: string,
   settings: { translationProvider: string; voiceChoice: string; subtitlesMode: string },
 ): Promise<string> {
-  const input = `${fileName}|${settings.translationProvider}|${settings.voiceChoice}|${settings.subtitlesMode}`
+  const input = `${fileName}|${settings.translationProvider}|${settings.voiceChoice}|${settings.subtitlesMode}|${PIPELINE_CACHE_SCHEMA}`
   return await computeHashHex(input)
 }
 
