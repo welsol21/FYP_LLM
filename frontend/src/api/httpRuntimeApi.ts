@@ -1137,9 +1137,10 @@ export class HttpRuntimeApi implements RuntimeApi {
           log(1, `Extracted ${sentences.length} sentences from document`, 100)
           ensureNotAborted()
         } else {
-        const isAndroid = /android/i.test(navigator.userAgent)
-        if (isAndroid && input.mediaBlob) {
-          // Android ONNX WASM crashes with raw exception numbers — use server-side Whisper instead
+        const isTauriRuntime = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+        if (!isTauriRuntime && input.mediaBlob) {
+          // Browser PWA (desktop or Android) — always use server-side Whisper.
+          // Client-side ONNX Whisper produces unreliable word timestamps in the browser.
           log(1, 'Uploading audio for server-side transcription…', 5)
           const submitTranscribeJob = async (): Promise<string> => {
             const transcribeForm = new FormData()
