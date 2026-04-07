@@ -180,47 +180,15 @@ def _build_sentence_units_from_whisper(result: dict[str, Any]) -> tuple[str, lis
     if not isinstance(segments_raw, list) or not segments_raw:
         return None
 
-    # ── Step 1: build flat unit list ──────────────────────────────────────
-    all_units: list[dict[str, Any]] = []
-    uid = 1
-    saw_words = False
-    for segment in segments_raw:
-        if not isinstance(segment, dict):
-            continue
-        seg_start = _safe_float(segment.get("start"), 0.0)
-        seg_end = _safe_float(segment.get("end"), seg_start)
-        words = segment.get("words")
-        if not isinstance(words, list):
-            continue
-        for word in words:
-            if not isinstance(word, dict):
-                continue
-            raw = str(word.get("word") or word.get("text") or "").strip()
-            if not raw:
-                continue
-            saw_words = True
-            w_start = _safe_float(word.get("start"), seg_start)
-            w_end = _safe_float(word.get("end"), max(w_start, seg_end))
-            for tok in re.findall(r"\d+|[A-Za-zА-Яа-яЁё]+|[^\w\s]", raw, flags=re.UNICODE):
-                all_units.append(
-                    {
-                        "id": uid,
-                        "type": "number" if tok.isdigit() else ("word" if tok.isalpha() else "symbol"),
-                        "text": tok,
-                        "audio": {
-                            "origin_start": round(w_start, 3),
-                            "origin_end": round(w_end, 3),
-                        },
-                    }
-                )
-                uid += 1
-
-    if not saw_words or not all_units:
-        return None
-
-    # ── Step 2: group units into sentences by .?! ─────────────────────────
+    # ── Steps 1+2 combined: build units and group into sentences ──────────
+    # Process segment by segment so that a segment boundary also acts as a
+    # flush point.  This prevents chapter titles like "The Voice of Reason 3"
+    # (which Whisper emits without terminal punctuation) from merging with the
+    # following sentence.
     sentence_chunks: list[dict[str, Any]] = []
     buffer: list[dict[str, Any]] = []
+    uid = 1
+    saw_words = False
 
     def _flush_buffer() -> None:
         if not buffer:
@@ -239,13 +207,42 @@ def _build_sentence_units_from_whisper(result: dict[str, Any]) -> tuple[str, lis
             )
         buffer.clear()
 
-    for unit in all_units:
-        buffer.append(unit)
-        if unit["type"] == "symbol" and unit["text"] in ".?!":
-            _flush_buffer()
-    _flush_buffer()
+    for segment in segments_raw:
+        if not isinstance(segment, dict):
+            continue
+        seg_start = _safe_float(segment.get("start"), 0.0)
+        seg_end = _safe_float(segment.get("end"), seg_start)
+        words = segment.get("words")
+        if not isinstance(words, list):
+            continue
+        for word in words:
+            if not isinstance(word, dict):
+                continue
+            raw = str(word.get("word") or word.get("text") or "").strip()
+            if not raw:
+                continue
+            saw_words = True
+            w_start = _safe_float(word.get("start"), seg_start)
+            w_end = _safe_float(word.get("end"), max(w_start, seg_end))
+            for tok in re.findall(r"\d+|[A-Za-zА-Яа-яЁё]+|[^\w\s]", raw, flags=re.UNICODE):
+                buffer.append(
+                    {
+                        "id": uid,
+                        "type": "number" if tok.isdigit() else ("word" if tok.isalpha() else "symbol"),
+                        "text": tok,
+                        "audio": {
+                            "origin_start": round(w_start, 3),
+                            "origin_end": round(w_end, 3),
+                        },
+                    }
+                )
+                uid += 1
+                if buffer[-1]["type"] == "symbol" and buffer[-1]["text"] in ".?!":
+                    _flush_buffer()
+        # Flush at segment boundary — prevents unpunctuated titles from merging
+        _flush_buffer()
 
-    if not sentence_chunks:
+    if not saw_words or not sentence_chunks:
         return None
 
     full_text = str(result.get("text") or "").strip()
