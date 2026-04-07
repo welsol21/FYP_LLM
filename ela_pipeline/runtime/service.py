@@ -42,7 +42,7 @@ TRANSLATION_CONFIG_STATE_KEY = "translation_config"
 MEDIA_FILE_SETTINGS_PREFIX = "media_file_settings:"
 BACKEND_TRANSLATION_PROVIDER_KEY = "m2m100"
 MEDIA_STAGE_MANIFEST_PREFIX = "media_stage_manifest:"
-CONTRACT_BUILD_VERSION = "2026-03-04-rulesfirst-v1"
+CONTRACT_BUILD_VERSION = "2026-04-07-whisper-word-timing-v1"
 FRONTEND_INTERNAL_PROJECT_ID = "_frontend_internal_project"
 FRONTEND_INTERNAL_PROJECT_NAME = "Frontend Internal Project"
 

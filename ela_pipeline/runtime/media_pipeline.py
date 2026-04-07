@@ -1099,6 +1099,14 @@ def extract_media_text_and_sentences(
     if progress_callback is not None:
         progress_callback("translating_text", 0.08, f"Prepared {len(sentence_stream)} sentences")
 
+    # --- TEMPORARY DIAGNOSTIC LOG ---
+    print(f"[pipeline-debug] total_sentences={len(sentence_stream)}", flush=True)
+    for _i, (_txt, _tl) in enumerate(zip(sentence_stream[:10], sentence_timeline[:10])):
+        _s = round(_tl["start_sec"], 2) if _tl else None
+        _e = round(_tl["end_sec"], 2) if _tl else None
+        print(f"[pipeline-debug] [{_i}] {_s}s-{_e}s | {_txt[:80]}", flush=True)
+    # --------------------------------
+
     return MediaExtractionResult(
         source_type=source_type,
         full_text=full_text,
