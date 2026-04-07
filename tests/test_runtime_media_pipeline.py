@@ -283,6 +283,62 @@ class RuntimeMediaPipelineTests(unittest.TestCase):
             self.assertAlmostEqual(then_unit["audio"]["origin_start"], 1.10, places=2)
             self.assertGreaterEqual(then_unit["audio"]["origin_start"], 1.0)
 
+            # Sentence order: s0 must end before s1 starts
+            self.assertLessEqual(
+                result.media_sentences[0]["end_ms"],
+                result.media_sentences[1]["start_ms"],
+            )
+
+    def test_audio_pipeline_sentence_order_matches_audio_order(self):
+        """Sentences must appear in the same order as in the audio timeline."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            media = Path(tmpdir) / "sample.mp3"
+            media.write_bytes(b"fake-audio")
+            mock_result = {
+                "text": "First sentence. Second sentence. Third sentence.",
+                "segments": [
+                    {
+                        "start": 0.0,
+                        "end": 1.0,
+                        "words": [
+                            {"word": "First", "start": 0.0, "end": 0.2},
+                            {"word": "sentence.", "start": 0.2, "end": 0.9},
+                        ],
+                    },
+                    {
+                        "start": 1.1,
+                        "end": 2.2,
+                        "words": [
+                            {"word": "Second", "start": 1.1, "end": 1.5},
+                            {"word": "sentence.", "start": 1.5, "end": 2.1},
+                        ],
+                    },
+                    {
+                        "start": 2.3,
+                        "end": 3.4,
+                        "words": [
+                            {"word": "Third", "start": 2.3, "end": 2.7},
+                            {"word": "sentence.", "start": 2.7, "end": 3.3},
+                        ],
+                    },
+                ],
+            }
+            with (
+                patch("ela_pipeline.runtime.media_pipeline._get_whisper_model_cached") as mock_model_factory,
+                patch("whisper.load_audio", return_value=np.zeros(32_000, dtype=np.float32)),
+                patch("ela_pipeline.runtime.media_pipeline._probe_media_duration_seconds", return_value=3.5),
+            ):
+                mock_model = mock_model_factory.return_value
+                mock_model.transcribe.return_value = mock_result
+                result = run_media_pipeline(source_path=str(media), sentence_contract_builder=self._builder)
+
+            self.assertEqual(len(result.media_sentences), 3)
+            starts = [s["start_ms"] for s in result.media_sentences]
+            self.assertEqual(starts, sorted(starts), "Sentence start_ms must be in ascending order")
+            self.assertEqual(result.media_sentences[0]["text_eng"], "First sentence.")
+            self.assertEqual(result.media_sentences[1]["text_eng"], "Second sentence.")
+            self.assertEqual(result.media_sentences[2]["text_eng"], "Third sentence.")
+
 
 if __name__ == "__main__":
     unittest.main()
