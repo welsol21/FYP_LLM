@@ -2177,6 +2177,31 @@ class RuntimeMediaService:
                         )
                     asyncio.run(_batch_tts())
 
+                # Normalize source clip boundaries: eliminate overlaps between
+                # adjacent sentences and trim a small margin from each edge to
+                # prevent bleeding of neighbouring words (Whisper segment
+                # timestamps can span multiple sentences, causing overlap).
+                _CLIP_TRIM_MS = 80  # trim from each edge before fade
+                _normalized_boundaries: list[tuple[int, int]] = []
+                for _i, _row in enumerate(media_sentences):
+                    _s = int(_row.get("start_ms") or 0)
+                    _e = int(_row.get("end_ms") or 0)
+                    # Clamp start so it doesn't overlap the previous clip's end.
+                    if _normalized_boundaries:
+                        _prev_end = _normalized_boundaries[-1][1]
+                        if _s < _prev_end:
+                            _s = _prev_end
+                    # Clamp end so it doesn't overlap the next clip's start.
+                    if _i + 1 < len(media_sentences):
+                        _next_start = int(media_sentences[_i + 1].get("start_ms") or 0)
+                        if _e > _next_start:
+                            _e = _next_start
+                    # Trim small margin from each edge.
+                    _trim = min(_CLIP_TRIM_MS, max(0, (_e - _s) // 4))
+                    _s = _s + _trim
+                    _e = _e - _trim
+                    _normalized_boundaries.append((_s, _e))
+
                 for idx, row in enumerate(media_sentences, start=1):
                     total_segments = max(1, len(media_sentences))
                     if stage_callback is not None:
@@ -2197,8 +2222,7 @@ class RuntimeMediaService:
                     }
 
                     if include_source:
-                        start_ms_raw = int(row.get("start_ms") or 0)
-                        end_ms_raw = int(row.get("end_ms") or 0)
+                        start_ms_raw, end_ms_raw = _normalized_boundaries[idx - 1]
                         source_seg = tmp / f"src_{idx:04d}.wav"
                         if (
                             source.exists()
