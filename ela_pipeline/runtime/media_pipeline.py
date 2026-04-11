@@ -377,16 +377,18 @@ def _extract_text_and_sentence_chunks(
         # build_semantic_units + group_units_by_sentence).  Each sentence gets
         # start = first-word.start, end = last-word.end so adjacent sentences
         # never overlap and there is no bleed from neighbouring clips.
+        #
+        # Keep each Whisper word intact (no character-level re-tokenization) so
+        # that tokens like "B2C.", "It's", "el-a.uk" are preserved as-is.
+        # Flush the current sentence buffer whenever a word ends with terminal
+        # punctuation (.?!), exactly as the reference script does.
         word_buf: list[dict[str, Any]] = []
         sentence_chunks: list[dict[str, Any]] = []
 
         def _flush_word_buf() -> None:
             if not word_buf:
                 return
-            text = "".join(
-                (w["text"] if w["type"] == "symbol" else " " + w["text"])
-                for w in word_buf
-            ).strip()
+            text = " ".join(w["text"] for w in word_buf).strip()
             if text:
                 sentence_chunks.append({
                     "sentence_text": text,
@@ -403,11 +405,9 @@ def _extract_text_and_sentence_chunks(
                     continue
                 w_start = float(w.get("start") or 0.0)
                 w_end = float(w.get("end") or w_start + 0.05)
-                for tok in re.findall(r"\d+|[A-Za-zА-Яа-яЁё]+(?:'[A-Za-z]+)*|[^\w\s]", raw):
-                    tok_type = "number" if tok.isdigit() else ("word" if tok.isalpha() else "symbol")
-                    word_buf.append({"type": tok_type, "text": tok, "start": w_start, "end": w_end})
-                    if tok_type == "symbol" and tok in ".?!":
-                        _flush_word_buf()
+                word_buf.append({"text": raw, "start": w_start, "end": w_end})
+                if raw[-1] in ".?!":
+                    _flush_word_buf()
             # Flush at segment boundary to prevent chapter-title lines without
             # terminal punctuation from merging with the next segment's text.
             _flush_word_buf()
