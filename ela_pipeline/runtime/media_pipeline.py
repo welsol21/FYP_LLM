@@ -191,6 +191,13 @@ def _has_finite_verb(doc: Any) -> bool:
 
 
 def _is_heading_like(doc: Any) -> bool:
+    # Sentences that end with terminal punctuation are real sentences, not headings.
+    # Book/slide headings like "Chapter 1 Introduction" or "Slide 2 Team" don't
+    # end with a period — if the author put one there, keep the sentence.
+    text = str(doc.text).rstrip()
+    if text and text[-1] in ".?!":
+        return False
+
     alpha_tokens = [tok for tok in doc if tok.is_alpha]
     if not alpha_tokens or len(alpha_tokens) > 8:
         return False
