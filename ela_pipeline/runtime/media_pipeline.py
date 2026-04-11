@@ -254,15 +254,31 @@ def _probe_media_duration_seconds(source_path: Path) -> float:
 
 
 def _read_text_file(path: Path) -> str:
-    """Read a plain-text file, auto-detecting encoding from BOM."""
+    """Read a plain-text file, auto-detecting encoding from BOM.
+
+    CRLF line endings are normalised to LF so that spaCy sentence
+    detection is not confused by \\r\\n mid-sentence (e.g. a soft
+    line-wrap inside a paragraph in a Windows-authored .txt file).
+    """
     raw = path.read_bytes()
     if raw[:2] == b"\xff\xfe":
-        return raw.decode("utf-16-le", errors="ignore").lstrip("\ufeff")
-    if raw[:2] == b"\xfe\xff":
-        return raw.decode("utf-16-be", errors="ignore").lstrip("\ufeff")
-    if raw[:3] == b"\xef\xbb\xbf":
-        return raw[3:].decode("utf-8", errors="ignore")
-    return raw.decode("utf-8", errors="ignore")
+        text = raw.decode("utf-16-le", errors="ignore").lstrip("\ufeff")
+    elif raw[:2] == b"\xfe\xff":
+        text = raw.decode("utf-16-be", errors="ignore").lstrip("\ufeff")
+    elif raw[:3] == b"\xef\xbb\xbf":
+        text = raw[3:].decode("utf-8", errors="ignore")
+    else:
+        text = raw.decode("utf-8", errors="ignore")
+    # Normalise Windows line endings; replace lone \r with \n.
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    # A colon at the end of a line (list header) acts as a sentence terminator —
+    # replace it with a period so that spaCy treats what follows as a new sentence.
+    text = re.sub(r":\s*\n(?!\n)", ".\n\n", text)
+    # Collapse soft line-wraps (single \n within a paragraph → space).
+    text = re.sub(r"(?<!\n)\n(?!\n)", " ", text)
+    # Normalise runs of spaces/tabs to a single space.
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text
 
 
 def _extract_text_and_sentence_chunks(
@@ -958,12 +974,22 @@ def extract_media_text_and_sentences(
                 }
             )
     else:
-        skeleton = build_skeleton(full_text, nlp)
-        fallback_stream = [str(text or "").strip() for text in skeleton.keys() if str(text or "").strip()]
-        for text in skeleton.keys():
-            text_resolved = str(text).strip()
-            if not text_resolved:
+        # For text/PDF/DOCX sources run spaCy on each paragraph separately so
+        # that abbreviations like "Inc." or "Corp." at a paragraph boundary do
+        # not prevent sentence splitting.  Paragraphs are separated by \n\n in
+        # the normalised text produced by _read_text_file.
+        raw_sentences: list[str] = []
+        for para in re.split(r"\n{2,}", full_text):
+            para = para.strip()
+            if not para:
                 continue
+            para_doc = nlp(para)
+            for sent in para_doc.sents:
+                t = sent.text.strip()
+                if t:
+                    raw_sentences.append(t)
+        fallback_stream = raw_sentences[:]
+        for text_resolved in raw_sentences:
             doc = nlp(text_resolved)
             if _is_metadata_like_sentence(text_resolved, doc):
                 continue
