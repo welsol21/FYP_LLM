@@ -51,7 +51,7 @@
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 0.65rem;
-    align-items: center;
+    align-items: start;
   }
 
   .mtu-logo {
@@ -568,45 +568,47 @@
     letter-spacing: 0;
     margin-bottom: 0.18rem;
   }
-  .footer ol { margin-left: 0.65rem; }
+  .footer > div { min-width: 0; overflow-wrap: break-word; word-break: break-word; }
+  .footer ol { margin-left: 0; padding-left: 1.6rem; }
   .footer ol li { margin-bottom: 0.09rem; }
+
+  /* A1 page size — must be top-level, not inside @media print */
+  @page { size: A1 portrait; margin: 10mm; }
 
   /* PRINT STYLES */
   @media print {
-    /* 1rem = 5.74mm = 1% of A1 printable width (574mm).
-       This makes rem-based sizes physically correct at A1 print. */
-    :root { font-size: 5.5mm; }
+    /* 5.2mm per rem keeps body text ~27pt — legible at 1.5m on A1 */
+    :root { font-size: 5.2mm; }
     body { background: #fff; margin: 0; padding: 0; }
     .poster { box-shadow: none; width: 100%; }
-    @page { size: A1 portrait; margin: 10mm; }
 
-    /* Reduce whitespace only (not font sizes) so all content fits on one page */
-    .header  { padding: 0.4rem 0.7rem 0.4rem; gap: 0.5rem; }
-    .col     { padding: 0.28rem 0.3rem; gap: 0.22rem; }
-    .card    { padding: 0.28rem 0.38rem; }
-    .card h2 { padding-bottom: 0.18rem; margin-bottom: 0.28rem; }
-    .card p  { margin-bottom: 0.28rem; }
-    .card ul { margin-bottom: 0.28rem; }
-    .card ul li { margin-bottom: 0.12rem; }
-    .metric-box { padding: 0.28rem 0.38rem; margin-bottom: 0.15rem; }
+    /* Tight whitespace so all content fits on one A1 page */
+    .header  { padding: 0.35rem 0.65rem 0.35rem; gap: 0.45rem; }
+    .col     { padding: 0.22rem 0.28rem; gap: 0.18rem; }
+    .card    { padding: 0.22rem 0.35rem; }
+    .card h2 { padding-bottom: 0.14rem; margin-bottom: 0.22rem; }
+    .card p  { margin-bottom: 0.18rem; }
+    .card ul { margin-bottom: 0.18rem; }
+    .card ul li { margin-bottom: 0.09rem; }
+    .metric-box { padding: 0.22rem 0.35rem; margin-bottom: 0.12rem; }
     .pipeline   { gap: 0; }
-    .pipe-step  { padding: 0.1rem 0.28rem; }
+    .pipe-step  { padding: 0.09rem 0.22rem; }
     .pipe-arrow { font-size: 1.2rem; line-height: 1; }
-    .insight    { padding: 0.22rem 0.35rem; margin: 0.12rem 0; }
-    .principle-box { padding: 0.25rem 0.38rem; margin: 0.15rem 0; }
-    .rle-tree   { padding: 0.22rem 0.35rem; margin: 0.15rem 0; }
-    .duality-diagram { padding: 0.28rem 0.25rem; }
-    .panel-open, .panel-closed { min-height: 5rem; padding: 0.22rem; }
-    .corpus-row { margin-top: 0.18rem; }
-    .corpus-label-sm { margin-bottom: 0.05rem; }
-    .rj-2col { gap: 0.12rem 0.22rem; }
-    .future-2col { gap: 0.12rem 0.22rem; }
-    .footer  { padding: 0.28rem 0.7rem; gap: 0.7rem; }
+    .insight    { padding: 0.18rem 0.3rem; margin: 0.09rem 0; }
+    .principle-box { padding: 0.2rem 0.35rem; margin: 0.12rem 0; }
+    .rle-tree   { padding: 0.18rem 0.3rem; margin: 0.12rem 0; }
+    .duality-diagram { padding: 0.22rem 0.2rem; }
+    .panel-open, .panel-closed { min-height: 4.5rem; padding: 0.18rem; }
+    .corpus-row { margin-top: 0.14rem; }
+    .corpus-label-sm { margin-bottom: 0.04rem; }
+    .rj-2col { gap: 0.09rem 0.18rem; }
+    .future-2col { gap: 0.09rem 0.18rem; }
+    .footer  { padding: 0.22rem 0.65rem; gap: 0.65rem; }
   }
 
   /* QR codes: generated at 256px, CSS-scaled to proper vw size */
-  #qrcode canvas, #qrcode img { width: 6.5rem !important; height: 6.5rem !important; display: block; }
-  #qrcode-live canvas, #qrcode-live img { width: 9.5rem !important; height: 9.5rem !important; display: block; }
+  #qrcode canvas, #qrcode img { width: 8rem !important; height: 8rem !important; display: block; }
+  #qrcode-live canvas, #qrcode-live img { width: 8rem !important; height: 8rem !important; display: block; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
@@ -617,33 +619,25 @@
   <!-- ══════════════════ HEADER ══════════════════ -->
   <!-- MTU mandatory: logo top-left corner, next to poster title -->
   <div class="header">
-    <!-- Left stack: MTU logo top, GitHub QR bottom -->
-    <div style="display:flex;flex-direction:column;justify-content:space-between;align-items:center;gap:0.5rem;align-self:stretch">
-      <div class="mtu-logo">
-        <div class="mtu-crest">
-          <div class="crest-q crest-q1"></div>
-          <div class="crest-q crest-q2"></div>
-          <div class="crest-q crest-q3"></div>
-          <div class="crest-q crest-q4"></div>
-        </div>
-        <div class="mtu-wordmark">MTU</div>
-        <div class="mtu-full">Munster Technological<br>University</div>
+    <!-- MTU logo only — top-left per MTU poster requirements -->
+    <div class="mtu-logo">
+      <div class="mtu-crest">
+        <div class="crest-q crest-q1"></div>
+        <div class="crest-q crest-q2"></div>
+        <div class="crest-q crest-q3"></div>
+        <div class="crest-q crest-q4"></div>
       </div>
-      <div class="qr-box">
-        <div id="qrcode" style="line-height:0"></div>
-        <div style="margin-top:0.18rem;font-size:1.11rem;color:#333;line-height:1.4;word-break:break-all;width:6.5rem">
-          github.com/<wbr>welsol21/<wbr>FYP_LLM
-        </div>
-      </div>
+      <div class="mtu-wordmark">MTU</div>
+      <div class="mtu-full">Munster Technological<br>University</div>
     </div>
     <!-- Title block -->
     <div>
-      <div class="poster-title">ELA: Recursive Linguistic Elements &amp; the Context–Pattern Duality</div>
-      <div class="poster-subtitle">An AI-Assisted Framework for Authentic English Comprehension — Where does language end and pattern begin?</div>
+      <div class="poster-title">ELA: English Language Assistant</div>
+      <div class="poster-subtitle">An AI-Assisted Framework for Authentic English Comprehension Using Recursive Linguistic Annotation</div>
       <div class="poster-meta">
         <strong>Vladyslav Rastvorov</strong> (R00274535) &nbsp;·&nbsp; BSc Honours in Computer Systems<br>
-        Research Supervisor: <strong>Dr. Alex Vakaloudis</strong><br>
-        Implementation Supervisor: <strong>Prof. Nasir Ahmad</strong><br>
+        Supervisor Semester 1 (Research Phase): <strong>Dr. Alex Vakaloudis</strong><br>
+        Supervisor Semester 2 (Implementation Phase): <strong>Dr. Nasir Ahmad</strong><br>
         Department of Computer Science · Faculty of Engineering and Science ·
         <strong>Munster Technological University Cork</strong> · May 2025
       </div>
@@ -658,12 +652,8 @@
 
       <div class="card">
         <h2>Problem &amp; Motivation</h2>
-        <p>Platforms simplify authentic input. We annotate it — <strong>structure intact</strong>.</p>
-        <ul>
-          <li>Can NLP + AI explain English without simplifying it?</li>
-          <li>What recursive schema stays human-interpretable?</li>
-          <li>Does bilingual annotation scaffold comprehension?</li>
-        </ul>
+        <p>Mainstream language learning platforms present <strong>pre-simplified content</strong>, stripping the grammatical structures and vocabulary range that define authentic English. Learners are shielded from complexity rather than guided through it.</p>
+        <p>ELA annotates authentic text and speech <strong>in place — structure intact</strong> — using rule-based NLP and fine-tuned ML models. Each sentence is decomposed into a <strong>Recursive Linguistic Element (RLE)</strong> tree enriched with CEFR level, tense–aspect–mood (TAM) tags, IPA, and bilingual notes — processed fully offline, client-side, without cloud dependency.</p>
       </div>
 
       <div class="card">
@@ -791,7 +781,7 @@ Sentence<br>
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" style="flex:1">
         <h2>Training Data &amp; Corpus Scale</h2>
         <div class="corpus-row">
           <div class="corpus-name">OANC</div>
@@ -819,21 +809,31 @@ Sentence<br>
         </div>
       </div>
 
-      <div style="background:#1B2A4A;border-radius:0.28rem;padding:0.35rem 0.45rem;display:flex;align-items:center;gap:0.4rem;margin-top:auto">
-        <div style="background:#fff;padding:0.22rem;border-radius:0.15rem;flex-shrink:0;line-height:0">
-          <div id="qrcode-live"></div>
-        </div>
-        <div style="color:#fff;line-height:1.4">
-          <strong style="color:#F5C518;font-size:2.21rem">Live Demo</strong><br>
-          <span style="font-size:2.46rem;font-weight:700">www.el-a.uk</span><br>
-          <span style="color:#B0C0D8;font-size:1.35rem">Try it in your browser</span>
-        </div>
-      </div>
-
     </div><!-- /col-centre -->
 
     <!-- ─────────── RIGHT COLUMN ─────────── -->
     <div class="col col-right">
+
+      <div class="card">
+        <h2>Annotation Backend Comparison</h2>
+        <table class="comp-table">
+          <tr><th>Approach</th><th>Quality</th><th>Cost</th><th>Offline</th></tr>
+          <tr><td>GPT-4o</td><td>High</td><td>$$$</td><td><span class="cross">✗</span></td></tr>
+          <tr><td>Rules only</td><td>Medium</td><td>Free</td><td><span class="tick">✓</span></td></tr>
+          <tr class="highlight"><td><strong>T5 fine-tuned</strong></td><td><strong>High</strong></td><td><strong>Free</strong></td><td><span class="tick">✓</span></td></tr>
+          <tr><td>XGBoost CEFR</td><td>78.3%</td><td>Free</td><td><span class="tick">✓</span></td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>System Validation</h2>
+        <ul>
+          <li><strong>O1:</strong> spaCy + TAM → schema-valid RLE ✓</li>
+          <li><strong>O2:</strong> CEFR 78.3%; T5 ROUGE-L 0.81 ✓</li>
+          <li><strong>O3:</strong> Visualizer + JSON/CSV export ✓</li>
+          <li><strong>O4:</strong> Android PWA, fully client-side ✓</li>
+        </ul>
+      </div>
 
       <!-- Metrics as 3-column horizontal grid -->
       <div class="card">
@@ -855,27 +855,6 @@ Sentence<br>
             <span class="sublabel">Whisper base</span>
           </div>
         </div>
-      </div>
-
-      <div class="card">
-        <h2>Annotation Backend Comparison</h2>
-        <table class="comp-table">
-          <tr><th>Approach</th><th>Quality</th><th>Cost</th><th>Offline</th></tr>
-          <tr><td>GPT-4o</td><td>High</td><td>$$$</td><td><span class="cross">✗</span></td></tr>
-          <tr><td>Rules only</td><td>Medium</td><td>Free</td><td><span class="tick">✓</span></td></tr>
-          <tr class="highlight"><td><strong>T5 fine-tuned</strong></td><td><strong>High</strong></td><td><strong>Free</strong></td><td><span class="tick">✓</span></td></tr>
-          <tr><td>XGBoost CEFR</td><td>78.3%</td><td>Free</td><td><span class="tick">✓</span></td></tr>
-        </table>
-      </div>
-
-      <div class="card">
-        <h2>System Validation</h2>
-        <ul>
-          <li><strong>O1:</strong> spaCy + TAM → schema-valid RLE ✓</li>
-          <li><strong>O2:</strong> CEFR 78.3%; T5 ROUGE-L 0.81 ✓</li>
-          <li><strong>O3:</strong> Visualizer + JSON/CSV export ✓</li>
-          <li><strong>O4:</strong> Android PWA, fully client-side ✓</li>
-        </ul>
       </div>
 
       <div class="card">
@@ -908,6 +887,24 @@ Sentence<br>
         </div>
       </div>
 
+      <!-- Dual QR panel — pushed to column bottom -->
+      <div style="background:#1B2A4A;border-radius:0.28rem;padding:0.46rem 0.55rem;display:grid;grid-template-columns:1fr 1fr;gap:0.55rem;margin-top:auto">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:0.22rem">
+          <div style="background:#fff;padding:0.18rem;border-radius:0.12rem;line-height:0;flex-shrink:0">
+            <div id="qrcode"></div>
+          </div>
+          <div style="color:#F5C518;font-weight:700;font-size:1.35rem;text-align:center">Source Code</div>
+          <div style="color:#B0C0D8;font-size:1.11rem;text-align:center;word-break:break-all">github.com/welsol21/FYP_LLM</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:0.22rem">
+          <div style="background:#fff;padding:0.18rem;border-radius:0.12rem;line-height:0;flex-shrink:0">
+            <div id="qrcode-live"></div>
+          </div>
+          <div style="color:#F5C518;font-weight:700;font-size:1.35rem;text-align:center">Live Demo</div>
+          <div style="color:#fff;font-weight:700;font-size:1.72rem;text-align:center">www.el-a.uk</div>
+        </div>
+      </div>
+
     </div><!-- /col-right -->
 
   </div><!-- /body -->
@@ -926,7 +923,7 @@ Sentence<br>
     </div>
     <div>
       <h4>Acknowledgements</h4>
-      <p>The author sincerely thanks <strong style="color:#fff">Prof. Nasir Ahmad</strong> (Implementation Supervisor) and <strong style="color:#fff">Dr. Alex Vakaloudis</strong> (Research Supervisor) for their invaluable guidance throughout this project. Thanks to the Department of Computer Science at MTU Cork for the academic environment that made this work possible. Inspired by <em>Eleonora Rastvorova</em>.</p>
+      <p>The author sincerely thanks <strong style="color:#fff">Dr. Nasir Ahmad</strong> (Supervisor Semester 2, Implementation Phase) and <strong style="color:#fff">Dr. Alex Vakaloudis</strong> (Supervisor Semester 1, Research Phase) for their invaluable guidance throughout this project. Thanks to the Department of Computer Science at MTU Cork for the academic environment that made this work possible. Inspired by <em>Eleonora Rastvorova</em>.</p>
     </div>
   </div>
 

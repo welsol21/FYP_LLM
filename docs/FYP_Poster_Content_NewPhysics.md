@@ -70,9 +70,9 @@
 ## Header
 
 - **MTU logo** — top-left. Currently CSS-rendered (4-quadrant coloured squares + "MTU" wordmark). **Replace with official MTU file from Canvas before printing.**
-- **Title (20pt screen / ~55pt A1):** `ELA: Recursive Linguistic Elements & the Context–Pattern Duality`
-- **Subtitle (italic, amber):** `An AI-Assisted Framework for Authentic English Comprehension — Where does language end and pattern begin?`
-- **Author line (14.5pt screen / ~40pt A1):** Vladyslav Rastvorov (R00274535) · BSc Honours in Computer Systems · Research Supervisor: Dr. Alex Vakaloudis · Implementation Supervisor: Prof. Nasir Ahmad · Department of Computer Science · MTU Cork · May 2025
+- **Title (20pt screen / ~55pt A1):** `ELA: English Language Assistant`
+- **Subtitle (italic, amber):** `An AI-Assisted Framework for Authentic English Comprehension Using Recursive Linguistic Annotation`
+- **Author line (14.5pt screen / ~40pt A1):** Vladyslav Rastvorov (R00274535) · BSc Honours in Computer Systems · Supervisor Semester 1 (Research Phase): Dr. Alex Vakaloudis · Supervisor Semester 2 (Implementation Phase): Dr. Nasir Ahmad · Department of Computer Science · MTU Cork · May 2025
 - **GitHub QR code** — top-right, white box with amber border. Encodes `https://github.com/welsol21/FYP_LLM`. Label: `github.com/welsol21/FYP_LLM`.
 
 ---
