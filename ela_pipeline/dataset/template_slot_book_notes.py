@@ -330,104 +330,70 @@ def _topic_template_projection(
     return f"topic_template::{template_id.lower()}", template_text, slot_values, flags, True
 
 
+def _parametrize_note(note_text: str, slots: dict[str, Any], slot_names: list[str]) -> tuple[str, list[str]]:
+    """Replace literal quoted slot values in note_text with {{SLOT}} markers.
+
+    Only matches values that appear quoted (with " or ') in the note, so that
+    general conceptual statements without instance-specific references are left
+    unchanged and fall through to passthrough.
+    """
+    result = note_text
+    replaced: list[str] = []
+    for slot_name in slot_names:
+        val = _norm(slots.get(slot_name) or "")
+        if not val:
+            continue
+        for q in ('"', "'"):
+            quoted = f"{q}{val}{q}"
+            marker = '"{{' + slot_name + '}}"'
+            if quoted in result:
+                result = result.replace(quoted, marker, 1)
+                replaced.append(slot_name)
+                break
+    return result, replaced
+
+
 def _template_phrase_note(topic: str, note_text: str, slots: dict[str, Any]) -> tuple[str, str, list[str]]:
     topic_lower = _norm_lower(topic)
-    note_lower = _norm_lower(note_text)
     flags: list[str] = []
     shape = slots.get("RELATIVE_SHAPE") or {}
     safe_head = _safe_head_noun(slots)
 
-    if "prepositional phrase" in topic_lower and "preposition and its object" in note_lower:
-        template = 'This prepositional phrase contains the preposition "{{PREPOSITION}}" and the object "{{OBJECT_NP}}".'
-        if not slots.get("PREPOSITION"):
-            flags.append("missing_preposition_slot")
-        if not slots.get("OBJECT_NP"):
-            flags.append("missing_object_slot")
-        return "prepositional_phrase_structure", template, flags
-
-    if "prepositional phrase" in topic_lower and "noun phrases" in note_lower:
-        template = 'Here, "{{OBJECT_NP}}" functions as the object of the preposition "{{PREPOSITION}}".'
-        if not slots.get("PREPOSITION"):
-            flags.append("missing_preposition_slot")
-        if not slots.get("OBJECT_NP"):
-            flags.append("missing_object_slot")
-        return "prepositional_phrase_object", template, flags
+    if "prepositional phrase" in topic_lower:
+        template, replaced = _parametrize_note(note_text, slots, ["PREPOSITION", "OBJECT_NP"])
+        if replaced:
+            for slot in ["PREPOSITION", "OBJECT_NP"]:
+                if "{{" + slot + "}}" in template and not slots.get(slot):
+                    flags.append(f"missing_{slot.lower()}_slot")
+            return "prepositional_phrase_parametrized", template, flags
+        flags.append("no_phrase_template_rule")
+        return "phrase_passthrough", note_text, flags
 
     if "non-restrictive relative clause" in topic_lower or "non restrictive relative clause" in topic_lower:
+        template, replaced = _parametrize_note(note_text, slots, ["HEAD_NOUN", "RELATIVE_MARKER"])
+        if replaced:
+            if not safe_head and "HEAD_NOUN" in replaced:
+                flags.append("unsafe_head_noun_slot")
+            return "non_restrictive_relative_clause_parametrized", template, flags
         if shape.get("embedded_marker"):
             flags.append("embedded_relative_clause_scope")
-            return (
-                "non_restrictive_relative_clause_generic",
-                "This non-restrictive relative clause adds extra information about a noun that is already identified.",
-                flags,
-            )
-        if not (shape.get("starts_with_marker") or shape.get("starts_with_preposition_marker")):
+        elif not (shape.get("starts_with_marker") or shape.get("starts_with_preposition_marker")):
             flags.append("relative_clause_pattern_fallback")
-            return (
-                "non_restrictive_relative_clause_generic",
-                "This non-restrictive relative clause adds extra information about a noun that is already identified.",
-                flags,
-            )
-        if not safe_head:
-            flags.append("unsafe_head_noun_slot")
-            return (
-                "non_restrictive_relative_clause_generic",
-                "This non-restrictive relative clause adds extra information about a noun that is already identified.",
-                flags,
-            )
-        return (
-            "non_restrictive_relative_clause",
-            'This non-restrictive relative clause adds extra information about the noun "{{HEAD_NOUN}}".',
-            flags,
-        )
+        flags.append("no_phrase_template_rule")
+        return "phrase_passthrough", note_text, flags
 
     if "restrictive relative clause" in topic_lower or "relative clause" in topic_lower:
-        if "preposition + whom/which" in note_lower:
-            if not shape.get("starts_with_preposition_marker"):
-                flags.append("relative_clause_pattern_fallback")
-                return (
-                    "relative_clause_preposition_marker_generic",
-                    "This relative clause uses a preposition together with a relative marker.",
-                    flags,
-                )
-            template = 'This pattern uses "{{PREPOSITION}}" + "{{RELATIVE_MARKER}}" in the relative clause.'
-            if not slots.get("PREPOSITION"):
-                flags.append("missing_preposition_slot")
-            if not slots.get("RELATIVE_MARKER"):
-                flags.append("missing_relative_marker_slot")
-            if flags:
-                return (
-                    "relative_clause_preposition_marker_generic",
-                    "This relative clause uses a preposition together with a relative marker.",
-                    flags,
-                )
-            return "relative_clause_preposition_marker", template, flags
+        template, replaced = _parametrize_note(note_text, slots, ["HEAD_NOUN", "PREPOSITION", "RELATIVE_MARKER"])
+        if replaced:
+            if not safe_head and "HEAD_NOUN" in replaced:
+                flags.append("unsafe_head_noun_slot")
+            return "relative_clause_parametrized", template, flags
         if shape.get("embedded_marker"):
             flags.append("embedded_relative_clause_scope")
-            return (
-                "relative_clause_modifier_generic",
-                "This phrase contains a relative clause that adds information about a noun in the sentence.",
-                flags,
-            )
-        if not (shape.get("starts_with_marker") or shape.get("starts_with_preposition_marker")):
+        elif not (shape.get("starts_with_marker") or shape.get("starts_with_preposition_marker")):
             flags.append("relative_clause_pattern_fallback")
-            return (
-                "relative_clause_modifier_generic",
-                "This relative clause gives more information about a noun in the sentence.",
-                flags,
-            )
-        if not safe_head:
-            flags.append("unsafe_head_noun_slot")
-            return (
-                "relative_clause_modifier_generic",
-                "This relative clause gives more information about a noun in the sentence.",
-                flags,
-            )
-        return (
-            "relative_clause_modifier",
-            'This relative clause gives more information about the noun "{{HEAD_NOUN}}".',
-            flags,
-        )
+        flags.append("no_phrase_template_rule")
+        return "phrase_passthrough", note_text, flags
 
     flags.append("no_phrase_template_rule")
     return "phrase_passthrough", note_text, flags
