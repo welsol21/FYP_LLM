@@ -331,11 +331,16 @@ def _topic_template_projection(
 
 
 def _parametrize_note(note_text: str, slots: dict[str, Any], slot_names: list[str]) -> tuple[str, list[str]]:
-    """Replace literal quoted slot values in note_text with {{SLOT}} markers.
+    """Replace contract field values found in note_text with {{SLOT}} markers.
 
-    Only matches values that appear quoted (with " or ') in the note, so that
-    general conceptual statements without instance-specific references are left
-    unchanged and fall through to passthrough.
+    Matching strategy:
+    - Quoted form first ("for", 'for') — highest precision, always tried.
+    - Multi-word values (OBJECT_NP, HEAD_NOUN etc.): word-boundary match in
+      running prose — safe because multi-word phrases rarely appear by accident.
+    - Single-word values (PREPOSITION, RELATIVE_MARKER etc.): bare match only
+      in book notation context — the value appears adjacent to "/" or "+"
+      (e.g. "who/that", "preposition + whom"). Avoids replacing common words
+      that appear as ordinary grammar in general conceptual statements.
     """
     result = note_text
     replaced: list[str] = []
@@ -343,13 +348,42 @@ def _parametrize_note(note_text: str, slots: dict[str, Any], slot_names: list[st
         val = _norm(slots.get(slot_name) or "")
         if not val:
             continue
+        is_multiword = len(val.split()) > 1
+        marker_quoted = '"{{' + slot_name + '}}"'
+        marker_bare = "{{" + slot_name + "}}"
+
+        # Quoted form (highest precision — always tried first)
+        matched = False
         for q in ('"', "'"):
             quoted = f"{q}{val}{q}"
-            marker = '"{{' + slot_name + '}}"'
             if quoted in result:
-                result = result.replace(quoted, marker, 1)
+                result = result.replace(quoted, marker_quoted, 1)
                 replaced.append(slot_name)
+                matched = True
                 break
+
+        if matched:
+            continue
+
+        if is_multiword:
+            # Multi-word value: safe to use word-boundary match in running prose
+            pattern = re.compile(r"(?<!\w)" + re.escape(val) + r"(?!\w)", re.IGNORECASE)
+            new_result, n = pattern.subn(marker_bare, result, count=1)
+            if n:
+                result = new_result
+                replaced.append(slot_name)
+        else:
+            # Single-word value: only match in notation context (adjacent to / or +)
+            pattern = re.compile(
+                r"(?<![a-zA-Z])" + re.escape(val) + r"(?=/)"  # val/…
+                r"|(?<=/)" + re.escape(val) + r"(?![a-zA-Z])"  # /val
+                r"|(?<=\+\s)" + re.escape(val) + r"(?![a-zA-Z])",  # + val
+                re.IGNORECASE,
+            )
+            new_result, n = pattern.subn(marker_bare, result, count=1)
+            if n:
+                result = new_result
+                replaced.append(slot_name)
     return result, replaced
 
 
@@ -464,18 +498,6 @@ def _template_row(row: dict[str, Any], nlp: Any) -> tuple[dict[str, Any], list[s
 
     slots = _slot_values(sentence_node, target_node, context)
     template_kind, note_template, template_flags = _template_phrase_note(topic, note_text, slots)
-    if template_kind == "phrase_passthrough":
-        generic_kind, generic_template, generic_slots, generic_flags, generic_templated = _topic_template_projection(
-            node_type="phrase",
-            topic=topic,
-            sentence_text=sentence_text,
-            phrase_context=context,
-        )
-        if generic_templated and generic_template:
-            template_kind = generic_kind
-            note_template = generic_template
-            slots = {**slots, **generic_slots}
-            template_flags = template_flags + generic_flags
     projection.update(
         {
             "template_kind": template_kind,
