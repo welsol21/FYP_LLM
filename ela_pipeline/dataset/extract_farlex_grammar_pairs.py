@@ -72,6 +72,13 @@ _TOPIC_HEADINGS: dict[str, str] = {
     "negative interrogative sentences": "questions_and_negatives",
     "question tags": "question_tags",
     "wh-questions": "wh_question",
+    # Phrases (syntax section)
+    "noun phrases": "noun_phrase",
+    "adjective phrases": "adjective_phrase",
+    "adverbial phrases": "adverb_phrase",
+    "participle phrases": "participle_phrase",
+    "absolute phrases": "absolute_phrase",
+    "verb phrases": "verb_phrase",
 }
 
 # Lines that signal end of a useful section
@@ -166,6 +173,17 @@ def extract_farlex_pairs(text: str, source_path: str) -> list[dict[str, Any]]:
 
     current_heading = ""
     current_topic = ""
+    definition_lines: list[str] = []
+    definition_locked = False  # True once we've seen the first bullet (stop adding prose)
+
+    _TRAILING_EXAMPLE_RE = re.compile(r"\s*[;,.]?\s*[Ff]or example[:\.]?\s*$|\s*[Ee]xamples?[:\.]?\s*$|\s*[Ff]or instance[:\.]?\s*$")
+
+    def _current_definition() -> str:
+        text = " ".join(definition_lines).strip()
+        text = _TRAILING_EXAMPLE_RE.sub(".", text).strip()
+        if text and text[-1] not in ".!?":
+            text += "."
+        return text
 
     for idx, line in enumerate(lines):
         line_no = idx + 1
@@ -176,11 +194,13 @@ def extract_farlex_pairs(text: str, source_path: str) -> list[dict[str, Any]]:
         if _is_stop(line):
             continue
 
-        # Detect new topic section
+        # Detect new topic section — reset definition buffer
         topic_key = _is_topic_heading(line)
         if topic_key:
             current_heading = line
             current_topic = topic_key
+            definition_lines = []
+            definition_locked = False
             continue
 
         if not current_topic:
@@ -195,6 +215,7 @@ def extract_farlex_pairs(text: str, source_path: str) -> list[dict[str, Any]]:
             continue
 
         if line.startswith("•") or line.startswith("✔"):
+            definition_locked = True  # prose after first bullet belongs to next entry
             sentence = _extract_sentence(line)
             if not sentence:
                 continue
@@ -202,16 +223,22 @@ def extract_farlex_pairs(text: str, source_path: str) -> list[dict[str, Any]]:
             if key in seen_sentences:
                 continue
             seen_sentences.add(key)
+            definition = _current_definition()
             pairs.append(
                 {
                     "topic_key": current_topic,
                     "context_text": sentence,
-                    "notation_text": current_heading,
+                    "notation_text": definition if definition else current_heading,
                     "entry_head": current_heading,
                     "source_path": source_path,
                     "pair_method": "farlex_bullet_v1",
                 }
             )
+            continue
+
+        # Prose line — accumulate as definition if not yet locked
+        if not definition_locked and line and not _PAGE_NUM_RE.fullmatch(line):
+            definition_lines.append(line)
 
     return pairs
 

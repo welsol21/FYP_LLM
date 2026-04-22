@@ -39,7 +39,7 @@ def save_json(path: str, payload: Dict) -> None:
 def _validate_processed_rows(rows: List[Dict[str, str]], split: str) -> None:
     if not rows:
         raise ValueError(f"{split} dataset is empty")
-    required_fields = {"input", "target", "level", "tam_bucket", "prompt_template_version"}
+    required_fields = {"input", "target", "prompt_template_version"}
     for idx, row in enumerate(rows[:200]):
         missing = required_fields.difference(row.keys())
         if missing:
@@ -58,9 +58,11 @@ def _validate_processed_freshness(train_path: str, dev_path: str) -> Dict:
         raise ValueError(f"Missing processed stats file: {stats_path}")
     with open(stats_path, "r", encoding="utf-8") as f:
         stats = json.load(f)
-    if stats.get("prompt_template_version") != "v1":
+    allowed_versions = {"v1", "contract_template_v2", "book_pairs_v1", "rle_v1"}
+    if stats.get("prompt_template_version") not in allowed_versions:
         raise ValueError("Incompatible processed stats: unexpected prompt_template_version")
-    if int(stats.get("total_after_balance", 0)) <= 0:
+    total = int(stats.get("total_after_balance") or stats.get("total") or 0)
+    if total <= 0:
         raise ValueError("Processed stats indicate zero training rows")
     return stats
 

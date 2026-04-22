@@ -54,12 +54,28 @@ LGSWE_1999_CONFIG = HandbookAdapterConfig(
             "passive voice",
             "passives across syntactic positions",
         ),
+        "progressive": (
+            "progressive aspect:",
+            "progressive aspect",
+        ),
+        "perfect": (
+            "perfect aspect",
+            "perfect aspect:",
+        ),
+        "noun_phrase": (
+            "noun phrases",
+        ),
+        "verb_phrase": (
+            "verb phrases",
+        ),
     },
     max_follow_blocks=3,
     min_start_line=7000,
     require_example_signal=False,
     max_block_chars=3800,
     topic_min_start_lines={
+        "noun_phrase": 9100,
+        "verb_phrase": 9300,
         "modal": 7700,
         "prepositions": 7700,
         "prepositional_phrases": 9500,
@@ -67,6 +83,8 @@ LGSWE_1999_CONFIG = HandbookAdapterConfig(
         "passive_voice": 12900,
         "conditional_sentences": 14500,
         "relative_clauses": 15600,
+        "progressive": 33000,
+        "perfect": 35300,
         "that_clause": 48300,
     },
 )

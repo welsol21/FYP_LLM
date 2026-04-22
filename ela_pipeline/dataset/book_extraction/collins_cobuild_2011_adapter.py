@@ -49,12 +49,32 @@ COLLINS_COBUILD_2011_CONFIG = HandbookAdapterConfig(
             "using the passive",
             "the passive",
         ),
+        "progressive": (
+            "the present progressive",
+            "actions in progress in the past: the past progressive",
+            "past progressive",
+            "future progressive",
+        ),
+        "perfect": (
+            "the past in relation to the present: the present perfect",
+            "present perfect",
+            "past perfect",
+            "future perfect",
+        ),
+        "noun_phrase": (
+            "noun phrases",
+        ),
+        "verb_phrase": (
+            "verb phrases",
+        ),
     },
     max_follow_blocks=3,
-    min_start_line=19000,
+    min_start_line=17000,
     require_example_signal=False,
     max_block_chars=3600,
     topic_min_start_lines={
+        "progressive": 17300,
+        "perfect": 17500,
         "question_tags": 19530,
         "modal": 20700,
         "prepositional_phrases": 22040,
@@ -63,6 +83,8 @@ COLLINS_COBUILD_2011_CONFIG = HandbookAdapterConfig(
         "relative_clauses": 28170,
         "that_clause": 28580,
         "passive_voice": 29770,
+        "noun_phrase": 34700,
+        "verb_phrase": 34700,
     },
 )
 

@@ -50,6 +50,20 @@ GSWE_CONFIG = HandbookAdapterConfig(
             "passives",
             "passive voice",
         ),
+        "progressive": (
+            "progressive aspect:",
+            "progressive aspect",
+        ),
+        "perfect": (
+            "perfect aspect",
+            "perfect aspect:",
+        ),
+        "noun_phrase": (
+            "noun phrases",
+        ),
+        "verb_phrase": (
+            "verb phrases",
+        ),
     },
     max_follow_blocks=3,
     min_start_line=5900,
@@ -59,11 +73,15 @@ GSWE_CONFIG = HandbookAdapterConfig(
         "modal": 5960,
         "prepositions": 5990,
         "prepositional_phrases": 8090,
-        "conditional_sentences": 60610,
+        "noun_phrase": 7600,
+        "verb_phrase": 7800,
         "relative_clauses": 14640,
         "question_tags": 15539,
+        "progressive": 32700,
+        "perfect": 35200,
         "that_clause": 48047,
         "passive_voice": 68261,
+        "conditional_sentences": 60610,
     },
 )
 

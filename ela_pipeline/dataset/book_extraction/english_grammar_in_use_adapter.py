@@ -36,10 +36,18 @@ def _infer_topic_key(title: str) -> str:
         return "passive_voice"
     if lowered.startswith("if ") or lowered.startswith("wish") or " if " in f" {lowered} ":
         return "conditional_sentences"
+    if "present perfect" in lowered or "past perfect" in lowered or "perfect continuous" in lowered:
+        return "perfect"
+    if "present continuous" in lowered or "past continuous" in lowered or "progressive" in lowered:
+        return "progressive"
     if lowered.startswith("can") or lowered.startswith("could") or lowered.startswith("must") or lowered.startswith("may") or lowered.startswith("might") or lowered.startswith("should") or lowered.startswith("would"):
         return "modal"
     if lowered.startswith("preposition") or "preposition" in lowered:
         return "prepositions"
+    if "noun phrase" in lowered:
+        return "noun_phrase"
+    if "verb phrase" in lowered:
+        return "verb_phrase"
     return ""
 
 
