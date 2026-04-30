@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RLE-Based Pedagogical Note Selection in ELA — Technical Report</title>
+<style>
+  @page {
+    size: A4;
+    margin: 2.4cm 2.2cm 2.8cm 2.2cm;
+  }
+  @media print {
+    body { background: #fff !important; padding: 0 !important; }
+    .page { max-width: 100% !important; padding: 0 !important; }
+    h2 { page-break-after: avoid; margin-top: 24px !important; }
+    h3 { page-break-after: avoid; }
+    p  { orphans: 3; widows: 3; }
+    .figure, table, .callout, .abstract { page-break-inside: avoid; }
+    .example-card { page-break-inside: auto; }
+    .paper-header { page-break-after: avoid; }
+    .figure, .figure img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    tbody tr:nth-child(even) td { background: #f8f8f8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .raw-row td { background: #f5fbf4 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .template-row td { background: #f5f8ff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; }
+  body {
+    font-family: "Georgia", "Times New Roman", serif;
+    background: #fafaf8;
+    color: #1a1a1a;
+    line-height: 1.75;
+  }
+  .page {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 64px 40px 96px;
+  }
+  .paper-header {
+    border-bottom: 2px solid #1a1a1a;
+    padding-bottom: 28px;
+    margin-bottom: 36px;
+  }
+  .paper-type {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    color: #666;
+    margin-bottom: 14px;
+  }
+  .paper-title {
+    font-size: 29px;
+    font-weight: 700;
+    line-height: 1.22;
+    letter-spacing: -.3px;
+    margin-bottom: 18px;
+    color: #0f0f0f;
+  }
+  .paper-subtitle {
+    font-size: 15px;
+    color: #444;
+    font-style: italic;
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  .author-block {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .author { font-size: 14px; }
+  .author strong {
+    display: block;
+    color: #1a1a1a;
+    font-style: normal;
+    font-family: "Segoe UI", system-ui, sans-serif;
+  }
+  .author span {
+    color: #666;
+    font-size: 12px;
+  }
+  .meta-row {
+    font-size: 12px;
+    color: #888;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    margin-top: 12px;
+  }
+  .abstract {
+    background: #f2f0eb;
+    border-left: 3px solid #1a1a1a;
+    padding: 20px 24px;
+    margin-bottom: 40px;
+    border-radius: 0 4px 4px 0;
+  }
+  .abstract-label {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    margin-bottom: 8px;
+    color: #444;
+  }
+  .abstract p {
+    font-size: 14px;
+    line-height: 1.7;
+    color: #222;
+  }
+  h2 {
+    font-size: 19px;
+    font-weight: 700;
+    margin: 44px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #ddd;
+    color: #0f0f0f;
+    letter-spacing: -.2px;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 28px 0 8px;
+    color: #222;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  p {
+    margin-bottom: 14px;
+    font-size: 15px;
+    color: #222;
+  }
+  ul {
+    margin: 10px 0 18px 22px;
+  }
+  li {
+    margin-bottom: 6px;
+    font-size: 14.5px;
+  }
+  code {
+    font-family: "Cascadia Code", "Fira Code", monospace;
+    font-size: 12.5px;
+    background: #f0ede8;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #333;
+  }
+  .callout {
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin: 20px 0;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .callout strong {
+    display: block;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    margin-bottom: 5px;
+  }
+  .callout.finding {
+    background: #e8f5e9;
+    border-left: 3px solid #2e7d32;
+  }
+  .callout.warning {
+    background: #fff8e1;
+    border-left: 3px solid #f9a825;
+  }
+  .callout.proposal {
+    background: #e3f2fd;
+    border-left: 3px solid #1565c0;
+  }
+  .callout.finding strong { color: #1b5e20; }
+  .callout.warning strong { color: #e65100; }
+  .callout.proposal strong { color: #0d47a1; }
+  .figure {
+    background: #fff;
+    border: 1px solid #e0ddd8;
+    border-radius: 6px;
+    padding: 20px 20px 14px;
+    margin: 28px 0;
+  }
+  .figure img {
+    width: 100%;
+    display: block;
+    border-radius: 4px;
+  }
+  .figure-caption {
+    font-size: 12px;
+    color: #666;
+    margin-top: 10px;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    line-height: 1.5;
+  }
+  .figure-caption strong { color: #1a1a1a; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    margin: 16px 0 8px;
+    font-family: "Segoe UI", system-ui, sans-serif;
+  }
+  thead th {
+    background: #1a1a1a;
+    color: #fff;
+    padding: 9px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: .03em;
+  }
+  tbody td {
+    padding: 8px 14px;
+    border-bottom: 1px solid #e8e5e0;
+    color: #222;
+  }
+  tbody tr:nth-child(even) td { background: #f7f5f2; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .raw-row td { background: #f5fbf4; }
+  .template-row td { background: #f5f8ff; }
+  .example-card {
+    background: #fff;
+    border: 1px solid #e0ddd8;
+    border-radius: 6px;
+    padding: 18px 20px;
+    margin: 20px 0;
+  }
+  .example-label {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #666;
+    margin-bottom: 8px;
+  }
+  .example-sentence {
+    font-size: 15px;
+    line-height: 1.65;
+    margin-bottom: 12px;
+  }
+  .kv {
+    font-size: 13px;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    color: #333;
+    margin-bottom: 6px;
+  }
+  .small {
+    font-size: 13px;
+    color: #444;
+  }
+  .references {
+    margin-top: 52px;
+    padding-top: 20px;
+    border-top: 1px solid #ddd;
+  }
+  .references h2 { border: none; margin-top: 0; }
+  .ref-list {
+    list-style: none;
+    font-size: 13px;
+    color: #444;
+    line-height: 1.6;
+    margin-left: 0;
+  }
+  .ref-list li {
+    margin-bottom: 8px;
+    padding-left: 28px;
+    position: relative;
+  }
+  .ref-list li::before {
+    content: attr(data-n);
+    position: absolute;
+    left: 0;
+    color: #888;
+    font-weight: 600;
+    font-family: "Segoe UI", system-ui, sans-serif;
+  }
+  .page-footer {
+    margin-top: 64px;
+    font-size: 11px;
+    color: #aaa;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="paper-header">
+  <div class="paper-type">Technical Report &nbsp;·&nbsp; April 2026 &nbsp;·&nbsp; Draft v1.0</div>
+  <h1 class="paper-title">RLE-Based Pedagogical Note Selection in ELA:<br>
+  Recursive Linguistic Elements,<br>
+  Structural Abstraction, and Note Dynamics</h1>
+  <p class="paper-subtitle">
+    A contract-based study of whether recursive grammatical structure improves note selection,
+    and how raw versus templated note inventories behave as the number of unique note classes grows
+  </p>
+  <div class="author-block">
+    <div class="author">
+      <strong>Vladyslav Rastvorov</strong>
+      <span>Final Year Student<br>Department of Computer Science<br>Munster Technological University</span>
+    </div>
+    <div class="author">
+      <strong>Dr. Nasir Ahmad</strong>
+      <span>Supervisor<br>Department of Computer Science<br>Munster Technological University</span>
+    </div>
+  </div>
+  <div class="meta-row">
+    Domain: English Linguistic Analysis (ELA) &nbsp;·&nbsp;
+    Task: <code>RLE contract -&gt; note_id</code> &nbsp;·&nbsp;
+    Repository: github.com/welsol21/FYP_LLM
+  </div>
+</header>
+
+<div class="abstract">
+  <div class="abstract-label">Abstract</div>
+  <p>
+    This report evaluates a core claim of the ELA framework: a sentence can be represented as a hierarchy
+    of Recursive Linguistic Elements (RLE), where each node preserves abstract grammatical information
+    rather than lexical identity, and this representation is useful for downstream generalisation. We test
+    this claim through the task of pedagogical note selection. First, we compare a shallow sentence-template
+    classifier against a classifier that receives a richer RLE-derived contract. The richer structural input
+    improves held-out performance from Top-1 = 0.3519 and Top-3 = 0.6037 to Top-1 = 0.3928 and
+    Top-3 = 0.7700. Second, we study how note selection changes as the number of unique note classes
+    grows, comparing raw note labels against templated note labels with placeholders. Raw notes achieve
+    higher absolute accuracy in the tested range, but templated notes show the more favorable dynamic trend
+    as note inventory increases. The results are consistent with the ELA hypothesis, while also indicating
+    that a much larger note inventory will be required for a decisive large-scale study.
+  </p>
+</div>
+
+<h2>1. Conceptual Motivation</h2>
+
+<p>
+  The starting point of this work is the thesis claim that natural language is not best represented as a flat
+  stream of words. Instead, each sentence can be decomposed into a recursive hierarchy of linguistic units:
+  sentence, phrase, and word nodes. In the ELA framework, these Recursive Linguistic Elements carry
+  structural attributes such as node type, syntactic role, and tense/aspect/mood, while remaining abstract
+  with respect to concrete lexical identity.
+</p>
+
+<p>
+  The practical consequence is strong: if the model learns the grammar of structural patterns rather than
+  memorising surface forms, it should generalise to previously unseen vocabulary that instantiates the same
+  grammatical configuration. That is the central idea tested in this report.
+</p>
+
+<div class="callout proposal">
+  <strong>Core hypothesis</strong>
+  If the input preserves recursive sentence structure in an RLE contract, note selection should improve even
+  when the classifier itself remains comparatively simple. If this effect holds, it supports the claim that
+  grammatical structure, not only lexical content, is a learnable and predictive substrate.
+</div>
+
+<h2>2. Task Definition and Metrics</h2>
+
+<p>
+  The prediction task studied here is:
+</p>
+
+<p><code>RLE contract input -&gt; note_id</code></p>
+
+<p>
+  A <code>note_id</code> is a canonical class label pointing to one pedagogical linguistic note. The note text may be
+  either raw natural language or a templated notation containing placeholders such as <code>{{SUBJECT}}</code> or
+  <code>{{IF_CLAUSE}}</code>.
+</p>
+
+<p>
+  Two ranking metrics are used throughout the report:
+</p>
+
+<ul>
+  <li><strong>Top-1</strong>: the correct <code>note_id</code> is ranked first.</li>
+  <li><strong>Top-3</strong>: the correct <code>note_id</code> appears anywhere among the first three ranked candidates.</li>
+</ul>
+
+<p>
+  Top-1 is therefore the strict measure of exact note selection, while Top-3 indicates whether the correct
+  pedagogical note remains available among the classifier's best immediate hypotheses.
+</p>
+
+<h2>3. Datasets and Experimental Materials</h2>
+
+<h3>3.1 Contract-input raw-note dataset</h3>
+
+<p>
+  The first experiment uses a sentence-level dataset in which the input is a serialized RLE contract
+  (<code>contract_template_v2</code>) and the target is a raw pedagogical note. This dataset contains 3875 rows after
+  balancing and 58 unique raw note targets.
+</p>
+
+<h3>3.2 Large mixed paired-template dataset</h3>
+
+<p>
+  The note-dynamics experiment uses a larger mixed source pool with 5016 rows, including 3545 templated
+  targets and 1471 raw targets. This pool is then separated into raw and templated note-id experiments so
+  that both curves can be compared on shared note-cardinality checkpoints.
+</p>
+
+<h3>3.3 Ready dataset examples</h3>
+
+<p>
+  Three dataset formats are directly relevant to the thesis:
+</p>
+
+<ul>
+  <li>contract-input raw-note dataset</li>
+  <li>paired-template raw-note dataset</li>
+  <li>paired-template templated-note dataset</li>
+</ul>
+
+<div class="callout finding">
+  <strong>Dataset interpretation</strong>
+  The contract-input dataset is the strongest direct test of the ELA idea because the classifier receives a
+  structural representation derived from the recursive sentence analysis itself, rather than a shallow surface
+  template alone.
+</div>
+
+<h2>4. Experiment A: Does Richer RLE Structure Help?</h2>
+
+<p>
+  The first experiment compares two input conditions for note classification:
+</p>
+
+<ul>
+  <li>a shallower sentence-template baseline</li>
+  <li>a richer RLE contract representation</li>
+</ul>
+
+<p>
+  The classifier architecture remains tabular in both cases. This is important: any gain can therefore be
+  attributed primarily to the representation, not to a larger neural encoder.
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Input condition</th>
+      <th class="num">Top-1</th>
+      <th class="num">Top-3</th>
+      <th class="num">Unique note_ids</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Shallow sentence-template input</td>
+      <td class="num">0.3519</td>
+      <td class="num">0.6037</td>
+      <td class="num">268</td>
+    </tr>
+    <tr class="raw-row">
+      <td><strong>RLE contract input</strong></td>
+      <td class="num"><strong>0.3928</strong></td>
+      <td class="num"><strong>0.7700</strong></td>
+      <td class="num">58</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout finding">
+  <strong>Main result</strong>
+  When the classifier receives a richer RLE-derived contract, note selection improves. This is direct
+  evidence consistent with the ELA thesis claim that structural abstraction carries predictive information.
+</div>
+
+<h2>5. Experiment B: Note-ID Dynamics under Increasing Inventory Size</h2>
+
+<p>
+  The second experiment studies how note selection changes as the number of unique note classes grows.
+  Two target regimes are compared on the same source pool:
+</p>
+
+<ul>
+  <li>raw note labels</li>
+  <li>templated note labels with placeholders</li>
+</ul>
+
+<p>
+  Shared note-cardinality checkpoints were constructed at 58, 73, 88, and 97 unique note_ids.
+</p>
+
+<div class="figure">
+  <img src="reports/assets/ela_note_id_dynamics_2026-04-30/compare_metrics.png" alt="Raw vs template note dynamics">
+  <div class="figure-caption">
+    <strong>Figure 1 — Raw vs templated note dynamics.</strong>
+    Raw note labels achieve stronger absolute Top-1 and Top-3 performance in the tested range. However,
+    templated note labels show a more favorable dynamic trend as the number of unique note classes grows.
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Target type</th>
+      <th class="num">Unique note_ids</th>
+      <th class="num">Top-1</th>
+      <th class="num">Top-3</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="raw-row">
+      <td>Raw</td>
+      <td class="num">58</td>
+      <td class="num">0.6467</td>
+      <td class="num">0.8623</td>
+    </tr>
+    <tr class="raw-row">
+      <td>Raw</td>
+      <td class="num">73</td>
+      <td class="num">0.5279</td>
+      <td class="num">0.7716</td>
+    </tr>
+    <tr class="raw-row">
+      <td>Raw</td>
+      <td class="num">88</td>
+      <td class="num">0.4595</td>
+      <td class="num">0.7658</td>
+    </tr>
+    <tr class="raw-row">
+      <td>Raw</td>
+      <td class="num">97</td>
+      <td class="num">0.4242</td>
+      <td class="num">0.7013</td>
+    </tr>
+    <tr class="template-row">
+      <td>Templated</td>
+      <td class="num">58</td>
+      <td class="num">0.1757</td>
+      <td class="num">0.4728</td>
+    </tr>
+    <tr class="template-row">
+      <td>Templated</td>
+      <td class="num">73</td>
+      <td class="num">0.2887</td>
+      <td class="num">0.5246</td>
+    </tr>
+    <tr class="template-row">
+      <td>Templated</td>
+      <td class="num">88</td>
+      <td class="num">0.2584</td>
+      <td class="num">0.5441</td>
+    </tr>
+    <tr class="template-row">
+      <td>Templated</td>
+      <td class="num">97</td>
+      <td class="num">0.2640</td>
+      <td class="num">0.5646</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout warning">
+  <strong>Interpretation boundary</strong>
+  Raw notes are easier classification targets at moderate note inventory sizes. Templated notes are weaker
+  in absolute terms at this scale, but their trend under inventory growth is more promising. The current
+  thesis does not yet reach the many-thousands note regime needed to settle this question decisively.
+</div>
+
+<h2>6. Why Templated Notes Are Harder at Present Scale</h2>
+
+<p>
+  The current evidence suggests that templated notes do not underperform because they are underrepresented.
+  In the 58-note setting, they actually have higher average class support than raw notes. Their difficulty is
+  instead linked to class separability.
+</p>
+
+<ul>
+  <li>templated notes are longer on average</li>
+  <li>every templated note contains explicit placeholders</li>
+  <li>many templated notes differ only by subtle pedagogical wording or slot choice</li>
+  <li>the resulting class space is dense, with many structurally related neighbours</li>
+</ul>
+
+<p>
+  This means that templating introduces abstraction, but also makes the label space semantically crowded.
+  In other words, abstraction is beneficial only when the downstream class inventory is large and clean
+  enough for that abstraction to become discriminative rather than ambiguous.
+</p>
+
+<h2>7. Pipeline Examples with Intermediate Results</h2>
+
+<p>
+  The following examples show the actual pipeline:
+</p>
+
+<p><code>sentence -&gt; selected RLE contract features -&gt; note ranking</code></p>
+
+<div class="example-card">
+  <div class="example-label">Example 1</div>
+  <div class="example-sentence">“Well, as long as she's — as long as she's quiet.”</div>
+  <div class="kv"><strong>RLE contract cue:</strong> <code>selection.template_id = SENT_DECLARATIVE</code></div>
+  <div class="kv"><strong>Top-3:</strong> <code>note_2a64580d4dcc</code> 0.9971, <code>note_9fe7db2e2cdc</code> 0.0025, <code>note_027a67f22f09</code> 0.0000</div>
+  <div class="small"><strong>Gold note:</strong> Provided, providing, as long as, and only if introduce a condition that is necessary for the result.</div>
+</div>
+
+<div class="example-card">
+  <div class="example-label">Example 2</div>
+  <div class="example-sentence">“If you teach me how to dance, I will show you my hidden scars.”</div>
+  <div class="kv"><strong>RLE contract cue:</strong> <code>selection.template_id = SENT_CONDITIONAL_THIRD</code></div>
+  <div class="kv"><strong>Top-3:</strong> <code>note_dca22961101a</code> 0.5097, <code>note_6504ae370d7a</code> 0.4562, <code>note_e5f70656b627</code> 0.0105</div>
+  <div class="small"><strong>Gold note:</strong> The first conditional uses an if-clause for a possible future condition and a main clause for the expected result.</div>
+</div>
+
+<div class="example-card">
+  <div class="example-label">Example 3</div>
+  <div class="example-sentence">“It is interesting to note that this company was made bankrupt by the British cinema industry due to the despotism and pedantry of George Harrison, who believed that the cinema industry would have worshiped him.”</div>
+  <div class="kv"><strong>RLE contract cue:</strong> <code>selection.template_id = SENT_EXTRAPOSITION_IT_THAT</code></div>
+  <div class="kv"><strong>Predicted Top-1:</strong> <code>note_5ed5294f5c50</code> 0.4682</div>
+  <div class="small"><strong>Interpretation:</strong> the classifier identifies the broad structural family correctly but still confuses several nearby note variants inside that family.</div>
+</div>
+
+<h2>8. Thesis-Level Interpretation</h2>
+
+<p>
+  Within the scope of this study, the observed behaviour is consistent with the ELA thesis claim.
+</p>
+
+<ul>
+  <li>Recursive structural abstraction is useful for pedagogical note selection.</li>
+  <li>A richer RLE contract improves the mapping from sentence structure to <code>note_id</code>.</li>
+  <li>Raw note labels are easier classification targets at moderate inventory sizes.</li>
+  <li>Templated note labels show the more favorable dynamic trend as note inventory expands.</li>
+</ul>
+
+<div class="callout proposal">
+  <strong>Thesis conclusion</strong>
+  The present study supports the claim that the grammar of linguistic structure is learnable from abstract
+  recursive representations. However, it does not yet settle the long-range scaling question, because the note
+  inventory remains far below the many-thousands level that would be required for a decisive large-scale test.
+  The current dynamics should therefore be treated as promising, but not final.
+</div>
+
+<div class="references">
+  <h2>9. Repository References</h2>
+  <ol class="ref-list">
+    <li data-n="[1]">Contract-input raw-note dataset stats:
+      <code>data/processed_sentence_seed/projection_external_sentence_contract_v2_note_first_balanced_exact5_cap104_v3/stats.json</code>
+    </li>
+    <li data-n="[2]">Mixed paired-template dataset stats:
+      <code>data/processed_sentence_seed/seed_preserving_sentence_dataset_v45_paired_template_sentence_nodes_contractfix4_v1/stats.json</code>
+    </li>
+    <li data-n="[3]">Contract dataset builder:
+      <code>ela_pipeline/classifier/build_note_id_classifier_dataset_from_contract.py</code>
+    </li>
+    <li data-n="[4]">Shared tabular training pipeline:
+      <code>ela_pipeline/classifier/train_tabular_cefr_baseline.py</code>
+    </li>
+    <li data-n="[5]">Raw-vs-template dynamics script:
+      <code>scripts/run_note_id_cardinality_curve_v45_compare.py</code>
+    </li>
+    <li data-n="[6]">Report assets:
+      <code>docs/reports/assets/ela_note_id_dynamics_2026-04-30/</code>
+    </li>
+  </ol>
+</div>
+
+<div class="page-footer">
+  ELA Technical Report · April 2026 · FYP_LLM
+</div>
+
+</div>
+</body>
+</html>

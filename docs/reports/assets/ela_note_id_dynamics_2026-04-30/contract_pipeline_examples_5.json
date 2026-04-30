@@ -1,0 +1,112 @@
+[
+  {
+    "sentence_text": "Well, as long as she's — as long as she's quiet.",
+    "template_id": "SENT_DECLARATIVE",
+    "note_text": "Provided, providing, as long as, and only if introduce a condition that is necessary for the result.",
+    "gold_note_id": "note_2a64580d4dcc",
+    "predictions": [
+      {
+        "note_id": "note_2a64580d4dcc",
+        "score": 0.9970531463623047
+      },
+      {
+        "note_id": "note_9fe7db2e2cdc",
+        "score": 0.002491429215297103
+      },
+      {
+        "note_id": "note_027a67f22f09",
+        "score": 4.489546699915081e-05
+      }
+    ],
+    "top1_correct": true,
+    "input": "task: rewrite_linguistic_note_template_from_contract_template payload: {\"allowed_slots\": [], \"audience_level\": \"intermediate\", \"context\": {\"children_summary\": {\"count\": 1, \"grammatical_role\": [\"predicate\"], \"part_of_speech\": [\"verb phrase\"], \"types\": [\"Phrase\"]}, \"depth\": 0, \"node_context\": {\"cefr_level\": \"\", \"content\": \"Well, as long as she's — as long as she's quiet.\", \"grammar_class_ids\": [], \"grammatical_role\": \"clause\", \"part_of_speech\": \"sentence\", \"tam_construction\": \"\"}, \"node_id\": null, \"node_type\": \"Sentence\", \"parent_context\": {\"content\": \"\", \"grammatical_role\": \"\", \"part_of_speech\": \"\"}, \"path_types\": [\"Sentence\"], \"sentence_context\": {\"sentence_text\": \"Well, as long as she's — as long as she's quiet.\"}, \"sibling_count\": 1, \"sibling_index\": 0}, \"deterministic_note\": \"This is a declarative sentence that makes a statement.\", \"node_level\": \"Sentence\", \"note_template_version\": \"v1\", \"prompt_template_version\": \"contract_template_v2\", \"selection\": {\"context_key_l1\": \"sentence|sentence|clause|none|generic\", \"context_key_l2\": \"sentence|sentence|clause|generic\", \"context_key_l3\": \"sentence|sentence\", \"level\": \"SEMANTIC_PRIORITY\", \"matched_key\": \"semantic::sent_declarative\", \"registry_version\": \"v1\", \"template_id\": \"SENT_DECLARATIVE\"}, \"slot_values\": {}, \"task\": \"rewrite_linguistic_note_template_from_contract_template\", \"template_id\": \"SENT_DECLARATIVE\", \"template_text\": \"This is a declarative sentence that makes a statement.\"}"
+  },
+  {
+    "sentence_text": "It is interesting to note that this company was made bankrupt by the British cinema industry due to the despotism and pedantry of George Harrison, who believed that the cinema industry would have worshiped him.",
+    "template_id": "SENT_EXTRAPOSITION_IT_THAT",
+    "note_text": "It is or It was with a time expression and a when-clause gives special emphasis to the time of an event.",
+    "gold_note_id": "note_5ed5294f5c50",
+    "predictions": [
+      {
+        "note_id": "note_5ed5294f5c50",
+        "score": 0.46822354197502136
+      },
+      {
+        "note_id": "note_a47425fe8765",
+        "score": 0.2233135998249054
+      },
+      {
+        "note_id": "note_f581bc4b4568",
+        "score": 0.09908226132392883
+      }
+    ],
+    "top1_correct": true,
+    "input": "task: rewrite_linguistic_note_template_from_contract_template payload: {\"allowed_slots\": [], \"audience_level\": \"intermediate\", \"context\": {\"children_summary\": {\"count\": 1, \"grammatical_role\": [\"predicate\"], \"part_of_speech\": [\"verb phrase\"], \"types\": [\"Phrase\"]}, \"depth\": 0, \"node_context\": {\"cefr_level\": \"\", \"content\": \"It is interesting to note that this company was made bankrupt by the British cinema industry due to the despotism and pedantry of George Harrison, who believed that the cinema industry would have worshiped him.\", \"grammar_class_ids\": [], \"grammatical_role\": \"clause\", \"part_of_speech\": \"sentence\", \"tam_construction\": \"\"}, \"node_id\": null, \"node_type\": \"Sentence\", \"parent_context\": {\"content\": \"\", \"grammatical_role\": \"\", \"part_of_speech\": \"\"}, \"path_types\": [\"Sentence\"], \"sentence_context\": {\"sentence_text\": \"It is interesting to note that this company was made bankrupt by the British cinema industry due to the despotism and pedantry of George Harrison, who believed that the cinema industry would have worshiped him.\"}, \"sibling_count\": 1, \"sibling_index\": 0}, \"deterministic_note\": \"\", \"node_level\": \"Sentence\", \"note_template_version\": \"v1\", \"prompt_template_version\": \"contract_template_v2\", \"selection\": {\"context_key_l1\": \"sentence|sentence|clause|none|generic\", \"context_key_l2\": \"sentence|sentence|clause|generic\", \"context_key_l3\": \"sentence|sentence\", \"level\": \"SEMANTIC_PRIORITY\", \"matched_key\": \"semantic::sent_extraposition_it_that\", \"registry_version\": \"v1\", \"template_id\": \"SENT_EXTRAPOSITION_IT_THAT\"}, \"slot_values\": {}, \"task\": \"rewrite_linguistic_note_template_from_contract_template\", \"template_id\": \"SENT_EXTRAPOSITION_IT_THAT\", \"template_text\": \"\"}"
+  },
+  {
+    "sentence_text": "If you teach me how to dance, I will show you my hidden scars.",
+    "template_id": "SENT_CONDITIONAL_THIRD",
+    "note_text": "The first conditional uses an if-clause for a possible future condition and a main clause for the expected result.",
+    "gold_note_id": "note_dca22961101a",
+    "predictions": [
+      {
+        "note_id": "note_dca22961101a",
+        "score": 0.5096814036369324
+      },
+      {
+        "note_id": "note_6504ae370d7a",
+        "score": 0.4561930298805237
+      },
+      {
+        "note_id": "note_e5f70656b627",
+        "score": 0.010522235184907913
+      }
+    ],
+    "top1_correct": true,
+    "input": "task: rewrite_linguistic_note_template_from_contract_template payload: {\"allowed_slots\": [], \"audience_level\": \"intermediate\", \"context\": {\"children_summary\": {\"count\": 2, \"grammatical_role\": [\"predicate\", \"predicate\"], \"part_of_speech\": [\"verb phrase\", \"verb phrase\"], \"types\": [\"Phrase\", \"Phrase\"]}, \"depth\": 0, \"node_context\": {\"cefr_level\": \"\", \"content\": \"If you teach me how to dance, I will show you my hidden scars.\", \"grammar_class_ids\": [], \"grammatical_role\": \"clause\", \"part_of_speech\": \"sentence\", \"tam_construction\": \"\"}, \"node_id\": null, \"node_type\": \"Sentence\", \"parent_context\": {\"content\": \"\", \"grammatical_role\": \"\", \"part_of_speech\": \"\"}, \"path_types\": [\"Sentence\"], \"sentence_context\": {\"sentence_text\": \"If you teach me how to dance, I will show you my hidden scars.\"}, \"sibling_count\": 1, \"sibling_index\": 0}, \"deterministic_note\": \"\", \"node_level\": \"Sentence\", \"note_template_version\": \"v1\", \"prompt_template_version\": \"contract_template_v2\", \"selection\": {\"context_key_l1\": \"sentence|sentence|clause|none|generic\", \"context_key_l2\": \"sentence|sentence|clause|generic\", \"context_key_l3\": \"sentence|sentence\", \"level\": \"SEMANTIC_PRIORITY\", \"matched_key\": \"semantic::sent_conditional_third\", \"registry_version\": \"v1\", \"template_id\": \"SENT_CONDITIONAL_THIRD\"}, \"slot_values\": {}, \"task\": \"rewrite_linguistic_note_template_from_contract_template\", \"template_id\": \"SENT_CONDITIONAL_THIRD\", \"template_text\": \"\"}"
+  },
+  {
+    "sentence_text": "It is interesting to note that this company was made bankrupt by the British cinema industry due to the despotism and pedantry of George Harrison, who believed that the cinema industry would have worshiped him.",
+    "template_id": "SENT_EXTRAPOSITION_IT_THAT",
+    "note_text": "English often uses anticipatory it and places the that-clause later in the sentence when the clause would be a heavy subject.",
+    "gold_note_id": "note_c2a1ae9b5dca",
+    "predictions": [
+      {
+        "note_id": "note_5ed5294f5c50",
+        "score": 0.46822354197502136
+      },
+      {
+        "note_id": "note_a47425fe8765",
+        "score": 0.2233135998249054
+      },
+      {
+        "note_id": "note_f581bc4b4568",
+        "score": 0.09908226132392883
+      }
+    ],
+    "top1_correct": false,
+    "input": "task: rewrite_linguistic_note_template_from_contract_template payload: {\"allowed_slots\": [], \"audience_level\": \"intermediate\", \"context\": {\"children_summary\": {\"count\": 1, \"grammatical_role\": [\"predicate\"], \"part_of_speech\": [\"verb phrase\"], \"types\": [\"Phrase\"]}, \"depth\": 0, \"node_context\": {\"cefr_level\": \"\", \"content\": \"It is interesting to note that this company was made bankrupt by the British cinema industry due to the despotism and pedantry of George Harrison, who believed that the cinema industry would have worshiped him.\", \"grammar_class_ids\": [], \"grammatical_role\": \"clause\", \"part_of_speech\": \"sentence\", \"tam_construction\": \"\"}, \"node_id\": null, \"node_type\": \"Sentence\", \"parent_context\": {\"content\": \"\", \"grammatical_role\": \"\", \"part_of_speech\": \"\"}, \"path_types\": [\"Sentence\"], \"sentence_context\": {\"sentence_text\": \"It is interesting to note that this company was made bankrupt by the British cinema industry due to the despotism and pedantry of George Harrison, who believed that the cinema industry would have worshiped him.\"}, \"sibling_count\": 1, \"sibling_index\": 0}, \"deterministic_note\": \"\", \"node_level\": \"Sentence\", \"note_template_version\": \"v1\", \"prompt_template_version\": \"contract_template_v2\", \"selection\": {\"context_key_l1\": \"sentence|sentence|clause|none|generic\", \"context_key_l2\": \"sentence|sentence|clause|generic\", \"context_key_l3\": \"sentence|sentence\", \"level\": \"SEMANTIC_PRIORITY\", \"matched_key\": \"semantic::sent_extraposition_it_that\", \"registry_version\": \"v1\", \"template_id\": \"SENT_EXTRAPOSITION_IT_THAT\"}, \"slot_values\": {}, \"task\": \"rewrite_linguistic_note_template_from_contract_template\", \"template_id\": \"SENT_EXTRAPOSITION_IT_THAT\", \"template_text\": \"\"}"
+  },
+  {
+    "sentence_text": "It is interesting to note that this company was made bankrupt by the British cinema industry due to the despotism and pedantry of George Harrison, who believed that the cinema industry would have worshiped him.",
+    "template_id": "SENT_EXTRAPOSITION_IT_THAT",
+    "note_text": "A heavy subject that-clause is often shifted to the end of the sentence, with dummy it in subject position.",
+    "gold_note_id": "note_064932365c6b",
+    "predictions": [
+      {
+        "note_id": "note_5ed5294f5c50",
+        "score": 0.46822354197502136
+      },
+      {
+        "note_id": "note_a47425fe8765",
+        "score": 0.2233135998249054
+      },
+      {
+        "note_id": "note_f581bc4b4568",
+        "score": 0.09908226132392883
+      }
+    ],
+    "top1_correct": false,
+    "input": "task: rewrite_linguistic_note_template_from_contract_template payload: {\"allowed_slots\": [], \"audience_level\": \"intermediate\", \"context\": {\"children_summary\": {\"count\": 1, \"grammatical_role\": [\"predicate\"], \"part_of_speech\": [\"verb phrase\"], \"types\": [\"Phrase\"]}, \"depth\": 0, \"node_context\": {\"cefr_level\": \"\", \"content\": \"It is interesting to note that this company was made bankrupt by the British cinema industry due to the despotism and pedantry of George Harrison, who believed that the cinema industry would have worshiped him.\", \"grammar_class_ids\": [], \"grammatical_role\": \"clause\", \"part_of_speech\": \"sentence\", \"tam_construction\": \"\"}, \"node_id\": null, \"node_type\": \"Sentence\", \"parent_context\": {\"content\": \"\", \"grammatical_role\": \"\", \"part_of_speech\": \"\"}, \"path_types\": [\"Sentence\"], \"sentence_context\": {\"sentence_text\": \"It is interesting to note that this company was made bankrupt by the British cinema industry due to the despotism and pedantry of George Harrison, who believed that the cinema industry would have worshiped him.\"}, \"sibling_count\": 1, \"sibling_index\": 0}, \"deterministic_note\": \"\", \"node_level\": \"Sentence\", \"note_template_version\": \"v1\", \"prompt_template_version\": \"contract_template_v2\", \"selection\": {\"context_key_l1\": \"sentence|sentence|clause|none|generic\", \"context_key_l2\": \"sentence|sentence|clause|generic\", \"context_key_l3\": \"sentence|sentence\", \"level\": \"SEMANTIC_PRIORITY\", \"matched_key\": \"semantic::sent_extraposition_it_that\", \"registry_version\": \"v1\", \"template_id\": \"SENT_EXTRAPOSITION_IT_THAT\"}, \"slot_values\": {}, \"task\": \"rewrite_linguistic_note_template_from_contract_template\", \"template_id\": \"SENT_EXTRAPOSITION_IT_THAT\", \"template_text\": \"\"}"
+  }
+]

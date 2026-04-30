@@ -7,6 +7,7 @@ from collections import Counter
 import json
 from pathlib import Path
 from typing import Any
+import re
 
 import joblib
 import numpy as np
@@ -19,6 +20,8 @@ from .metadata import build_classifier_metadata_from_dataset
 
 CEFR_ORDER = ("A1", "A2", "B1", "B2", "C1", "C2")
 FEATURE_PROFILES = ("full", "no_source", "runtime_stable")
+PLACEHOLDER_PATTERN = re.compile(r"\{\{([A-Z0-9_]+)\}\}")
+CONTRACT_PROMPT_RE = re.compile(r"^task:\s*(?P<task>[^ ]+)\s+payload:\s*(?P<payload>\{.*\})\s*$", re.DOTALL)
 
 
 def _load_jsonl(path: str) -> list[dict[str, Any]]:
@@ -49,8 +52,28 @@ def _safe_list(value: Any) -> list[str]:
     return [str(item).strip() for item in value if str(item).strip()]
 
 
+def _safe_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _parse_contract_prompt(text: str) -> dict[str, Any]:
+    match = CONTRACT_PROMPT_RE.match(text.strip())
+    if not match:
+        return {}
+    try:
+        payload = json.loads(match.group("payload"))
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    parsed = dict(payload)
+    parsed["task"] = str(parsed.get("task") or match.group("task") or "").strip()
+    return parsed
+
+
 def extract_tabular_features(row: dict[str, Any]) -> dict[str, Any]:
     text = str(row.get("source_text") or row.get("text") or row.get("input") or "").strip()
+    contract_payload = _parse_contract_prompt(text)
     normalized_text = " ".join(part for part in text.lower().split() if part)
     tokens = [part for part in normalized_text.split(" ") if part]
     bigrams = [f"{tokens[i]}_{tokens[i+1]}" for i in range(max(0, len(tokens) - 1))]
@@ -59,6 +82,27 @@ def extract_tabular_features(row: dict[str, Any]) -> dict[str, Any]:
     pos_signature = _safe_list(evidence.get("pos_signature"))
     grammar_classes = _safe_list(row.get("grammar_classes"))
     provenance = row.get("provenance") if isinstance(row.get("provenance"), dict) else {}
+    placeholder_names = PLACEHOLDER_PATTERN.findall(text)
+    token_counter = Counter(tokens)
+    bigram_counter = Counter(bigrams)
+    placeholder_counter = Counter(placeholder_names)
+    prompt_context = _safe_dict(contract_payload.get("context"))
+    node_context = _safe_dict(prompt_context.get("node_context"))
+    parent_context = _safe_dict(prompt_context.get("parent_context"))
+    sentence_context = _safe_dict(prompt_context.get("sentence_context"))
+    children_summary = _safe_dict(prompt_context.get("children_summary"))
+    selection = _safe_dict(contract_payload.get("selection"))
+    slot_values = _safe_dict(contract_payload.get("slot_values"))
+    path_types = _safe_list(prompt_context.get("path_types"))
+    child_types = _safe_list(children_summary.get("types"))
+    child_pos = _safe_list(children_summary.get("part_of_speech"))
+    child_roles = _safe_list(children_summary.get("grammatical_role"))
+    sentence_text = str(sentence_context.get("sentence_text") or row.get("sentence_text") or "").strip()
+    sentence_norm = " ".join(part for part in sentence_text.lower().split() if part)
+    sentence_tokens = [part for part in sentence_norm.split(" ") if part]
+    sentence_bigrams = [f"{sentence_tokens[i]}_{sentence_tokens[i+1]}" for i in range(max(0, len(sentence_tokens) - 1))]
+    sentence_token_counter = Counter(sentence_tokens)
+    sentence_bigram_counter = Counter(sentence_bigrams)
 
     feature_row: dict[str, Any] = {
         "word_count": len(text.split()),
@@ -96,11 +140,66 @@ def extract_tabular_features(row: dict[str, Any]) -> dict[str, Any]:
         "has_before_after": int(any(tok in {"before", "after"} for tok in tokens)),
         "has_if_when_while": int(any(tok in {"if", "when", "while"} for tok in tokens)),
         "ends_with_question": int(text.endswith("?")),
+        "placeholder_count": len(placeholder_names),
+        "placeholder_unique_count": len(set(placeholder_names)),
+        "placeholder_signature_join": "|".join(placeholder_names),
+        "token_signature_join": "|".join(tokens),
+        "bigram_signature_join": "|".join(bigrams),
+        "is_contract_prompt": int(bool(contract_payload)),
+        "contract_task": str(contract_payload.get("task") or "").strip().lower(),
+        "contract_prompt_template_version": str(contract_payload.get("prompt_template_version") or row.get("prompt_template_version") or "").strip().lower(),
+        "contract_node_level": str(contract_payload.get("node_level") or "").strip().lower(),
+        "contract_note_template_version": str(contract_payload.get("note_template_version") or "").strip().lower(),
+        "contract_selection_template_id": str(selection.get("template_id") or row.get("template_id") or "").strip(),
+        "contract_selection_level": str(selection.get("level") or "").strip().lower(),
+        "contract_selection_key_l1": str(selection.get("context_key_l1") or "").strip().lower(),
+        "contract_selection_key_l2": str(selection.get("context_key_l2") or "").strip().lower(),
+        "contract_selection_key_l3": str(selection.get("context_key_l3") or "").strip().lower(),
+        "contract_selection_matched_key": str(selection.get("matched_key") or "").strip().lower(),
+        "contract_allowed_slot_count": len(_safe_list(contract_payload.get("allowed_slots"))),
+        "contract_slot_value_count": len(slot_values),
+        "contract_path_depth": int(prompt_context.get("depth") or 0),
+        "contract_sibling_index": int(prompt_context.get("sibling_index") or 0),
+        "contract_sibling_count": int(prompt_context.get("sibling_count") or 0),
+        "contract_path_types_join": "|".join(path_types),
+        "contract_node_type": str(prompt_context.get("node_type") or "").strip().lower(),
+        "contract_node_pos": str(node_context.get("part_of_speech") or "").strip().lower(),
+        "contract_node_role": str(node_context.get("grammatical_role") or "").strip().lower(),
+        "contract_node_tam": str(node_context.get("tam_construction") or "").strip().lower(),
+        "contract_node_cefr": str(node_context.get("cefr_level") or "").strip().upper(),
+        "contract_node_grammar_classes_join": "|".join(_safe_list(node_context.get("grammar_class_ids"))),
+        "contract_parent_pos": str(parent_context.get("part_of_speech") or "").strip().lower(),
+        "contract_parent_role": str(parent_context.get("grammatical_role") or "").strip().lower(),
+        "contract_child_count": int(children_summary.get("count") or 0),
+        "contract_child_types_join": "|".join(child_types),
+        "contract_child_pos_join": "|".join(child_pos),
+        "contract_child_roles_join": "|".join(child_roles),
+        "sentence_word_count": len(sentence_tokens),
+        "sentence_char_count": len(sentence_text),
+        "sentence_first_token": sentence_tokens[0] if sentence_tokens else "",
+        "sentence_last_token": sentence_tokens[-1] if sentence_tokens else "",
+        "sentence_bigram_first": sentence_bigrams[0] if sentence_bigrams else "",
+        "sentence_bigram_last": sentence_bigrams[-1] if sentence_bigrams else "",
+        "has_if_in_sentence": int("if" in sentence_tokens),
+        "has_why_in_sentence": int("why" in sentence_tokens),
+        "has_that_in_sentence": int("that" in sentence_tokens),
+        "has_not_in_sentence": int("not" in sentence_tokens or "n't" in sentence_norm),
+        "has_question_mark_sentence": int(sentence_text.endswith("?")),
     }
     for idx, tok in enumerate(tokens[:8]):
         feature_row[f"tok_{idx}"] = tok
     for idx, bg in enumerate(bigrams[:6]):
         feature_row[f"bg_{idx}"] = bg
+    for tok, count in token_counter.items():
+        feature_row[f"tok_count::{tok}"] = int(count)
+    for bg, count in bigram_counter.items():
+        feature_row[f"bg_count::{bg}"] = int(count)
+    for name, count in placeholder_counter.items():
+        feature_row[f"ph_count::{name}"] = int(count)
+    for tok, count in sentence_token_counter.items():
+        feature_row[f"sent_tok_count::{tok}"] = int(count)
+    for bg, count in sentence_bigram_counter.items():
+        feature_row[f"sent_bg_count::{bg}"] = int(count)
     return feature_row
 
 
@@ -133,6 +232,51 @@ def project_feature_profile(features: dict[str, Any], *, profile: str = "full") 
             "has_passive_signal",
             "dep_signature_join",
             "pos_signature_join",
+            "placeholder_count",
+            "placeholder_unique_count",
+            "placeholder_signature_join",
+            "token_signature_join",
+            "bigram_signature_join",
+            "is_contract_prompt",
+            "contract_task",
+            "contract_prompt_template_version",
+            "contract_node_level",
+            "contract_note_template_version",
+            "contract_selection_template_id",
+            "contract_selection_level",
+            "contract_selection_key_l1",
+            "contract_selection_key_l2",
+            "contract_selection_key_l3",
+            "contract_selection_matched_key",
+            "contract_allowed_slot_count",
+            "contract_slot_value_count",
+            "contract_path_depth",
+            "contract_sibling_index",
+            "contract_sibling_count",
+            "contract_path_types_join",
+            "contract_node_type",
+            "contract_node_pos",
+            "contract_node_role",
+            "contract_node_tam",
+            "contract_node_cefr",
+            "contract_node_grammar_classes_join",
+            "contract_parent_pos",
+            "contract_parent_role",
+            "contract_child_count",
+            "contract_child_types_join",
+            "contract_child_pos_join",
+            "contract_child_roles_join",
+            "sentence_word_count",
+            "sentence_char_count",
+            "sentence_first_token",
+            "sentence_last_token",
+            "sentence_bigram_first",
+            "sentence_bigram_last",
+            "has_if_in_sentence",
+            "has_why_in_sentence",
+            "has_that_in_sentence",
+            "has_not_in_sentence",
+            "has_question_mark_sentence",
             "first_token",
             "second_token",
             "last_token",
@@ -168,6 +312,14 @@ def project_feature_profile(features: dict[str, Any], *, profile: str = "full") 
             "bg_5",
         )
         if key in features
+    } | {
+        key: value
+        for key, value in features.items()
+        if key.startswith("tok_count::")
+        or key.startswith("bg_count::")
+        or key.startswith("ph_count::")
+        or key.startswith("sent_tok_count::")
+        or key.startswith("sent_bg_count::")
     }
 
 
@@ -258,7 +410,7 @@ def _make_models(seed: int, *, num_classes: int) -> dict[str, Pipeline]:
                 (
                     "classifier",
                     XGBClassifier(
-                        objective="multi:softmax",
+                        objective="multi:softprob",
                         num_class=int(num_classes),
                         n_estimators=600,
                         max_depth=8,
@@ -361,6 +513,7 @@ def train_tabular_cefr_baseline(
         "test_path": test_path,
         "label_field": label_field,
         "feature_profile": feature_profile,
+        "label_order": label_order,
         "train_samples": len(x_train),
         "dev_samples": len(x_dev),
         "test_samples": len(x_test),
