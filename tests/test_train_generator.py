@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ela_pipeline.training.train_generator import load_jsonl, mix_with_feedback_rows, save_json
+from ela_pipeline.training.train_generator import build_seq2seq_labels, load_jsonl, mix_with_feedback_rows, save_json
 
 
 class TrainGeneratorTests(unittest.TestCase):
@@ -34,6 +34,11 @@ class TrainGeneratorTests(unittest.TestCase):
         self.assertEqual(mixed[0]["input"], "a")
         self.assertEqual(mixed[1]["input"], "b")
         self.assertEqual(mixed[2]["input"], "b")
+
+    def test_build_seq2seq_labels_masks_pad_token(self):
+        labels = [[12, 0, 0], [7, 8, 0]]
+        masked = build_seq2seq_labels(labels, pad_token_id=0)
+        self.assertEqual(masked, [[12, -100, -100], [7, 8, -100]])
 
 
 if __name__ == "__main__":
