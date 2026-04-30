@@ -1,0 +1,23 @@
+{
+  "inputs": [
+    "data/raw_sources/ingested_sentences.jsonl",
+    "data/raw_sources/ud_merged_treebank_sentences.jsonl"
+  ],
+  "rows_written": 28195,
+  "duplicate_rows": 1194,
+  "per_input_read": {
+    "data/raw_sources/ingested_sentences.jsonl": 2973,
+    "data/raw_sources/ud_merged_treebank_sentences.jsonl": 26416
+  },
+  "per_input_kept": {
+    "data/raw_sources/ingested_sentences.jsonl": 2973,
+    "data/raw_sources/ud_merged_treebank_sentences.jsonl": 25222
+  },
+  "per_source_name": {
+    "tatoeba": 1190,
+    "ud_ewt": 1190,
+    "ud_ewt_treebank": 13395,
+    "ud_gum_treebank": 11827,
+    "wikinews": 593
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "output_jsonl": "data/raw_sources/ud_merged_treebank_sentences.jsonl",
+  "treebanks": [
+    "UD_English-EWT",
+    "UD_English-GUM"
+  ],
+  "rows_written": 26416,
+  "duplicate_rows": 604,
+  "filtered_short": 2656,
+  "filtered_long": 209,
+  "min_chars": 12,
+  "max_chars": 320,
+  "per_treebank_counts": {
+    "UD_English-EWT": 14586,
+    "UD_English-GUM": 11830
+  },
+  "per_split_counts": {
+    "dev": 3140,
+    "test": 3090,
+    "train": 20186
+  },
+  "per_genre_counts": {
+    "academic": 586,
+    "bio": 718,
+    "conversation": 1397,
+    "court": 510,
+    "essay": 494,
+    "fiction": 1013,
+    "interview": 1022,
+    "letter": 492,
+    "news": 731,
+    "podcast": 604,
+    "speech": 721,
+    "textbook": 740,
+    "vlog": 1023,
+    "voyage": 735,
+    "whow": 1044
+  }
+}
