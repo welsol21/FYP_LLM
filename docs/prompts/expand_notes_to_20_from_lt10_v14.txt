@@ -1,0 +1,206 @@
+You are expanding a grammar-note dataset.
+
+Task:
+For each grammar note below, generate exactly 19 new English sentences that clearly fit the note.
+
+Goal:
+- Keep each sentence grammatical and natural.
+- Make each sentence a different example, not a paraphrase of another example.
+- Keep the target grammar pattern central and easy to identify.
+- Do not copy the wording of the note.
+- Do not produce duplicate sentences across notes.
+- Do not add commentary, labels, or explanations.
+- Return one JSON object per line with fields:
+  - note
+  - sentence
+
+Quality requirements:
+- Prefer short or medium-length sentences.
+- Vary subjects, verbs, and lexical items.
+- Keep the syntax clean and readable.
+- If the note is about a clause type, make the clause type obvious.
+- If the note is about a phrase type, make the phrase type obvious.
+- If the note is about a word-level pattern, keep the target word form obvious.
+- If a note is hard to illustrate, still produce the best matching natural sentence you can.
+
+Notes to expand:
+
+1. Use can't for strong negative epistemic deduction.
+   Example sentence: It can't work.
+2. May not expresses possibility of a negative outcome.
+   Example sentence: It may not work.
+3. Won't is the negative of will and predicts absence of an event.
+   Example sentence: It won't rain.
+4. Don't have to indicates lack of necessity.
+   Example sentence: You don't have to do it.
+5. May not can express prohibition.
+   Example sentence: You may not leave.
+6. Non-restrictive relative clauses are set off by commas.
+   Example sentence: My neighbor, who is an English teacher, plays very loud music.
+7. That can replace whom in object relative clauses.
+   Example sentence: I didn't like the woman that I met.
+8. Whose indicates possession within a relative clause.
+   Example sentence: Did you talk to the girl whose bag was stolen?
+9. Predictive conditional uses present simple in {{IF_CLAUSE}} and will in result clause.
+   Example sentence: If the weather is okay, we'll have lunch outside.
+10. Modals in the result clause of a conditional express degree of certainty.
+   Example sentence: If you don't get paid, I may not get my money back.
+11. Future result depends on a realizable condition in the {{IF_CLAUSE}}.
+   Example sentence: If you lend me some money, I'll pay you back tomorrow.
+12. Restrictive relative clauses are not separated by commas.
+   Example sentence: My friend who's Japanese is coming.
+13. Epistemic should expresses a confident expectation.
+   Example sentence: The journey should take two or three days.
+14. Deontic should gives mild advice or recommendation.
+   Example sentence: You should brush your teeth twice a day.
+15. Stranded prepositions in relative clauses are common in informal English.
+   Example sentence: Can I meet the person that you talked to?
+16. Who refers to a person and acts as subject of the relative clause.
+   Example sentence: I'm the kind of person who is always losing things.
+17. Zero relative pronoun is possible when it functions as object.
+   Example sentence: I don't want to talk about the woman I met.
+18. Imperatives use the base verb form without a subject.
+   Example sentence: Eat a balanced diet.
+19. An imperative can follow a concessive clause.
+   Example sentence: No matter what happens, hit the road.
+20. Omission of that in object clauses is optional and common.
+   Example sentence: He claimed he had been working at home all afternoon.
+21. Do + not appears before the main verb in negative declaratives without an auxiliary.
+   Example sentence: You do not know where the sugar is.
+22. Use did to form past tense yes-no questions without an auxiliary.
+   Example sentence: Did John smile?
+23. Yes-no questions with main verb have use do.
+   Example sentence: Do you have a question?
+24. The main verb reverts to base form after do/does/did.
+   Example sentence: Does the TV work?
+25. The passive subject is the recipient, not the performer, of the action.
+   Example sentence: The garage was cleaned out yesterday.
+26. Negator not follows the first auxiliary or the do-support auxiliary.
+   Example sentence: They do not know where it is.
+27. The by-phrase follows the past participle in a passive clause.
+   Example sentence: The meeting was postponed by Kathy.
+28. Be + past participle = passive voice.
+   Example sentence: The movie was filmed in Spain.
+29. Perfect passive = have + been + past participle.
+   Example sentence: John has been seen by Mary.
+30. Progressive passive uses be + being + past participle.
+   Example sentence: The job is being contracted out to a firm in Singapore.
+31. Being + past participle marks progressive passive.
+   Example sentence: The kids are being watched by my parents.
+32. Modal passive = modal + be + past participle.
+   Example sentence: The bill will be paid by them.
+33. Tag questions use the same auxiliary as the main clause.
+   Example sentence: You are ready to go, aren’t you?
+34. Right functions as an invariant tag in informal English.
+   Example sentence: You know how to fill out these forms, right?
+35. Extraposition moves a heavy that-clause after the main verb.
+   Example sentence: It didn’t come as a big surprise that the flight was going to be delayed.
+36. Anticipatory it + be + adjective + that-clause expresses evaluation.
+   Example sentence: It seems a little out of character that they would even consider doing it.
+37. A that-clause can follow a linking verb as subject complement.
+   Example sentence: The decision was that we will go ahead as we had planned.
+38. Verbs like know, think, and say can take a that-clause object.
+   Example sentence: They knew that they would have to extend the deadline.
+39. That can be omitted after common verbs like decide.
+   Example sentence: We decided that we should call a taxi.
+40. In embedded wh-questions, the subject appears before the verb.
+   Example sentence: I know what he said.
+41. Wh-clauses as objects maintain declarative word order.
+   Example sentence: I know what you mean.
+42. The wh-word in a noun clause is not followed by inverted word order.
+   Example sentence: I know where they went.
+43. Subject-verb inversion does not happen in wh-noun clauses.
+   Example sentence: I know who that man is.
+44. Whom is used as the object of a stranded preposition.
+   Example sentence: I know whom you spoke to.
+45. Wh-clauses can follow be as a complement.
+   Example sentence: The question is whose idea was it in the first place?
+46. Prepositions can take wh-clauses as their object.
+   Example sentence: We worried about where you had gone.
+47. A wh-clause can serve as the subject of a sentence.
+   Example sentence: What they are doing is none of our business.
+48. Whatever introduces a free relative clause meaning anything that.
+   Example sentence: Whatever you want to do is OK with me.
+49. Fronting a preposition before whom is more formal.
+   Example sentence: I know to whom you spoke.
+50. How + often asks about frequency.
+   Example sentence: How often have you seen it?
+51. Wh-word + auxiliary + subject + main verb forms a wh-question.
+   Example sentence: What should we give them?
+52. Inversion occurs after the wh-word in information questions.
+   Example sentence: When will they be back?
+53. Use did + subject + base verb for past tense wh-questions without an auxiliary.
+   Example sentence: Where did Charlie go?
+54. Do-support provides an auxiliary for inversion in wh-questions.
+   Example sentence: Whom did you want to see?
+55. Why + do/does/did + subject + base verb asks for a reason.
+   Example sentence: Why do you want to go there?
+56. Be as main verb inverts with the subject in questions.
+   Example sentence: Are you ready to go?
+57. Auxiliary be inverts with subject for yes-no questions.
+   Example sentence: Is he leaving soon?
+58. Modal + subject + base verb forms a yes-no question.
+   Example sentence: Should we call them?
+59. Inversion with main be does not require do-support.
+   Example sentence: Are the kids at school?
+60. Impersonal passive with it avoids naming the decision-maker.
+   Example sentence: It has been decided to cancel next week's meeting.
+61. The by-phrase optionally names the agent.
+   Example sentence: Penicillin was discovered by Alexander Fleming in 1928.
+62. Passive omits the obvious agent (police).
+   Example sentence: The murderer has been arrested.
+63. Passive is used when the agent is unknown.
+   Example sentence: Tom's bike has been stolen.
+64. The head noun of the subject determines verb agreement, not the object of a preposition.
+   Example sentence: The bottles inside the carton are all broken.
+65. A comma separates a fronted adverb clause from the main clause.
+   Example sentence: Because it was raining, he brought an umbrella.
+66. After introduces a time adverb clause.
+   Example sentence: We will watch a movie after we eat dinner.
+67. But shows contrast between two independent clauses.
+   Example sentence: Jordan is rich, but he owns an old car.
+68. Imperative result clauses issue a command based on a condition.
+   Example sentence: If you are available for a meeting, please call me.
+69. While introduces a dependent clause showing time.
+   Example sentence: While we are watching a movie, we will eat pizza.
+70. Will in the main clause shows the future consequence.
+   Example sentence: If she comes late, I will leave without her.
+71. Nor can trigger subject-auxiliary inversion.
+   Example sentence: He is neither rich, nor is he famous.
+72. Not only triggers inversion when it begins a sentence.
+   Example sentence: Not only is she kind, but she also donates a lot of money to charity.
+73. Use were instead of was in hypothetical if-clauses.
+   Example sentence: If I were an astronaut, I would love to travel to Mars.
+74. He will be very surprised when he sees his present.
+   Example sentence: She is going to look for a job as soon as she moves.
+75. He found it impossible to reach the top shelf.
+   Example sentence: We made it our mission to help the local charity.
+76. If she should change her mind, let me know immediately.
+   Example sentence: If they should offer you the job, I think you should take it.
+77. If he calls again, do not answer the phone.
+   Example sentence: If you are tired, go to bed early tonight.
+78. It is thought that the treasure is hidden somewhere in the forest.
+   Example sentence: It was decided that the meeting would be cancelled.
+79. What she managed to do was to save enough money for a car.
+   Example sentence: What they are going to do is to visit their family in London.
+80. She made a special effort for her students to understand.
+   Example sentence: They are building a new house for their old parents.
+81. If you did tell her about it, she would never forgive you.
+   Example sentence: If I did win the lottery, I would travel around the world.
+82. I submitted my application to the university office yesterday.
+   Example sentence: She delivered the package to the correct address in the end.
+83. The book that I am reading is very interesting and quite long.
+   Example sentence: The students who study hard usually pass all their exams easily.
+84. The flowers that you planted in the garden are blooming now.
+   Example sentence: The music that they are playing is too loud for me to study.
+
+Output format:
+- One JSON object per line.
+- Fields:
+  - note
+  - sentence
+- No markdown.
+- No bullet lists.
+- No extra text.
+
+Generate exactly 19 sentences for each note, in the same order as the notes above.

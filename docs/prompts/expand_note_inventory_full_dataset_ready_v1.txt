@@ -1,0 +1,287 @@
+You are expanding the target-note inventory for an English grammar teaching dataset.
+
+Your job is to generate reusable pedagogical note targets for the grammar constructions listed below.
+
+This is a dataset-building task, not a sentence-explanation task.
+The output must be reusable across many different sentences of the same grammatical shape.
+
+Global rules:
+- Work only with the constructions listed below.
+- For each item, generate 12 alternative pedagogical notes.
+- Each note must be a single sentence.
+- Keep notes concise, clear, and reusable.
+- Prefer 8 to 18 words when possible.
+- Do not mention CEFR, textbooks, rules, chapters, sources, or line numbers.
+- Do not mention the example sentence directly unless absolutely necessary.
+- Do not overfit to the exact wording of the example.
+- Do not output vague filler like "This sentence shows this grammar."
+- Do not produce near-duplicates that differ only by one or two words.
+- Each note must add a genuinely useful pedagogical angle.
+- Notes must remain valid for many sentences of the same construction.
+- Notes must not contradict each other.
+- Notes must not drift into unrelated grammar topics.
+
+Coverage balance inside each 12-note set:
+- At least 4 notes must focus on form or structure.
+- At least 4 notes must focus on function, meaning, or discourse role.
+- At least 4 notes must focus on usage, constraints, contrasts, or distribution.
+
+Output format:
+- Return a JSON array.
+- Each item in the array must have:
+  - "pattern_id"
+  - "grammar_pattern"
+  - "grammar_subtype"
+  - "reference_note"
+  - "alternative_notes"
+- "alternative_notes" must be a list of exactly 12 strings.
+- Return only JSON.
+
+Pattern inventory:
+
+1.
+pattern_id: conditional_general
+grammar_pattern: conditional clauses
+grammar_subtype: general condition + result relation
+reference_note: A conditional clause presents a possible or typical situation together with its consequence.
+example_sentence: If it rains tomorrow, we will stay home.
+
+2.
+pattern_id: conditional_formal_should
+grammar_pattern: conditional clauses
+grammar_subtype: formal should in the if-clause
+reference_note: In formal style, should in the conditional clause presents a possible future situation.
+example_sentence: If you should need help, call me.
+
+3.
+pattern_id: first_conditional_modal_main
+grammar_pattern: conditional clauses
+grammar_subtype: present condition with modal result
+reference_note: For a possible present situation, the if-clause often uses the present simple and the main clause uses a modal.
+example_sentence: If anyone doubts this, they should look at the facts.
+
+4.
+pattern_id: future_time_clause
+grammar_pattern: time subordination
+grammar_subtype: future meaning with present form in time clause
+reference_note: A future time clause uses the simple present after words like before, after, and when rather than will or be going to.
+example_sentence: Before Ann goes to work tomorrow, she will eat breakfast.
+
+5.
+pattern_id: negation_aux_not
+grammar_pattern: negation
+grammar_subtype: not after auxiliary
+reference_note: In English negation, not is typically placed after the first auxiliary or after do in do-support clauses.
+example_sentence: She has not finished yet.
+
+6.
+pattern_id: negation_do_support
+grammar_pattern: negation
+grammar_subtype: do-support for negative clauses
+reference_note: When a clause lacks an auxiliary, do-support is used to carry negation.
+example_sentence: He does not agree.
+
+7.
+pattern_id: that_clause_object_optional_that
+grammar_pattern: that-clauses
+grammar_subtype: object that-clause with optional that
+reference_note: The introductory that in an object that-clause is often optional, but the clause still functions as a noun clause.
+example_sentence: I think that she knows the answer.
+
+8.
+pattern_id: that_clause_statement_order
+grammar_pattern: that-clauses
+grammar_subtype: statement order inside that-clause
+reference_note: That-clauses are formed from a statement in normal word order and often function as objects of verbs.
+example_sentence: She said that the train was late.
+
+9.
+pattern_id: wh_clause_statement_order
+grammar_pattern: wh-clauses as noun clauses
+grammar_subtype: fronted wh-word with statement order
+reference_note: A wh-clause is formed by moving the wh-word to the front of the embedded clause while the rest of the clause keeps statement order.
+example_sentence: I know what she wants.
+
+10.
+pattern_id: wh_clause_no_inversion
+grammar_pattern: wh-clauses as noun clauses
+grammar_subtype: no question inversion inside noun clause
+reference_note: Inside a wh-clause used as a noun clause, the clause keeps statement order rather than question inversion.
+example_sentence: Tell me where he lives.
+
+11.
+pattern_id: wh_clause_object
+grammar_pattern: wh-clauses as noun clauses
+grammar_subtype: object noun clause
+reference_note: A wh-clause can function as the object of a verb while keeping statement word order inside the clause.
+example_sentence: She explained how the machine worked.
+
+12.
+pattern_id: wh_clause_subject
+grammar_pattern: wh-clauses as noun clauses
+grammar_subtype: subject noun clause
+reference_note: A noun clause can function as the subject of a sentence even though it contains its own subject and verb.
+example_sentence: What happened is very tragic.
+
+13.
+pattern_id: wh_clause_preposition_stranding
+grammar_pattern: wh-clauses as noun clauses
+grammar_subtype: fronted wh-expression with delayed preposition
+reference_note: A wh-clause can contain a fronted wh-expression while the related preposition remains later in the clause in ordinary style.
+example_sentence: I don't know who you were talking to.
+
+14.
+pattern_id: wh_clause_after_preposition
+grammar_pattern: wh-clauses as noun clauses
+grammar_subtype: noun clause after preposition
+reference_note: Unlike that-clauses, wh-clauses can function as the object of a preposition.
+example_sentence: It depends on what happens next.
+
+15.
+pattern_id: wh_clause_ever_form
+grammar_pattern: wh-clauses as noun clauses
+grammar_subtype: ever-form wh-clause
+reference_note: Wh-clauses can be introduced by ever-forms such as whatever and function as full noun clauses.
+example_sentence: Take whatever you need.
+
+16.
+pattern_id: existential_there_basic
+grammar_pattern: existential there
+grammar_subtype: existence/presence introduction
+reference_note: There plus be introduces the existence or presence of something and makes the following noun phrase new information.
+example_sentence: There is a book on my desk.
+
+17.
+pattern_id: existential_there_agreement
+grammar_pattern: existential there
+grammar_subtype: agreement with following noun phrase
+reference_note: In existential there constructions, agreement normally follows the noun phrase that comes after be.
+example_sentence: There are some books on Ali's desk.
+
+18.
+pattern_id: existential_there_form_of_be
+grammar_pattern: existential there
+grammar_subtype: be agreement in existential clauses
+reference_note: In existential there clauses, the form of be agrees with the noun phrase that follows it.
+example_sentence: There are several reasons for this.
+
+19.
+pattern_id: existential_there_singular
+grammar_pattern: existential there
+grammar_subtype: singular existence statement
+reference_note: There is introduces the existence of a singular thing in a place or situation.
+example_sentence: There is a problem with the engine.
+
+20.
+pattern_id: yes_no_question_aux_inversion
+grammar_pattern: yes-no questions
+grammar_subtype: auxiliary inversion
+reference_note: A yes-no question is formed by inverting the subject and the first available auxiliary or main be verb.
+example_sentence: Have you finished?
+
+21.
+pattern_id: yes_no_question_be
+grammar_pattern: yes-no questions
+grammar_subtype: main verb be in question formation
+reference_note: When be is the main verb, the question is formed by placing be before the subject.
+example_sentence: Is she ready?
+
+22.
+pattern_id: yes_no_question_modal
+grammar_pattern: yes-no questions
+grammar_subtype: modal before subject
+reference_note: With modal auxiliaries, yes-no questions are formed by placing the modal before the subject.
+example_sentence: Can you swim?
+
+23.
+pattern_id: yes_no_question_helping_verb
+grammar_pattern: yes-no questions
+grammar_subtype: helping verb inversion
+reference_note: Helping verbs such as be and have can invert with the subject to form a yes-no question.
+example_sentence: Have they arrived?
+
+24.
+pattern_id: wh_question_general
+grammar_pattern: wh-questions
+grammar_subtype: fronted wh-expression plus inversion
+reference_note: Information questions place the interrogative word first and then invert the subject with the first verb.
+example_sentence: What do the new speeches tell us about the organization?
+
+25.
+pattern_id: wh_question_inversion
+grammar_pattern: wh-questions
+grammar_subtype: fronted wh-expression with inverted question order
+reference_note: In an information question, the wh-expression is fronted and the clause keeps inverted question order.
+example_sentence: Why did they leave so early?
+
+26.
+pattern_id: wh_question_do_support
+grammar_pattern: wh-questions
+grammar_subtype: do-support after wh-fronting
+reference_note: When no auxiliary is available, an object wh-question uses do-support after the wh-expression is fronted.
+example_sentence: What did she buy?
+
+27.
+pattern_id: question_tag_general
+grammar_pattern: question tags
+grammar_subtype: statement plus short confirmation tag
+reference_note: Question tags are short questions added at the end of a statement.
+example_sentence: It's warm today, isn't it?
+
+28.
+pattern_id: passive_general
+grammar_pattern: passive voice
+grammar_subtype: subject as affected participant
+reference_note: The passive voice presents the subject as the affected participant rather than the doer.
+example_sentence: Tom's bike has been stolen.
+
+29.
+pattern_id: passive_form
+grammar_pattern: passive voice
+grammar_subtype: be plus past participle
+reference_note: Passive forms consist of be followed by a past participle.
+example_sentence: The bridge was destroyed.
+
+30.
+pattern_id: passive_agent_omission
+grammar_pattern: passive voice
+grammar_subtype: omitted performer
+reference_note: A passive clause often omits the performer when the performer is unknown or unimportant.
+example_sentence: The window was broken during the night.
+
+31.
+pattern_id: relative_clause_general
+grammar_pattern: relative clauses
+grammar_subtype: clause modifying a noun
+reference_note: A relative clause modifies a noun and gives more information about it.
+example_sentence: Do you know the people who live next door?
+
+32.
+pattern_id: extraposition_it_that
+grammar_pattern: extraposition with it
+grammar_subtype: anticipatory it plus delayed that-clause
+reference_note: English often uses anticipatory it and places the that-clause later in the sentence when the clause would be a heavy subject.
+example_sentence: It is obvious that they were wrong.
+
+33.
+pattern_id: be_going_to_future
+grammar_pattern: future expression
+grammar_subtype: be going to for plan or intention
+reference_note: Be going to is used to talk about a future plan or intention.
+example_sentence: I'm going to go downtown tomorrow.
+
+34.
+pattern_id: be_going_to_question
+grammar_pattern: future expression
+grammar_subtype: be going to in yes-no question
+reference_note: A yes-no question with be going to is formed by placing be before the subject.
+example_sentence: Are you going to come to class tomorrow?
+
+35.
+pattern_id: be_going_to_wh_question
+grammar_pattern: future expression
+grammar_subtype: be going to in wh-question
+reference_note: A wh-question with be going to begins with the wh-expression and keeps be before the subject.
+example_sentence: What time are you going to eat dinner tonight?
+
+Generate the JSON now.

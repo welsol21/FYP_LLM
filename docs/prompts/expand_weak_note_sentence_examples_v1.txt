@@ -1,0 +1,78 @@
+You are expanding a grammar-note dataset.
+
+Task:
+For each grammar note below, generate 6 new English sentences that clearly fit the note.
+
+Rules:
+- Keep each sentence grammatical and natural.
+- Make each sentence a different example, not a paraphrase of another example.
+- Keep the target grammar pattern central and easy to identify.
+- Do not copy the wording of the note.
+- Do not produce duplicate sentences across notes.
+- Do not add commentary, labels, or explanations.
+- Return one JSON object per line with fields:
+  - note
+  - sentence
+
+Quality requirements:
+- Prefer short or medium-length sentences.
+- Vary subjects, verbs, and lexical items.
+- Keep the syntax clean and readable.
+- If the note is about a clause type, make the clause type obvious.
+- If the note is about a phrase type, make the phrase type obvious.
+- If the note is about a word-level pattern, keep the target word form obvious.
+- If a note is hard to illustrate, still produce the best matching natural sentence you can.
+
+Weak notes to expand:
+
+1. A by-phrase can introduce the agent in a passive clause when the performer is expressed.
+2. A by-phrase can name the performer at the end of a passive clause, where it receives end focus.
+3. A clause can be both progressive and passive when it contains be plus being plus a past participle.
+4. A complex sentence contains one independent clause and one or more dependent clauses.
+5. A compound sentence contains two or more independent clauses joined by a coordinating conjunction.
+6. A compound-complex sentence contains at least two independent clauses together with at least one dependent clause.
+7. A conditional may be followed by an instruction when the speaker gives a directive that depends on the condition being met.
+8. A dependent clause may be grammatically complete on its own, but its idea remains incomplete until it is attached to an independent clause.
+9. A final if-clause often works like an afterthought or reminder rather than the main point of the message.
+10. A fronted-preposition relative clause places the preposition before the relative pronoun and sounds more formal than the stranded pattern.
+11. A non-restrictive relative clause adds extra information rather than identifying the noun, and it is marked off by separation markers such as commas.
+12. A passive clause contains be followed by a past participle and presents the affected participant as subject.
+13. A passive clause often omits the performer when the performer is unknown, unimportant, or already understood.
+14. A predictive conditional often uses a modal in the main clause to mark how likely the result is.
+15. A progressive passive combines progressive aspect with passive voice to describe an ongoing action affecting the subject.
+16. A question tag repeats the clause with auxiliary-pronoun structure and is typically negative after a positive statement.
+17. A relative clause can combine two clauses into one complex sentence by embedding extra information after a noun.
+18. A restrictive relative clause provides identifying information needed to pick out which person or thing is meant.
+19. A subject relative clause places the relative pronoun at the start of the clause where it functions as the subject.
+20. A that-clause can function as a noun clause, including as the complement of a linking verb.
+21. A wh-clause can also function as the complement of a linking verb.
+22. A wh-question with be going to begins with the wh-expression and keeps be before the subject.
+23. A yes-no question with be going to is formed by placing be before the subject.
+24. An adverb clause can tell when the action in the main clause happens.
+25. An if-clause can come before or after the main clause, but it still uses the simple present for future time.
+26. An object relative clause can use that to connect the noun to a clause where the relative element functions as the object.
+27. Be going to is used to talk about a future plan or intention.
+28. Be supposed to expresses an external social expectation rather than a strong personal command from the speaker.
+29. By plus an -ing form can express the method by which a result is achieved.
+30. Can't often conveys that something is not possible, which is stronger than merely saying it may not happen.
+31. Conditional clauses are often used with imperatives when an instruction depends on a condition.
+32. Conditional clauses usually begin with if and link the consequence in the main clause to a stated condition.
+33. Conditionals followed by directives are common in procedural and advisory texts.
+34. Counterfactual conditionals can use were to mark a situation presented as contrary to fact.
+35. Counterfactual conditionals present an outcome against a past situation that is known not to have happened.
+36. Don't have to marks the absence of obligation, not a prohibition against doing the action.
+37. Factual conditionals present a relationship that is generally true or habitually the case in the circumstances described.
+38. Hypothetical conditionals present an unlikely but still possible situation and typically use past forms in the if-clause.
+39. Imperative verbs give commands.
+40. Impersonal it can describe a situation or place without referring to a concrete antecedent.
+
+Output format:
+- One JSON object per line.
+- Fields:
+  - note
+  - sentence
+- No markdown.
+- No bullet lists.
+- No extra text.
+
+Generate 6 sentences for each note, in the same order as the notes above.

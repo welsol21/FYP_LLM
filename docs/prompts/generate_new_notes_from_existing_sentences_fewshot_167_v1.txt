@@ -1,0 +1,912 @@
+You are expanding a grammar-note dataset.
+
+Task:
+For each input sentence and its existing note, generate exactly 1 NEW note that also fits the same sentence.
+
+Goal:
+- Keep the same sentence.
+- Produce a different note from the existing one.
+- The new note must be template-like and use spaCy-style placeholders when the sentence contains concrete words, phrases, or spans that should be abstracted.
+- If the sentence supports any concrete span, phrase, word, or clause that can be abstracted, the new note must include at least one placeholder.
+- Only allow a placeholder-free new note when the sentence truly has no stable abstractable span.
+- Use the sentence as evidence for another valid grammar note.
+- Increase note variety on existing sentences.
+- Expand the dataset by adding new notes for already covered examples.
+
+Important:
+- Do NOT rewrite the sentence.
+- Do NOT repeat the original note.
+- Do NOT paraphrase the original note too closely.
+- The new note must be grammatically correct for the sentence.
+- The new note must be reusable for many sentences with the same grammar shape when possible.
+- Prefer a different pedagogical angle from the original note.
+- Prefer placeholders such as {{SUBJECT}}, {{OBJECT}}, {{CLAUSE}}, {{NOUN_PHRASE}}, {{VERB_PHRASE}}, {{ADJECTIVE}}, {{ADVERB}}, {{PREPOSITION}}, {{AUXILIARY}}, {{MODAL}}, {{RELATIVE_PRONOUN}}, {{QUESTION_TAG}}, {{TARGET_SPAN}}.
+- If the original note is general, still generate a different template note using placeholders only when they genuinely improve reuse.
+- Do not output a template-style note without at least one placeholder if the sentence supports one.
+- If the sentence clearly supports another grammar pattern, use that pattern.
+- If not, use a different valid angle on the same pattern.
+- Do not invent a note that the sentence does not support.
+- Do not add commentary, labels, or explanations.
+
+Output requirements:
+- Return one JSON object per line.
+- Each object must contain:
+  - original_note
+  - sentence
+  - new_note
+  - new_note_type
+  - new_note_style
+  - relation_to_original
+- `new_note_type` must be one of:
+  - same_pattern_different_angle
+  - different_pattern_same_sentence
+  - broader_usable_template
+- `new_note_style` must be one of:
+  - verbatim
+  - slot_template
+  - generalized_template
+- `relation_to_original` must be one short phrase explaining how the new note differs from the original.
+- Do not output the original note as the new note.
+- Do not output duplicate new notes for different inputs.
+- Do not add any extra text outside JSON.
+
+How to choose the new note:
+- Focus on a real grammar feature in the sentence.
+- Prefer notes that:
+  - describe a different function,
+  - describe a different structure,
+  - or describe a different constraint.
+- Keep the note concise and pedagogical.
+- Keep the note reusable across similar sentences.
+- Avoid empty generalities like "This is an example of grammar."
+
+Few-shot examples:
+
+Input:
+{"note": "Be going to is used to talk about a future plan or intention.", "sentence": "I’m going to go downtown tomorrow."}
+Output:
+{"original_note": "Be going to is used to talk about a future plan or intention.", "sentence": "I’m going to go downtown tomorrow.", "new_note": "Be going to is used for a future plan or intention.", "new_note_type": "same_pattern_different_angle", "new_note_style": "generalized_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In negative be going to clauses, not follows be.", "sentence": "Ann isn’t going to study tonight."}
+Output:
+{"original_note": "In negative be going to clauses, not follows be.", "sentence": "Ann isn’t going to study tonight.", "new_note": "Be going to is used for a future plan or intention.", "new_note_type": "same_pattern_different_angle", "new_note_style": "generalized_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A wh-question with be going to begins with the wh-expression and keeps be before the subject.", "sentence": "What time are you going to eat dinner tonight?"}
+Output:
+{"original_note": "A wh-question with be going to begins with the wh-expression and keeps be before the subject.", "sentence": "What time are you going to eat dinner tonight?", "new_note": "Wh-questions front {{QUESTION_WORD}} and keep {{AUXILIARY}} before the subject.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A yes-no question with be going to is formed by placing be before the subject.", "sentence": "Are you going to come to class tomorrow?"}
+Output:
+{"original_note": "A yes-no question with be going to is formed by placing be before the subject.", "sentence": "Are you going to come to class tomorrow?", "new_note": "Yes-no questions with {{MODAL}} place the modal before the subject.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In existential there clauses, the form of be agrees with the noun phrase that follows it.", "sentence": "There are some books on Ali’s desk."}
+Output:
+{"original_note": "In existential there clauses, the form of be agrees with the noun phrase that follows it.", "sentence": "There are some books on Ali’s desk.", "new_note": "Existential there introduces {{NOUN_PHRASE}} as new information.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "There is introduces the existence of a singular thing in a place or situation.", "sentence": "There is a book on my desk."}
+Output:
+{"original_note": "There is introduces the existence of a singular thing in a place or situation.", "sentence": "There is a book on my desk.", "new_note": "Existential there introduces {{NOUN_PHRASE}} as new information.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "With plural following nouns, existential there questions use are there.", "sentence": "Are there any eggs in the refrigerator?"}
+Output:
+{"original_note": "With plural following nouns, existential there questions use are there.", "sentence": "Are there any eggs in the refrigerator?", "new_note": "Existential there introduces {{NOUN_PHRASE}} as new information.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Questions with existential there are formed by placing be before there.", "sentence": "Is there any milk in the refrigerator?"}
+Output:
+{"original_note": "Questions with existential there are formed by placing be before there.", "sentence": "Is there any milk in the refrigerator?", "new_note": "Existential there introduces {{NOUN_PHRASE}} as new information.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In a future if-clause, English uses the simple present in the condition clause and a future form in the main clause.", "sentence": "If it rains tomorrow, we will stay home."}
+Output:
+{"original_note": "In a future if-clause, English uses the simple present in the condition clause and a future form in the main clause.", "sentence": "If it rains tomorrow, we will stay home.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "An if-clause can come before or after the main clause, but it still uses the simple present for future time.", "sentence": "I’m going to buy a new car next year if I have enough money."}
+Output:
+{"original_note": "An if-clause can come before or after the main clause, but it still uses the simple present for future time.", "sentence": "I’m going to buy a new car next year if I have enough money.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A future time clause uses the simple present after words like before, after, and when rather than will or be going to.", "sentence": "Before Ann goes to work tomorrow, she will eat breakfast."}
+Output:
+{"original_note": "A future time clause uses the simple present after words like before, after, and when rather than will or be going to.", "sentence": "Before Ann goes to work tomorrow, she will eat breakfast.", "new_note": "Future time clauses use present tense after {{TIME_MARKER}}.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In a future time clause, the time-marker clause uses the simple present while the main clause carries the future meaning.", "sentence": "I’m going to finish my homework after I eat dinner tonight."}
+Output:
+{"original_note": "In a future time clause, the time-marker clause uses the simple present while the main clause carries the future meaning.", "sentence": "I’m going to finish my homework after I eat dinner tonight.", "new_note": "Future time clauses use present tense after {{TIME_MARKER}}.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "When-clauses that refer to the future use the simple present instead of will.", "sentence": "When I go to New York next week, I’m going to stay at the Hilton Hotel."}
+Output:
+{"original_note": "When-clauses that refer to the future use the simple present instead of will.", "sentence": "When I go to New York next week, I’m going to stay at the Hilton Hotel.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Maybe is an adverb meaning possibly and it appears before the subject and verb.", "sentence": "Maybe Abdullah will be in class tomorrow."}
+Output:
+{"original_note": "Maybe is an adverb meaning possibly and it appears before the subject and verb.", "sentence": "Maybe Abdullah will be in class tomorrow.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "May and might express possibility rather than certainty.", "sentence": "Abdullah may be here tomorrow."}
+Output:
+{"original_note": "May and might express possibility rather than certainty.", "sentence": "Abdullah may be here tomorrow.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "May can present a future event as possible rather than certain.", "sentence": "It may rain tomorrow."}
+Output:
+{"original_note": "May can present a future event as possible rather than certain.", "sentence": "It may rain tomorrow.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A complex sentence contains one independent clause and one or more dependent clauses.", "sentence": "I went to the garage because I needed my bike."}
+Output:
+{"original_note": "A complex sentence contains one independent clause and one or more dependent clauses.", "sentence": "I went to the garage because I needed my bike.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A compound sentence contains two or more independent clauses joined by a coordinating conjunction.", "sentence": "I went to the garage, and I found my bike."}
+Output:
+{"original_note": "A compound sentence contains two or more independent clauses joined by a coordinating conjunction.", "sentence": "I went to the garage, and I found my bike.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A compound-complex sentence contains at least two independent clauses together with at least one dependent clause.", "sentence": "I went to the garage because I needed my bike, and I found it."}
+Output:
+{"original_note": "A compound-complex sentence contains at least two independent clauses together with at least one dependent clause.", "sentence": "I went to the garage because I needed my bike, and I found it.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In an imperative sentence, the subject is often omitted and understood as the second-person pronoun you.", "sentence": "Get out of here!"}
+Output:
+{"original_note": "In an imperative sentence, the subject is often omitted and understood as the second-person pronoun you.", "sentence": "Get out of here!", "new_note": "Imperatives leave the subject unspoken and give a command or instruction.", "new_note_type": "same_pattern_different_angle", "new_note_style": "verbatim", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A relative clause can combine two clauses into one complex sentence by embedding extra information after a noun.", "sentence": "The job that you want is part-time."}
+Output:
+{"original_note": "A relative clause can combine two clauses into one complex sentence by embedding extra information after a noun.", "sentence": "The job that you want is part-time.", "new_note": "A relative clause adds extra information about a {{NOUN}}.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Subordinate clauses are adverbial and can often be moved to the beginning or the end of the sentence.", "sentence": "Because he wanted to leave, he left."}
+Output:
+{"original_note": "Subordinate clauses are adverbial and can often be moved to the beginning or the end of the sentence.", "sentence": "Because he wanted to leave, he left.", "new_note": "An adverb clause shows the time, reason, or condition for the main clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "verbatim", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "All can replace what when the construction emphasizes that just one thing is wanted or needed.", "sentence": "All they want is a holiday."}
+Output:
+{"original_note": "All can replace what when the construction emphasizes that just one thing is wanted or needed.", "sentence": "All they want is a holiday.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "With find or think, it can stand as anticipatory object before an adjective and infinitive or clause.", "sentence": "He found it hard to make friends."}
+Output:
+{"original_note": "With find or think, it can stand as anticipatory object before an adjective and infinitive or clause.", "sentence": "He found it hard to make friends.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A counterfactual conditional presents what might have happened in the past but did not happen.", "sentence": "Perhaps if he had realized that, he would have run away while there was still time."}
+Output:
+{"original_note": "A counterfactual conditional presents what might have happened in the past but did not happen.", "sentence": "Perhaps if he had realized that, he would have run away while there was still time.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Even if marks a condition that does not change the outcome stated in the main clause.", "sentence": "Even if you don’t get the job this time, there will be many exciting opportunities in the future."}
+Output:
+{"original_note": "Even if marks a condition that does not change the outcome stated in the main clause.", "sentence": "Even if you don’t get the job this time, there will be many exciting opportunities in the future.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In existential there constructions, agreement normally follows the noun phrase that comes after be.", "sentence": "There were a lot of people there."}
+Output:
+{"original_note": "In existential there constructions, agreement normally follows the noun phrase that comes after be.", "sentence": "There were a lot of people there.", "new_note": "Existential there introduces {{NOUN_PHRASE}} as new information.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "There plus be introduces the existence or presence of something and makes the following noun phrase new information.", "sentence": "There were thirty boys in the class."}
+Output:
+{"original_note": "There plus be introduces the existence or presence of something and makes the following noun phrase new information.", "sentence": "There were thirty boys in the class.", "new_note": "Existential there introduces {{NOUN_PHRASE}} as new information.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "There plus be can also introduce an event as something that happened.", "sentence": "There was a knock at his door."}
+Output:
+{"original_note": "There plus be can also introduce an event as something that happened.", "sentence": "There was a knock at his door.", "new_note": "Existential there introduces {{NOUN_PHRASE}} as new information.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In formal style, verbs such as remain, follow, and come can appear after there.", "sentence": "There remained a risk of war."}
+Output:
+{"original_note": "In formal style, verbs such as remain, follow, and come can appear after there.", "sentence": "There remained a risk of war.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "There plus be, a noun phrase, and an -ing participle can describe what is present in a scene or situation.", "sentence": "There was a storm raging outside."}
+Output:
+{"original_note": "There plus be, a noun phrase, and an -ing participle can describe what is present in a scene or situation.", "sentence": "There was a storm raging outside.", "new_note": "Existential there introduces {{NOUN_PHRASE}} as new information.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "There can be followed by a passive reporting verb to relay what is said or expected to exist or happen.", "sentence": "There is expected to be an announcement about the proposed building."}
+Output:
+{"original_note": "There can be followed by a passive reporting verb to relay what is said or expected to exist or happen.", "sentence": "There is expected to be an announcement about the proposed building.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "There can occur with seem or appear to present something as apparently existing.", "sentence": "There appears to be a lot of confusion on this point."}
+Output:
+{"original_note": "There can occur with seem or appear to present something as apparently existing.", "sentence": "There appears to be a lot of confusion on this point.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In the first conditional, the if-clause uses the present simple while the main clause presents a future result.", "sentence": "I’ll scream if you say that again."}
+Output:
+{"original_note": "In the first conditional, the if-clause uses the present simple while the main clause presents a future result.", "sentence": "I’ll scream if you say that again.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In formal style, should in the conditional clause presents a possible future situation.", "sentence": "If that should happen, you will be blamed."}
+Output:
+{"original_note": "In formal style, should in the conditional clause presents a possible future situation.", "sentence": "If that should happen, you will be blamed.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "When talking about something that may happen in the future, the conditional clause typically uses the present simple and the main clause uses will or shall.", "sentence": "If I survive this experience, I’ll never leave you again."}
+Output:
+{"original_note": "When talking about something that may happen in the future, the conditional clause typically uses the present simple and the main clause uses will or shall.", "sentence": "If I survive this experience, I’ll never leave you again.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A conditional clause presents a possible or typical situation together with its consequence.", "sentence": "If they lose weight during an illness, they soon regain it afterwards."}
+Output:
+{"original_note": "A conditional clause presents a possible or typical situation together with its consequence.", "sentence": "If they lose weight during an illness, they soon regain it afterwards.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "The passive lets you present an event from the point of view of the person or thing affected rather than the performer.", "sentence": "A girl from my class was chosen to do the reading."}
+Output:
+{"original_note": "The passive lets you present an event from the point of view of the person or thing affected rather than the performer.", "sentence": "A girl from my class was chosen to do the reading.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Conditional clauses usually begin with if and link the consequence in the main clause to a stated condition.", "sentence": "If you do that I shall be very pleased."}
+Output:
+{"original_note": "Conditional clauses usually begin with if and link the consequence in the main clause to a stated condition.", "sentence": "If you do that I shall be very pleased.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Conditional clauses are often used with imperatives when an instruction depends on a condition.", "sentence": "If you dry your washing outdoors, wipe the line first."}
+Output:
+{"original_note": "Conditional clauses are often used with imperatives when an instruction depends on a condition.", "sentence": "If you dry your washing outdoors, wipe the line first.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Impersonal it can describe a situation or place without referring to a concrete antecedent.", "sentence": "It’s lovely here."}
+Output:
+{"original_note": "Impersonal it can describe a situation or place without referring to a concrete antecedent.", "sentence": "It’s lovely here.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Impersonal it is also used to give the time or date.", "sentence": "It’s eight o’clock."}
+Output:
+{"original_note": "Impersonal it is also used to give the time or date.", "sentence": "It’s eight o’clock.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Impersonal it is used in weather expressions.", "sentence": "It’s still raining."}
+Output:
+{"original_note": "Impersonal it is used in weather expressions.", "sentence": "It’s still raining.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In formal English, should, were, or had can be fronted and if omitted in a conditional clause.", "sentence": "Should ministers demand an inquiry, we would welcome it."}
+Output:
+{"original_note": "In formal English, should, were, or had can be fronted and if omitted in a conditional clause.", "sentence": "Should ministers demand an inquiry, we would welcome it.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "An it-cleft focuses one constituent by placing it after It is or It was and following it with a relative clause.", "sentence": "It was Ted who broke the news to me."}
+Output:
+{"original_note": "An it-cleft focuses one constituent by placing it after It is or It was and following it with a relative clause.", "sentence": "It was Ted who broke the news to me.", "new_note": "A relative clause adds extra information about a {{NOUN}}.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A split sentence can focus time, place, or other circumstances rather than the subject or object.", "sentence": "It was in Paris that I first saw these films."}
+Output:
+{"original_note": "A split sentence can focus time, place, or other circumstances rather than the subject or object.", "sentence": "It was in Paris that I first saw these films.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "It plus be, an adjective or noun, and a that-clause comments on a fact or situation.", "sentence": "It is strange that it hasn’t been noticed before."}
+Output:
+{"original_note": "It plus be, an adjective or noun, and a that-clause comments on a fact or situation.", "sentence": "It is strange that it hasn’t been noticed before.", "new_note": "A that-clause can function as a {{CLAUSE}} or noun clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "It plus be, an adjective, and a to-infinitive lets the clause comment on an action while keeping the heavier information at the end.", "sentence": "It’s nice to see you with your books for a change."}
+Output:
+{"original_note": "It plus be, an adjective, and a to-infinitive lets the clause comment on an action while keeping the heavier information at the end.", "sentence": "It’s nice to see you with your books for a change.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "It is or It was with a time expression and a when-clause gives special emphasis to the time of an event.", "sentence": "It was 11 o’clock at night when 16 armed men came to my house."}
+Output:
+{"original_note": "It is or It was with a time expression and a when-clause gives special emphasis to the time of an event.", "sentence": "It was 11 o’clock at night when 16 armed men came to my house.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "It with take or cost introduces the amount of time, effort, or money needed for an action.", "sentence": "It takes an hour to get to Northampton."}
+Output:
+{"original_note": "It with take or cost introduces the amount of time, effort, or money needed for an action.", "sentence": "It takes an hour to get to Northampton.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Some verbs are especially common in passive form because the performer is not normally mentioned.", "sentence": "The meeting is scheduled for February 14."}
+Output:
+{"original_note": "Some verbs are especially common in passive form because the performer is not normally mentioned.", "sentence": "The meeting is scheduled for February 14.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Provided, providing, as long as, and only if introduce a condition that is necessary for the result.", "sentence": "Ordering is quick and easy provided you have access to the internet."}
+Output:
+{"original_note": "Provided, providing, as long as, and only if introduce a condition that is necessary for the result.", "sentence": "Ordering is quick and easy provided you have access to the internet.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "By plus an -ing form can express the method by which a result is achieved.", "sentence": "The strong taste can be removed by changing the cooking water."}
+Output:
+{"original_note": "By plus an -ing form can express the method by which a result is achieved.", "sentence": "The strong taste can be removed by changing the cooking water.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A by-phrase can name the performer at the end of a passive clause, where it receives end focus.", "sentence": "Some of the children were adopted by local couples."}
+Output:
+{"original_note": "A by-phrase can name the performer at the end of a passive clause, where it receives end focus.", "sentence": "Some of the children were adopted by local couples.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Passive forms consist of an appropriate form of be followed by the -ed participle of the verb.", "sentence": "He was being treated for a stomach ulcer."}
+Output:
+{"original_note": "Passive forms consist of an appropriate form of be followed by the -ed participle of the verb.", "sentence": "He was being treated for a stomach ulcer.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Transitive phrasal verbs can also appear in the passive.", "sentence": "Such expectations are drummed into every growing child."}
+Output:
+{"original_note": "Transitive phrasal verbs can also appear in the passive.", "sentence": "Such expectations are drummed into every growing child.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "The passive of reporting verbs is often used in impersonal it structures when the source of the report is general or already understood.", "sentence": "It was agreed that he would come and see us again the next day."}
+Output:
+{"original_note": "The passive of reporting verbs is often used in impersonal it structures when the source of the report is general or already understood.", "sentence": "It was agreed that he would come and see us again the next day.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "With can name the instrument or means used to perform the action in a passive clause.", "sentence": "A circle was drawn in the dirt with a stick."}
+Output:
+{"original_note": "With can name the instrument or means used to perform the action in a passive clause.", "sentence": "A circle was drawn in the dirt with a stick.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "The passive is common when the focus is on what should be done rather than on who does it.", "sentence": "Such items should be carefully packed in boxes."}
+Output:
+{"original_note": "The passive is common when the focus is on what should be done rather than on who does it.", "sentence": "Such items should be carefully packed in boxes.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A passive clause often omits the performer when the performer is unknown, unimportant, or already understood.", "sentence": "The fence between the two properties had been removed."}
+Output:
+{"original_note": "A passive clause often omits the performer when the performer is unknown, unimportant, or already understood.", "sentence": "The fence between the two properties had been removed.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "For a possible present situation, the if-clause often uses the present simple and the main clause uses a modal.", "sentence": "If anyone doubts this, they should look at the facts."}
+Output:
+{"original_note": "For a possible present situation, the if-clause often uses the present simple and the main clause uses a modal.", "sentence": "If anyone doubts this, they should look at the facts.", "new_note": "With {{MODAL}}, the modal comes before the subject in questions.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In accounts of processes and experiments, the passive keeps the focus on what happens rather than on the performer.", "sentence": "Food is put in jars, the jars and their contents are heated to a temperature which is maintained long enough to ensure that all bacteria, moulds and viruses are destroyed."}
+Output:
+{"original_note": "In accounts of processes and experiments, the passive keeps the focus on what happens rather than on the performer.", "sentence": "Food is put in jars, the jars and their contents are heated to a temperature which is maintained long enough to ensure that all bacteria, moulds and viruses are destroyed.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A reduced if-phrase can replace a fuller conditional clause with be when the meaning is clear.", "sentence": "If in doubt, ask at your local library."}
+Output:
+{"original_note": "A reduced if-phrase can replace a fuller conditional clause with be when the meaning is clear.", "sentence": "If in doubt, ask at your local library.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In the second conditional, a past form in the if-clause combines with would or should to present an unlikely situation.", "sentence": "If I had more time, I would happily offer to help."}
+Output:
+{"original_note": "In the second conditional, a past form in the if-clause combines with would or should to present an unlikely situation.", "sentence": "If I had more time, I would happily offer to help.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Some state passives use with to introduce what creates or characterizes the state.", "sentence": "The room was filled with people."}
+Output:
+{"original_note": "Some state passives use with to introduce what creates or characterizes the state.", "sentence": "The room was filled with people.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In the third conditional, the if-clause uses the past perfect and the main clause uses would have or should have for an unreal past result.", "sentence": "If I had tried a bit harder, I would have passed that exam."}
+Output:
+{"original_note": "In the third conditional, the if-clause uses the past perfect and the main clause uses would have or should have for an unreal past result.", "sentence": "If I had tried a bit harder, I would have passed that exam.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Unless means except if and introduces the condition that would prevent the result.", "sentence": "Government cannot operate effectively unless it is free to take its own decisions."}
+Output:
+{"original_note": "Unless means except if and introduces the condition that would prevent the result.", "sentence": "Government cannot operate effectively unless it is free to take its own decisions.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "An unlikely present situation is often expressed with a past form in the if-clause and would, should, or might in the main clause.", "sentence": "If I were a guy, I would look like my dad."}
+Output:
+{"original_note": "An unlikely present situation is often expressed with a past form in the if-clause and would, should, or might in the main clause.", "sentence": "If I were a guy, I would look like my dad.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "When the condition is unreal, the main clause normally uses a modal such as would, could, or might.", "sentence": "If you weren’t here, she would get rid of me in no time."}
+Output:
+{"original_note": "When the condition is unreal, the main clause normally uses a modal such as would, could, or might.", "sentence": "If you weren’t here, she would get rid of me in no time.", "new_note": "With {{MODAL}}, the modal comes before the subject in questions.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Were to with an infinitive is a formal way to present a remote future possibility.", "sentence": "If we were to move north, we would be able to buy a bigger house."}
+Output:
+{"original_note": "Were to with an infinitive is a formal way to present a remote future possibility.", "sentence": "If we were to move north, we would be able to buy a bigger house.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A what-cleft can focus an action by placing it after be.", "sentence": "What I did was to make a plan."}
+Output:
+{"original_note": "A what-cleft can focus an action by placing it after be.", "sentence": "What I did was to make a plan.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A what-cleft with want or need highlights the thing wanted or needed.", "sentence": "What you need is a doctor."}
+Output:
+{"original_note": "A what-cleft with want or need highlights the thing wanted or needed.", "sentence": "What you need is a doctor.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "The zero conditional uses present forms in both clauses to express a general truth or regular result.", "sentence": "Water boils if you heat it to 100°C."}
+Output:
+{"original_note": "The zero conditional uses present forms in both clauses to express a general truth or regular result.", "sentence": "Water boils if you heat it to 100°C.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Be supposed to expresses an external social expectation rather than a strong personal command from the speaker.", "sentence": "You're supposed to be studying, not watching TV."}
+Output:
+{"original_note": "Be supposed to expresses an external social expectation rather than a strong personal command from the speaker.", "sentence": "You're supposed to be studying, not watching TV.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "With verbs of benefitting, a for-phrase can present the indirect object as a beneficiary without necessarily implying immediate possession.", "sentence": "I'm getting a present for Keiko."}
+Output:
+{"original_note": "With verbs of benefitting, a for-phrase can present the indirect object as a beneficiary without necessarily implying immediate possession.", "sentence": "I'm getting a present for Keiko.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Conditionals followed by directives are common in procedural and advisory texts.", "sentence": "If the wood has knots or broken lines, don't buy it."}
+Output:
+{"original_note": "Conditionals followed by directives are common in procedural and advisory texts.", "sentence": "If the wood has knots or broken lines, don't buy it.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A conditional may be followed by an instruction when the speaker gives a directive that depends on the condition being met.", "sentence": "If you have a poor connection or are cut off on a long distance call, tell the operator and ask to be reconnected."}
+Output:
+{"original_note": "A conditional may be followed by an instruction when the speaker gives a directive that depends on the condition being met.", "sentence": "If you have a poor connection or are cut off on a long distance call, tell the operator and ask to be reconnected.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Counterfactual conditionals present an outcome against a past situation that is known not to have happened.", "sentence": "If I had called Jack earlier, he would have helped."}
+Output:
+{"original_note": "Counterfactual conditionals present an outcome against a past situation that is known not to have happened.", "sentence": "If I had called Jack earlier, he would have helped.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Counterfactual conditionals can use were to mark a situation presented as contrary to fact.", "sentence": "If I were rich, I wouldn't have this problem."}
+Output:
+{"original_note": "Counterfactual conditionals can use were to mark a situation presented as contrary to fact.", "sentence": "If I were rich, I wouldn't have this problem.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In a factual conditional, both clauses typically describe a regular pattern rather than a single imagined outcome.", "sentence": "If they don't have any money, they use credit cards."}
+Output:
+{"original_note": "In a factual conditional, both clauses typically describe a regular pattern rather than a single imagined outcome.", "sentence": "If they don't have any money, they use credit cards.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Factual conditionals present a relationship that is generally true or habitually the case in the circumstances described.", "sentence": "Nowadays, if people want something, they just buy it."}
+Output:
+{"original_note": "Factual conditionals present a relationship that is generally true or habitually the case in the circumstances described.", "sentence": "Nowadays, if people want something, they just buy it.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A final if-clause often works like an afterthought or reminder rather than the main point of the message.", "sentence": "There's no other choice, if you still want to go there."}
+Output:
+{"original_note": "A final if-clause often works like an afterthought or reminder rather than the main point of the message.", "sentence": "There's no other choice, if you still want to go there.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Relative clauses in final position commonly modify an object from the main clause.", "sentence": "The woman has a large dog that the cat likes."}
+Output:
+{"original_note": "Relative clauses in final position commonly modify an object from the main clause.", "sentence": "The woman has a large dog that the cat likes.", "new_note": "A relative clause adds extra information about a {{NOUN}}.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A fronted-preposition relative clause places the preposition before the relative pronoun and sounds more formal than the stranded pattern.", "sentence": "Where is the person to whom you talked?"}
+Output:
+{"original_note": "A fronted-preposition relative clause places the preposition before the relative pronoun and sounds more formal than the stranded pattern.", "sentence": "Where is the person to whom you talked?", "new_note": "A relative clause adds extra information about a {{NOUN}}.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In hypothetical conditionals, the main clause usually contains would, could, or might to mark remoteness of possibility.", "sentence": "If he did have enough money, he would give you some."}
+Output:
+{"original_note": "In hypothetical conditionals, the main clause usually contains would, could, or might to mark remoteness of possibility.", "sentence": "If he did have enough money, he would give you some.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Hypothetical conditionals present an unlikely but still possible situation and typically use past forms in the if-clause.", "sentence": "If you asked Jack, he might lend you the money."}
+Output:
+{"original_note": "Hypothetical conditionals present an unlikely but still possible situation and typically use past forms in the if-clause.", "sentence": "If you asked Jack, he might lend you the money.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Many communication verbs prefer the after-preposition pattern because they focus on the act of communication rather than transfer of possession.", "sentence": "He described the picture to us."}
+Output:
+{"original_note": "Many communication verbs prefer the after-preposition pattern because they focus on the act of communication rather than transfer of possession.", "sentence": "He described the picture to us.", "new_note": "A {{PREPOSITIONAL_PHRASE}} can show the recipient or goal.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In the after-verb pattern, the indirect object is presented as a recipient who comes to have the transferred entity.", "sentence": "I sent my friend some photos."}
+Output:
+{"original_note": "In the after-verb pattern, the indirect object is presented as a recipient who comes to have the transferred entity.", "sentence": "I sent my friend some photos.", "new_note": "The recipient can come after the verb in the {{AFTER_VERB}} pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In the after-preposition pattern, the indirect object appears as the goal of transfer in a prepositional phrase.", "sentence": "I sent some photos to my friend."}
+Output:
+{"original_note": "In the after-preposition pattern, the indirect object appears as the goal of transfer in a prepositional phrase.", "sentence": "I sent some photos to my friend.", "new_note": "A {{PREPOSITIONAL_PHRASE}} can show the recipient or goal.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Some verbs such as cost use only the after-verb pattern and express loss of possession rather than transfer to a goal.", "sentence": "It cost me a lot of money."}
+Output:
+{"original_note": "Some verbs such as cost use only the after-verb pattern and express loss of possession rather than transfer to a goal.", "sentence": "It cost me a lot of money.", "new_note": "The recipient can come after the verb in the {{AFTER_VERB}} pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "The after-verb pattern is preferred when the indirect object is shorter, more given, or pronominal and the direct object carries the newer information.", "sentence": "I gave him some money."}
+Output:
+{"original_note": "The after-verb pattern is preferred when the indirect object is shorter, more given, or pronominal and the direct object carries the newer information.", "sentence": "I gave him some money.", "new_note": "The recipient can come after the verb in the {{AFTER_VERB}} pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "The after-preposition pattern is preferred when the indirect object is newer, heavier, or more informative than the direct object.", "sentence": "I gave it to Jack."}
+Output:
+{"original_note": "The after-preposition pattern is preferred when the indirect object is newer, heavier, or more informative than the direct object.", "sentence": "I gave it to Jack.", "new_note": "A {{PREPOSITIONAL_PHRASE}} can show the recipient or goal.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Relative clauses often occur in medial position when they modify the subject of the main clause.", "sentence": "The man who lives next door has a cat."}
+Output:
+{"original_note": "Relative clauses often occur in medial position when they modify the subject of the main clause.", "sentence": "The man who lives next door has a cat.", "new_note": "A relative clause adds extra information about a {{NOUN}}.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "With epistemic may, the speaker presents a proposition as a possibility rather than a certainty.", "sentence": "He may be a Democrat, but he happens to be right on this question."}
+Output:
+{"original_note": "With epistemic may, the speaker presents a proposition as a possibility rather than a certainty.", "sentence": "He may be a Democrat, but he happens to be right on this question.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Can't often conveys that something is not possible, which is stronger than merely saying it may not happen.", "sentence": "It can't work."}
+Output:
+{"original_note": "Can't often conveys that something is not possible, which is stronger than merely saying it may not happen.", "sentence": "It can't work.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "May not can mean that a negative outcome is possible rather than impossible.", "sentence": "It may not work."}
+Output:
+{"original_note": "May not can mean that a negative outcome is possible rather than impossible.", "sentence": "It may not work.", "new_note": "Negation is marked with {{NEGATIVE_MARKER}} in the clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "With some epistemic modals, negation affects the action or event rather than the modal meaning itself.", "sentence": "It won't rain."}
+Output:
+{"original_note": "With some epistemic modals, negation affects the action or event rather than the modal meaning itself.", "sentence": "It won't rain.", "new_note": "With {{MODAL}}, the modal comes before the subject in questions.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Don't have to marks the absence of obligation, not a prohibition against doing the action.", "sentence": "You don't have to do it."}
+Output:
+{"original_note": "Don't have to marks the absence of obligation, not a prohibition against doing the action.", "sentence": "You don't have to do it.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "With root may, negation normally blocks permission rather than describing a negative event.", "sentence": "You may not leave."}
+Output:
+{"original_note": "With root may, negation normally blocks permission rather than describing a negative event.", "sentence": "You may not leave.", "new_note": "Negation is marked with {{NEGATIVE_MARKER}} in the clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A non-restrictive relative clause adds extra information rather than identifying the noun, and it is marked off by separation markers such as commas.", "sentence": "My neighbor, who is an English teacher, plays very loud music."}
+Output:
+{"original_note": "A non-restrictive relative clause adds extra information rather than identifying the noun, and it is marked off by separation markers such as commas.", "sentence": "My neighbor, who is an English teacher, plays very loud music.", "new_note": "A relative clause adds extra information about a {{NOUN}}.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "An object relative clause can use that to connect the noun to a clause where the relative element functions as the object.", "sentence": "I didn't like the woman that I met."}
+Output:
+{"original_note": "An object relative clause can use that to connect the noun to a clause where the relative element functions as the object.", "sentence": "I didn't like the woman that I met.", "new_note": "A relative clause adds extra information about a {{NOUN}}.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Possessive relative clauses use whose to link the noun to something associated with it inside the relative clause.", "sentence": "Did you talk to the girl whose bag was stolen?"}
+Output:
+{"original_note": "Possessive relative clauses use whose to link the noun to something associated with it inside the relative clause.", "sentence": "Did you talk to the girl whose bag was stolen?", "new_note": "A relative clause adds extra information about a {{NOUN}}.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Predictive conditionals are common when speakers talk about future plans and their likely consequences.", "sentence": "If the weather is okay, we'll have lunch outside."}
+Output:
+{"original_note": "Predictive conditionals are common when speakers talk about future plans and their likely consequences.", "sentence": "If the weather is okay, we'll have lunch outside.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A predictive conditional often uses a modal in the main clause to mark how likely the result is.", "sentence": "If you don't get paid, I may not get my money back."}
+Output:
+{"original_note": "A predictive conditional often uses a modal in the main clause to mark how likely the result is.", "sentence": "If you don't get paid, I may not get my money back.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Predictive conditionals present the main-clause event as a future possibility that depends on the if-clause situation.", "sentence": "If you lend me some money, I'll pay you back tomorrow."}
+Output:
+{"original_note": "Predictive conditionals present the main-clause event as a future possibility that depends on the if-clause situation.", "sentence": "If you lend me some money, I'll pay you back tomorrow.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A restrictive relative clause provides identifying information needed to pick out which person or thing is meant.", "sentence": "My friend who's Japanese is coming."}
+Output:
+{"original_note": "A restrictive relative clause provides identifying information needed to pick out which person or thing is meant.", "sentence": "My friend who's Japanese is coming.", "new_note": "A relative clause adds extra information about a {{NOUN}}.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Should can also express a reasonable assumption or probability about what is likely to happen.", "sentence": "The journey should take two or three days."}
+Output:
+{"original_note": "Should can also express a reasonable assumption or probability about what is likely to happen.", "sentence": "The journey should take two or three days.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "With should, the core meaning is requirement, often interpreted in practice as advice or weak obligation.", "sentence": "You should brush your teeth twice a day."}
+Output:
+{"original_note": "With should, the core meaning is requirement, often interpreted in practice as advice or weak obligation.", "sentence": "You should brush your teeth twice a day.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "When the preposition stays at the end of the clause, the relative clause has a stranded-preposition pattern that is common in contemporary English.", "sentence": "Can I meet the person that you talked to?"}
+Output:
+{"original_note": "When the preposition stays at the end of the clause, the relative clause has a stranded-preposition pattern that is common in contemporary English.", "sentence": "Can I meet the person that you talked to?", "new_note": "A relative clause adds extra information about a {{NOUN}}.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A subject relative clause places the relative pronoun at the start of the clause where it functions as the subject.", "sentence": "I'm the kind of person who is always losing things."}
+Output:
+{"original_note": "A subject relative clause places the relative pronoun at the start of the clause where it functions as the subject.", "sentence": "I'm the kind of person who is always losing things.", "new_note": "A relative clause adds extra information about a {{NOUN}}.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In informal English, object relatives often omit the relative pronoun entirely and use a zero relative.", "sentence": "I don't want to talk about the woman I met."}
+Output:
+{"original_note": "In informal English, object relatives often omit the relative pronoun entirely and use a zero relative.", "sentence": "I don't want to talk about the woman I met.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Imperative verbs give commands.", "sentence": "Eat a balanced diet."}
+Output:
+{"original_note": "Imperative verbs give commands.", "sentence": "Eat a balanced diet.", "new_note": "Imperatives leave the subject unspoken and give a command or instruction.", "new_note_type": "same_pattern_different_angle", "new_note_style": "verbatim", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Most imperative verbs do not have a written subject; the subject is understood as you.", "sentence": "No matter what happens, hit the road."}
+Output:
+{"original_note": "Most imperative verbs do not have a written subject; the subject is understood as you.", "sentence": "No matter what happens, hit the road.", "new_note": "Imperatives leave the subject unspoken and give a command or instruction.", "new_note_type": "same_pattern_different_angle", "new_note_style": "verbatim", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "When a that-clause functions as object, the introductory that is often omitted in everyday English.", "sentence": "He claimed he had been working at home all afternoon."}
+Output:
+{"original_note": "When a that-clause functions as object, the introductory that is often omitted in everyday English.", "sentence": "He claimed he had been working at home all afternoon.", "new_note": "A that-clause can function as a {{CLAUSE}} or noun clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "When a clause lacks an auxiliary, do-support is used to carry negation.", "sentence": "You do not know where the sugar is."}
+Output:
+{"original_note": "When a clause lacks an auxiliary, do-support is used to carry negation.", "sentence": "You do not know where the sugar is.", "new_note": "Negation is marked with {{NEGATIVE_MARKER}} in the clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "When the clause has no invertible auxiliary, English uses do-support to form a yes-no question.", "sentence": "Did John smile?"}
+Output:
+{"original_note": "When the clause has no invertible auxiliary, English uses do-support to form a yes-no question.", "sentence": "Did John smile?", "new_note": "Yes-no questions with {{MODAL}} place the modal before the subject.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In modern American English, main verb have normally takes do-support in yes-no questions.", "sentence": "Do you have a question?"}
+Output:
+{"original_note": "In modern American English, main verb have normally takes do-support in yes-no questions.", "sentence": "Do you have a question?", "new_note": "Yes-no questions with {{MODAL}} place the modal before the subject.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In a do-support question, tense is carried by do while the main verb appears in its base form.", "sentence": "Does the TV work?"}
+Output:
+{"original_note": "In a do-support question, tense is carried by do while the main verb appears in its base form.", "sentence": "Does the TV work?", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A passive clause contains be followed by a past participle and presents the affected participant as subject.", "sentence": "The garage was cleaned out yesterday."}
+Output:
+{"original_note": "A passive clause contains be followed by a past participle and presents the affected participant as subject.", "sentence": "The garage was cleaned out yesterday.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In English negation, not is typically placed after the first auxiliary or after do in do-support clauses.", "sentence": "They do not know where it is."}
+Output:
+{"original_note": "In English negation, not is typically placed after the first auxiliary or after do in do-support clauses.", "sentence": "They do not know where it is.", "new_note": "Negation is marked with {{NEGATIVE_MARKER}} in the clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A by-phrase can introduce the agent in a passive clause when the performer is expressed.", "sentence": "The meeting was postponed by Kathy."}
+Output:
+{"original_note": "A by-phrase can introduce the agent in a passive clause when the performer is expressed.", "sentence": "The meeting was postponed by Kathy.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "The passive is identified by a form of be followed by the verb in its past participle form.", "sentence": "The movie was filmed in Spain."}
+Output:
+{"original_note": "The passive is identified by a form of be followed by the verb in its past participle form.", "sentence": "The movie was filmed in Spain.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In a perfect passive, the tense is carried by have while the passive sequence appears as been plus past participle.", "sentence": "John has been seen by Mary."}
+Output:
+{"original_note": "In a perfect passive, the tense is carried by have while the passive sequence appears as been plus past participle.", "sentence": "John has been seen by Mary.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A clause can be both progressive and passive when it contains be plus being plus a past participle.", "sentence": "The job is being contracted out to a firm in Singapore."}
+Output:
+{"original_note": "A clause can be both progressive and passive when it contains be plus being plus a past participle.", "sentence": "The job is being contracted out to a firm in Singapore.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A progressive passive combines progressive aspect with passive voice to describe an ongoing action affecting the subject.", "sentence": "The kids are being watched by my parents."}
+Output:
+{"original_note": "A progressive passive combines progressive aspect with passive voice to describe an ongoing action affecting the subject.", "sentence": "The kids are being watched by my parents.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "With modal auxiliaries, the passive is formed by modal plus be plus past participle.", "sentence": "The bill will be paid by them."}
+Output:
+{"original_note": "With modal auxiliaries, the passive is formed by modal plus be plus past participle.", "sentence": "The bill will be paid by them.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A question tag repeats the clause with auxiliary-pronoun structure and is typically negative after a positive statement.", "sentence": "You are ready to go, aren’t you?"}
+Output:
+{"original_note": "A question tag repeats the clause with auxiliary-pronoun structure and is typically negative after a positive statement.", "sentence": "You are ready to go, aren’t you?", "new_note": "Question tags check agreement at the end of a statement.", "new_note_type": "same_pattern_different_angle", "new_note_style": "verbatim", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Informal conversation can use a short final tag to check or confirm what the speaker assumes is true.", "sentence": "You know how to fill out these forms, right?"}
+Output:
+{"original_note": "Informal conversation can use a short final tag to check or confirm what the speaker assumes is true.", "sentence": "You know how to fill out these forms, right?", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A heavy subject that-clause is often shifted to the end of the sentence, with dummy it in subject position.", "sentence": "It didn’t come as a big surprise that the flight was going to be delayed."}
+Output:
+{"original_note": "A heavy subject that-clause is often shifted to the end of the sentence, with dummy it in subject position.", "sentence": "It didn’t come as a big surprise that the flight was going to be delayed.", "new_note": "A that-clause can function as a {{CLAUSE}} or noun clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "English often uses anticipatory it and places the that-clause later in the sentence when the clause would be a heavy subject.", "sentence": "It seems a little out of character that they would even consider doing it."}
+Output:
+{"original_note": "English often uses anticipatory it and places the that-clause later in the sentence when the clause would be a heavy subject.", "sentence": "It seems a little out of character that they would even consider doing it.", "new_note": "A that-clause can function as a {{CLAUSE}} or noun clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A that-clause can function as a noun clause, including as the complement of a linking verb.", "sentence": "The decision was that we will go ahead as we had planned."}
+Output:
+{"original_note": "A that-clause can function as a noun clause, including as the complement of a linking verb.", "sentence": "The decision was that we will go ahead as we had planned.", "new_note": "A that-clause can function as a {{CLAUSE}} or noun clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "That-clauses are formed from a statement in normal word order and often function as objects of verbs.", "sentence": "They knew that they would have to extend the deadline."}
+Output:
+{"original_note": "That-clauses are formed from a statement in normal word order and often function as objects of verbs.", "sentence": "They knew that they would have to extend the deadline.", "new_note": "A that-clause can function as a {{CLAUSE}} or noun clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "The introductory that in an object that-clause is often optional, but the clause still functions as a noun clause.", "sentence": "We decided that we should call a taxi."}
+Output:
+{"original_note": "The introductory that in an object that-clause is often optional, but the clause still functions as a noun clause.", "sentence": "We decided that we should call a taxi.", "new_note": "A that-clause can function as a {{CLAUSE}} or noun clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A wh-clause is formed by moving the wh-word to the front of the embedded clause while the rest of the clause keeps statement order.", "sentence": "I know what he said."}
+Output:
+{"original_note": "A wh-clause is formed by moving the wh-word to the front of the embedded clause while the rest of the clause keeps statement order.", "sentence": "I know what he said.", "new_note": "A wh-clause can function as a {{NOUN_PHRASE}} or complement.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A wh-clause can function as the object of a verb while keeping statement word order inside the clause.", "sentence": "I know what you mean."}
+Output:
+{"original_note": "A wh-clause can function as the object of a verb while keeping statement word order inside the clause.", "sentence": "I know what you mean.", "new_note": "A wh-clause can function as a {{NOUN_PHRASE}} or complement.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Inside a wh-clause used as a noun clause, the clause keeps statement order rather than question inversion.", "sentence": "I know where they went."}
+Output:
+{"original_note": "Inside a wh-clause used as a noun clause, the clause keeps statement order rather than question inversion.", "sentence": "I know where they went.", "new_note": "A wh-clause can function as a {{NOUN_PHRASE}} or complement.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Wh-clauses used as noun clauses do not use the inverted word order of direct questions.", "sentence": "I know who that man is."}
+Output:
+{"original_note": "Wh-clauses used as noun clauses do not use the inverted word order of direct questions.", "sentence": "I know who that man is.", "new_note": "A wh-clause can function as a {{NOUN_PHRASE}} or complement.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A wh-clause can contain a fronted wh-expression while the related preposition remains later in the clause in ordinary style.", "sentence": "I know whom you spoke to."}
+Output:
+{"original_note": "A wh-clause can contain a fronted wh-expression while the related preposition remains later in the clause in ordinary style.", "sentence": "I know whom you spoke to.", "new_note": "A wh-clause can function as a {{NOUN_PHRASE}} or complement.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A wh-clause can also function as the complement of a linking verb.", "sentence": "The question is whose idea was it in the first place?"}
+Output:
+{"original_note": "A wh-clause can also function as the complement of a linking verb.", "sentence": "The question is whose idea was it in the first place?", "new_note": "A wh-clause can function as a {{NOUN_PHRASE}} or complement.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Unlike that-clauses, wh-clauses can function as the object of a preposition.", "sentence": "We worried about where you had gone."}
+Output:
+{"original_note": "Unlike that-clauses, wh-clauses can function as the object of a preposition.", "sentence": "We worried about where you had gone.", "new_note": "A that-clause can function as a {{CLAUSE}} or noun clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A noun clause can function as the subject of a sentence even though it contains its own subject and verb.", "sentence": "What they are doing is none of our business."}
+Output:
+{"original_note": "A noun clause can function as the subject of a sentence even though it contains its own subject and verb.", "sentence": "What they are doing is none of our business.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Wh-clauses can be introduced by ever-forms such as whatever and function as full noun clauses.", "sentence": "Whatever you want to do is OK with me."}
+Output:
+{"original_note": "Wh-clauses can be introduced by ever-forms such as whatever and function as full noun clauses.", "sentence": "Whatever you want to do is OK with me.", "new_note": "A wh-clause can function as a {{NOUN_PHRASE}} or complement.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In formal style, the preposition can move to the front together with whom inside a wh-clause.", "sentence": "I know to whom you spoke."}
+Output:
+{"original_note": "In formal style, the preposition can move to the front together with whom inside a wh-clause.", "sentence": "I know to whom you spoke.", "new_note": "A wh-clause can function as a {{NOUN_PHRASE}} or complement.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Interrogative expressions such as how often function as fronted question words in information questions.", "sentence": "How often have you seen it?"}
+Output:
+{"original_note": "Interrogative expressions such as how often function as fronted question words in information questions.", "sentence": "How often have you seen it?", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In an information question, the wh-expression is fronted and the clause keeps inverted question order.", "sentence": "What should we give them?"}
+Output:
+{"original_note": "In an information question, the wh-expression is fronted and the clause keeps inverted question order.", "sentence": "What should we give them?", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Information questions place the interrogative word first and then invert the subject with the first verb.", "sentence": "When will they be back?"}
+Output:
+{"original_note": "Information questions place the interrogative word first and then invert the subject with the first verb.", "sentence": "When will they be back?", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "An information question moves the wh-word to the front and still uses auxiliary inversion.", "sentence": "Where did Charlie go?"}
+Output:
+{"original_note": "An information question moves the wh-word to the front and still uses auxiliary inversion.", "sentence": "Where did Charlie go?", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "When no auxiliary is available, an object wh-question uses do-support after the wh-expression is fronted.", "sentence": "Whom did you want to see?"}
+Output:
+{"original_note": "When no auxiliary is available, an object wh-question uses do-support after the wh-expression is fronted.", "sentence": "Whom did you want to see?", "new_note": "Wh-questions front {{QUESTION_WORD}} and keep {{AUXILIARY}} before the subject.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Wh-questions with lexical verbs require do-support in the same way as yes-no questions.", "sentence": "Why do you want to go there?"}
+Output:
+{"original_note": "Wh-questions with lexical verbs require do-support in the same way as yes-no questions.", "sentence": "Why do you want to go there?", "new_note": "Wh-questions front {{QUESTION_WORD}} and keep {{AUXILIARY}} before the subject.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A yes-no question is formed by inverting the subject and the first available auxiliary or main be verb.", "sentence": "Are you ready to go?"}
+Output:
+{"original_note": "A yes-no question is formed by inverting the subject and the first available auxiliary or main be verb.", "sentence": "Are you ready to go?", "new_note": "Yes-no questions with {{MODAL}} place the modal before the subject.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Helping verbs such as be and have can invert with the subject to form a yes-no question.", "sentence": "Is he leaving soon?"}
+Output:
+{"original_note": "Helping verbs such as be and have can invert with the subject to form a yes-no question.", "sentence": "Is he leaving soon?", "new_note": "Yes-no questions with {{MODAL}} place the modal before the subject.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "With modal auxiliaries, yes-no questions are formed by placing the modal before the subject.", "sentence": "Should we call them?"}
+Output:
+{"original_note": "With modal auxiliaries, yes-no questions are formed by placing the modal before the subject.", "sentence": "Should we call them?", "new_note": "Yes-no questions with {{MODAL}} place the modal before the subject.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "When be is the main verb, the question is formed by placing be before the subject.", "sentence": "Are the kids at school?"}
+Output:
+{"original_note": "When be is the main verb, the question is formed by placing be before the subject.", "sentence": "Are the kids at school?", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "We use the passive voice when we do not want to mention the agent.", "sentence": "It has been decided to cancel next week's meeting."}
+Output:
+{"original_note": "We use the passive voice when we do not want to mention the agent.", "sentence": "It has been decided to cancel next week's meeting.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "With the passive voice, the subject is the recipient of the action.", "sentence": "Penicillin was discovered by Alexander Fleming in 1928."}
+Output:
+{"original_note": "With the passive voice, the subject is the recipient of the action.", "sentence": "Penicillin was discovered by Alexander Fleming in 1928.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "We use the passive voice when the identity of the agent is obvious and can be omitted.", "sentence": "The murderer has been arrested."}
+Output:
+{"original_note": "We use the passive voice when the identity of the agent is obvious and can be omitted.", "sentence": "The murderer has been arrested.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "We use the passive voice when we do not know who is performing the action.", "sentence": "Tom's bike has been stolen."}
+Output:
+{"original_note": "We use the passive voice when we do not know who is performing the action.", "sentence": "Tom's bike has been stolen.", "new_note": "The passive voice uses {{AUXILIARY}} plus past participle to describe the event.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "The prepositional phrase does not determine the number of the verb; the subject does.", "sentence": "The bottles inside the carton are all broken."}
+Output:
+{"original_note": "The prepositional phrase does not determine the number of the verb; the subject does.", "sentence": "The bottles inside the carton are all broken.", "new_note": "A {{PREPOSITIONAL_PHRASE}} can show the recipient or goal.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "When an adverb clause comes first, the subordinating conjunction stays with that clause and a comma follows it.", "sentence": "Because it was raining, he brought an umbrella."}
+Output:
+{"original_note": "When an adverb clause comes first, the subordinating conjunction stays with that clause and a comma follows it.", "sentence": "Because it was raining, he brought an umbrella.", "new_note": "A that-clause can function as a {{CLAUSE}} or noun clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "An adverb clause can tell when the action in the main clause happens.", "sentence": "We will watch a movie after we eat dinner."}
+Output:
+{"original_note": "An adverb clause can tell when the action in the main clause happens.", "sentence": "We will watch a movie after we eat dinner.", "new_note": "An adverb clause shows the time, reason, or condition for the main clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "verbatim", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In a compound sentence, two independent clauses are linked by a coordinating conjunction.", "sentence": "Jordan is rich, but he owns an old car."}
+Output:
+{"original_note": "In a compound sentence, two independent clauses are linked by a coordinating conjunction.", "sentence": "Jordan is rich, but he owns an old car.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "In a conditional sentence, the result clause can be an imperative when the speaker gives a directive based on the condition.", "sentence": "If you are available for a meeting, please call me."}
+Output:
+{"original_note": "In a conditional sentence, the result clause can be an imperative when the speaker gives a directive based on the condition.", "sentence": "If you are available for a meeting, please call me.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "A dependent clause may be grammatically complete on its own, but its idea remains incomplete until it is attached to an independent clause.", "sentence": "While we are watching a movie, we will eat pizza."}
+Output:
+{"original_note": "A dependent clause may be grammatically complete on its own, but its idea remains incomplete until it is attached to an independent clause.", "sentence": "While we are watching a movie, we will eat pizza.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "The first conditional uses an if-clause for a possible future condition and a main clause for the expected result.", "sentence": "If she comes late, I will leave without her."}
+Output:
+{"original_note": "The first conditional uses an if-clause for a possible future condition and a main clause for the expected result.", "sentence": "If she comes late, I will leave without her.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "With neither...nor, the second clause is coordinated with a negative alternative and often shows inversion after nor.", "sentence": "He is neither rich, nor is he famous."}
+Output:
+{"original_note": "With neither...nor, the second clause is coordinated with a negative alternative and often shows inversion after nor.", "sentence": "He is neither rich, nor is he famous.", "new_note": "Negation is marked with {{NEGATIVE_MARKER}} in the clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "Not only...but also links parallel ideas and gives extra emphasis to the second clause.", "sentence": "Not only is she kind, but she also donates a lot of money to charity."}
+Output:
+{"original_note": "Not only...but also links parallel ideas and gives extra emphasis to the second clause.", "sentence": "Not only is she kind, but she also donates a lot of money to charity.", "new_note": "This sentence shows {{TARGET_SPAN}} in a grammatical pattern.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Input:
+{"note": "The second conditional presents a hypothetical or unreal situation and typically uses would or could in the main clause.", "sentence": "If I were an astronaut, I would love to travel to Mars."}
+Output:
+{"original_note": "The second conditional presents a hypothetical or unreal situation and typically uses would or could in the main clause.", "sentence": "If I were an astronaut, I would love to travel to Mars.", "new_note": "The {{IF_CLAUSE}} states the condition for the result clause.", "new_note_type": "same_pattern_different_angle", "new_note_style": "slot_template", "relation_to_original": "focuses on a different grammatical angle"}
+
+Now process all input rows carefully.
+For each row:
+- produce exactly one new note;
+- keep it distinct from the original note;
+- keep it faithful to the sentence;
+- make it template-like when possible, using placeholders to abstract reusable parts;
+- if a placeholder is possible, include one;
+- prefer a useful, reusable grammar note.
+
+Input format:
+You will receive one JSON object per line with:
+- note
+- sentence

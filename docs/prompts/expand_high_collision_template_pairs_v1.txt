@@ -1,0 +1,157 @@
+You are expanding a grammar-note dataset.
+
+Goal:
+Generate new training pairs that reduce model collapse on the most overused note families.
+
+Core rule:
+- The input and the target must use the same placeholder inventory.
+- If a placeholder appears in the target, the same placeholder must appear in the input.
+- If a pair cannot be templated cleanly, output a raw/raw pair instead.
+- Do not mix templated target with raw input, or raw target with templated input.
+
+Output format:
+- One JSON object per line.
+- Only these fields:
+  - input
+  - target
+- No markdown.
+- No extra commentary.
+
+Task:
+For each problematic family below, generate 6 new aligned pairs:
+1. a sentence template or signature-like input with slots
+2. a note template with the same slots
+
+The note must be more specific than a generic clause label.
+Prefer notes that encode:
+- grammatical form
+- grammatical function
+- distribution / constraint
+- contrast with nearby constructions
+
+Do not repeat the same note wording across families.
+Do not produce near-duplicates.
+Do not use vague targets like "This is an IF_CLAUSE."
+Do not overuse one placeholder such as IF_CLAUSE as a catch-all for many families.
+Make each pair genuinely different.
+
+Most significant collision families to expand:
+
+1. Existential there
+- Existing note pattern: "Existential there introduces {{NOUN_PHRASE}} as new information."
+- Problem: too many signatures collapse into this one line.
+- Required direction: split into narrower templates for existential there with:
+  - singular / plural NP
+  - clause vs phrase complement
+  - locative vs non-locative use
+
+2. Conditionals
+- Existing note patterns:
+  - "A {{CONDITIONAL_CLAUSE}} presents a possible or typical situation together with its consequence."
+  - "A future {{TIME_CLAUSE}} uses the simple present after words like before, after, and when rather than will or be going to."
+  - "The second conditional presents a hypothetical or unreal situation and typically uses would or could in the main clause."
+  - "Unless means except if and introduces the condition that would prevent the result."
+  - "Even if marks a condition that does not change the outcome stated in the main clause."
+  - "Provided, providing, as long as, and only if introduce a condition that is necessary for the result."
+- Required direction: separate
+  - first conditional
+  - second conditional
+  - future time clause
+  - unless-clause
+  - even-if clause
+  - restrictive condition
+
+3. Wh-clauses
+- Existing note patterns:
+  - "A {{WH_CLAUSE}} can contain a fronted wh-expression while the related {{PREPOSITION}} remains later in the clause in ordinary style."
+  - "A {{WH_CLAUSE}} is formed by moving the wh-word to the front of the embedded clause while the rest of the clause keeps statement order."
+  - "Inside a {{WH_CLAUSE}} used as a {{NOUN_CLAUSE}}, the clause keeps statement order rather than question inversion."
+  - "A {{WH_CLAUSE}} can function as the {{OBJECT}} of a verb while keeping statement word order inside the clause."
+- Required direction: separate
+  - wh-object clause
+  - wh-subject clause
+  - wh-clause with stranded preposition
+  - wh-clause as noun clause
+
+4. Clefts and extraposition
+- Existing note patterns:
+  - "An it-{{CLEFT}} focuses one constituent by placing it after It is or It was and following it with a {{RELATIVE_CLAUSE}}."
+  - "It is or It was with a time expression and a when-clause gives special emphasis to the time of an event."
+  - "It plus be, an {{ADJECTIVE}} or noun, and a {{THAT_CLAUSE}} comments on a fact or situation."
+  - "A heavy {{SUBJECT}} {{THAT_CLAUSE}} is often shifted to the end of the sentence, with dummy it in {{SUBJECT}} position."
+  - "English often uses anticipatory it and places the {{THAT_CLAUSE}} later in the sentence when the clause would be a heavy {{SUBJECT}}."
+- Required direction: split into
+  - it-cleft
+  - extraposition
+  - anticipatory it with that-clause
+  - time-cleft
+
+5. Negation and do-support
+- Existing note pattern: "When a clause lacks an {{AUXILIARY}}, {{DO_SUPPORT}} is used to carry {{NEGATION}}."
+- Required direction: produce separate templates for
+  - simple present negation
+  - simple past negation
+  - question formation with do-support
+  - contrast with clauses that already have an auxiliary
+
+6. Passives
+- Existing note patterns:
+  - "In English {{NEGATION}}, not is typically placed after the first {{AUXILIARY}} or after do in {{DO_SUPPORT}} clauses."
+  - "Passive voice with reporting verbs..."
+  - "A {{PASSIVE_VOICE}}..."
+- Required direction: split into
+  - by-phrase passive
+  - reporting-verb passive
+  - passive with agent omitted
+  - passive with double object / prepositional object
+
+7. Relative clauses
+- Existing note patterns:
+  - "A {{RELATIVE_CLAUSE}}..."
+- Required direction: separate
+  - defining relative clause
+  - non-defining relative clause
+  - relative clause with pronoun subject
+  - relative clause with preposition
+
+8. Question types
+- Existing note patterns:
+  - "A {{WH_QUESTION}}..."
+  - "A {{YES_NO_QUESTIONS}}..."
+  - "A {{QUESTION_TAG}}..."
+- Required direction: keep them apart.
+  - wh-question
+  - yes-no question
+  - question tag
+  - modal question
+
+9. Modal-perfect and related patterns
+- Existing note patterns:
+  - "A {{MODAL}} have {{PAST_PARTICIPLE}}..."
+  - "A {{MODAL}}..."
+- Required direction:
+  - criticism / regret about a past event
+  - inference about a past event
+  - obligation or advice about a past event
+  - remote past possibility
+
+10. Nominal clause families
+- Existing note patterns:
+  - "{{THAT_CLAUSE}}"
+  - "{{NOUN_CLAUSE}}"
+- Required direction:
+  - that-clause as object
+  - that-clause after adjective
+  - that-clause as subject
+  - noun clause after reporting verb
+
+Quality constraints:
+- Each generated pair must be grammatical.
+- Each target must be a good teaching note, not just a label.
+- Use placeholders only when they help the note and the input.
+- Keep the placeholder names consistent across input and target.
+- Do not invent placeholders that are unrelated to the sentence structure.
+- Prefer 8 to 18 words in the target when possible.
+- Keep the input compact and structurally informative.
+
+Return 6 pairs for each family above, in JSONL.

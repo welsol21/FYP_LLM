@@ -1,0 +1,89 @@
+You are expanding a grammar-note dataset.
+
+Input file:
+- data/processed_sentence_seed/if_clause_signature_items_v1.jsonl
+
+Task:
+Split the IF_CLAUSE family into narrower, more specific template pairs.
+
+Goal:
+The attached file contains IF_CLAUSE signatures that still collapse too much.
+Generate new pairs so the family is broken into smaller, clearer conditional subtypes.
+
+Hard rules:
+- Use only the attached file as input.
+- Keep `input` and `target` aligned.
+- If a placeholder appears in `input`, the same placeholder inventory must appear in `target`.
+- If a pair is raw, keep it raw on both sides.
+- Do not mix raw and templated forms.
+- Do not use placeholders outside the allowed list below.
+- Do not invent new placeholder names.
+- Do not output vague generic conditional notes.
+- Do not produce duplicate or near-duplicate template pairs.
+- Make each pair narrow enough that it belongs to one conditional subtype, not the whole IF_CLAUSE family.
+
+Allowed placeholders:
+- IF_CLAUSE
+- PRESENT_SIMPLE_CONDITION
+- WILL_RESULT_CLAUSE
+- MODAL_RESULT_CLAUSE
+- IMPERATIVE_RESULT_CLAUSE
+- PRESENT_SIMPLE_GENERAL_CONDITION
+- PRESENT_SIMPLE_GENERAL_RESULT
+- PRESENT_SIMPLE_HABIT_CONDITION
+- PRESENT_SIMPLE_HABIT_RESULT
+- PAST_SIMPLE_HYPOTHETICAL_CONDITION
+- WOULD_RESULT_CLAUSE
+- COULD_RESULT_CLAUSE
+- MIGHT_RESULT_CLAUSE
+- WERE_CONDITION
+- PAST_PERFECT_CONDITION
+- WOULD_HAVE_RESULT_CLAUSE
+- COULD_HAVE_RESULT_CLAUSE
+- MIGHT_HAVE_RESULT_CLAUSE
+- PRESENT_CONDITIONAL_RESULT
+- MODAL_PERFECT_RESULT_CLAUSE
+- UNLESS_CONDITION
+- MAIN_RESULT_CLAUSE
+- EVEN_IF_CONDITION
+- UNCHANGED_RESULT_CLAUSE
+- NECESSARY_CONDITION
+- INVERTED_RESULT_CLAUSE
+- RESTRICTIVE_CONDITION
+- REDUCED_ADJECTIVE_CONDITION
+- REDUCED_PARTICIPLE_CONDITION
+- BASE_VERB
+- PAST_PARTICIPLE
+- CONDITION_CLAUSE
+- SHOULD_RESULT_CLAUSE
+- MAY_RESULT_CLAUSE
+
+Target coverage:
+- first conditional
+- predictive conditional
+- imperative conditional
+- zero conditional
+- factual conditional
+- second conditional
+- third conditional
+- mixed conditional
+- unless
+- even if
+- only if
+- provided / providing / as long as
+- reduced if-phrases
+- formal should / were to / had inversion conditionals
+- result clauses with modal or imperative outcomes
+
+Output format:
+- One JSON object per line.
+- Fields:
+  - input
+  - target
+- Return only valid JSONL.
+
+Quality target:
+- Aim for around 28 to 32 narrow subtemplates overall.
+- Each subtemplate should cover only a small cluster of signatures.
+- Prefer precise grammar labels over broad IF_CLAUSE wording.
+

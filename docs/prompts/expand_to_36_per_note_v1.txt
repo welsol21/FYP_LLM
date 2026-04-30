@@ -1,0 +1,163 @@
+You are expanding a grammar-note dataset.
+
+Task:
+For each grammar note below, generate exactly the requested number of new English sentences that clearly fit the note.
+
+Rules:
+- Keep each sentence grammatical and natural.
+- Make each sentence a different example, not a paraphrase of another example.
+- Keep the target grammar pattern central and easy to identify.
+- Do not copy the wording of the note.
+- Do not produce duplicate sentences across notes.
+- Do not add commentary, labels, or explanations.
+- Return one JSON object per line with fields:
+  - note
+  - sentence
+
+Quality requirements:
+- Prefer short or medium-length sentences.
+- Vary subjects, verbs, and lexical items.
+- Keep the syntax clean and readable.
+- If the note is about a clause type, make the clause type obvious.
+- If the note is about a phrase type, make the phrase type obvious.
+- If the note is about a word-level pattern, keep the target word form obvious.
+- If a note is hard to illustrate, still produce the best matching natural sentence you can.
+
+Notes to expand:
+
+1. [8/36, need 28] There was a bright light shining in the distance.
+2. [10/36, need 26] A counterfactual conditional presents what might have happened in the past but did not happen.
+3. [10/36, need 26] In the third conditional, the if-clause uses the past perfect and the main clause uses would have or should have for an unreal past result.
+4. [11/36, need 25] The passive of reporting verbs is often used in impersonal it structures when the source of the report is general or already understood.
+5. [12/36, need 24] A by-phrase can introduce the agent in a passive clause when the performer is expressed.
+6. [12/36, need 24] A conditional may be followed by an instruction when the speaker gives a directive that depends on the condition being met.
+7. [12/36, need 24] Counterfactual conditionals can use were to mark a situation presented as contrary to fact.
+8. [12/36, need 24] Impersonal it is also used to give the time or date.
+9. [12/36, need 24] Impersonal it is used in weather expressions.
+10. [12/36, need 24] In formal English, should, were, or had can be fronted and if omitted in a conditional clause.
+11. [12/36, need 24] There can occur with seem or appear to present something as apparently existing.
+12. [12/36, need 24] There plus be, a noun phrase, and an -ing participle can describe what is present in a scene or situation.
+13. [12/36, need 24] Transitive phrasal verbs can also appear in the passive.
+14. [12/36, need 24] With find or think, it can stand as anticipatory object before an adjective and infinitive or clause.
+15. [13/36, need 23] A by-phrase can name the performer at the end of a passive clause, where it receives end focus.
+16. [13/36, need 23] A clause can be both progressive and passive when it contains be plus being plus a past participle.
+17. [13/36, need 23] A complex sentence contains one independent clause and one or more dependent clauses.
+18. [13/36, need 23] A compound sentence contains two or more independent clauses joined by a coordinating conjunction.
+19. [13/36, need 23] A compound-complex sentence contains at least two independent clauses together with at least one dependent clause.
+20. [13/36, need 23] A dependent clause may be grammatically complete on its own, but its idea remains incomplete until it is attached to an independent clause.
+21. [13/36, need 23] A final if-clause often works like an afterthought or reminder rather than the main point of the message.
+22. [13/36, need 23] A fronted-preposition relative clause places the preposition before the relative pronoun and sounds more formal than the stranded pattern.
+23. [13/36, need 23] A non-restrictive relative clause adds extra information rather than identifying the noun, and it is marked off by separation markers such as commas.
+24. [13/36, need 23] A passive clause contains be followed by a past participle and presents the affected participant as subject.
+25. [13/36, need 23] A passive clause often omits the performer when the performer is unknown, unimportant, or already understood.
+26. [13/36, need 23] A predictive conditional often uses a modal in the main clause to mark how likely the result is.
+27. [13/36, need 23] A progressive passive combines progressive aspect with passive voice to describe an ongoing action affecting the subject.
+28. [13/36, need 23] A question tag repeats the clause with auxiliary-pronoun structure and is typically negative after a positive statement.
+29. [13/36, need 23] A relative clause can combine two clauses into one complex sentence by embedding extra information after a noun.
+30. [13/36, need 23] A restrictive relative clause provides identifying information needed to pick out which person or thing is meant.
+31. [13/36, need 23] A subject relative clause places the relative pronoun at the start of the clause where it functions as the subject.
+32. [13/36, need 23] A that-clause can function as a noun clause, including as the complement of a linking verb.
+33. [13/36, need 23] A wh-clause can also function as the complement of a linking verb.
+34. [13/36, need 23] A wh-question with be going to begins with the wh-expression and keeps be before the subject.
+35. [13/36, need 23] A yes-no question with be going to is formed by placing be before the subject.
+36. [13/36, need 23] An adverb clause can tell when the action in the main clause happens.
+37. [13/36, need 23] An if-clause can come before or after the main clause, but it still uses the simple present for future time.
+38. [13/36, need 23] An object relative clause can use that to connect the noun to a clause where the relative element functions as the object.
+39. [13/36, need 23] Be going to is used to talk about a future plan or intention.
+40. [13/36, need 23] Be supposed to expresses an external social expectation rather than a strong personal command from the speaker.
+41. [13/36, need 23] By plus an -ing form can express the method by which a result is achieved.
+42. [13/36, need 23] Can't often conveys that something is not possible, which is stronger than merely saying it may not happen.
+43. [13/36, need 23] Conditional clauses are often used with imperatives when an instruction depends on a condition.
+44. [13/36, need 23] Conditional clauses usually begin with if and link the consequence in the main clause to a stated condition.
+45. [13/36, need 23] Conditionals followed by directives are common in procedural and advisory texts.
+46. [13/36, need 23] Counterfactual conditionals present an outcome against a past situation that is known not to have happened.
+47. [13/36, need 23] Don't have to marks the absence of obligation, not a prohibition against doing the action.
+48. [13/36, need 23] Factual conditionals present a relationship that is generally true or habitually the case in the circumstances described.
+49. [13/36, need 23] Hypothetical conditionals present an unlikely but still possible situation and typically use past forms in the if-clause.
+50. [13/36, need 23] Imperative verbs give commands.
+51. [13/36, need 23] Impersonal it can describe a situation or place without referring to a concrete antecedent.
+52. [13/36, need 23] In a compound sentence, two independent clauses are linked by a coordinating conjunction.
+53. [13/36, need 23] In a conditional sentence, the result clause can be an imperative when the speaker gives a directive based on the condition.
+54. [13/36, need 23] In a factual conditional, both clauses typically describe a regular pattern rather than a single imagined outcome.
+55. [13/36, need 23] In a future time clause, the time-marker clause uses the simple present while the main clause carries the future meaning.
+56. [13/36, need 23] In a perfect passive, the tense is carried by have while the passive sequence appears as been plus past participle.
+57. [13/36, need 23] In accounts of processes and experiments, the passive keeps the focus on what happens rather than on the performer.
+58. [13/36, need 23] In an imperative sentence, the subject is often omitted and understood as the second-person pronoun you.
+59. [13/36, need 23] In formal style, verbs such as remain, follow, and come can appear after there.
+60. [13/36, need 23] In hypothetical conditionals, the main clause usually contains would, could, or might to mark remoteness of possibility.
+61. [13/36, need 23] In informal English, object relatives often omit the relative pronoun entirely and use a zero relative.
+62. [13/36, need 23] In negative be going to clauses, not follows be.
+63. [13/36, need 23] In the after-preposition pattern, the indirect object appears as the goal of transfer in a prepositional phrase.
+64. [13/36, need 23] In the after-verb pattern, the indirect object is presented as a recipient who comes to have the transferred entity.
+65. [13/36, need 23] In the first conditional, the if-clause uses the present simple while the main clause presents a future result.
+66. [13/36, need 23] Informal conversation can use a short final tag to check or confirm what the speaker assumes is true.
+67. [13/36, need 23] Interrogative expressions such as how often function as fronted question words in information questions.
+68. [13/36, need 23] It plus be, an adjective, and a to-infinitive lets the clause comment on an action while keeping the heavier information at the end.
+69. [13/36, need 23] It with take or cost introduces the amount of time, effort, or money needed for an action.
+70. [13/36, need 23] Many communication verbs prefer the after-preposition pattern because they focus on the act of communication rather than transfer of possession.
+71. [13/36, need 23] May and might express possibility rather than certainty.
+72. [13/36, need 23] May can present a future event as possible rather than certain.
+73. [13/36, need 23] May not can mean that a negative outcome is possible rather than impossible.
+74. [13/36, need 23] Maybe is an adverb meaning possibly and it appears before the subject and verb.
+75. [13/36, need 23] Most imperative verbs do not have a written subject; the subject is understood as you.
+76. [13/36, need 23] Not only...but also links parallel ideas and gives extra emphasis to the second clause.
+77. [13/36, need 23] Passive forms consist of an appropriate form of be followed by the -ed participle of the verb.
+78. [13/36, need 23] Possessive relative clauses use whose to link the noun to something associated with it inside the relative clause.
+79. [13/36, need 23] Predictive conditionals are common when speakers talk about future plans and their likely consequences.
+80. [13/36, need 23] Predictive conditionals present the main-clause event as a future possibility that depends on the if-clause situation.
+81. [13/36, need 23] Relative clauses in final position commonly modify an object from the main clause.
+82. [13/36, need 23] Relative clauses often occur in medial position when they modify the subject of the main clause.
+83. [13/36, need 23] Should can also express a reasonable assumption or probability about what is likely to happen.
+84. [13/36, need 23] Some state passives use with to introduce what creates or characterizes the state.
+85. [13/36, need 23] Some verbs are especially common in passive form because the performer is not normally mentioned.
+86. [13/36, need 23] Some verbs such as cost use only the after-verb pattern and express loss of possession rather than transfer to a goal.
+87. [13/36, need 23] Subordinate clauses are adverbial and can often be moved to the beginning or the end of the sentence.
+88. [13/36, need 23] The after-preposition pattern is preferred when the indirect object is newer, heavier, or more informative than the direct object.
+89. [13/36, need 23] The after-verb pattern is preferred when the indirect object is shorter, more given, or pronominal and the direct object carries the newer information.
+90. [13/36, need 23] The passive is common when the focus is on what should be done rather than on who does it.
+91. [13/36, need 23] The passive is identified by a form of be followed by the verb in its past participle form.
+92. [13/36, need 23] The passive lets you present an event from the point of view of the person or thing affected rather than the performer.
+93. [13/36, need 23] The prepositional phrase does not determine the number of the verb; the subject does.
+94. [13/36, need 23] The zero conditional uses present forms in both clauses to express a general truth or regular result.
+95. [13/36, need 23] There can be followed by a passive reporting verb to relay what is said or expected to exist or happen.
+96. [13/36, need 23] There plus be can also introduce an event as something that happened.
+97. [13/36, need 23] We use the passive voice when the identity of the agent is obvious and can be omitted.
+98. [13/36, need 23] We use the passive voice when we do not know who is performing the action.
+99. [13/36, need 23] We use the passive voice when we do not want to mention the agent.
+100. [13/36, need 23] Were to with an infinitive is a formal way to present a remote future possibility.
+101. [13/36, need 23] When a that-clause functions as object, the introductory that is often omitted in everyday English.
+102. [13/36, need 23] When an adverb clause comes first, the subordinating conjunction stays with that clause and a comma follows it.
+103. [13/36, need 23] When be is the main verb, the question is formed by placing be before the subject.
+104. [13/36, need 23] When talking about something that may happen in the future, the conditional clause typically uses the present simple and the main clause uses will or shall.
+105. [13/36, need 23] When the condition is unreal, the main clause normally uses a modal such as would, could, or might.
+106. [13/36, need 23] When the preposition stays at the end of the clause, the relative clause has a stranded-preposition pattern that is common in contemporary English.
+107. [13/36, need 23] When-clauses that refer to the future use the simple present instead of will.
+108. [13/36, need 23] With can name the instrument or means used to perform the action in a passive clause.
+109. [13/36, need 23] With epistemic may, the speaker presents a proposition as a possibility rather than a certainty.
+110. [13/36, need 23] With modal auxiliaries, the passive is formed by modal plus be plus past participle.
+111. [13/36, need 23] With modal auxiliaries, yes-no questions are formed by placing the modal before the subject.
+112. [13/36, need 23] With neither...nor, the second clause is coordinated with a negative alternative and often shows inversion after nor.
+113. [13/36, need 23] With root may, negation normally blocks permission rather than describing a negative event.
+114. [13/36, need 23] With should, the core meaning is requirement, often interpreted in practice as advice or weak obligation.
+115. [13/36, need 23] With some epistemic modals, negation affects the action or event rather than the modal meaning itself.
+116. [13/36, need 23] With the passive voice, the subject is the recipient of the action.
+117. [13/36, need 23] With verbs of benefitting, a for-phrase can present the indirect object as a beneficiary without necessarily implying immediate possession.
+118. [20/36, need 16] A what-cleft can focus an action by placing it after be.
+119. [20/36, need 16] A what-cleft with want or need highlights the thing wanted or needed.
+120. [20/36, need 16] All can replace what when the construction emphasizes that just one thing is wanted or needed.
+121. [24/36, need 12] Questions with existential there are formed by placing be before there.
+122. [24/36, need 12] Wh-clauses used as noun clauses do not use the inverted word order of direct questions.
+123. [24/36, need 12] With plural following nouns, existential there questions use are there.
+124. [32/36, need 4] Unlike that-clauses, wh-clauses can function as the object of a preposition.
+125. [32/36, need 4] Wh-clauses can be introduced by ever-forms such as whatever and function as full noun clauses.
+
+Output format:
+- One JSON object per line.
+- Fields:
+  - note
+  - sentence
+- No markdown.
+- No bullet lists.
+- No extra text.
+
+Generate exactly the requested number of sentences for each note, in the same order as the notes above.

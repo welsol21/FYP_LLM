@@ -79,6 +79,8 @@ linguistic_hierarchical_3000_v3.json
 # -------------------------
 # Cache
 # -------------------------
+.codex
+.codex/
 .cache/
 .cache/*
 *.cache

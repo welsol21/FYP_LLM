@@ -1,0 +1,107 @@
+You are expanding a grammar-note dataset.
+
+Task:
+For each input sentence and its existing note, generate exactly 1 NEW note that also fits the same sentence.
+
+Goal:
+- Keep the same sentence.
+- Produce a different note from the existing one.
+- The new note must be template-like and use spaCy-style placeholders when the sentence contains concrete words, phrases, or spans that should be abstracted.
+- If the sentence supports any concrete span, phrase, word, or clause that can be abstracted, the new note must include at least one placeholder.
+- Only allow a placeholder-free new note when the sentence truly has no stable abstractable span.
+- Use the sentence as evidence for another valid grammar note.
+- Increase note variety on existing sentences.
+- Expand the dataset by adding new notes for already covered examples.
+
+Important:
+- Do NOT rewrite the sentence.
+- Do NOT repeat the original note.
+- Do NOT paraphrase the original note too closely.
+- The new note must be grammatically correct for the sentence.
+- The new note must be reusable for many sentences with the same grammar shape when possible.
+- Prefer a different pedagogical angle from the original note.
+- Prefer placeholders such as {{SUBJECT}}, {{OBJECT}}, {{CLAUSE}}, {{NOUN_PHRASE}}, {{VERB_PHRASE}}, {{ADJECTIVE}}, {{ADVERB}}, {{PREPOSITION}}, {{AUXILIARY}}, {{MODAL}}, {{RELATIVE_PRONOUN}}, {{QUESTION_TAG}}, {{TARGET_SPAN}}.
+- If the original note is general, still generate a different template note using placeholders only when they genuinely improve reuse.
+- Do not output a template-style note without at least one placeholder if the sentence supports one.
+- If the sentence clearly supports another grammar pattern, use that pattern.
+- If not, use a different valid angle on the same pattern.
+- Do not invent a note that the sentence does not support.
+- Do not add commentary, labels, or explanations.
+
+Output requirements:
+- Return one JSON object per line.
+- Each object must contain:
+  - original_note
+  - sentence
+  - new_note
+  - new_note_type
+  - new_note_style
+  - relation_to_original
+- `new_note_type` must be one of:
+  - same_pattern_different_angle
+  - different_pattern_same_sentence
+  - broader_usable_template
+- `new_note_style` must be one of:
+  - verbatim
+  - slot_template
+  - generalized_template
+- `relation_to_original` must be one short phrase explaining how the new note differs from the original.
+- Do not output the original note as the new note.
+- Do not output duplicate new notes for different inputs.
+- Do not add any extra text outside JSON.
+
+How to choose the new note:
+- Focus on a real grammar feature in the sentence.
+- Prefer notes that:
+  - describe a different function,
+  - describe a different structure,
+  - or describe a different constraint.
+- Keep the note concise and pedagogical.
+- Keep the note reusable across similar sentences.
+- Avoid empty generalities like "This is an example of grammar."
+
+Few-shot examples:
+
+Input:
+{"note":"In existential there clauses, the form of be agrees with the noun phrase that follows it.","sentence":"There are some books on Ali’s desk."}
+Output:
+{"original_note":"In existential there clauses, the form of be agrees with the noun phrase that follows it.","sentence":"There are some books on Ali’s desk.","new_note":"Existential there can introduce {{NOUN_PHRASE}} as new information.","new_note_type":"same_pattern_different_angle","new_note_style":"slot_template","relation_to_original":"focuses on information structure rather than agreement"}
+
+Input:
+{"note":"Conditional clauses usually begin with if and link the consequence in the main clause to a stated condition.","sentence":"If you do that I shall be very pleased."}
+Output:
+{"original_note":"Conditional clauses usually begin with if and link the consequence in the main clause to a stated condition.","sentence":"If you do that I shall be very pleased.","new_note":"The if-clause states the condition for the result in the main clause.","new_note_type":"same_pattern_different_angle","new_note_style":"generalized_template","relation_to_original":"focuses on clause function rather than clause shape"}
+
+Input:
+{"note":"In an information question, the wh-expression is fronted and the clause keeps inverted question order.","sentence":"What should we give them?"}
+Output:
+{"original_note":"In an information question, the wh-expression is fronted and the clause keeps inverted question order.","sentence":"What should we give them?","new_note":"Wh-questions front the question word and keep {{AUXILIARY}} before the subject.","new_note_type":"broader_usable_template","new_note_style":"slot_template","relation_to_original":"keeps the structure but abstracts the auxiliary"}
+
+Input:
+{"note":"With modal auxiliaries, yes-no questions are formed by placing the modal before the subject.","sentence":"Should we call them?"}
+Output:
+{"original_note":"With modal auxiliaries, yes-no questions are formed by placing the modal before the subject.","sentence":"Should we call them?","new_note":"Modal yes-no questions place {{MODAL}} before the subject.","new_note_type":"broader_usable_template","new_note_style":"slot_template","relation_to_original":"compresses the rule into a reusable template"}
+
+Input:
+{"note":"A relative clause can combine two clauses into one complex sentence by embedding extra information after a noun.","sentence":"The book that you lent me was helpful."}
+Output:
+{"original_note":"A relative clause can combine two clauses into one complex sentence by embedding extra information after a noun.","sentence":"The book that you lent me was helpful.","new_note":"The relative clause identifies which {{NOUN}} is meant.","new_note_type":"same_pattern_different_angle","new_note_style":"slot_template","relation_to_original":"focuses on identification rather than clause combination"}
+
+Input:
+{"note":"A passive clause presents the subject as the receiver of the action.","sentence":"The house was painted yesterday."}
+Output:
+{"original_note":"A passive clause presents the subject as the receiver of the action.","sentence":"The house was painted yesterday.","new_note":"The passive voice uses {{AUXILIARY}} plus past participle to describe the action.","new_note_type":"different_pattern_same_sentence","new_note_style":"slot_template","relation_to_original":"focuses on form rather than role"}
+
+Now process all input rows carefully.
+For each row:
+- produce exactly one new note;
+- keep it distinct from the original note;
+- keep it faithful to the sentence;
+- make it template-like when possible, using placeholders to abstract reusable parts;
+- if a placeholder is possible, include one;
+- prefer a useful, reusable grammar note.
+
+Input format:
+You will receive one JSON object per line with:
+- note
+- sentence

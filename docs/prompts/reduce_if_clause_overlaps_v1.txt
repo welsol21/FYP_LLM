@@ -1,0 +1,42 @@
+You are cleaning a grammar-note dataset.
+
+Task:
+Reduce the number of IF_CLAUSE training pairs that are too broad and cause model collapse.
+
+Goal:
+The current IF_CLAUSE family is too large and too repetitive.
+Remove or replace the most redundant pairs so the remaining set is narrower and more specific.
+
+What to focus on:
+- generic first conditional templates
+- generic second conditional templates
+- generic future-in-time if-clause templates
+- generic unless / even if / only if templates that are too broad
+- templates that appear across many different signatures but do not add new information
+
+Rules:
+- Use only the attached IF_CLAUSE family file as input.
+- Keep pairs that are narrow, specific, and structurally distinct.
+- Remove pairs that are near-duplicates or overly general.
+- Prefer keeping one strong template per conditional subtype instead of several broad variants.
+- Do not invent new placeholders.
+- If a pair is templated, input and target must use the same placeholder inventory.
+- If a pair is raw, keep it raw on both sides.
+- Do not mix raw and templated forms.
+- Do not output commentary, explanations, or labels.
+
+Removal target:
+- Reduce the IF_CLAUSE family by about 90 to 120 pairs.
+- Prioritize removing the broadest and most repetitive pairs first.
+- Keep the narrower subtypes that best distinguish conditional meaning.
+
+Output format:
+- One JSON object per line.
+- Fields:
+  - input
+  - target
+- Return only the cleaned pairs that should remain.
+
+Quality target:
+- After cleaning, the IF_CLAUSE family should be noticeably smaller and less repetitive.
+- The remaining pairs should be specific enough that the model does not collapse onto a single IF_CLAUSE template.

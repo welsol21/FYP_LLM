@@ -1,0 +1,48 @@
+You are expanding a grammar-note dataset.
+
+Input file:
+- if_clause_signature_items_v1.jsonl
+
+Task:
+Split the IF_CLAUSE family into narrower, more specific template pairs.
+
+Goal:
+The attached file contains the current IF_CLAUSE signatures that collapse into too few note templates.
+Generate new template pairs so that each note template covers a much smaller, more specific signature cluster.
+
+Rules:
+- Use the attached JSONL file as the only source of signatures to split.
+- Keep `input` and `target` aligned.
+- If you template one side with placeholders, template the other side with the same placeholder inventory.
+- Do not mix raw and templated forms in the same pair.
+- Do not keep a single broad IF_CLAUSE template for dozens of signatures.
+- Prefer one narrow conditional subtype per pair.
+- Avoid duplicate or near-duplicate targets.
+- Keep the note pedagogical, concise, and reusable.
+- Make the conditional pattern explicit in both `input` and `target`.
+- Use placeholders only when they are genuinely shared by both sides.
+
+Target coverage:
+- first conditional
+- second conditional
+- third conditional
+- future-in-time if-clause
+- unless
+- even if
+- only if
+- provided / providing / as long as
+- reduced if-phrases
+- formal should / were to / had + participle conditionals
+- conditional clauses with modal result clauses
+
+Output format:
+- One JSON object per line.
+- Fields:
+  - input
+  - target
+- Return only valid JSONL.
+
+Quality target:
+- Produce enough narrower pairs so that the current IF_CLAUSE collapse is visibly reduced.
+- Aim for about 28 to 32 narrower subtemplates overall.
+- Keep each subtemplate limited to a small set of signatures rather than the whole family.

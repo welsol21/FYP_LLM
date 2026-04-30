@@ -1,0 +1,372 @@
+You are expanding a grammar-note dataset.
+
+Task:
+For each grammar note below, generate exactly 19 new English sentences that clearly fit the note.
+
+Goal:
+- Keep each sentence grammatical and natural.
+- Make each sentence a different example, not a paraphrase of another example.
+- Keep the target grammar pattern central and easy to identify.
+- Do not copy the wording of the note.
+- Do not produce duplicate sentences across notes.
+- Do not add commentary, labels, or explanations.
+- Return one JSON object per line with fields:
+  - note
+  - sentence
+
+Quality requirements:
+- Prefer short or medium-length sentences.
+- Vary subjects, verbs, and lexical items.
+- Keep the syntax clean and readable.
+- If the note is about a clause type, make the clause type obvious.
+- If the note is about a phrase type, make the phrase type obvious.
+- If the note is about a word-level pattern, keep the target word form obvious.
+- If a note is hard to illustrate, still produce the best matching natural sentence you can.
+
+Notes to expand:
+
+1. {{SUBJECT}} am/is/are going to {{VERB_PHRASE}} to express a future action.
+   Example sentence: I’m going to go downtown tomorrow.
+2. Negation with be going to places {{NEGATIVE_MARKER}} after the form of be.
+   Example sentence: Ann isn’t going to study tonight.
+3. {{QUESTION_WORD}} {{AUXILIARY}} {{SUBJECT}} going to {{VERB_PHRASE}}.
+   Example sentence: What time are you going to eat dinner tonight?
+4. Yes-no questions with be going to invert {{AUXILIARY}} and {{SUBJECT}}.
+   Example sentence: Are you going to come to class tomorrow?
+5. In existential there, the verb agrees with the {{NOUN_PHRASE}} after it.
+   Example sentence: There are some books on Ali’s desk.
+6. Use existential there to present the existence of {{NOUN_PHRASE}}.
+   Example sentence: There is a book on my desk.
+7. Yes-no questions with existential there place {{AUXILIARY}} before there.
+   Example sentence: Are there any eggs in the refrigerator?
+8. Question formation with existential there inverts {{AUXILIARY}} and there.
+   Example sentence: Is there any milk in the refrigerator?
+9. Conditional sentences use the simple present in the {{IF_CLAUSE}} for future time.
+   Example sentence: If it rains tomorrow, we will stay home.
+10. The {{IF_CLAUSE}} can appear after the main clause while still using present tense.
+   Example sentence: I’m going to buy a new car next year if I have enough money.
+11. After {{TIME_MARKER}}, the verb stays in simple present even for future events.
+   Example sentence: Before Ann goes to work tomorrow, she will eat breakfast.
+12. Future meaning appears in the main clause, not in the clause introduced by {{TIME_MARKER}}.
+   Example sentence: I’m going to finish my homework after I eat dinner tonight.
+13. Use simple present in when-clauses that refer to a {{FUTURE_TIME}}.
+   Example sentence: When I go to New York next week, I’m going to stay at the Hilton Hotel.
+14. The adverb maybe expresses {{POSSIBILITY}} and precedes the subject.
+   Example sentence: Maybe Abdullah will be in class tomorrow.
+15. Use {{MODAL}} to indicate that an event is possible but not certain.
+   Example sentence: Abdullah may be here tomorrow.
+16. Epistemic {{MODAL}} expresses the speaker’s judgment of likelihood.
+   Example sentence: It may rain tomorrow.
+17. The dependent clause starts with a subordinating conjunction such as because.
+   Example sentence: I went to the garage because I needed my bike.
+18. Coordinating conjunctions like and join two independent clauses.
+   Example sentence: I went to the garage, and I found my bike.
+19. A compound-complex sentence includes both a dependent clause and two independent clauses joined by a conjunction.
+   Example sentence: I went to the garage because I needed my bike, and I found it.
+20. Imperative mood uses the base form of the {{VERB}}.
+   Example sentence: Get out of here!
+21. The relative pronoun that introduces a clause modifying {{NOUN}}.
+   Example sentence: The job that you want is part-time.
+22. An adverb clause can be fronted for emphasis and followed by a comma.
+   Example sentence: Because he wanted to leave, he left.
+23. The pattern All + {{SUBJECT}} + want/need + is + {{NOUN_PHRASE}} highlights minimal requirement.
+   Example sentence: All they want is a holiday.
+24. Anticipatory it serves as placeholder for a {{TO_INFINITIVE_PHRASE}}.
+   Example sentence: He found it hard to make friends.
+25. Past perfect in the {{IF_CLAUSE}} signals an unreal past condition.
+   Example sentence: Perhaps if he had realized that, he would have run away while there was still time.
+26. Even if introduces a concessive conditional clause.
+   Example sentence: Even if you don’t get the job this time, there will be many exciting opportunities in the future.
+27. The verb in there + be agrees with the following {{NOUN_PHRASE}}.
+   Example sentence: There were a lot of people there.
+28. There + be + {{NOUN_PHRASE}} presents new information at the end of the clause.
+   Example sentence: There were thirty boys in the class.
+29. Use there + be to introduce an unexpected event.
+   Example sentence: There was a knock at his door.
+30. Existential there can take verbs other than be, such as remain.
+   Example sentence: There remained a risk of war.
+31. There + be + {{NOUN_PHRASE}} + {{VERB_ING}} describes an ongoing event.
+   Example sentence: There was a storm raging outside.
+32. There + passive reporting verb + to be expresses general expectation.
+   Example sentence: There is expected to be an announcement about the proposed building.
+33. There + seem/appear + to be hedges the existence of {{NOUN_PHRASE}}.
+   Example sentence: There appears to be a lot of confusion on this point.
+34. Use present simple in the condition clause for a possible future event.
+   Example sentence: I’ll scream if you say that again.
+35. Use should in the {{IF_CLAUSE}} for a formal possible condition.
+   Example sentence: If that should happen, you will be blamed.
+36. The main clause in a predictive conditional uses a future modal like will.
+   Example sentence: If I survive this experience, I’ll never leave you again.
+37. Zero conditional expresses a general truth with present tense in both clauses.
+   Example sentence: If they lose weight during an illness, they soon regain it afterwards.
+38. Passive construction shifts focus from agent to recipient of the action.
+   Example sentence: A girl from my class was chosen to do the reading.
+39. The comma between clauses is optional when the {{IF_CLAUSE}} comes second.
+   Example sentence: If you do that I shall be very pleased.
+40. The result clause in a conditional can be an imperative command.
+   Example sentence: If you dry your washing outdoors, wipe the line first.
+41. Use impersonal it to make a comment about a place or situation.
+   Example sentence: It’s lovely here.
+42. Impersonal it + be + time expression tells the time.
+   Example sentence: It’s eight o’clock.
+43. Impersonal it serves as a dummy subject for weather verbs.
+   Example sentence: It’s still raining.
+44. Inversion in conditional clauses omits if and moves {{AUXILIARY}} before the subject.
+   Example sentence: Should ministers demand an inquiry, we would welcome it.
+45. It-clefts highlight {{FOCUSED_ELEMENT}} using it + be + relative clause.
+   Example sentence: It was Ted who broke the news to me.
+46. It was + {{PREPOSITIONAL_PHRASE}} + that + clause focuses on circumstance.
+   Example sentence: It was in Paris that I first saw these films.
+47. It + be + {{ADJECTIVE}} + that-clause expresses evaluation.
+   Example sentence: It is strange that it hasn’t been noticed before.
+48. It + be + {{ADJECTIVE}} + to-infinitive comments on an action.
+   Example sentence: It’s nice to see you with your books for a change.
+49. It + be + {{TIME_EXPRESSION}} + when-clause emphasizes the timing.
+   Example sentence: It was 11 o’clock at night when 16 armed men came to my house.
+50. It + takes/cost + {{MEASURE}} + to-infinitive expresses required resource.
+   Example sentence: It takes an hour to get to Northampton.
+51. Stative passive describes a current state, not an action.
+   Example sentence: The meeting is scheduled for February 14.
+52. Conditional conjunctions other than if can introduce a necessary condition.
+   Example sentence: Ordering is quick and easy provided you have access to the internet.
+53. By + {{GERUND}} indicates the means or method.
+   Example sentence: The strong taste can be removed by changing the cooking water.
+54. The agent in a passive clause appears in a by-phrase after the verb.
+   Example sentence: Some of the children were adopted by local couples.
+55. Passive progressive uses be + being + past participle.
+   Example sentence: He was being treated for a stomach ulcer.
+56. The particle in a passive phrasal verb stays attached to the verb.
+   Example sentence: Such expectations are drummed into every growing child.
+57. Impersonal it + passive reporting verb + that-clause avoids specifying the agent.
+   Example sentence: It was agreed that he would come and see us again the next day.
+58. Use with + {{NOUN_PHRASE}} to introduce the instrument in a passive clause.
+   Example sentence: A circle was drawn in the dirt with a stick.
+59. Passive with modal + be + past participle expresses necessity or advice.
+   Example sentence: Such items should be carefully packed in boxes.
+60. Agentless passive focuses on the action and its result, not the doer.
+   Example sentence: The fence between the two properties had been removed.
+61. In open conditionals, the main clause contains a modal like should.
+   Example sentence: If anyone doubts this, they should look at the facts.
+62. Passive voice is common in procedural and scientific descriptions.
+   Example sentence: Food is put in jars, the jars and their contents are heated to a temperature which is maintained long enough to ensure that all bacteria, moulds and viruses are destroyed.
+63. Elliptical if-clauses omit the subject and form of be.
+   Example sentence: If in doubt, ask at your local library.
+64. Past subjunctive in the {{IF_CLAUSE}} signals hypothetical present or future.
+   Example sentence: If I had more time, I would happily offer to help.
+65. Stative passive + with + {{NOUN_PHRASE}} indicates what fills or covers.
+   Example sentence: The room was filled with people.
+66. Past perfect in the {{IF_CLAUSE}} expresses a counterfactual past condition.
+   Example sentence: If I had tried a bit harder, I would have passed that exam.
+67. Unless can replace if not in negative conditional sentences.
+   Example sentence: Government cannot operate effectively unless it is free to take its own decisions.
+68. Use were instead of was in the {{IF_CLAUSE}} for all persons in formal hypotheticals.
+   Example sentence: If I were a guy, I would look like my dad.
+69. Unreal conditionals use a modal in the main clause to show the hypothetical result.
+   Example sentence: If you weren’t here, she would get rid of me in no time.
+70. Were + to + infinitive in the {{IF_CLAUSE}} emphasizes remoteness.
+   Example sentence: If we were to move north, we would be able to buy a bigger house.
+71. What + clause + be + to-infinitive highlights an action.
+   Example sentence: What I did was to make a plan.
+72. What-clefts isolate the focal element to give it special emphasis.
+   Example sentence: What you need is a doctor.
+73. Zero conditional states a scientific or logical fact.
+   Example sentence: Water boils if you heat it to 100°C.
+74. Be supposed to indicates an obligation based on rules or norms.
+   Example sentence: You're supposed to be studying, not watching TV.
+75. The prepositional phrase for + {{NOUN}} marks the beneficiary.
+   Example sentence: I'm getting a present for Keiko.
+76. The result clause in a warning conditional is often negative imperative.
+   Example sentence: If the wood has knots or broken lines, don't buy it.
+77. Condition + imperative structure gives advice for specific situations.
+   Example sentence: If you have a poor connection or are cut off on a long distance call, tell the operator and ask to be reconnected.
+78. Past counterfactuals describe an unfulfilled past possibility.
+   Example sentence: If I had called Jack earlier, he would have helped.
+79. Were in the {{IF_CLAUSE}} indicates a hypothetical present state.
+   Example sentence: If I were rich, I wouldn't have this problem.
+80. Factual conditionals describe habitual or typical behavior.
+   Example sentence: If they don't have any money, they use credit cards.
+81. Present simple in both clauses of a conditional shows general truth.
+   Example sentence: Nowadays, if people want something, they just buy it.
+82. An if-clause placed at the end can soften or qualify the main statement.
+   Example sentence: There's no other choice, if you still want to go there.
+83. The relative pronoun that can refer to a preceding object noun.
+   Example sentence: The woman has a large dog that the cat likes.
+84. Whom replaces who after a fronted preposition.
+   Example sentence: Where is the person to whom you talked?
+85. The past form did in the {{IF_CLAUSE}} adds emphasis to the hypothetical.
+   Example sentence: If he did have enough money, he would give you some.
+86. Past simple in the {{IF_CLAUSE}} can refer to an unlikely future event.
+   Example sentence: If you asked Jack, he might lend you the money.
+87. Verbs like describe require to + recipient without an indirect object pattern.
+   Example sentence: He described the picture to us.
+88. The dative movement pattern places indirect object before direct object.
+   Example sentence: I sent my friend some photos.
+89. The prepositional dative structure uses to to mark the goal.
+   Example sentence: I sent some photos to my friend.
+90. Verbs like cost cannot be used in the prepositional pattern.
+   Example sentence: It cost me a lot of money.
+91. Pronominal indirect objects usually appear in the after-verb pattern.
+   Example sentence: I gave him some money.
+92. Use the prepositional pattern when the direct object is a pronoun like it.
+   Example sentence: I gave it to Jack.
+93. A subject relative clause immediately follows the noun it modifies.
+   Example sentence: The man who lives next door has a cat.
+94. Epistemic may expresses possible truth in the present.
+   Example sentence: He may be a Democrat, but he happens to be right on this question.
+95. Use can't for strong negative epistemic deduction.
+   Example sentence: It can't work.
+96. May not expresses possibility of a negative outcome.
+   Example sentence: It may not work.
+97. Won't is the negative of will and predicts absence of an event.
+   Example sentence: It won't rain.
+98. Don't have to indicates lack of necessity.
+   Example sentence: You don't have to do it.
+99. May not can express prohibition.
+   Example sentence: You may not leave.
+100. Non-restrictive relative clauses are set off by commas.
+   Example sentence: My neighbor, who is an English teacher, plays very loud music.
+101. That can replace whom in object relative clauses.
+   Example sentence: I didn't like the woman that I met.
+102. Whose indicates possession within a relative clause.
+   Example sentence: Did you talk to the girl whose bag was stolen?
+103. Predictive conditional uses present simple in {{IF_CLAUSE}} and will in result clause.
+   Example sentence: If the weather is okay, we'll have lunch outside.
+104. Modals in the result clause of a conditional express degree of certainty.
+   Example sentence: If you don't get paid, I may not get my money back.
+105. Future result depends on a realizable condition in the {{IF_CLAUSE}}.
+   Example sentence: If you lend me some money, I'll pay you back tomorrow.
+106. Restrictive relative clauses are not separated by commas.
+   Example sentence: My friend who's Japanese is coming.
+107. Epistemic should expresses a confident expectation.
+   Example sentence: The journey should take two or three days.
+108. Deontic should gives mild advice or recommendation.
+   Example sentence: You should brush your teeth twice a day.
+109. Stranded prepositions in relative clauses are common in informal English.
+   Example sentence: Can I meet the person that you talked to?
+110. Who refers to a person and acts as subject of the relative clause.
+   Example sentence: I'm the kind of person who is always losing things.
+111. Zero relative pronoun is possible when it functions as object.
+   Example sentence: I don't want to talk about the woman I met.
+112. Imperatives use the base verb form without a subject.
+   Example sentence: Eat a balanced diet.
+113. An imperative can follow a concessive clause.
+   Example sentence: No matter what happens, hit the road.
+114. Omission of that in object clauses is optional and common.
+   Example sentence: He claimed he had been working at home all afternoon.
+115. Do + not appears before the main verb in negative declaratives without an auxiliary.
+   Example sentence: You do not know where the sugar is.
+116. Use did to form past tense yes-no questions without an auxiliary.
+   Example sentence: Did John smile?
+117. Yes-no questions with main verb have use do.
+   Example sentence: Do you have a question?
+118. The main verb reverts to base form after do/does/did.
+   Example sentence: Does the TV work?
+119. The passive subject is the recipient, not the performer, of the action.
+   Example sentence: The garage was cleaned out yesterday.
+120. Negator not follows the first auxiliary or the do-support auxiliary.
+   Example sentence: They do not know where it is.
+121. The by-phrase follows the past participle in a passive clause.
+   Example sentence: The meeting was postponed by Kathy.
+122. Be + past participle = passive voice.
+   Example sentence: The movie was filmed in Spain.
+123. Perfect passive = have + been + past participle.
+   Example sentence: John has been seen by Mary.
+124. Progressive passive uses be + being + past participle.
+   Example sentence: The job is being contracted out to a firm in Singapore.
+125. Being + past participle marks progressive passive.
+   Example sentence: The kids are being watched by my parents.
+126. Modal passive = modal + be + past participle.
+   Example sentence: The bill will be paid by them.
+127. Tag questions use the same auxiliary as the main clause.
+   Example sentence: You are ready to go, aren’t you?
+128. Right functions as an invariant tag in informal English.
+   Example sentence: You know how to fill out these forms, right?
+129. Extraposition moves a heavy that-clause after the main verb.
+   Example sentence: It didn’t come as a big surprise that the flight was going to be delayed.
+130. Anticipatory it + be + adjective + that-clause expresses evaluation.
+   Example sentence: It seems a little out of character that they would even consider doing it.
+131. A that-clause can follow a linking verb as subject complement.
+   Example sentence: The decision was that we will go ahead as we had planned.
+132. Verbs like know, think, and say can take a that-clause object.
+   Example sentence: They knew that they would have to extend the deadline.
+133. That can be omitted after common verbs like decide.
+   Example sentence: We decided that we should call a taxi.
+134. In embedded wh-questions, the subject appears before the verb.
+   Example sentence: I know what he said.
+135. Wh-clauses as objects maintain declarative word order.
+   Example sentence: I know what you mean.
+136. The wh-word in a noun clause is not followed by inverted word order.
+   Example sentence: I know where they went.
+137. Subject-verb inversion does not happen in wh-noun clauses.
+   Example sentence: I know who that man is.
+138. Whom is used as the object of a stranded preposition.
+   Example sentence: I know whom you spoke to.
+139. Wh-clauses can follow be as a complement.
+   Example sentence: The question is whose idea was it in the first place?
+140. Prepositions can take wh-clauses as their object.
+   Example sentence: We worried about where you had gone.
+141. A wh-clause can serve as the subject of a sentence.
+   Example sentence: What they are doing is none of our business.
+142. Whatever introduces a free relative clause meaning anything that.
+   Example sentence: Whatever you want to do is OK with me.
+143. Fronting a preposition before whom is more formal.
+   Example sentence: I know to whom you spoke.
+144. How + often asks about frequency.
+   Example sentence: How often have you seen it?
+145. Wh-word + auxiliary + subject + main verb forms a wh-question.
+   Example sentence: What should we give them?
+146. Inversion occurs after the wh-word in information questions.
+   Example sentence: When will they be back?
+147. Use did + subject + base verb for past tense wh-questions without an auxiliary.
+   Example sentence: Where did Charlie go?
+148. Do-support provides an auxiliary for inversion in wh-questions.
+   Example sentence: Whom did you want to see?
+149. Why + do/does/did + subject + base verb asks for a reason.
+   Example sentence: Why do you want to go there?
+150. Be as main verb inverts with the subject in questions.
+   Example sentence: Are you ready to go?
+151. Auxiliary be inverts with subject for yes-no questions.
+   Example sentence: Is he leaving soon?
+152. Modal + subject + base verb forms a yes-no question.
+   Example sentence: Should we call them?
+153. Inversion with main be does not require do-support.
+   Example sentence: Are the kids at school?
+154. Impersonal passive with it avoids naming the decision-maker.
+   Example sentence: It has been decided to cancel next week's meeting.
+155. The by-phrase optionally names the agent.
+   Example sentence: Penicillin was discovered by Alexander Fleming in 1928.
+156. Passive omits the obvious agent (police).
+   Example sentence: The murderer has been arrested.
+157. Passive is used when the agent is unknown.
+   Example sentence: Tom's bike has been stolen.
+158. The head noun of the subject determines verb agreement, not the object of a preposition.
+   Example sentence: The bottles inside the carton are all broken.
+159. A comma separates a fronted adverb clause from the main clause.
+   Example sentence: Because it was raining, he brought an umbrella.
+160. After introduces a time adverb clause.
+   Example sentence: We will watch a movie after we eat dinner.
+161. But shows contrast between two independent clauses.
+   Example sentence: Jordan is rich, but he owns an old car.
+162. Imperative result clauses issue a command based on a condition.
+   Example sentence: If you are available for a meeting, please call me.
+163. While introduces a dependent clause showing time.
+   Example sentence: While we are watching a movie, we will eat pizza.
+164. Will in the main clause shows the future consequence.
+   Example sentence: If she comes late, I will leave without her.
+165. Nor can trigger subject-auxiliary inversion.
+   Example sentence: He is neither rich, nor is he famous.
+166. Not only triggers inversion when it begins a sentence.
+   Example sentence: Not only is she kind, but she also donates a lot of money to charity.
+167. Use were instead of was in hypothetical if-clauses.
+   Example sentence: If I were an astronaut, I would love to travel to Mars.
+
+Output format:
+- One JSON object per line.
+- Fields:
+  - note
+  - sentence
+- No markdown.
+- No bullet lists.
+- No extra text.
+
+Generate exactly 19 sentences for each note, in the same order as the notes above.

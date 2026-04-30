@@ -1,0 +1,43 @@
+You are expanding a grammar-note dataset.
+
+Task:
+For each grammar note below, generate 8 new English sentences that clearly fit the note.
+
+Rules:
+- Keep each sentence grammatical and natural.
+- Make each sentence a different example, not a paraphrase of another example.
+- Keep the target grammar pattern central and easy to identify.
+- Do not copy the wording of the note.
+- Do not produce duplicate sentences across notes.
+- Do not add commentary, labels, or explanations.
+- Return one JSON object per line with fields:
+  - note
+  - sentence
+
+Quality requirements:
+- Prefer short or medium-length sentences.
+- Vary subjects, verbs, and lexical items.
+- Keep the syntax clean and readable.
+- If the note is about a clause type, make the clause type obvious.
+- If the note is about a phrase type, make the phrase type obvious.
+- If the note is about a word-level pattern, keep the target word form obvious.
+- If a note is hard to illustrate, still produce the best matching natural sentence you can.
+
+Notes to expand:
+
+1. There was a bright light shining in the distance.
+2. The passive of reporting verbs is often used in impersonal it structures when the source of the report is general or already understood.
+3. With find or think, it can stand as anticipatory object before an adjective and infinitive or clause.
+4. Were to with an infinitive is a formal way to present a remote future possibility.
+5. With modal auxiliaries, yes-no questions are formed by placing the modal before the subject.
+
+Output format:
+- One JSON object per line.
+- Fields:
+  - note
+  - sentence
+- No markdown.
+- No bullet lists.
+- No extra text.
+
+Generate 8 sentences for each note, in the same order as the notes above.

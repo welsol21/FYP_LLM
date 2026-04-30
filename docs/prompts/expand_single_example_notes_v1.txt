@@ -1,0 +1,107 @@
+You are expanding a grammar-note dataset.
+
+Task:
+For each grammar note below, generate 6 new English sentences that clearly fit the note.
+
+Rules:
+- Keep each sentence grammatical and natural.
+- Make each sentence a different example, not a paraphrase of another example.
+- Keep the target grammar pattern central and easy to identify.
+- Do not copy the wording of the note.
+- Do not produce duplicate sentences across notes.
+- Do not add commentary, labels, or explanations.
+- Return one JSON object per line with fields:
+  - note
+  - sentence
+
+Quality requirements:
+- Prefer short or medium-length sentences.
+- Vary subjects, verbs, and lexical items.
+- Keep the syntax clean and readable.
+- If the note is about a clause type, make the clause type obvious.
+- If the note is about a phrase type, make the phrase type obvious.
+- If the note is about a word-level pattern, keep the target word form obvious.
+- If a note is hard to illustrate, still produce the best matching natural sentence you can.
+
+Notes to expand:
+
+1. Impersonal it is also used to give the time or date.
+2. Impersonal it is used in weather expressions.
+3. In a compound sentence, two independent clauses are linked by a coordinating conjunction.
+4. In a conditional sentence, the result clause can be an imperative when the speaker gives a directive based on the condition.
+5. In a factual conditional, both clauses typically describe a regular pattern rather than a single imagined outcome.
+6. In a future time clause, the time-marker clause uses the simple present while the main clause carries the future meaning.
+7. In a perfect passive, the tense is carried by have while the passive sequence appears as been plus past participle.
+8. In accounts of processes and experiments, the passive keeps the focus on what happens rather than on the performer.
+9. In an imperative sentence, the subject is often omitted and understood as the second-person pronoun you.
+10. In formal style, verbs such as remain, follow, and come can appear after there.
+11. In hypothetical conditionals, the main clause usually contains would, could, or might to mark remoteness of possibility.
+12. In informal English, object relatives often omit the relative pronoun entirely and use a zero relative.
+13. In negative be going to clauses, not follows be.
+14. In the after-preposition pattern, the indirect object appears as the goal of transfer in a prepositional phrase.
+15. In the after-verb pattern, the indirect object is presented as a recipient who comes to have the transferred entity.
+16. In the first conditional, the if-clause uses the present simple while the main clause presents a future result.
+17. Informal conversation can use a short final tag to check or confirm what the speaker assumes is true.
+18. Interrogative expressions such as how often function as fronted question words in information questions.
+19. It plus be, an adjective, and a to-infinitive lets the clause comment on an action while keeping the heavier information at the end.
+20. It with take or cost introduces the amount of time, effort, or money needed for an action.
+21. Many communication verbs prefer the after-preposition pattern because they focus on the act of communication rather than transfer of possession.
+22. May and might express possibility rather than certainty.
+23. May can present a future event as possible rather than certain.
+24. May not can mean that a negative outcome is possible rather than impossible.
+25. Maybe is an adverb meaning possibly and it appears before the subject and verb.
+26. Most imperative verbs do not have a written subject; the subject is understood as you.
+27. Not only...but also links parallel ideas and gives extra emphasis to the second clause.
+28. Passive forms consist of an appropriate form of be followed by the -ed participle of the verb.
+29. Possessive relative clauses use whose to link the noun to something associated with it inside the relative clause.
+30. Predictive conditionals are common when speakers talk about future plans and their likely consequences.
+31. Predictive conditionals present the main-clause event as a future possibility that depends on the if-clause situation.
+32. Relative clauses in final position commonly modify an object from the main clause.
+33. Relative clauses often occur in medial position when they modify the subject of the main clause.
+34. Should can also express a reasonable assumption or probability about what is likely to happen.
+35. Some state passives use with to introduce what creates or characterizes the state.
+36. Some verbs are especially common in passive form because the performer is not normally mentioned.
+37. Some verbs such as cost use only the after-verb pattern and express loss of possession rather than transfer to a goal.
+38. Subordinate clauses are adverbial and can often be moved to the beginning or the end of the sentence.
+39. The after-preposition pattern is preferred when the indirect object is newer, heavier, or more informative than the direct object.
+40. The after-verb pattern is preferred when the indirect object is shorter, more given, or pronominal and the direct object carries the newer information.
+41. The passive is common when the focus is on what should be done rather than on who does it.
+42. The passive is identified by a form of be followed by the verb in its past participle form.
+43. The passive lets you present an event from the point of view of the person or thing affected rather than the performer.
+44. The prepositional phrase does not determine the number of the verb; the subject does.
+45. The zero conditional uses present forms in both clauses to express a general truth or regular result.
+46. There can be followed by a passive reporting verb to relay what is said or expected to exist or happen.
+47. There can occur with seem or appear to present something as apparently existing.
+48. There plus be can also introduce an event as something that happened.
+49. There plus be, a noun phrase, and an -ing participle can describe what is present in a scene or situation.
+50. Transitive phrasal verbs can also appear in the passive.
+51. We use the passive voice when the identity of the agent is obvious and can be omitted.
+52. We use the passive voice when we do not know who is performing the action.
+53. We use the passive voice when we do not want to mention the agent.
+54. When a that-clause functions as object, the introductory that is often omitted in everyday English.
+55. When an adverb clause comes first, the subordinating conjunction stays with that clause and a comma follows it.
+56. When be is the main verb, the question is formed by placing be before the subject.
+57. When talking about something that may happen in the future, the conditional clause typically uses the present simple and the main clause uses will or shall.
+58. When the condition is unreal, the main clause normally uses a modal such as would, could, or might.
+59. When the preposition stays at the end of the clause, the relative clause has a stranded-preposition pattern that is common in contemporary English.
+60. When-clauses that refer to the future use the simple present instead of will.
+61. With can name the instrument or means used to perform the action in a passive clause.
+62. With epistemic may, the speaker presents a proposition as a possibility rather than a certainty.
+63. With modal auxiliaries, the passive is formed by modal plus be plus past participle.
+64. With neither...nor, the second clause is coordinated with a negative alternative and often shows inversion after nor.
+65. With root may, negation normally blocks permission rather than describing a negative event.
+66. With should, the core meaning is requirement, often interpreted in practice as advice or weak obligation.
+67. With some epistemic modals, negation affects the action or event rather than the modal meaning itself.
+68. With the passive voice, the subject is the recipient of the action.
+69. With verbs of benefitting, a for-phrase can present the indirect object as a beneficiary without necessarily implying immediate possession.
+
+Output format:
+- One JSON object per line.
+- Fields:
+  - note
+  - sentence
+- No markdown.
+- No bullet lists.
+- No extra text.
+
+Generate 6 sentences for each note, in the same order as the notes above.

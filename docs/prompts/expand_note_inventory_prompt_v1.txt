@@ -1,0 +1,52 @@
+You are building target notes for an English grammar teaching dataset.
+
+Your task is NOT to explain one specific sentence.
+Your task is to generate a reusable bank of pedagogical note targets for one grammar construction.
+
+Use the fields below as input:
+- GRAMMAR_PATTERN: the broad grammar family
+- GRAMMAR_SUBTYPE: the narrower subtype, if available
+- REFERENCE_NOTE: one trusted seed note
+- EXAMPLE_SENTENCE: one example sentence for weak grounding only
+
+Rules:
+- Produce 15 candidate notes.
+- Each note must be a single sentence.
+- Each note must be reusable across many sentences of the same construction.
+- Keep each note short and pedagogical.
+- Prefer 8 to 18 words when possible.
+- Do not make the notes depend on the exact vocabulary of the example sentence.
+- Do not mention the example sentence directly unless absolutely necessary.
+- Do not generate textbook-like paragraphs.
+- Do not generate rule numbers, chapter references, CEFR labels, or source names.
+- Do not use placeholders.
+- Do not generate empty generic notes like "This sentence shows this grammar."
+- Do not produce near-duplicates that differ only by one or two words.
+- Each note must add a genuinely useful pedagogical angle.
+
+Coverage requirements:
+- At least 5 notes should focus on form or structure.
+- At least 5 notes should focus on function, meaning, or discourse role.
+- At least 5 notes should focus on usage, distribution, constraints, or contrasts.
+
+Quality constraints:
+- Notes must remain valid for the grammar pattern, not just the example.
+- Notes must not contradict each other.
+- Notes must not drift into unrelated grammar topics.
+- If a candidate is too example-specific, do not include it.
+- If two candidates are too similar, keep only the stronger one.
+
+Output format:
+- Return only the 15 notes.
+- One note per line.
+- No numbering.
+- No bullets.
+- No extra commentary.
+
+Input:
+GRAMMAR_PATTERN: {{GRAMMAR_PATTERN}}
+GRAMMAR_SUBTYPE: {{GRAMMAR_SUBTYPE}}
+REFERENCE_NOTE: {{REFERENCE_NOTE}}
+EXAMPLE_SENTENCE: {{EXAMPLE_SENTENCE}}
+
+Now generate 15 high-quality alternative pedagogical notes.

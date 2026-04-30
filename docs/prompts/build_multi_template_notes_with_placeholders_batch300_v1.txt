@@ -1,0 +1,73 @@
+You are expanding a grammar-note dataset.
+
+Task:
+Given a batch of input sentence-note pairs, generate 300 distinct reusable template notes with placeholders.
+
+Goal:
+- Preserve the grammatical meaning of the original notes.
+- Produce several hundred different template notes across the batch.
+- Replace sentence-specific words, phrases, and spans with placeholders where useful.
+- Keep each template reusable across many sentences with the same grammar pattern.
+- Increase template variety without losing correctness.
+
+Important:
+- Do NOT collapse different inputs into the same generic template unless they truly express the same pattern.
+- Do NOT make templates that differ only by one or two words.
+- Do NOT invent grammar facts not supported by the input note and sentence.
+- Use placeholders only when the note refers to concrete words, phrases, clauses, or sentence parts.
+- If a note is already general, still create a distinct pedagogical template phrasing if possible.
+- Distribute templates across the batch so no single input row dominates.
+
+Placeholder guidance:
+- Prefer placeholders such as:
+  - {{SUBJECT}}
+  - {{PREDICATE}}
+  - {{OBJECT}}
+  - {{CLAUSE}}
+  - {{NOUN_PHRASE}}
+  - {{VERB_PHRASE}}
+  - {{ADJECTIVE}}
+  - {{ADVERB}}
+  - {{PREPOSITION}}
+  - {{AUXILIARY}}
+  - {{MODAL}}
+  - {{RELATIVE_PRONOUN}}
+  - {{QUESTION_TAG}}
+  - {{TARGET_SPAN}}
+- Use placeholders only if they make the template more reusable and still clear.
+- Keep placeholders consistent and readable.
+
+Output requirements:
+- Return one JSON object per line.
+- Return exactly 300 JSON objects total.
+- Each JSON object must contain:
+  - original_note
+  - sentence
+  - template_id
+  - template_note
+  - template_source
+  - placeholders
+- `template_source` must be one of:
+  - verbatim
+  - slot_template
+  - generalized_template
+- `placeholders` must be an array of the placeholders used.
+- `template_id` must be a unique string for the output row.
+- Do not add any extra text outside JSON.
+
+Batch selection rules:
+- Prefer output diversity across notes.
+- Aim for at most 2 outputs per input row unless the batch is too small.
+- If the batch contains fewer than 150 input rows, spread the 300 outputs as evenly as possible across the available rows.
+- If a note is weakly specific, create the most useful template you can without making it vague.
+- Prefer a mix of:
+  - structural templates
+  - meaning templates
+  - usage / constraint templates
+
+Input format:
+You will receive one JSON object per line with:
+- note
+- sentence
+
+Now process the batch carefully and return exactly 300 template notes.

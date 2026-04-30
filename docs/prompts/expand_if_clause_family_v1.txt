@@ -1,0 +1,52 @@
+You are expanding a grammar-note dataset.
+
+Task:
+Split the broad IF_CLAUSE family into narrower, more specific template pairs so that no single note template covers too many different sentence signatures.
+
+Goal:
+Reduce collapse caused by one IF_CLAUSE note matching many different signatures.
+Create more specific, reusable, and clearly different note templates for conditional / if-like constructions.
+
+Target size:
+- Aim for about 28 to 32 total IF_CLAUSE subtemplates.
+- Each subtemplate should ideally cover no more than 10 to 12 sentence signatures.
+- Do not keep one template broad enough to cover dozens of signatures.
+
+Rules:
+- Keep `input` and `target` aligned.
+- If you use placeholders in `input`, use the same placeholder inventory in `target`.
+- If you cannot template a pair cleanly, keep it raw on both sides.
+- Do not mix raw and templated forms inside the same pair.
+- Prefer precise subtypes over generic IF_CLAUSE wording.
+- Each note should describe one narrow conditional pattern.
+- Avoid notes that collapse several different conditional constructions into the same sentence.
+- Do not produce duplicate or near-duplicate templates.
+- Do not add commentary, labels, or explanations.
+
+What to cover:
+- real if-clauses with present simple condition
+- first conditional
+- second conditional
+- third conditional
+- unless
+- even if
+- only if
+- provided / providing / as long as
+- reduced if-phrases
+- formal should / were to / had + participle conditionals
+- conditional clauses with modal result clauses
+
+Output format:
+- One JSON object per line.
+- Fields:
+  - input
+  - target
+- Return only valid JSONL.
+
+Quality requirements:
+- Prefer short, clear, pedagogical notes.
+- Make the grammar pattern central and easy to identify.
+- Make the note specific enough that it matches a narrower signature cluster, not the whole IF_CLAUSE family.
+- Use placeholders only when they are genuinely shared by both sides.
+
+Generate enough pairs to make the IF_CLAUSE family much narrower and less likely to collapse during training.

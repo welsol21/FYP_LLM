@@ -1,0 +1,90 @@
+You are converting grammar notes into reusable template notes.
+
+Task:
+For each input sentence and its note, rewrite the note as a reusable template note with placeholders.
+
+Goal:
+- Preserve the grammatical meaning of the original note.
+- Replace sentence-specific words, phrases, and spans with placeholders.
+- Make the note reusable across many sentences with the same grammar pattern.
+- Keep the template specific enough to be useful and broad enough to generalize.
+
+Rules:
+- Do not change the grammar meaning.
+- Do not add new grammar facts that are not supported by the input note and sentence.
+- Do not keep unnecessary surface words if they can be replaced by placeholders.
+- Do not over-generalize into empty or vague templates.
+- Do not make two different inputs collapse into the same template unless they truly express the same pattern.
+- Use placeholders only when the note refers to concrete words, phrases, clauses, or sentence parts.
+- Keep placeholders consistent and readable.
+- Prefer placeholders such as:
+  - {{SUBJECT}}
+  - {{PREDICATE}}
+  - {{OBJECT}}
+  - {{CLAUSE}}
+  - {{NOUN_PHRASE}}
+  - {{VERB_PHRASE}}
+  - {{ADJECTIVE}}
+  - {{ADVERB}}
+  - {{PREPOSITION}}
+  - {{AUXILIARY}}
+  - {{MODAL}}
+  - {{RELATIVE_PRONOUN}}
+  - {{QUESTION_TAG}}
+  - {{TARGET_SPAN}}
+- If a note is already general and does not need placeholders, keep it as a clean generalized template.
+- If a note has a concrete example inside it, convert that example into a placeholder.
+- If the input sentence contains the target grammar only inside a clause, phrase, or word, use the corresponding placeholder.
+- If a note is about a sentence-level pattern, keep sentence-level placeholders only.
+- Do not invent placeholders for information that is not visible in the note or sentence.
+
+Output requirements:
+- Return one JSON object per line.
+- Each object must contain:
+  - original_note
+  - sentence
+  - template_note
+  - template_source
+  - placeholders
+- `template_source` must be one of:
+  - verbatim
+  - slot_template
+  - generalized_template
+- `placeholders` must be an array of the placeholders used.
+- If no placeholder is needed, set `placeholders` to an empty array.
+- Do not add any extra text outside JSON.
+
+Input format:
+You will receive one JSON object per line with:
+- note
+- sentence
+
+Examples:
+
+Input:
+{"note":"The passive of reporting verbs is often used in impersonal it structures when the source of the report is general or already understood.","sentence":"It was reported that the bridge had reopened by noon."}
+Output:
+{"original_note":"The passive of reporting verbs is often used in impersonal it structures when the source of the report is general or already understood.","sentence":"It was reported that the bridge had reopened by noon.","template_note":"The passive of {{REPORTING_VERB}} is often used in impersonal it structures when the source of the report is general or already understood.","template_source":"slot_template","placeholders":["{{REPORTING_VERB}}"]}
+
+Input:
+{"note":"With modal auxiliaries, yes-no questions are formed by placing the modal before the subject.","sentence":"Can you stay a little longer?"}
+Output:
+{"original_note":"With modal auxiliaries, yes-no questions are formed by placing the modal before the subject.","sentence":"Can you stay a little longer?","template_note":"With {{MODAL}} auxiliaries, yes-no questions are formed by placing the modal before the subject.","template_source":"slot_template","placeholders":["{{MODAL}}"]}
+
+Input:
+{"note":"A question tag repeats the clause with auxiliary-pronoun structure and is typically negative after a positive statement.","sentence":"It's warm today, isn't it?"}
+Output:
+{"original_note":"A question tag repeats the clause with auxiliary-pronoun structure and is typically negative after a positive statement.","sentence":"It's warm today, isn't it?","template_note":"A question tag repeats the clause with auxiliary-pronoun structure and is typically negative after a positive statement.","template_source":"verbatim","placeholders":[]}
+
+Input:
+{"note":"A relative clause can combine two clauses into one complex sentence by embedding extra information after a noun.","sentence":"The book that you lent me was helpful."}
+Output:
+{"original_note":"A relative clause can combine two clauses into one complex sentence by embedding extra information after a noun.","sentence":"The book that you lent me was helpful.","template_note":"A relative clause can combine two clauses into one complex sentence by embedding extra information after a {{NOUN}}.","template_source":"slot_template","placeholders":["{{NOUN}}"]}
+
+Now process all input rows carefully.
+For each row:
+- detect whether the note can be turned into a reusable template;
+- keep the note concise;
+- keep the placeholders grammatical;
+- prefer a single strong template over multiple weak ones;
+- preserve uniqueness across templates.
