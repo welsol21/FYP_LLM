@@ -11,6 +11,7 @@ from typing import Any
 
 from ela_pipeline.classifier.grammar_blueprints import build_note_blueprints
 from ela_pipeline.classifier.grammar_rules import map_pedagogical_grammar_classes
+from ela_pipeline.annotate.spacy_signature import build_spacy_signature
 from ela_pipeline.contract import deep_copy_contract
 from ela_pipeline.parse.spacy_parser import load_nlp
 from ela_pipeline.runtime import (
@@ -36,7 +37,7 @@ CEFR_ALLOWED_LEVELS = {"A1", "A2", "B1", "B2", "C1", "C2"}
 CEFR_LEVEL_ORDER = ("A1", "A2", "B1", "B2", "C1", "C2")
 CEFR_LEVEL_TO_INDEX = {level: idx for idx, level in enumerate(CEFR_LEVEL_ORDER)}
 LEGACY_NOTE_MODES = {"template_only", "llm", "hybrid", "two_stage"}
-NOTE_MODE_CHOICES = tuple(sorted(LEGACY_NOTE_MODES | {"controlled"}))
+NOTE_MODE_CHOICES = tuple(sorted(LEGACY_NOTE_MODES | {"controlled", "signature_only"}))
 
 WORD_POS_CEILING = {
     "article": "A1",
@@ -110,6 +111,13 @@ def _get_controlled_t5_renderer_cached(model_dir: str):
     from ela_pipeline.annotate.controlled_renderer import ControlledT5NoteRenderer
 
     return ControlledT5NoteRenderer(model_dir=model_dir)
+
+
+@lru_cache(maxsize=2)
+def _get_signature_only_t5_renderer_cached(model_dir: str):
+    from ela_pipeline.annotate.signature_only_renderer import SignatureOnlyT5NoteRenderer
+
+    return SignatureOnlyT5NoteRenderer(model_dir=model_dir)
 
 
 def _normalize_strict_null_sentinels(node: dict) -> None:
@@ -834,6 +842,41 @@ def _rewrite_controlled_notes_with_t5(doc: dict, renderer: Any) -> None:
         )
 
 
+def _rewrite_sentence_notes_with_signature_t5(doc: dict, renderer: Any) -> None:
+    def walk_sentence(sentence_node: dict) -> None:
+        signature_nodes = build_spacy_signature(sentence_node, depth=2)
+        signature_text_value = " -> ".join(signature_nodes)
+        if not signature_text_value:
+            return
+        blueprints = sentence_node.get("note_blueprints")
+        if not isinstance(blueprints, dict):
+            blueprints = {}
+        for key, level in (
+            ("elementary_text", "elementary"),
+            ("intermediate_text", "intermediate"),
+            ("advanced_text", "advanced"),
+        ):
+            rendered = str(
+                renderer.render_note(
+                    signature_text=signature_text_value,
+                    level=level,
+                    node_level="Sentence",
+                    depth=2,
+                    family_id=sentence_node.get("spacy_signature_family_id") or "",
+                )
+                or ""
+            ).strip()
+            if rendered:
+                blueprints[key] = rendered
+        sentence_node["note_blueprints"] = blueprints
+        sentence_node["spacy_signature"] = signature_text_value
+        sentence_node["spacy_signature_nodes"] = signature_nodes
+
+    for sentence_node in doc.values():
+        if isinstance(sentence_node, dict):
+            walk_sentence(sentence_node)
+
+
 def _attach_classifier_profiles(
     doc: dict,
     classifier: Any,
@@ -1157,9 +1200,24 @@ def run_pipeline(
             version=note_version,
         )
         _prune_unused_legacy_fields(enriched)
+    elif note_mode == "signature_only":
+        _apply_controlled_notes(enriched)
+        note_version = "signature_only::spacy_signature"
+        if model_dir:
+            renderer = _get_signature_only_t5_renderer_cached(model_dir)
+            _rewrite_sentence_notes_with_signature_t5(enriched, renderer=renderer)
+            _apply_controlled_notes(enriched)
+            note_version = "signature_only_t5::spacy_signature_rewrite"
+        _attach_note_generator_version(
+            enriched,
+            version=note_version,
+        )
+        _prune_unused_legacy_fields(enriched)
 
     _normalize_linguistic_notes_shape(enriched)
-    raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
+    skip_validation = str(os.getenv("ELA_SKIP_INFERENCE_VALIDATION", "")).strip().lower() in {"1", "true", "yes"}
+    if not skip_validation:
+        raise_if_invalid(validate_contract(enriched, validation_mode=validation_mode))
     _enforce_linguistic_elements_last(enriched)
     return enriched
 

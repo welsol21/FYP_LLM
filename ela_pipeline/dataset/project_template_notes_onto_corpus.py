@@ -20,6 +20,11 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+from ela_pipeline.dataset.contract_signatures import (
+    contract_bucketed_signature,
+    contract_exact_signature,
+    contract_presence_signature,
+)
 from ela_pipeline.dataset.tree_construction_inventory import (
     _compress_phrase_signature_bucketed,
     _compress_phrase_signature_presence,
@@ -131,6 +136,48 @@ def _family_id(prefix: str, signature: Any) -> str:
     return f"{prefix}_{digest}"
 
 
+def _sort_signature_children(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
+        items,
+        key=lambda item: (
+            int((item.get("source_span") or {}).get("start", 0)),
+            int((item.get("source_span") or {}).get("end", 0)),
+            0 if str(item.get("type") or "") == "Word" else 1,
+        ),
+    )
+
+
+def _spacy_marker(node: dict[str, Any]) -> str:
+    node_type = str(node.get("type") or "").strip()
+    if node_type == "Sentence":
+        return "ROOT"
+    if node_type == "Word":
+        marker = _norm(node.get("dep_label")).lower()
+        return marker
+    return ""
+
+
+def _spacy_signature(node: dict[str, Any], *, depth: int = 2) -> list[str]:
+    labels: list[str] = []
+
+    def walk(cur: dict[str, Any], remaining_depth: int) -> None:
+        marker = _spacy_marker(cur)
+        if marker:
+            labels.append(marker)
+        if remaining_depth <= 0:
+            return
+        children = [
+            child
+            for child in (cur.get("linguistic_elements") or [])
+            if isinstance(child, dict)
+        ]
+        for child in _sort_signature_children(children):
+            walk(child, remaining_depth - 1)
+
+    walk(node, depth)
+    return labels
+
+
 def _iter_jsonl(path: str):
     with Path(path).open("r", encoding="utf-8") as handle:
         for line in handle:
@@ -198,6 +245,7 @@ def _build_phrase_entries(children: list[dict[str, Any]]) -> list[dict[str, Any]
 def _build_sentence_profiles(text: str, nlp: Any, *, max_phrase_depth: int) -> list[dict[str, Any]]:
     profiles: list[dict[str, Any]] = []
     for sentence_text, sentence_node in build_skeleton(text, nlp).items():
+        exact_contract_signature = contract_exact_signature(sentence_node)
         effective_children = _normalize_phrase_children(
             sentence_node,
             depth=1,
@@ -205,6 +253,9 @@ def _build_sentence_profiles(text: str, nlp: Any, *, max_phrase_depth: int) -> l
             stats=Counter(),
         )
         exact_signature = _sentence_signature(effective_children)
+        spacy_signature_depth = 2
+        spacy_signature_nodes = _spacy_signature(sentence_node, depth=spacy_signature_depth)
+        spacy_signature_text = " -> ".join(spacy_signature_nodes)
         profiles.append(
             {
                 "sentence_text": sentence_text,
@@ -220,6 +271,19 @@ def _build_sentence_profiles(text: str, nlp: Any, *, max_phrase_depth: int) -> l
                     "sent_presence",
                     _compress_sentence_signature_presence(exact_signature),
                 ),
+                "sentence_contract_exact_family_id": _family_id("sent_contract_exact", exact_contract_signature),
+                "sentence_contract_bucketed_family_id": _family_id(
+                    "sent_contract_bucket",
+                    contract_bucketed_signature(exact_contract_signature),
+                ),
+                "sentence_contract_presence_family_id": _family_id(
+                    "sent_contract_presence",
+                    contract_presence_signature(exact_contract_signature),
+                ),
+                "spacy_signature_depth": spacy_signature_depth,
+                "spacy_signature": spacy_signature_text,
+                "spacy_signature_nodes": spacy_signature_nodes,
+                "spacy_signature_family_id": _family_id("spacy_sig", spacy_signature_text),
                 "phrase_entries": _build_phrase_entries(effective_children),
             }
         )
@@ -241,6 +305,10 @@ def _note_payload(row: dict[str, Any], *, match_level: str) -> dict[str, Any]:
         "topic": _norm(source.get("topic")),
         "origin_unit": _norm(source.get("origin_unit")),
         "source_record_id": _norm(source.get("source_record_id")),
+        "slot_template_text": _norm(projection.get("note_template")),
+        "slot_values": dict(projection.get("slot_values") or {}),
+        "slot_rendered_note": _norm(projection.get("rendered_note")),
+        "slot_templated": bool(projection.get("templated")),
     }
 
 
@@ -830,7 +898,15 @@ def _candidate_key(candidate: dict[str, Any]) -> tuple[Any, ...]:
 
 
 def _sort_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    match_rank = {"exact": 0, "bucketed": 1, "presence": 2}
+    match_rank = {
+        "contract_exact": 0,
+        "exact": 1,
+        "contract_bucketed": 2,
+        "bucketed": 3,
+        "contract_presence": 4,
+        "presence": 5,
+        "topic": 6,
+    }
     return sorted(
         candidates,
         key=lambda item: (
@@ -864,6 +940,9 @@ def _append_candidates(
 
 def _build_note_indexes(note_rows_path: str) -> dict[str, dict[str, list[dict[str, Any]]]]:
     indexes = {
+        "sentence_contract_exact": defaultdict(list),
+        "sentence_contract_bucketed": defaultdict(list),
+        "sentence_contract_presence": defaultdict(list),
         "sentence_exact": defaultdict(list),
         "sentence_bucketed": defaultdict(list),
         "sentence_presence": defaultdict(list),
@@ -879,6 +958,18 @@ def _build_note_indexes(note_rows_path: str) -> dict[str, dict[str, list[dict[st
         sentence_alignment = alignment.get("sentence") or {}
         if node_type == "sentence":
             if _source_sentence_note_usable(row):
+                if sentence_alignment.get("contract_exact_family_id"):
+                    indexes["sentence_contract_exact"][sentence_alignment["contract_exact_family_id"]].append(row)
+                if sentence_alignment.get("contract_bucketed_family_id"):
+                    indexes["sentence_contract_bucketed"][sentence_alignment["contract_bucketed_family_id"]].append(row)
+                if sentence_alignment.get("contract_presence_family_id"):
+                    indexes["sentence_contract_presence"][sentence_alignment["contract_presence_family_id"]].append(row)
+                if sentence_alignment.get("exact_family_id"):
+                    indexes["sentence_exact"][sentence_alignment["exact_family_id"]].append(row)
+                if sentence_alignment.get("bucketed_family_id"):
+                    indexes["sentence_bucketed"][sentence_alignment["bucketed_family_id"]].append(row)
+                if sentence_alignment.get("presence_family_id"):
+                    indexes["sentence_presence"][sentence_alignment["presence_family_id"]].append(row)
                 topic = _norm(((row.get("source") or {}).get("topic"))).lower()
                 indexes["sentence_topic"][topic].append(row)
         if node_type == "phrase":
@@ -917,6 +1008,48 @@ def project_notes_onto_corpus(
             report_counts["sentence_nodes_total"] += 1
             sentence_candidates: list[dict[str, Any]] = []
             sentence_seen: set[tuple[Any, ...]] = set()
+            _append_candidates(
+                sentence_candidates,
+                sentence_seen,
+                indexes["sentence_contract_exact"].get(profile["sentence_contract_exact_family_id"], []),
+                match_level="contract_exact",
+                compatible=lambda row, profile=profile: _sentence_candidate_compatible(row, profile),
+            )
+            _append_candidates(
+                sentence_candidates,
+                sentence_seen,
+                indexes["sentence_contract_bucketed"].get(profile["sentence_contract_bucketed_family_id"], []),
+                match_level="contract_bucketed",
+                compatible=lambda row, profile=profile: _sentence_candidate_compatible(row, profile),
+            )
+            _append_candidates(
+                sentence_candidates,
+                sentence_seen,
+                indexes["sentence_contract_presence"].get(profile["sentence_contract_presence_family_id"], []),
+                match_level="contract_presence",
+                compatible=lambda row, profile=profile: _sentence_candidate_compatible(row, profile),
+            )
+            _append_candidates(
+                sentence_candidates,
+                sentence_seen,
+                indexes["sentence_exact"].get(profile["sentence_exact_family_id"], []),
+                match_level="exact",
+                compatible=lambda row, profile=profile: _sentence_candidate_compatible(row, profile),
+            )
+            _append_candidates(
+                sentence_candidates,
+                sentence_seen,
+                indexes["sentence_bucketed"].get(profile["sentence_bucketed_family_id"], []),
+                match_level="bucketed",
+                compatible=lambda row, profile=profile: _sentence_candidate_compatible(row, profile),
+            )
+            _append_candidates(
+                sentence_candidates,
+                sentence_seen,
+                indexes["sentence_presence"].get(profile["sentence_presence_family_id"], []),
+                match_level="presence",
+                compatible=lambda row, profile=profile: _sentence_candidate_compatible(row, profile),
+            )
             for topic, rows in indexes["sentence_topic"].items():
                 if not rows:
                     continue
@@ -989,10 +1122,17 @@ def project_notes_onto_corpus(
                     "sentence_text": profile["sentence_text"],
                     "source_span": profile["source_span"],
                     "sentence_family_alignment": {
+                        "contract_exact_family_id": profile["sentence_contract_exact_family_id"],
+                        "contract_bucketed_family_id": profile["sentence_contract_bucketed_family_id"],
+                        "contract_presence_family_id": profile["sentence_contract_presence_family_id"],
                         "exact_family_id": profile["sentence_exact_family_id"],
                         "bucketed_family_id": profile["sentence_bucketed_family_id"],
                         "presence_family_id": profile["sentence_presence_family_id"],
                     },
+                    "spacy_signature_depth": profile["spacy_signature_depth"],
+                    "spacy_signature": profile["spacy_signature"],
+                    "spacy_signature_nodes": profile["spacy_signature_nodes"],
+                    "spacy_signature_family_id": profile["spacy_signature_family_id"],
                     "sentence_note_candidates": sentence_candidates,
                     "phrase_entries": phrase_entries,
                 }

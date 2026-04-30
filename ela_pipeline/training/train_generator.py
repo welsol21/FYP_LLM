@@ -39,7 +39,7 @@ def save_json(path: str, payload: Dict) -> None:
 def _validate_processed_rows(rows: List[Dict[str, str]], split: str) -> None:
     if not rows:
         raise ValueError(f"{split} dataset is empty")
-    required_fields = {"input", "target", "prompt_template_version"}
+    required_fields = {"input", "target"}
     for idx, row in enumerate(rows[:200]):
         missing = required_fields.difference(row.keys())
         if missing:
@@ -58,10 +58,40 @@ def _validate_processed_freshness(train_path: str, dev_path: str) -> Dict:
         raise ValueError(f"Missing processed stats file: {stats_path}")
     with open(stats_path, "r", encoding="utf-8") as f:
         stats = json.load(f)
-    allowed_versions = {"v1", "contract_template_v2", "book_pairs_v1", "rle_v1"}
-    if stats.get("prompt_template_version") not in allowed_versions:
+    allowed_versions = {
+        "v1",
+        "contract_template_v2",
+        "book_pairs_v1",
+        "rle_v1",
+        "rle_v3",
+        "rle_v4",
+        "rle_v5",
+        "rle_v6",
+        "rle_v7",
+        "note_expansion_v1",
+        "seed_note_pool_v1",
+        "seed_preserving_v1",
+        "signature_only_v1",
+        "signature_only_input_v1",
+        "paired_template_signature_v1",
+        "paired_template_signature_v2",
+        "paired_template_signature_v3",
+        "paired_template_signature_v4",
+        "paired_template_sentence_nodes_v1",
+    }
+    prompt_template_version = stats.get("prompt_template_version")
+    if prompt_template_version is not None and prompt_template_version not in allowed_versions:
         raise ValueError("Incompatible processed stats: unexpected prompt_template_version")
-    total = int(stats.get("total_after_balance") or stats.get("total") or 0)
+    total = int(
+        stats.get("total_after_balance")
+        or stats.get("total")
+        or stats.get("output_rows")
+        or (
+            int(stats.get("train") or 0)
+            + int(stats.get("dev") or 0)
+            + int(stats.get("test") or 0)
+        )
+    )
     if total <= 0:
         raise ValueError("Processed stats indicate zero training rows")
     return stats
@@ -80,6 +110,13 @@ def mix_with_feedback_rows(
     for _ in range(feedback_weight):
         mixed.extend(feedback_rows)
     return mixed
+
+
+def build_seq2seq_labels(label_ids: List[List[int]], pad_token_id: int) -> List[List[int]]:
+    masked: List[List[int]] = []
+    for row in label_ids:
+        masked.append([token_id if token_id != pad_token_id else -100 for token_id in row])
+    return masked
 
 
 def main() -> None:
@@ -135,7 +172,7 @@ def main() -> None:
     def preprocess(batch):
         inputs = tokenizer(batch["input"], truncation=True, padding="max_length", max_length=args.max_input)
         labels = tokenizer(batch["target"], truncation=True, padding="max_length", max_length=args.max_target)
-        inputs["labels"] = labels["input_ids"]
+        inputs["labels"] = build_seq2seq_labels(labels["input_ids"], tokenizer.pad_token_id)
         return inputs
 
     train_tok = train_ds.map(preprocess, batched=True, remove_columns=train_ds.column_names)

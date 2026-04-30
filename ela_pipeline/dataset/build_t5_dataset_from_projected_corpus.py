@@ -9,6 +9,7 @@ document to reduce leakage.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 import re
@@ -24,6 +25,7 @@ from ela_pipeline.annotate.contract_template_builder import (
     template_uses_allowed_slots,
 )
 from ela_pipeline.dataset.template_topic_mapping import topic_to_template_id
+from ela_pipeline.dataset.note_patterning import build_note_pattern
 from ela_pipeline.dataset.build_dataset import (
     _count_by,
     _count_level_tam,
@@ -96,10 +98,18 @@ def _candidate_target_text(candidate: Dict[str, Any]) -> str:
     return str(candidate.get("note_text") or "").strip()
 
 
-def _candidate_target_template(candidate: Dict[str, Any], payload: Dict[str, Any] | None) -> tuple[str, str]:
+def _candidate_target_template(
+    candidate: Dict[str, Any],
+    payload: Dict[str, Any] | None,
+    *,
+    target_selection: str,
+) -> tuple[str, str]:
+    raw_note_text = normalize_template_text(candidate.get("note_text"))
+    slot_rendered_note = normalize_template_text(candidate.get("slot_rendered_note"))
     canonical_template = normalize_template_text((payload or {}).get("template_text"))
     allowed_slots = list((payload or {}).get("allowed_slots") or [])
     payload_template_id = str((payload or {}).get("template_id") or "").strip()
+    note_text_fallback = raw_note_text
     payload_level = ""
     if payload_template_id.startswith("SENT"):
         payload_level = "Sentence"
@@ -126,6 +136,15 @@ def _candidate_target_template(candidate: Dict[str, Any], payload: Dict[str, Any
         if not compatible and mapped_template_id == "PHRASE_VP_GENERAL" and payload_template_id.startswith("PHRASE_VP_"):
             compatible = True
 
+    if target_selection == "note_first":
+        if note_text_fallback:
+            return note_text_fallback, "note_text_fallback"
+        if slot_rendered_note:
+            return slot_rendered_note, "slot_rendered_note"
+        if canonical_template and compatible:
+            return canonical_template, "contract_template"
+        return "", "missing_template"
+
     if (
         slot_template
         and bool(candidate.get("slot_templated"))
@@ -133,8 +152,15 @@ def _candidate_target_template(candidate: Dict[str, Any], payload: Dict[str, Any
         and template_uses_allowed_slots(slot_template, allowed_slots)
     ):
         return slot_template, "slot_template"
-    if canonical_template:
+
+    # Only use the contract template as the training target when the note topic
+    # is semantically compatible with the selected runtime template. Otherwise
+    # the exporter collapses diverse book notes into a few generic sentence
+    # templates, which destroys the value of the projected supervision.
+    if canonical_template and compatible:
         return canonical_template, "contract_template"
+    if note_text_fallback:
+        return note_text_fallback, "note_text_fallback"
     return "", "missing_template"
 
 
@@ -157,6 +183,14 @@ def _document_id(row: Dict[str, Any]) -> str:
             return doc_id.strip()
     text = str(row.get("sentence_text") or "").strip()
     return f"fallback::{text[:80]}"
+
+
+def _candidate_note_id(candidate: Dict[str, Any], *, fallback_source: str, fallback_text: str) -> str:
+    source_record_id = str(candidate.get("source_record_id") or "").strip()
+    if source_record_id:
+        return source_record_id
+    payload = f"{fallback_source}::{fallback_text}".encode("utf-8")
+    return f"note_{hashlib.sha1(payload).hexdigest()[:12]}"
 
 
 def _simple_phrase_stub(phrase_entry: Dict[str, Any]) -> Dict[str, Any]:
@@ -371,6 +405,42 @@ def _choose_candidate(
     return accepted[0]
 
 
+def _choose_candidates(
+    candidates: List[Dict[str, Any]],
+    *,
+    level: str,
+    sentence_text: str,
+    phrase_text: str = "",
+    mode: str,
+    max_candidates: int,
+) -> List[Dict[str, Any]]:
+    accepted: List[Dict[str, Any]] = []
+    seen_note_texts: set[str] = set()
+
+    for candidate in sorted(candidates, key=_candidate_priority, reverse=True):
+        source_book = str(candidate.get("source_book") or "")
+        if source_book not in BOOK_WHITELIST:
+            continue
+        if mode == "book_only" and source_book == "internal_pedagogical_grammar":
+            continue
+        ok = (
+            _sentence_candidate_ok(candidate, sentence_text)
+            if level == "Sentence"
+            else _phrase_candidate_ok(candidate, phrase_text, sentence_text)
+        )
+        if not ok:
+            continue
+        note_text_key = _candidate_target_text(candidate).strip().lower()
+        if not note_text_key or note_text_key in seen_note_texts:
+            continue
+        seen_note_texts.add(note_text_key)
+        accepted.append(candidate)
+        if len(accepted) >= max(1, int(max_candidates)):
+            break
+
+    return accepted
+
+
 def _make_sentence_row(row: Dict[str, Any], candidate: Dict[str, Any]) -> Dict[str, Any]:
     sentence_stub = _build_sentence_stub(row)
     payload = build_contract_template_payload(
@@ -383,11 +453,34 @@ def _make_sentence_row(row: Dict[str, Any], candidate: Dict[str, Any]) -> Dict[s
         sibling_count=1,
     )
     prompt = build_contract_template_training_prompt(payload or {}, node_level="Sentence")
-    target_template, target_variant = _candidate_target_template(candidate, payload)
+    target_template, target_variant = _candidate_target_template(
+        candidate,
+        payload,
+        target_selection=str(row.get("_target_selection") or "canonical_first"),
+    )
+    note_pattern = build_note_pattern(
+        note_text=target_template,
+        sentence_text=str(row.get("sentence_text") or ""),
+        slot_template_text=str(candidate.get("slot_template_text") or ""),
+        slot_values=dict(candidate.get("slot_values") or {}),
+    )
     source_document = row.get("source_document") or {}
+    source_name = source_document.get("source_name") or row.get("projection_version") or candidate.get("source_book")
+    note_text = target_template
     return {
         "input": prompt,
         "target": target_template,
+        "target_rendered": target_template,
+        "note_text": note_text,
+        "note_id": _candidate_note_id(candidate, fallback_source=str(source_name or ""), fallback_text=note_text),
+        "source": str(source_name or ""),
+        "target_pattern": note_pattern["pattern_text"],
+        "target_pattern_slots": note_pattern["slot_values"],
+        "target_pattern_source": note_pattern["pattern_source"],
+        "spacy_signature_depth": row.get("spacy_signature_depth"),
+        "spacy_signature": row.get("spacy_signature"),
+        "spacy_signature_nodes": row.get("spacy_signature_nodes"),
+        "spacy_signature_family_id": row.get("spacy_signature_family_id"),
         "level": "Sentence",
         "tam_bucket": "none",
         "prompt_template_version": CONTRACT_PROMPT_TEMPLATE_VERSION,
@@ -395,7 +488,6 @@ def _make_sentence_row(row: Dict[str, Any], candidate: Dict[str, Any]) -> Dict[s
         "source_name": source_document.get("source_name"),
         "sentence_text": row.get("sentence_text"),
         "target_content": row.get("sentence_text"),
-        "template_id": (payload or {}).get("template_id"),
         "note_source_book": candidate.get("source_book"),
         "note_topic": candidate.get("topic"),
         "note_origin_unit": candidate.get("origin_unit"),
@@ -425,11 +517,34 @@ def _make_phrase_row(row: Dict[str, Any], phrase_entry: Dict[str, Any], candidat
         sibling_count=sibling_count,
     )
     prompt = build_contract_template_training_prompt(payload or {}, node_level="Phrase")
-    target_template, target_variant = _candidate_target_template(candidate, payload)
+    target_template, target_variant = _candidate_target_template(
+        candidate,
+        payload,
+        target_selection=str(row.get("_target_selection") or "canonical_first"),
+    )
+    note_pattern = build_note_pattern(
+        note_text=target_template,
+        sentence_text=str(row.get("sentence_text") or ""),
+        slot_template_text=str(candidate.get("slot_template_text") or ""),
+        slot_values=dict(candidate.get("slot_values") or {}),
+    )
     source_document = row.get("source_document") or {}
+    source_name = source_document.get("source_name") or row.get("projection_version") or candidate.get("source_book")
+    note_text = target_template
     return {
         "input": prompt,
         "target": target_template,
+        "target_rendered": target_template,
+        "note_text": note_text,
+        "note_id": _candidate_note_id(candidate, fallback_source=str(source_name or ""), fallback_text=note_text),
+        "source": str(source_name or ""),
+        "target_pattern": note_pattern["pattern_text"],
+        "target_pattern_slots": note_pattern["slot_values"],
+        "target_pattern_source": note_pattern["pattern_source"],
+        "spacy_signature_depth": row.get("spacy_signature_depth"),
+        "spacy_signature": row.get("spacy_signature"),
+        "spacy_signature_nodes": row.get("spacy_signature_nodes"),
+        "spacy_signature_family_id": row.get("spacy_signature_family_id"),
         "level": "Phrase",
         "tam_bucket": "none",
         "prompt_template_version": CONTRACT_PROMPT_TEMPLATE_VERSION,
@@ -437,7 +552,6 @@ def _make_phrase_row(row: Dict[str, Any], phrase_entry: Dict[str, Any], candidat
         "source_name": source_document.get("source_name"),
         "sentence_text": row.get("sentence_text"),
         "target_content": phrase_entry.get("content"),
-        "template_id": (payload or {}).get("template_id"),
         "note_source_book": candidate.get("source_book"),
         "note_topic": candidate.get("topic"),
         "note_origin_unit": candidate.get("origin_unit"),
@@ -452,18 +566,26 @@ def _make_phrase_row(row: Dict[str, Any], phrase_entry: Dict[str, Any], candidat
     }
 
 
-def _build_rows(projected_path: Path, mode: str) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
+def _build_rows(
+    projected_path: Path,
+    mode: str,
+    *,
+    max_sentence_targets_per_node: int = 1,
+    target_selection: str = "canonical_first",
+) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
     rows: List[Dict[str, Any]] = []
     counters: Dict[str, int] = defaultdict(int)
     for item in _iter_jsonl(projected_path):
+        item["_target_selection"] = target_selection
         sentence_text = str(item.get("sentence_text") or "")
-        sentence_candidate = _choose_candidate(
+        sentence_candidates = _choose_candidates(
             item.get("sentence_note_candidates") or [],
             level="Sentence",
             sentence_text=sentence_text,
             mode=mode,
+            max_candidates=max_sentence_targets_per_node,
         )
-        if sentence_candidate:
+        for sentence_candidate in sentence_candidates:
             rows.append(_make_sentence_row(item, sentence_candidate))
             counters["sentence_rows_selected"] += 1
             counters[f"source__{sentence_candidate.get('source_book') or 'unknown'}"] += 1
@@ -588,6 +710,11 @@ def main() -> None:
     )
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--mode", choices=["book_only", "hybrid"], default="hybrid")
+    parser.add_argument(
+        "--target-selection",
+        choices=["canonical_first", "note_first"],
+        default="canonical_first",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--dev-ratio", type=float, default=0.1)
     parser.add_argument("--test-ratio", type=float, default=0.1)
@@ -595,6 +722,7 @@ def main() -> None:
     parser.add_argument("--max-per-topic", type=int, default=0)
     parser.add_argument("--max-per-source-sentence", type=int, default=0)
     parser.add_argument("--max-per-source-phrase", type=int, default=0)
+    parser.add_argument("--max-sentence-targets-per-node", type=int, default=1)
     parser.add_argument(
         "--dedup-exact-input-target",
         action=argparse.BooleanOptionalAction,
@@ -603,7 +731,12 @@ def main() -> None:
     args = parser.parse_args()
 
     projected_path = Path(args.input)
-    rows_before_dedup, selection_counters = _build_rows(projected_path, mode=args.mode)
+    rows_before_dedup, selection_counters = _build_rows(
+        projected_path,
+        mode=args.mode,
+        max_sentence_targets_per_node=int(args.max_sentence_targets_per_node),
+        target_selection=str(args.target_selection),
+    )
     rows_after_dedup, dedup_report = dedup_and_cap_rows(
         rows_before_dedup,
         max_per_target=int(args.max_per_target),
@@ -633,6 +766,7 @@ def main() -> None:
         "task": "linguistic_note",
         "builder": "build_t5_dataset_from_projected_corpus.py",
         "mode": args.mode,
+        "target_selection": args.target_selection,
         "prompt_template_version": CONTRACT_PROMPT_TEMPLATE_VERSION,
         "input_path": str(projected_path.resolve()),
         "total_before_dedup": len(rows_before_dedup),
@@ -643,6 +777,7 @@ def main() -> None:
         "max_per_topic": int(args.max_per_topic),
         "max_per_source_sentence": int(args.max_per_source_sentence),
         "max_per_source_phrase": int(args.max_per_source_phrase),
+        "max_sentence_targets_per_node": int(args.max_sentence_targets_per_node),
         "dedup_exact_input_target": bool(args.dedup_exact_input_target),
         "dedup_report": dedup_report,
         "topic_source_report": topic_source_report,

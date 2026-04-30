@@ -361,7 +361,6 @@ def resolve_generated_template_text(
 def _selection_to_dict(selection: TemplateSelection, *, semantic_rejects: list[dict[str, str]] | None = None) -> dict[str, Any]:
     payload = {
         "level": selection.level,
-        "template_id": selection.template_id,
         "matched_key": selection.matched_key,
         "registry_version": selection.registry_version,
         "context_key_l1": selection.context_key_l1,
@@ -566,7 +565,6 @@ def build_contract_template_training_prompt(
         "node_level": str(node_level or "").strip() or "Unknown",
         "audience_level": str(audience_level or "").strip() or "intermediate",
         "note_template_version": payload.get("note_template_version"),
-        "template_id": payload.get("template_id"),
         "template_text": payload.get("template_text"),
         "allowed_slots": payload.get("allowed_slots"),
         "slot_values": payload.get("slot_values"),

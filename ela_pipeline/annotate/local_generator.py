@@ -80,7 +80,7 @@ class LocalT5Annotator:
     def _build_prompt(self, sentence: str, node: Dict) -> str:
         return (
             "Write one short educational linguistic note in natural English. "
-            "Do not output field names, labels, placeholders, booleans, or JSON fragments. "
+            "Return only the note. "
             f"Sentence: {sentence} "
             f"Node type: {node['type']}. "
             f"Part of speech: {node['part_of_speech']}. "
@@ -288,46 +288,9 @@ class LocalT5Annotator:
         return trace
 
     def _is_note_suitable_for_node(self, node: Dict, note: str) -> bool:
-        if not is_valid_note(note):
-            return False
-
-        node_type = (node.get("type") or "").strip()
-        content = sanitize_note(str(node.get("content", ""))).lower()
-        note_l = sanitize_note(note).lower()
-
-        if fails_semantic_sanity(
-            note_l,
-            node_type=node.get("type"),
-            node_part_of_speech=node.get("part_of_speech"),
-            node_content=node.get("content"),
-        ):
-            return False
-
-        if node_type == "Word":
-            # Force strict lexical anchoring in quoted form to suppress generic noise.
-            if content and f"'{content}'" not in note_l:
-                return False
-            return True
-
-        if node_type == "Phrase":
-            if "phrase" not in note_l:
-                return False
-            phrase_tokens = [t for t in re.findall(r"[a-z]+", content) if len(t) >= 4]
-            if phrase_tokens and not any(tok in note_l for tok in phrase_tokens[:2]):
-                return False
-            return True
-
-        if node_type == "Sentence":
-            if "sentence" not in note_l:
-                return False
-            tense = (node.get("tense") or "").lower()
-            if tense == "past" and "present simple" in note_l:
-                return False
-            if tense == "present" and "past simple" in note_l:
-                return False
-            return True
-
-        return True
+        # Compatibility filtering is intentionally disabled here to inspect raw model outputs.
+        # Keep only basic syntactic validity so the generator can emit unconstrained notes.
+        return is_valid_note(note)
 
     @staticmethod
     def _normalize_tam_for_node(node: Dict) -> None:

@@ -10,6 +10,11 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+from ela_pipeline.dataset.contract_signatures import (
+    contract_bucketed_signature,
+    contract_exact_signature,
+    contract_presence_signature,
+)
 from ela_pipeline.dataset.tree_construction_inventory import (
     _compress_phrase_signature_bucketed,
     _compress_phrase_signature_presence,
@@ -60,6 +65,9 @@ def _load_book_rows(paths: list[str]) -> list[dict[str, Any]]:
 def _prepare_sentence_profiles(text: str, nlp: Any, *, max_phrase_depth: int) -> list[dict[str, Any]]:
     profiles: list[dict[str, Any]] = []
     for sentence_text, sentence_node in build_skeleton(text, nlp).items():
+        exact_contract_signature = contract_exact_signature(sentence_node)
+        bucketed_contract_signature = contract_bucketed_signature(exact_contract_signature)
+        presence_contract_signature = contract_presence_signature(exact_contract_signature)
         effective_children = _normalize_phrase_children(
             sentence_node,
             depth=1,
@@ -95,6 +103,9 @@ def _prepare_sentence_profiles(text: str, nlp: Any, *, max_phrase_depth: int) ->
                 "exact_signature": exact_sentence_signature,
                 "bucketed_signature": bucketed_sentence_signature,
                 "presence_signature": presence_sentence_signature,
+                "contract_exact_signature": exact_contract_signature,
+                "contract_bucketed_signature": bucketed_contract_signature,
+                "contract_presence_signature": presence_contract_signature,
                 "phrase_profiles": phrase_profiles,
             }
         )
@@ -111,6 +122,9 @@ def _build_corpus_registry(
     sentence_exact_counts: Counter[str] = Counter()
     sentence_bucketed_counts: Counter[str] = Counter()
     sentence_presence_counts: Counter[str] = Counter()
+    sentence_contract_exact_counts: Counter[str] = Counter()
+    sentence_contract_bucketed_counts: Counter[str] = Counter()
+    sentence_contract_presence_counts: Counter[str] = Counter()
     phrase_exact_counts: Counter[str] = Counter()
     phrase_bucketed_counts: Counter[str] = Counter()
     phrase_presence_counts: Counter[str] = Counter()
@@ -126,9 +140,15 @@ def _build_corpus_registry(
             sentence_exact_id = _family_id("sent_exact", profile["exact_signature"])
             sentence_bucketed_id = _family_id("sent_bucket", profile["bucketed_signature"])
             sentence_presence_id = _family_id("sent_presence", profile["presence_signature"])
+            sentence_contract_exact_id = _family_id("sent_contract_exact", profile["contract_exact_signature"])
+            sentence_contract_bucketed_id = _family_id("sent_contract_bucket", profile["contract_bucketed_signature"])
+            sentence_contract_presence_id = _family_id("sent_contract_presence", profile["contract_presence_signature"])
             sentence_exact_counts[sentence_exact_id] += 1
             sentence_bucketed_counts[sentence_bucketed_id] += 1
             sentence_presence_counts[sentence_presence_id] += 1
+            sentence_contract_exact_counts[sentence_contract_exact_id] += 1
+            sentence_contract_bucketed_counts[sentence_contract_bucketed_id] += 1
+            sentence_contract_presence_counts[sentence_contract_presence_id] += 1
             if len(sentence_examples[sentence_exact_id]) < 3:
                 sentence_examples[sentence_exact_id].append(profile["sentence_text"])
 
@@ -157,6 +177,9 @@ def _build_corpus_registry(
         "sentence_exact_counts": dict(sentence_exact_counts),
         "sentence_bucketed_counts": dict(sentence_bucketed_counts),
         "sentence_presence_counts": dict(sentence_presence_counts),
+        "sentence_contract_exact_counts": dict(sentence_contract_exact_counts),
+        "sentence_contract_bucketed_counts": dict(sentence_contract_bucketed_counts),
+        "sentence_contract_presence_counts": dict(sentence_contract_presence_counts),
         "phrase_exact_counts": dict(phrase_exact_counts),
         "phrase_bucketed_counts": dict(phrase_bucketed_counts),
         "phrase_presence_counts": dict(phrase_presence_counts),
@@ -241,6 +264,9 @@ def _align_book_rows(
         sentence_exact_id = _family_id("sent_exact", profile["exact_signature"])
         sentence_bucketed_id = _family_id("sent_bucket", profile["bucketed_signature"])
         sentence_presence_id = _family_id("sent_presence", profile["presence_signature"])
+        sentence_contract_exact_id = _family_id("sent_contract_exact", profile["contract_exact_signature"])
+        sentence_contract_bucketed_id = _family_id("sent_contract_bucket", profile["contract_bucketed_signature"])
+        sentence_contract_presence_id = _family_id("sent_contract_presence", profile["contract_presence_signature"])
 
         family_alignment = {
             "registry_version": registry["registry_version"],
@@ -249,9 +275,15 @@ def _align_book_rows(
                 "exact_family_id": sentence_exact_id,
                 "bucketed_family_id": sentence_bucketed_id,
                 "presence_family_id": sentence_presence_id,
+                "contract_exact_family_id": sentence_contract_exact_id,
+                "contract_bucketed_family_id": sentence_contract_bucketed_id,
+                "contract_presence_family_id": sentence_contract_presence_id,
                 "corpus_exact_count": int(registry["sentence_exact_counts"].get(sentence_exact_id, 0)),
                 "corpus_bucketed_count": int(registry["sentence_bucketed_counts"].get(sentence_bucketed_id, 0)),
                 "corpus_presence_count": int(registry["sentence_presence_counts"].get(sentence_presence_id, 0)),
+                "corpus_contract_exact_count": int(registry["sentence_contract_exact_counts"].get(sentence_contract_exact_id, 0)),
+                "corpus_contract_bucketed_count": int(registry["sentence_contract_bucketed_counts"].get(sentence_contract_bucketed_id, 0)),
+                "corpus_contract_presence_count": int(registry["sentence_contract_presence_counts"].get(sentence_contract_presence_id, 0)),
             },
         }
 

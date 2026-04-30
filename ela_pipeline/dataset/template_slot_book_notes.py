@@ -330,60 +330,53 @@ def _topic_template_projection(
     return f"topic_template::{template_id.lower()}", template_text, slot_values, flags, True
 
 
-def _parametrize_note(note_text: str, slots: dict[str, Any], slot_names: list[str]) -> tuple[str, list[str]]:
-    """Replace contract field values found in note_text with {{SLOT}} markers.
+# Grammatical category terms that authors use in notes, mapped to contract slot names.
+# Terms within each list are tried longest-first so "head noun" matches before "noun",
+# "relative pronoun" matches before "pronoun", "object of the preposition" before "object".
+_SLOT_CATEGORY_TERMS: dict[str, list[str]] = {
+    "HEAD_NOUN": ["head noun", "antecedent noun", "antecedent", "noun"],
+    "PREPOSITION": ["preposition"],
+    "OBJECT_NP": [
+        "object of the preposition",
+        "object of a preposition",
+        "noun phrase",
+        "object np",
+        "object",
+    ],
+    "RELATIVE_MARKER": [
+        "relative pronoun",
+        "relative adverb",
+        "relative element",
+        "relative word",
+        "relative marker",
+        "wh-word",
+        "wh-pronoun",
+    ],
+    "TAG_AUXILIARY": ["tag auxiliary", "auxiliary verb", "auxiliary"],
+    "TAG_PRONOUN": ["tag pronoun", "pronoun"],
+}
 
-    Matching strategy:
-    - Quoted form first ("for", 'for') — highest precision, always tried.
-    - Multi-word values (OBJECT_NP, HEAD_NOUN etc.): word-boundary match in
-      running prose — safe because multi-word phrases rarely appear by accident.
-    - Single-word values (PREPOSITION, RELATIVE_MARKER etc.): bare match only
-      in book notation context — the value appears adjacent to "/" or "+"
-      (e.g. "who/that", "preposition + whom"). Avoids replacing common words
-      that appear as ordinary grammar in general conceptual statements.
+
+def _parametrize_note(note_text: str, slot_names: list[str]) -> tuple[str, list[str]]:
+    """Replace grammatical category terms in note_text with {{SLOT}} markers.
+
+    Searches for the terms authors actually use ("noun", "preposition",
+    "relative pronoun", etc.) rather than the contract field values, so that
+    conceptual notes like "The noun modified by the relative pronoun …" become
+    "The {{HEAD_NOUN}} modified by the {{RELATIVE_MARKER}} …".
     """
     result = note_text
     replaced: list[str] = []
     for slot_name in slot_names:
-        val = _norm(slots.get(slot_name) or "")
-        if not val:
-            continue
-        is_multiword = len(val.split()) > 1
-        marker_quoted = '"{{' + slot_name + '}}"'
-        marker_bare = "{{" + slot_name + "}}"
-
-        # Quoted form (highest precision — always tried first)
-        matched = False
-        for q in ('"', "'"):
-            quoted = f"{q}{val}{q}"
-            if quoted in result:
-                result = result.replace(quoted, marker_quoted, 1)
+        terms = _SLOT_CATEGORY_TERMS.get(slot_name, [])
+        marker = "{{" + slot_name + "}}"
+        for term in terms:
+            pattern = re.compile(r"(?<!\w)" + re.escape(term) + r"(?!\w)", re.IGNORECASE)
+            new_result, n = pattern.subn(marker, result, count=1)
+            if n:
+                result = new_result
                 replaced.append(slot_name)
-                matched = True
                 break
-
-        if matched:
-            continue
-
-        if is_multiword:
-            # Multi-word value: safe to use word-boundary match in running prose
-            pattern = re.compile(r"(?<!\w)" + re.escape(val) + r"(?!\w)", re.IGNORECASE)
-            new_result, n = pattern.subn(marker_bare, result, count=1)
-            if n:
-                result = new_result
-                replaced.append(slot_name)
-        else:
-            # Single-word value: only match in notation context (adjacent to / or +)
-            pattern = re.compile(
-                r"(?<![a-zA-Z])" + re.escape(val) + r"(?=/)"  # val/…
-                r"|(?<=/)" + re.escape(val) + r"(?![a-zA-Z])"  # /val
-                r"|(?<=\+\s)" + re.escape(val) + r"(?![a-zA-Z])",  # + val
-                re.IGNORECASE,
-            )
-            new_result, n = pattern.subn(marker_bare, result, count=1)
-            if n:
-                result = new_result
-                replaced.append(slot_name)
     return result, replaced
 
 
@@ -394,7 +387,7 @@ def _template_phrase_note(topic: str, note_text: str, slots: dict[str, Any]) -> 
     safe_head = _safe_head_noun(slots)
 
     if "prepositional phrase" in topic_lower:
-        template, replaced = _parametrize_note(note_text, slots, ["PREPOSITION", "OBJECT_NP"])
+        template, replaced = _parametrize_note(note_text, ["OBJECT_NP", "PREPOSITION"])
         if replaced:
             for slot in ["PREPOSITION", "OBJECT_NP"]:
                 if "{{" + slot + "}}" in template and not slots.get(slot):
@@ -404,7 +397,7 @@ def _template_phrase_note(topic: str, note_text: str, slots: dict[str, Any]) -> 
         return "phrase_passthrough", note_text, flags
 
     if "non-restrictive relative clause" in topic_lower or "non restrictive relative clause" in topic_lower:
-        template, replaced = _parametrize_note(note_text, slots, ["HEAD_NOUN", "RELATIVE_MARKER"])
+        template, replaced = _parametrize_note(note_text, ["HEAD_NOUN", "RELATIVE_MARKER"])
         if replaced:
             if not safe_head and "HEAD_NOUN" in replaced:
                 flags.append("unsafe_head_noun_slot")
@@ -417,7 +410,7 @@ def _template_phrase_note(topic: str, note_text: str, slots: dict[str, Any]) -> 
         return "phrase_passthrough", note_text, flags
 
     if "restrictive relative clause" in topic_lower or "relative clause" in topic_lower:
-        template, replaced = _parametrize_note(note_text, slots, ["HEAD_NOUN", "PREPOSITION", "RELATIVE_MARKER"])
+        template, replaced = _parametrize_note(note_text, ["HEAD_NOUN", "RELATIVE_MARKER", "PREPOSITION"])
         if replaced:
             if not safe_head and "HEAD_NOUN" in replaced:
                 flags.append("unsafe_head_noun_slot")

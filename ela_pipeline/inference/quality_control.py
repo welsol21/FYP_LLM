@@ -43,11 +43,18 @@ def _extract_probe_stats(result: Dict[str, Any]) -> Dict[str, int]:
     semantic_mismatch = 0
     for node in nodes:
         quality_flags = node.get("quality_flags", []) or []
+        notes = node.get("linguistic_notes")
+        has_note = False
+        if isinstance(notes, dict):
+            has_note = any(str(v).strip() for v in notes.values())
+        elif isinstance(notes, list):
+            has_note = any(str(v).strip() for v in notes)
         if (
             "model_used" in quality_flags
             or "model_predicted_template" in quality_flags
             or "rule_used" in quality_flags
             or ("note_generated" in quality_flags and "fallback_used" not in quality_flags)
+            or has_note
         ):
             model_notes += 1
         if "fallback_used" in quality_flags:

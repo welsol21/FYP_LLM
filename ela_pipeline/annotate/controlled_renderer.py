@@ -7,7 +7,7 @@ import os
 import torch
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
-from ela_pipeline.annotate.note_context import build_note_context_prompt
+from ela_pipeline.annotate.contract_template_builder import build_contract_template_training_prompt
 from ela_pipeline.validation.notes_quality import sanitize_note
 
 
@@ -56,24 +56,41 @@ class ControlledT5NoteRenderer:
         sibling_index: int,
         sibling_count: int,
     ) -> str:
-        context = build_note_context_prompt(
-            node=node,
-            parent=parent,
-            sentence_node=sentence_node,
-            path_types=path_types,
-            depth=depth,
-            sibling_index=sibling_index,
-            sibling_count=sibling_count,
-            template_version="v2_flat_context",
-        )
-        return (
-            "Rewrite this linguistic note blueprint into one short educational note in natural English. "
-            "Keep grammar meaning precise. Use only grammatical context from the payload. "
-            "Do not add JSON, labels, or extra fields. "
-            f"Audience level: {level}. "
-            f"Blueprint: {blueprint_text}. "
-            f"Context: {context}"
-        )
+        payload = {
+            "note_template_version": "controlled_t5_rewrite_v1",
+            "template_text": blueprint_text,
+            "allowed_slots": [],
+            "slot_values": {},
+            "rendered_note_text": blueprint_text,
+            "fallback_note_text": blueprint_text,
+            "selection": {
+                "level": level,
+                "mode": "controlled_t5_rewrite",
+            },
+            "note_template_input": {
+                "node_level": str(node.get("type") or "").strip() or "Node",
+                "node_context": {
+                    "content": str(node.get("content") or "").strip(),
+                    "part_of_speech": str(node.get("part_of_speech") or "").strip(),
+                    "grammatical_role": str(node.get("grammatical_role") or "").strip(),
+                    "cefr_level": str(node.get("cefr_level") or "").strip(),
+                    "tam_construction": str(node.get("tam_construction") or "").strip(),
+                },
+                "sentence_context": {
+                    "sentence_text": str(sentence_node.get("content") or "").strip(),
+                },
+                "parent_context": {
+                    "content": str(parent.get("content") or "").strip() if isinstance(parent, dict) else "",
+                    "part_of_speech": str(parent.get("part_of_speech") or "").strip() if isinstance(parent, dict) else "",
+                    "grammatical_role": str(parent.get("grammatical_role") or "").strip() if isinstance(parent, dict) else "",
+                },
+                "path_types": list(path_types),
+                "depth": depth,
+                "sibling_index": sibling_index,
+                "sibling_count": sibling_count,
+            },
+        }
+        return build_contract_template_training_prompt(payload, node_level=str(node.get("type") or "Node"), audience_level=level)
 
     def render_note(
         self,
