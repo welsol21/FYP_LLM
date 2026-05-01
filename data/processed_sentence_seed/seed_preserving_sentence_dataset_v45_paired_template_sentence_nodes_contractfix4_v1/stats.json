@@ -1,0 +1,20 @@
+{
+  "builder": "paired_template_sentence_nodes_contractfix4_v1",
+  "output_rows": 5016,
+  "train": 4009,
+  "dev": 506,
+  "test": 501,
+  "input_template_rows": 5016,
+  "raw_input_rows": 0,
+  "template_target_rows": 3545,
+  "raw_target_rows": 1471,
+  "raw_going_to_rows_before_cleanup": 120,
+  "bad_rows_before_cleanup": 90,
+  "cleanup_counts": {
+    "keep": 9912,
+    "future": 36,
+    "negative": 30,
+    "yesno": 54,
+    "wh": 0
+  }
+}

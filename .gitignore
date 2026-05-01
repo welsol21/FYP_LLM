@@ -131,3 +131,10 @@ frontend/public/models/
 frontend/public/ffmpeg/
 frontend/public/onnx/
 docs/StudentInc2026/
+
+# Tracked report artifacts referenced from the thesis
+!data/processed_sentence_seed/
+!data/processed_sentence_seed/projection_external_sentence_contract_v2_note_first_balanced_exact5_cap104_v3/
+!data/processed_sentence_seed/projection_external_sentence_contract_v2_note_first_balanced_exact5_cap104_v3/stats.json
+!data/processed_sentence_seed/seed_preserving_sentence_dataset_v45_paired_template_sentence_nodes_contractfix4_v1/
+!data/processed_sentence_seed/seed_preserving_sentence_dataset_v45_paired_template_sentence_nodes_contractfix4_v1/stats.json
