@@ -1,14 +1,14 @@
 # ELA — English Language Assistant
 
 **FYP Implementation — Vladyslav Rastvorov, MTU Cork, BSc Software Development, 2025–2026**
-Supervised by Dr. Alex Vakaloudis (research) and Prof. Nasir Ahmad (implementation).
+Supervised by Dr. Alex Vakaloudis (research) and Dr. Nasir Ahmad (implementation).
 
 ELA converts English text, audio, and video into a validated hierarchical linguistic JSON contract
 (`Sentence → Phrase → Word`), enriched with grammar annotations, CEFR difficulty levels,
 EN→RU translations, and IPA phonetics. A React/PWA frontend renders the contract as an
 interactive tree and produces bilingual subtitle videos and audio artifacts.
 
-Live deployment: **el-a.uk**
+Live deployment: **el-a.uk** · Thesis source: [welsol21/FYP_report](https://github.com/welsol21/FYP_report)
 
 ---
 
