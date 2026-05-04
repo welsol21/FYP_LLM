@@ -547,7 +547,8 @@ Each contract is a `Record<sentence_text, Node>` where nodes are recursive:
 | `docs/contract_field_ownership_2026-03-04.md` | Field responsibility matrix |
 | `docs/TODO.md` | Active work items |
 | `docs/sample.json` | Authoritative contract example |
-| `docs/FYP_ResearchProject_Thesis_VladyslavRastvorov_R00274535.pdf` | Full thesis |
+| `docs/FYP_ResearchProject_Thesis_VladyslavRastvorov_R00274535.pdf` | Year 3 Research Project thesis (preliminary research phase) |
+| [welsol21/FYP_report](https://github.com/welsol21/FYP_report) | Year 4 FYP Implementation thesis — LaTeX source and compiled PDF (primary submission) |
 
 ---
 
