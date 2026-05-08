@@ -169,7 +169,7 @@ export function FilesPage() {
         aria-label="Media File"
         type="file"
         accept=".mp3,.wav,.m4a,.flac,.ogg,.mp4,.mkv,.mov,.avi,.webm,.pdf,.txt,.md,.rtf,.docx,.doc"
-        style={{ display: 'none' }}
+        style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, overflow: 'hidden', clip: 'rect(0,0,0,0)' }}
         onChange={async (e) => {
           recordRuntimeDiagnostic('ui.files', 'file_input.change', {
             count: e.target.files?.length || 0,
