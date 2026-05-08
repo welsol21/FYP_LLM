@@ -185,11 +185,24 @@ export function ProjectsPage() {
                   <td>{new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                   <td>{new Date(row.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                   <td>{`${stat.analyzed}/${stat.total}`}</td>
-                  <td>
+                  <td style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      style={{ background: '#2e7d32', color: '#fff', borderColor: '#2e7d32' }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void openFiles(row)
+                      }}
+                      aria-label={`open-project-${row.id}`}
+                    >
+                      Open
+                    </button>
                     {typeof api.deleteProject === 'function' ? (
                       <button
                         type="button"
                         className="secondary-btn"
+                        style={{ background: '#b71c1c', color: '#fff', borderColor: '#b71c1c' }}
                         onClick={(e) => {
                           e.stopPropagation()
                           void onDeleteProject(row)
@@ -234,23 +247,34 @@ export function ProjectsPage() {
                   <span className="mobile-record-label">Analyzed</span>
                   <span>{`${stat.analyzed}/${stat.total}`}</span>
                 </div>
+              </div>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  style={{ flex: 1, background: '#2e7d32', color: '#fff', borderColor: '#2e7d32' }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void openFiles(row)
+                  }}
+                  aria-label={`mobile-open-project-${row.id}`}
+                >
+                  Open
+                </button>
                 {typeof api.deleteProject === 'function' ? (
-                  <div className="mobile-record-field mobile-record-field-delete">
-                    <button
-                      type="button"
-                      className="secondary-btn mobile-project-delete-btn"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        void onDeleteProject(row)
-                      }}
-                      disabled={Boolean(deletingByProjectId[row.id])}
-                      aria-label={`mobile-delete-project-${row.id}`}
-                    >
-                      <span className="mobile-project-delete-btn-text">
-                        {deletingByProjectId[row.id] ? 'Deleting...' : 'Delete'}
-                      </span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    style={{ flex: 1, background: '#b71c1c', color: '#fff', borderColor: '#b71c1c' }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void onDeleteProject(row)
+                    }}
+                    disabled={Boolean(deletingByProjectId[row.id])}
+                    aria-label={`mobile-delete-project-${row.id}`}
+                  >
+                    {deletingByProjectId[row.id] ? 'Deleting...' : 'Delete'}
+                  </button>
                 ) : null}
               </div>
             </article>

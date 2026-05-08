@@ -251,10 +251,23 @@ export function FilesPage() {
                         {expanded ? `Hide versions (${versions.length})` : `Show versions (${versions.length})`}
                       </button>
                     </td>
-                    <td>
+                    <td style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <button
                         type="button"
                         className="secondary-btn"
+                        style={{ background: '#2e7d32', color: '#fff', borderColor: '#2e7d32' }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openAnalyze(row)
+                        }}
+                        aria-label={`open-file-${row.id}`}
+                      >
+                        Open
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        style={{ background: '#b71c1c', color: '#fff', borderColor: '#b71c1c' }}
                         onClick={(e) => {
                           e.stopPropagation()
                           void deleteFile(row.id)
@@ -364,10 +377,23 @@ export function FilesPage() {
                   </button>
                 </div>
               </div>
-              <div className="mobile-record-actions">
+              <div className="mobile-record-actions" style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
                 <button
                   type="button"
-                  className="secondary-btn mobile-record-action-btn"
+                  className="secondary-btn"
+                  style={{ flex: 1, background: '#2e7d32', color: '#fff', borderColor: '#2e7d32' }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    openAnalyze(row)
+                  }}
+                  aria-label={`mobile-open-file-${row.id}`}
+                >
+                  Open
+                </button>
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  style={{ flex: 1, background: '#b71c1c', color: '#fff', borderColor: '#b71c1c' }}
                   onClick={(e) => {
                     e.stopPropagation()
                     void deleteFile(row.id)
