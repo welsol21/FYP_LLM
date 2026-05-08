@@ -624,7 +624,6 @@ export function VisualizerPage() {
             <article key={`${activeRow.document_id}:${activeRow.sentence_key}:${activeRow.tree.node_id}`} className="visualizer-article">
               <VisualizerTreeLegacy
                 node={activeRow.tree}
-                isRoot
                 selectedNodeId={nodeId}
                 preferredTranslationProvider={effectiveTranslationProvider}
                 showAllTranslations={showAllTranslations}

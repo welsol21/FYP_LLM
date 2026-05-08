@@ -94,76 +94,55 @@ function providerLabel(provider: string | undefined): string {
   return normalized
 }
 
-function flattenForTokens(node: VisualizerNode): VisualizerNode[] {
+function nodeTokens(node: VisualizerNode): Token[] {
   const children = orderedChildren(node)
-  return children.flatMap((child) => {
-    const grandchildren = orderedChildren(child)
-    if (grandchildren.length > 0) return grandchildren
-    return [child]
-  })
-}
-
-function nodeTokens(node: VisualizerNode, level: number): Token[] {
-  if (level === 0 && node.linguistic_elements.length > 0) {
-    const parentText = node.content ?? ''
-    const parentStart = node.source_span?.start ?? 0
-    const children = flattenForTokens(node)
-      .map((child, idx) => {
-        const startAbs = child.source_span?.start
-        const endAbs = child.source_span?.end
-        if (typeof startAbs !== 'number' || typeof endAbs !== 'number') return null
-        const start = Math.max(0, startAbs - parentStart)
-        const end = Math.min(parentText.length, endAbs - parentStart)
-        if (end <= start) return null
-        return {
-          idx,
-          start,
-          end,
-          tone: colorOf(labelOf(child)),
-        }
-      })
-      .filter((item): item is { idx: number; start: number; end: number; tone: string } => item !== null)
-      .sort((a, b) => (a.start - b.start) || (a.end - b.end) || (a.idx - b.idx))
-
-    if (children.length > 0) {
-      const out: Token[] = []
-      let cursor = 0
-      for (const child of children) {
-        if (child.start > cursor) {
-          const gap = parentText.slice(cursor, child.start).trim()
-          if (gap) out.push({ text: gap, tone: GAP_TONE })
-        }
-        if (child.start < cursor) {
-          continue
-        }
-        const text = parentText.slice(child.start, child.end).trim()
-        if (text) out.push({ text, tone: child.tone })
-        cursor = Math.max(cursor, child.end)
-      }
-      if (cursor < parentText.length) {
-        const tail = parentText.slice(cursor).trim()
-        if (tail) out.push({ text: tail, tone: GAP_TONE })
-      }
-      if (out.length > 0) return out
-    }
-
-    return orderedChildren(node).reduce<Token[]>((acc, child) => {
-      const text = child.content?.trim()
-      if (!text) return acc
-      if (acc.length > 0 && acc[acc.length - 1].text.toLowerCase() === text.toLowerCase()) return acc
-      acc.push({ text, tone: colorOf(labelOf(child)) })
-      return acc
-    }, [])
+  if (children.length === 0) {
+    return [{ text: node.content, tone: colorOf(labelOf(node)) }]
   }
-  const tone = level === 1 && node.linguistic_elements.length === 0 ? stableTopLevelTone(node.node_id) : colorOf(labelOf(node))
-  return [{ text: node.content, tone }]
+
+  const parentText = node.content ?? ''
+  const parentStart = node.source_span?.start ?? 0
+  const spans = children
+    .map((child, idx) => {
+      const startAbs = child.source_span?.start
+      const endAbs = child.source_span?.end
+      if (typeof startAbs !== 'number' || typeof endAbs !== 'number') return null
+      const start = Math.max(0, startAbs - parentStart)
+      const end = Math.min(parentText.length, endAbs - parentStart)
+      if (end <= start) return null
+      return { idx, start, end, tone: colorOf(labelOf(child)) }
+    })
+    .filter((item): item is { idx: number; start: number; end: number; tone: string } => item !== null)
+    .sort((a, b) => (a.start - b.start) || (a.end - b.end) || (a.idx - b.idx))
+
+  if (spans.length === 0) {
+    return [{ text: node.content, tone: colorOf(labelOf(node)) }]
+  }
+
+  const out: Token[] = []
+  let cursor = 0
+  for (const span of spans) {
+    if (span.start > cursor) {
+      const gap = parentText.slice(cursor, span.start).trim()
+      if (gap) out.push({ text: gap, tone: GAP_TONE })
+    }
+    if (span.start < cursor) continue
+    const text = parentText.slice(span.start, span.end).trim()
+    if (text) out.push({ text, tone: span.tone })
+    cursor = Math.max(cursor, span.end)
+  }
+  if (cursor < parentText.length) {
+    const tail = parentText.slice(cursor).trim()
+    if (tail) out.push({ text: tail, tone: GAP_TONE })
+  }
+
+  return out.length > 0 ? out : [{ text: node.content, tone: colorOf(labelOf(node)) }]
 }
 
 type NoteLevel = 'elementary' | 'intermediate' | 'advanced' | 'all'
 
 type Props = {
   node: VisualizerNode
-  isRoot?: boolean
   level?: number
   selectedNodeId?: string
   preferredTranslationProvider?: string
@@ -174,7 +153,6 @@ type Props = {
 
 export function VisualizerTreeLegacy({
   node,
-  isRoot = false,
   level = 0,
   selectedNodeId,
   preferredTranslationProvider,
@@ -189,7 +167,7 @@ export function VisualizerTreeLegacy({
     return colorOf(label)
   }, [label, level, node.linguistic_elements.length, node.node_id])
   const children = useMemo(() => orderedChildren(node), [node])
-  const tokens = useMemo(() => nodeTokens(node, level), [node, level])
+  const tokens = useMemo(() => nodeTokens(node), [node])
   const hasChildren = children.length > 0
   const cefrText = node.cefr_level ?? '-'
   const tenseText = node.tense == null || node.tense === '' ? '-' : node.tense
