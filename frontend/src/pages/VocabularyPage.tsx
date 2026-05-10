@@ -430,6 +430,7 @@ export function VocabularyPage() {
             <button
               type="button"
               className="secondary-btn"
+              style={{ background: '#2e7d32', color: '#fff', borderColor: '#2e7d32' }}
               onClick={() => {
                 setSelectedExportFields(DEFAULT_EXPORT_FIELDS)
                 setPendingExportFormat('json')
@@ -440,6 +441,7 @@ export function VocabularyPage() {
             <button
               type="button"
               className="secondary-btn"
+              style={{ background: '#2e7d32', color: '#fff', borderColor: '#2e7d32' }}
               onClick={() => {
                 setSelectedExportFields(DEFAULT_EXPORT_FIELDS)
                 setPendingExportFormat('csv')
@@ -450,6 +452,7 @@ export function VocabularyPage() {
             <button
               type="button"
               className="secondary-btn"
+              style={{ background: '#b71c1c', color: '#fff', borderColor: '#b71c1c' }}
               disabled={selectedDocumentIds.length === 0 || deleting}
               onClick={() => {
                 void deleteSelectedAnalyses()
@@ -490,7 +493,7 @@ export function VocabularyPage() {
             <button type="button" onClick={() => setPendingExportFormat(null)} className="secondary-btn">
               Cancel
             </button>
-            <button type="button" onClick={() => { void confirmExport() }}>
+            <button type="button" style={{ background: '#2e7d32', color: '#fff', borderColor: '#2e7d32' }} onClick={() => { void confirmExport() }}>
               Export {pendingExportFormat.toUpperCase()}
             </button>
           </div>
