@@ -181,7 +181,8 @@ export function toExportRows(row: VocabRow): ExportRow[] {
 }
 
 function downloadTextFile(filename: string, text: string, mimeType: string): void {
-  const blob = new Blob([text], { type: mimeType })
+  const bom = mimeType.includes('csv') ? '﻿' : ''
+  const blob = new Blob([bom + text], { type: mimeType })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
