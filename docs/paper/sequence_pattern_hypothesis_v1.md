@@ -1,0 +1,15 @@
+At its most general level, the Sequence Pattern Hypothesis states that some complex systems can be studied not only through raw observations or fully specified governing equations, but also through the identification of analytical units, the extraction of abstract patterns from those units, and the study of the sequences in which such patterns recur and interact.
+
+The hypothesis does not deny the value of first-principles science, nor does it reject the use of modern machine learning. Instead, it proposes an intermediate scientific logic: before attempting either full mechanistic derivation or end-to-end statistical fitting, one may first seek the recurring units and regularities through which the observable behaviour of the system is organized.
+
+In this framework, an analytical unit is the minimal recurring element through which the system becomes tractable for study. The unit need not be physically fundamental in an ontological sense; rather, it is fundamental in a methodological sense, because it is the smallest element at which stable regularities can be identified, compared, and reused in further analysis.
+
+An abstract pattern is a higher-order description extracted from such units. It does not preserve every surface detail of the original observation, but retains those features that are stable enough to recur across different instances and informative enough to support interpretation, comparison, or prediction.
+
+A pattern sequence arises when these abstract patterns are not considered in isolation, but in the order in which they appear, combine, and transform over time or within a structured system. The central assumption of the hypothesis is that this sequential organization is itself a carrier of knowledge, because it preserves regularities that are not visible at the level of isolated units alone.
+
+The hypothesis therefore implies a characteristic sequence of scientific work: observable content is decomposed into analytical units; analytical units are mapped into abstract patterns; abstract patterns are organized into sequences; and those sequences are then used as the basis for interpretation, prediction, reconstruction, or discovery. In this sense, the sequence is not merely a record of what happened, but a structured object from which new knowledge may be inferred.
+
+This does not mean that every complex system will admit a useful decomposition of this kind, nor that every abstraction will preserve the right information. The hypothesis is therefore not a universal guarantee, but a methodological claim: where stable analytical units, abstract patterns, and informative pattern sequences can be found, they may provide a workable path between raw complexity and scientific inference.
+
+The purpose of the present paper is not to prove this hypothesis in full generality, but to clarify its logic and examine its plausibility in two sharply different domains. By doing so, the paper seeks to show that the same sequence-based mode of abstraction can operate both in a recursive symbolic system such as language and in a continuous observational system such as weather.
