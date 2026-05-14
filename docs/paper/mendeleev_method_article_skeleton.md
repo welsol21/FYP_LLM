@@ -12,6 +12,14 @@ Working skeleton for the English research paper. This document keeps the termino
 
 The paper should present the hypothesis as a cross-domain research claim supported by two case studies, not as a universal law already proven.
 
+Current drafting status:
+
+- drafted: `abstract_v1.md`
+- drafted: `introduction_v1.md`
+- drafted: `sequence_pattern_hypothesis_v1.md`
+- drafted: `context_pattern_duality_v1.md`
+- next: language case study
+
 ## One-Sentence Paper Claim
 
 This paper argues that some complex systems can be studied by decomposing observable content into analytical units, extracting abstract patterns from those units, and learning or using sequences of such patterns for interpretation, prediction, or discovery.
@@ -34,6 +42,10 @@ Conceptual-methodological paper with two empirical case studies:
 - weather: ODE-segment forecasting
 
 ## Abstract Skeleton
+
+Status:
+
+- drafted in [abstract_v1.md](/home/vlad/Dev/FYP_LLM/docs/paper/abstract_v1.md)
 
 ### Abstract draft shape
 
@@ -76,6 +88,10 @@ Close with scope. The paper does not claim a universal theory, but proposes a te
 ## Section Plan
 
 ## 1. Introduction
+
+Status:
+
+- drafted in [introduction_v1.md](/home/vlad/Dev/FYP_LLM/docs/paper/introduction_v1.md)
 
 ### Purpose
 
@@ -171,6 +187,10 @@ End by stating that the present paper does not claim that all systems behave thi
 
 ## 3. The Sequence Pattern Hypothesis
 
+Status:
+
+- drafted in [sequence_pattern_hypothesis_v1.md](/home/vlad/Dev/FYP_LLM/docs/paper/sequence_pattern_hypothesis_v1.md)
+
 ### Purpose
 
 Define the hypothesis cleanly and make it reusable across domains.
@@ -231,6 +251,10 @@ This subsection is useful for scientific tone. Add explicit questions such as:
 
 ## 4. Context-Pattern Duality
 
+Status:
+
+- drafted in [context_pattern_duality_v1.md](/home/vlad/Dev/FYP_LLM/docs/paper/context_pattern_duality_v1.md)
+
 ### Purpose
 
 Translate the thesis framing into article form.
@@ -248,7 +272,7 @@ Examples:
 ### 4.2 Closed Phase
 
 Definition:
-In a closed phase, internalized pattern structure supports interpretation, generation, or prediction.
+In a closed phase, already organized pattern structure supports interpretation, generation, prediction, reconstruction, and, in some cases, discovery.
 
 Examples:
 
@@ -264,6 +288,13 @@ In the open phase, content gives rise to patterns. In the closed phase, patterns
 
 Important caution:
 This is an interpretive framework for the present hypothesis, not a universal ontology of all learning systems.
+
+Important clarification:
+
+- in the drafted section, `open` and `closed` are defined relative to scientific work on the same reality
+- open system = system as it exists in nature
+- closed system = reconstructed, formalized, or generative version of that system
+- different closed versions of the same open system may coexist across observers, models, or scientific communities
 
 ### Figure plan
 
@@ -450,9 +481,16 @@ State the pattern families:
 ### 6.4 Boundary Formation
 
 Key distinction:
-boundaries arise when fit residual exceeds tolerance, rather than from syntax.
+weather boundaries do not arise from syntax or arbitrary windowing; they arise where a local channel equation ceases to hold.
 
-This should be used later in the cross-domain section.
+Important refinement already clarified during drafting:
+
+- each channel is segmented separately first
+- these channel-wise segmentations are then aligned on a shared temporal axis
+- additional boundaries may appear during alignment and joint refinement
+- the boundary of a final joint weather segment lies where at least one of the equations describing the channels within that segment stops working
+
+This stronger version should be used later in the cross-domain section.
 
 ### 6.5 Pattern Sequences and Learning
 
@@ -708,13 +746,19 @@ If a separate weather repository or report is available later, add its exact cit
 
 Possible follow-up files for this folder:
 
-- `abstract_v1.md`
-- `introduction_v1.md`
 - `related_work_notes.md`
 - `ela_case_evidence.md`
-- `weather_case_evidence.md`
+- `language_case_v1.md`
+- `weather_case_v1.md`
 - `references_seed.md`
 
 Weather-side case note created:
 
 - [weather_case_evidence.md](/home/vlad/Dev/FYP_LLM/docs/paper/weather_case_evidence.md)
+
+Drafted section files already created:
+
+- [abstract_v1.md](/home/vlad/Dev/FYP_LLM/docs/paper/abstract_v1.md)
+- [introduction_v1.md](/home/vlad/Dev/FYP_LLM/docs/paper/introduction_v1.md)
+- [sequence_pattern_hypothesis_v1.md](/home/vlad/Dev/FYP_LLM/docs/paper/sequence_pattern_hypothesis_v1.md)
+- [context_pattern_duality_v1.md](/home/vlad/Dev/FYP_LLM/docs/paper/context_pattern_duality_v1.md)
